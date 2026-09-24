@@ -40,6 +40,13 @@ class CatalogReconciler:
                 ReconciliationResult(
                     product=product,
                     listing=match.listings[0] if match.listings else None,
+                    matched_listing_count=len(match.listings),
+                    matched_listing_ids=[
+                        item.external_id
+                        for item in match.listings
+                        if item.external_id is not None
+                    ],
+                    multiple_ml_listings=len(match.listings) > 1,
                     status=status,
                     confidence=match.confidence,
                     reason=reason,
@@ -72,10 +79,10 @@ class CatalogReconciler:
                 ReconciliationStatus.REVIEW_REQUIRED,
                 "Distintos aliases del producto coinciden con publicaciones diferentes; requiere revisión.",
             )
-        if "SKU_DUPLICATE" in codes or len(matches) > 1:
+        if "SKU_DUPLICATE" in codes:
             return (
                 ReconciliationStatus.POSSIBLE_DUPLICATE,
-                "Se encontraron identificadores o publicaciones duplicadas.",
+                "El identificador está compartido por productos Ecomm distintos.",
             )
         if "SKU_MISSING" in codes or "SKU_INVALID" in codes:
             return (

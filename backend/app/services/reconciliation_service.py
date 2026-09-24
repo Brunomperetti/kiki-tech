@@ -107,6 +107,9 @@ class ReconciliationService:
             "total_products": len(products),
             "total_ecomm_associated_rows": associated_rows,
             "total_listings": len(listings),
+            "MULTIPLE_ML_LISTINGS": sum(
+                result.multiple_ml_listings for result in results if result.product
+            ),
             **{
                 key: counts.get(key, 0)
                 for key in [

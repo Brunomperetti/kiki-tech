@@ -116,6 +116,9 @@ class CatalogMatcher:
                 id(listing): listing for group in evidence.values() for listing in group
             }.values()
         )
+        evidence_listing_sets = {
+            frozenset(id(listing) for listing in group) for group in evidence.values()
+        }
         return MatchResult(
             listings=listings,
             method=method,
@@ -123,7 +126,7 @@ class CatalogMatcher:
             matched_identifier=", ".join(evidence),
             # Different aliases pointing to different listings are conflicting
             # evidence. Repeated listings for one identifier remain duplicates.
-            alias_ambiguity=len(evidence) > 1 and len(listings) > 1,
+            alias_ambiguity=len(evidence_listing_sets) > 1,
         )
 
     def match(self, product: Product) -> MatchResult:

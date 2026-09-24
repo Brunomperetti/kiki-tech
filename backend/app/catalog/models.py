@@ -103,6 +103,9 @@ class ValidationIssue(BaseModel):
 class ReconciliationResult(BaseModel):
     product: Product | None = None
     listing: ChannelListing | None = None
+    matched_listing_count: int = 0
+    matched_listing_ids: list[str] = Field(default_factory=list)
+    multiple_ml_listings: bool = False
     status: ReconciliationStatus
     confidence: float = 0
     reason: str

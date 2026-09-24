@@ -27,6 +27,9 @@ def test_match_by_sku():
         ReconciliationStatus.ALREADY_PUBLISHED,
         MatchMethod.SKU,
     )
+    assert r.matched_listing_count == 1
+    assert r.matched_listing_ids == ["ML1"]
+    assert r.multiple_ml_listings is False
 
 
 def test_match_by_ean():
@@ -61,16 +64,30 @@ def test_text_match_still_works_with_large_listing_set():
     assert r.match_method == MatchMethod.TITLE
 
 
-def test_multiple_sku_matches_are_duplicate():
+def test_multiple_sku_matches_are_already_published():
     listings = [ChannelListing(external_id=str(i), sku="A1") for i in range(2)]
-    assert (
-        CatalogReconciler().reconcile([product()], listings)[0].status
-        == ReconciliationStatus.POSSIBLE_DUPLICATE
-    )
+    result = CatalogReconciler().reconcile([product()], listings)[0]
+    assert result.status == ReconciliationStatus.ALREADY_PUBLISHED
+    assert result.matched_listing_count == 2
+    assert result.matched_listing_ids == ["0", "1"]
+    assert result.multiple_ml_listings is True
+
+
+def test_active_and_paused_sku_matches_are_already_published():
+    listings = [
+        ChannelListing(external_id="ML1", sku="A1", status="active"),
+        ChannelListing(external_id="ML2", sku="A1", status="paused"),
+    ]
+    result = CatalogReconciler().reconcile([product()], listings)[0]
+    assert result.status == ReconciliationStatus.ALREADY_PUBLISHED
+    assert result.multiple_ml_listings is True
+    assert result.listing == listings[0]
 
 
 def test_duplicate_product_sku():
-    results = CatalogReconciler().reconcile([product(), product()], [])
+    results = CatalogReconciler().reconcile(
+        [product(ecomm_id="1"), product(ecomm_id="2")], []
+    )
     assert all(x.status == ReconciliationStatus.POSSIBLE_DUPLICATE for x in results)
 
 
@@ -105,3 +122,10 @@ def test_different_aliases_matching_different_listings_require_review():
     result = CatalogReconciler().reconcile([product_with_alias], listings)[0]
     assert result.status == ReconciliationStatus.REVIEW_REQUIRED
     assert "aliases" in result.reason
+
+
+def test_aliases_matching_same_listings_are_not_ambiguous():
+    product_with_alias = product(sku_aliases=["A1", "OLD-A1"])
+    listing = ChannelListing(external_id="ML1", sku="A1")
+    matcher_result = CatalogReconciler().reconcile([product_with_alias], [listing])[0]
+    assert matcher_result.status == ReconciliationStatus.ALREADY_PUBLISHED

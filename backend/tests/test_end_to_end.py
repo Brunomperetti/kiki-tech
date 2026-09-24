@@ -37,6 +37,15 @@ def test_real_exports_import_normalize_reconcile_and_generate_metrics():
     ]
     ml = [
         {
+            "Título de la publicación": "Café rojo pausado",
+            "Nro. de la publicación": "MLA3",
+            "SKU": "001",
+            "SKU de la Variante": "001-R",
+            "Status": "paused",
+            "Precio": 100,
+            "Publicacion Vinculada con Inventario": "Sí",
+        },
+        {
             "Título de la publicación": "Café rojo",
             "Nro. de la publicación": "MLA1",
             "SKU": "001",
@@ -68,11 +77,12 @@ def test_real_exports_import_normalize_reconcile_and_generate_metrics():
         assert ecomm_job.diagnostics["grouped_rows"] == 2
         assert ecomm_job.diagnostics["associated_rows"] == 3
         assert any("SKU 002" in item for item in ecomm_job.diagnostics["conflicts"])
-        assert ml_job.diagnostics["rows_accepted"] == 2
+        assert ml_job.diagnostics["rows_accepted"] == 3
         assert run.summary["total_ecomm_rows"] == 5
-        assert run.summary["total_products"] == 3 and run.summary["total_listings"] == 2
+        assert run.summary["total_products"] == 3 and run.summary["total_listings"] == 3
         assert (
             run.summary["ALREADY_PUBLISHED"] == 1
             and run.summary["POSSIBLE_DUPLICATE"] == 2
             and run.summary["UNMATCHED_ML_LISTING"] == 1
+            and run.summary["MULTIPLE_ML_LISTINGS"] == 1
         )
