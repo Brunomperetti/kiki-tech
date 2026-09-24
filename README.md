@@ -90,14 +90,18 @@ La importación conserva primero cada fila como una asociación de canal (`Ecomm
 
 La clave de agrupación se elige de forma conservadora, en este orden:
 
-1. ID interno + SKU de variante.
-2. ID interno + SKU de producto cuando no existe variante.
-3. ID interno solo, únicamente cuando no existe ningún SKU.
-4. Sin ID interno, SKU de variante o SKU de producto en namespaces separados; EAN es el último fallback.
+1. **ID interno**, por sí solo, cuando existe. Todas las filas con ese ID forman un único producto canónico aunque hayan cambiado SKU, canal, publicación o precio.
+2. Sin ID interno, SKU de variante.
+3. Sin ID interno ni SKU de variante, SKU de producto.
+4. EAN como último fallback.
 
-Nunca se agrupa por nombre. Dos IDs internos diferentes permanecen como productos canónicos diferentes; si comparten un SKU que debería ser único, la validación los marca como duplicados reales. Al agrupar, se conserva la primera ocurrencia no vacía de cada campo canónico y se exponen todas las diferencias como conflictos, sin eliminar las filas originales.
+Nunca se agrupa por nombre. Todos los SKU y EAN observados bajo un ID se conservan en `sku_aliases` y `ean_aliases`; los cambios se exponen como conflictos, pero no crean productos artificiales ni duplicados por sí solos. Dos IDs internos diferentes permanecen como productos canónicos diferentes; si comparten un alias que debería ser único, la validación los marca como duplicados reales. Al agrupar, se conserva la primera ocurrencia no vacía de cada campo canónico y se exponen todas las diferencias sin eliminar las filas originales.
+
+El matching prueba primero cualquiera de los SKU del producto, después cualquiera de sus EAN y finalmente el título, que siempre requiere revisión. Un único alias exacto implica evidencia de publicación; si aliases distintos apuntan a publicaciones diferentes, el resultado es `REVIEW_REQUIRED` en vez de inventar otro producto o elegir una publicación arbitrariamente.
 
 El precio canónico es exclusivamente `Precio Lista`, porque representa el valor del producto. `Precio Marketplace` pertenece a cada canal y permanece en la fila asociada; nunca se promueve implícitamente a precio canónico. Ambos precios y el costo se conservan. El dashboard separa filas Ecomm importadas, productos únicos, filas asociadas, publicaciones ML y resultados de conciliación, y el diagnóstico informa productos creados, filas agrupadas y conflictos calculados.
+
+Un modelo explícito `Product → ProductVariant` queda como decisión arquitectónica futura para el publicador. No se implementa en este MVP: esta etapa solamente reconcilia de forma read-only el catálogo existente y no incorpora API, OAuth ni publicación en Mercado Libre.
 
 ## Estados
 
@@ -118,6 +122,8 @@ cd frontend && npm run build
 ```
 
 La suite cubre normalización de SKU/EAN, matching exacto, no-match, revisión textual, duplicados, datos incompletos, archivos inválidos y aliases alternativos.
+
+Cada pull request ejecuta GitHub Actions en dos jobs independientes: backend con Python 3.12 (`pip install`, `ruff` y `pytest`) y frontend con Node.js 22 LTS (`npm ci` y build). Las dependencias frontend usan versiones exactas y `package-lock.json`; cualquier actualización debe regenerar y confirmar el lockfile para mantener instalaciones reproducibles.
 
 ## Docker y Render
 

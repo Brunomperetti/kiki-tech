@@ -18,9 +18,6 @@ class EcommCanonicalizer:
     """Collapse channel rows into products without using mutable display data."""
 
     canonical_fields = (
-        "sku_product",
-        "sku_variant",
-        "ean",
         "name",
         "brand",
         "list_price",
@@ -52,10 +49,6 @@ class EcommCanonicalizer:
 
     @staticmethod
     def _key(row: EcommChannelRow) -> tuple[str, ...]:
-        if row.ecomm_id and row.sku_variant:
-            return ("id_variant", row.ecomm_id, row.sku_variant)
-        if row.ecomm_id and row.sku_product:
-            return ("id_product", row.ecomm_id, row.sku_product)
         if row.ecomm_id:
             return ("id", row.ecomm_id)
         # Rows reaching this point have at least one accepted identifier. Keeping
@@ -87,9 +80,16 @@ class EcommCanonicalizer:
                 )
 
         first = rows[0]
-        sku_variant = selected["sku_variant"]
-        sku_product = selected["sku_product"]
+        sku_products = self._distinct(row.sku_product for row in rows)
+        sku_variants = self._distinct(row.sku_variant for row in rows)
+        eans = self._distinct(row.ean for row in rows)
+        sku_product = sku_products[0] if sku_products else None
+        sku_variant = sku_variants[0] if sku_variants else None
         sku_effective = sku_variant or sku_product
+        sku_aliases = self._distinct([*sku_variants, *sku_products])
+        self._alias_conflict(key, "SKU de variante", sku_variants, conflicts)
+        self._alias_conflict(key, "SKU de producto", sku_products, conflicts)
+        self._alias_conflict(key, "EAN", eans, conflicts)
         return Product(
             ecomm_id=first.ecomm_id,
             sku=sku_effective,
@@ -101,7 +101,9 @@ class EcommCanonicalizer:
             else "sku_product"
             if sku_product
             else None,
-            ean=selected["ean"],
+            sku_aliases=sku_aliases,
+            ean=eans[0] if eans else None,
+            ean_aliases=eans,
             name=selected["name"],
             brand=selected["brand"],
             # List price is product-level. Marketplace prices remain only on rows.
@@ -118,15 +120,31 @@ class EcommCanonicalizer:
 
     @staticmethod
     def _identifier_conflicts(products: list[Product], conflicts: list[str]) -> None:
-        for field_name in ("sku", "ean"):
+        for field_name, aliases_name in (
+            ("SKU", "sku_aliases"),
+            ("EAN", "ean_aliases"),
+        ):
             owners: dict[str, list[str]] = defaultdict(list)
             for product in products:
-                value = getattr(product, field_name)
-                if value:
+                for value in getattr(product, aliases_name):
                     owners[value].append(product.ecomm_id or "sin ID interno")
             for value, ecomm_ids in owners.items():
                 if len(ecomm_ids) > 1:
                     conflicts.append(
-                        f"{field_name.upper()} {value}: compartido por productos "
+                        f"{field_name} {value}: compartido por productos "
                         f"canónicos distintos ({', '.join(ecomm_ids)})."
                     )
+
+    @staticmethod
+    def _distinct(values) -> list[str]:
+        return list(dict.fromkeys(value for value in values if value))
+
+    @classmethod
+    def _alias_conflict(
+        cls, key: Hashable, label: str, aliases: list[str], conflicts: list[str]
+    ) -> None:
+        if len(aliases) > 1:
+            conflicts.append(
+                f"{cls._key_label(key)}: múltiples {label} asociados "
+                f"({', '.join(aliases)})."
+            )

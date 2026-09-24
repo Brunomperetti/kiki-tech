@@ -44,6 +44,23 @@ def test_channel_rows_of_same_product_become_one_canonical_product():
     assert result.status == ReconciliationStatus.CANDIDATE_TO_PUBLISH
 
 
+def test_same_internal_id_with_different_variant_skus_stays_one_product():
+    canonical = EcommCanonicalizer().canonicalize(
+        [
+            row(sku_variant="6228", sku_effective="6228", marketplace="ML"),
+            row(sku_variant="6124", sku_effective="6124", marketplace="Web"),
+        ]
+    )
+
+    assert len(canonical.products) == 1
+    assert canonical.products[0].sku_aliases == ["6228", "6124", "001"]
+    assert any(
+        "múltiples SKU de variante" in conflict for conflict in canonical.conflicts
+    )
+    result = CatalogReconciler().reconcile(canonical.products, [])[0]
+    assert result.status != ReconciliationStatus.POSSIBLE_DUPLICATE
+
+
 def test_different_internal_ids_with_same_sku_are_real_duplicates():
     canonical = EcommCanonicalizer().canonicalize(
         [row(ecomm_id="10"), row(ecomm_id="20")]

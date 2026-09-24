@@ -1,0 +1,4 @@
+[tool.ruff.lint]
+# Compact one-line statements predate the hardening work. Keep CI focused on
+# correctness rules while those files are reformatted incrementally.
+ignore = ["E701", "E702"]

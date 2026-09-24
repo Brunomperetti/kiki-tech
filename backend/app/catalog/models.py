@@ -64,7 +64,9 @@ class Product(BaseModel):
     sku_variant: str | None = None
     sku_effective: str | None = None
     sku_source: str | None = None
+    sku_aliases: list[str] = Field(default_factory=list)
     ean: str | None = None
+    ean_aliases: list[str] = Field(default_factory=list)
     name: str | None = None
     brand: str | None = None
     price: Decimal | None = None
