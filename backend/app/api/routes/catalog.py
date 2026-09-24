@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from ...catalog.models import ReconciliationStatus
 from ...core.config import get_settings
@@ -17,7 +17,7 @@ async def import_catalog(source: str, file: UploadFile=File(...), db: Session=De
     if len(content)>get_settings().max_upload_mb*1024*1024: raise HTTPException(413,"El archivo supera el tamaño máximo permitido.")
     try:
         job=ReconciliationService(db).import_file(source,file.filename,content)
-        return {"id":job.id,"records":job.records,"unknown_columns":job.unknown_columns,"status":job.status}
+        return {"id":job.id,"records":job.records,"unknown_columns":job.diagnostics.get("ignored_columns",[]),"diagnostics":job.diagnostics,"status":job.status}
     except ExcelImportError as exc: raise HTTPException(422,str(exc)) from exc
     except Exception as exc:
         logger.exception("import_failed source=%s",source); raise HTTPException(500,"No se pudo procesar el archivo.") from exc
@@ -27,7 +27,10 @@ def analyze(db: Session=Depends(get_db)):
     except Exception as exc: logger.exception("reconciliation_failed"); raise HTTPException(500,"No se pudo analizar el catálogo.") from exc
 @router.get("/dashboard")
 def dashboard(db: Session=Depends(get_db)):
-    run=CatalogRepository(db).latest_run(); return run.summary if run else {"total_products":0,"total_listings":0}
+    repo=CatalogRepository(db); run=repo.latest_run()
+    summary=dict(run.summary) if run else {"total_products":0,"total_listings":0}
+    summary["import_diagnostics"]=[{"source":job.source,"filename":job.filename,**(job.diagnostics or {})} for job in repo.latest_jobs_by_source()]
+    return summary
 @router.get("/products")
 def products(status: ReconciliationStatus|None=None, search: str="", review_only: bool=False, db: Session=Depends(get_db)):
     run=CatalogRepository(db).latest_run(); items=run.results if run else []
@@ -39,4 +42,10 @@ def products(status: ReconciliationStatus|None=None, search: str="", review_only
     return items
 @router.get("/imports")
 def imports(db: Session=Depends(get_db)):
-    return CatalogRepository(db).jobs()
+    return [{
+        "id": job.id, "filename": job.filename, "source": job.source,
+        "started_at": job.started_at, "records": job.records,
+        "processed": job.processed, "errors": job.errors, "status": job.status,
+        "unknown_columns": job.diagnostics.get("ignored_columns", []),
+        "diagnostics": job.diagnostics,
+    } for job in CatalogRepository(db).jobs()]
