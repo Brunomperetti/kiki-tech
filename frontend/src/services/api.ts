@@ -1,0 +1,4 @@
+import type {ImportJob,Result,Summary} from '../types/catalog';
+const base=import.meta.env.VITE_API_URL||'http://localhost:8000';
+async function request<T>(path:string,options?:RequestInit):Promise<T>{const response=await fetch(`${base}${path}`,options);if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.detail||'No pudimos completar la operación.');}return response.json()}
+export const api={dashboard:()=>request<Summary>('/api/dashboard'),products:(query='')=>request<Result[]>(`/api/products${query}`),imports:()=>request<ImportJob[]>('/api/imports'),analyze:()=>request<unknown>('/api/reconciliations',{method:'POST'}),upload:(source:string,file:File)=>{const data=new FormData();data.append('file',file);return request(`/api/imports/${source}`,{method:'POST',body:data})}};

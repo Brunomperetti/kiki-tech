@@ -1,0 +1,2 @@
+import {NavLink,Outlet} from 'react-router-dom';
+export function Layout(){return <div className="shell"><aside><div className="brand"><span>K</span><div>KIKI Tech<small>Catalog Reconciler</small></div></div><nav><NavLink to="/">Resumen</NavLink><NavLink to="/products">Productos</NavLink><NavLink to="/review">Revisión</NavLink><NavLink to="/imports">Importaciones</NavLink></nav><div className="readonly">● Modo lectura<br/><small>Sin cambios externos</small></div></aside><main><Outlet/></main></div>}
