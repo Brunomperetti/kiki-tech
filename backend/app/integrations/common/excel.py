@@ -1,9 +1,12 @@
+import logging
 from dataclasses import dataclass, field
 from io import BytesIO
 
 import pandas as pd
 
 from ...catalog.normalizer import normalize_title
+
+logger = logging.getLogger(__name__)
 
 
 class ExcelImportError(ValueError):
@@ -62,6 +65,12 @@ class ExcelImporter:
                 BytesIO(content), header=None, dtype=object, engine="openpyxl"
             )
         except Exception as exc:
+            logger.exception(
+                "xlsx_read_failed source=%s size_bytes=%d error_type=%s",
+                self.source_label,
+                len(content),
+                type(exc).__name__,
+            )
             raise ExcelImportError(
                 f"No se pudo leer el archivo {self.source_label}. Verificá que sea un XLSX válido."
             ) from exc
