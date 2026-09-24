@@ -50,6 +50,17 @@ def test_text_match_requires_review():
     assert r.status == ReconciliationStatus.REVIEW_REQUIRED
 
 
+def test_text_match_still_works_with_large_listing_set():
+    listings = [
+        ChannelListing(external_id=f"NOISE-{i}", title=f"Producto distinto {i}")
+        for i in range(1000)
+    ]
+    listings.append(ChannelListing(external_id="ML1", title="Cafe premium 500g"))
+    r = CatalogReconciler().reconcile([product()], listings)[0]
+    assert r.status == ReconciliationStatus.REVIEW_REQUIRED
+    assert r.match_method == MatchMethod.TITLE
+
+
 def test_multiple_sku_matches_are_duplicate():
     listings = [ChannelListing(external_id=str(i), sku="A1") for i in range(2)]
     assert (
