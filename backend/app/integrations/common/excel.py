@@ -1,6 +1,8 @@
 import logging
+import re
 from dataclasses import dataclass, field
 from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
 
@@ -8,9 +10,42 @@ from ...catalog.normalizer import normalize_title
 
 logger = logging.getLogger(__name__)
 
+_HYPERLINK_ADDRESS_RE = re.compile(
+    rb'(<hyperlink\b[^>]*?)\saddress="[^"]*"([^>]*>)'
+)
+
 
 class ExcelImportError(ValueError):
     pass
+
+
+def _strip_unsupported_hyperlink_address(content: bytes) -> tuple[bytes, int]:
+    """Remove only the non-standard hyperlink `address` attribute in-memory.
+
+    Some Ecomm-App XLSX exports include both the normal relationship id and an
+    extra `address` attribute on worksheet hyperlink nodes. openpyxl rejects
+    that attribute before pandas can read the sheet. The relationship and all
+    cell/product data remain untouched; only the redundant unsupported
+    attribute is removed from the temporary in-memory copy used for reading.
+    """
+    output = BytesIO()
+    removed = 0
+
+    with ZipFile(BytesIO(content), "r") as source, ZipFile(
+        output, "w", compression=ZIP_DEFLATED
+    ) as target:
+        for info in source.infolist():
+            data = source.read(info.filename)
+            if info.filename.startswith("xl/worksheets/") and info.filename.endswith(
+                ".xml"
+            ):
+                data, count = _HYPERLINK_ADDRESS_RE.subn(
+                    lambda match: match.group(1) + match.group(2), data
+                )
+                removed += count
+            target.writestr(info, data)
+
+    return output.getvalue(), removed
 
 
 @dataclass
@@ -59,11 +94,58 @@ class ExcelImporter:
         _, index, mapping = max(candidates, key=lambda item: (item[0], -item[1]))
         return index, mapping
 
+    @staticmethod
+    def _read_frame(content: bytes) -> pd.DataFrame:
+        return pd.read_excel(
+            BytesIO(content), header=None, dtype=object, engine="openpyxl"
+        )
+
     def read(self, content: bytes) -> ImportReport:
+        compatibility_warning = None
         try:
-            raw = pd.read_excel(
-                BytesIO(content), header=None, dtype=object, engine="openpyxl"
-            )
+            raw = self._read_frame(content)
+        except TypeError as exc:
+            error_text = str(exc)
+            if "Hyperlink.__init__()" in error_text and "address" in error_text:
+                try:
+                    sanitized_content, removed = _strip_unsupported_hyperlink_address(
+                        content
+                    )
+                    if removed == 0:
+                        raise exc
+                    raw = self._read_frame(sanitized_content)
+                    compatibility_warning = (
+                        "Se aplicó compatibilidad de lectura a metadatos de hipervínculos "
+                        f"del XLSX ({removed} atributos no estándar ignorados)."
+                    )
+                    logger.warning(
+                        "xlsx_hyperlink_compatibility_applied source=%s removed=%d",
+                        self.source_label,
+                        removed,
+                    )
+                except Exception as retry_exc:
+                    logger.exception(
+                        "xlsx_read_failed_after_hyperlink_cleanup source=%s "
+                        "size_bytes=%d error_type=%s",
+                        self.source_label,
+                        len(content),
+                        type(retry_exc).__name__,
+                    )
+                    raise ExcelImportError(
+                        f"No se pudo leer el archivo {self.source_label}. "
+                        "Verificá que sea un XLSX válido."
+                    ) from retry_exc
+            else:
+                logger.exception(
+                    "xlsx_read_failed source=%s size_bytes=%d error_type=%s",
+                    self.source_label,
+                    len(content),
+                    type(exc).__name__,
+                )
+                raise ExcelImportError(
+                    f"No se pudo leer el archivo {self.source_label}. "
+                    "Verificá que sea un XLSX válido."
+                ) from exc
         except Exception as exc:
             logger.exception(
                 "xlsx_read_failed source=%s size_bytes=%d error_type=%s",
@@ -96,6 +178,8 @@ class ExcelImporter:
             else:
                 discarded += 1
         warnings = []
+        if compatibility_warning:
+            warnings.append(compatibility_warning)
         if unknown:
             warnings.append(f"Se ignoraron {len(unknown)} columnas no reconocidas.")
         if discarded:
