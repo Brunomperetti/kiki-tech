@@ -1,5 +1,5 @@
 from ..common.excel import ExcelImporter
-from ...catalog.models import Product
+from ...catalog.models import EcommChannelRow
 from ...catalog.normalizer import normalize_decimal, normalize_ean, normalize_sku
 
 
@@ -25,11 +25,21 @@ class EcommExcelImporter(ExcelImporter):
             "Descripción del producto",
         },
         "brand": {"Marca", "Brand"},
-        # Marketplace is the actual selling price; list price is a fallback only.
+        # Both prices are row data; canonicalization decides their product meaning.
         "price_marketplace": {"Precio Marketplace", "Precio", "Precio venta"},
         "price_list": {"Precio Lista", "Precio de lista"},
         "cost": {"Costo", "Cost", "Costo del producto"},
         "stock": {"Stock", "Inventario", "Cantidad", "General"},
+        "marketplace": {"MarketPlace", "Marketplace"},
+        "marketplace_id": {"Id MarketPlace", "ID Marketplace"},
+        "store": {"Tienda"},
+        "listing_id": {"Nro. de la publicación", "Nro. de publicacion"},
+        "listing_title": {"Título de la publicación", "Titulo de la publicacion"},
+        "listing_status": {"Estado", "Status"},
+        "inventory_linked": {
+            "Publicacion Vinculada con Inventario",
+            "Publicación Vinculada con Inventario",
+        },
     }
 
     def to_model(self, row, mapping):
@@ -46,9 +56,7 @@ class EcommExcelImporter(ExcelImporter):
         sku_product = normalize_sku(get("sku_product"))
         sku_variant = normalize_sku(get("sku_variant"))
         sku_effective = sku_variant or sku_product
-        marketplace_price = normalize_decimal(get("price_marketplace"))
-        list_price = normalize_decimal(get("price_list"))
-        return Product(
+        return EcommChannelRow(
             ecomm_id=normalize_sku(get("ecomm_id")),
             sku=sku_effective,
             sku_product=sku_product,
@@ -62,9 +70,17 @@ class EcommExcelImporter(ExcelImporter):
             ean=normalize_ean(get("ean")),
             name=clean(get("name")),
             brand=clean(get("brand")),
-            price=marketplace_price if marketplace_price is not None else list_price,
+            marketplace=clean(get("marketplace")),
+            marketplace_id=normalize_sku(get("marketplace_id")),
+            store=clean(get("store")),
+            listing_id=normalize_sku(get("listing_id")),
+            listing_title=clean(get("listing_title")),
+            listing_status=clean(get("listing_status")),
+            marketplace_price=normalize_decimal(get("price_marketplace")),
+            list_price=normalize_decimal(get("price_list")),
             cost=normalize_decimal(get("cost")),
             stock=normalize_decimal(get("stock")),
+            inventory_linked=clean(get("inventory_linked")),
         )
 
     def report_warnings(self, records):

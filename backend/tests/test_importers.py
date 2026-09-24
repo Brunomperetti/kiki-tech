@@ -77,7 +77,10 @@ def test_real_ecomm_headers_are_detected_after_information_row():
         and report.records[1].sku_source == "sku_product"
     )
     assert report.records[1].ean == "0779123456789"
-    assert report.records[0].price == 120 and report.records[1].price == 90
+    assert report.records[0].marketplace_price == 120
+    assert report.records[0].list_price == 150
+    assert report.records[1].marketplace_price is None
+    assert report.records[1].list_price == 90
 
 
 def test_real_mercadolibre_aliases_and_inventory_link():

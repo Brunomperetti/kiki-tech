@@ -18,17 +18,22 @@ def test_real_exports_import_normalize_reconcile_and_generate_metrics():
     ecomm = [
         ["No Modificar", "Obligatorio", None, None, None, None, None],
         [
+            "ID interno (no cambiar)",
             "Descripción del producto",
             "SKU del Producto",
             "SKU de la variante",
             "Código de barra",
             "Precio Marketplace",
+            "Precio Lista",
             "Marca",
             "General",
+            "MarketPlace",
         ],
-        ["Café rojo", "001", "001-R", None, 100, "KIKI", 2],
-        ["Té", "002", None, "0779123456789", 80, "KIKI", 3],
-        ["Té duplicado", "002", None, None, 85, "KIKI", 1],
+        ["10", "Café rojo", "001", "001-R", None, 100, 110, "KIKI", 2, "Mercado Libre"],
+        ["10", "Café rojo", "001", "001-R", None, 105, 110, "KIKI", 2, "Web"],
+        ["10", "Café rojo", "001", "001-R", None, 108, 110, "KIKI", 2, "Tienda Nube"],
+        ["20", "Té", "002", None, "0779123456789", 80, 90, "KIKI", 3, None],
+        ["30", "Té duplicado", "002", None, None, 85, 95, "KIKI", 1, None],
     ]
     ml = [
         {
@@ -57,9 +62,14 @@ def test_real_exports_import_normalize_reconcile_and_generate_metrics():
         run = service.analyze()
         assert (
             ecomm_job.diagnostics["header_row"] == 2
-            and ecomm_job.diagnostics["rows_accepted"] == 3
+            and ecomm_job.diagnostics["rows_accepted"] == 5
         )
+        assert ecomm_job.diagnostics["canonical_products"] == 3
+        assert ecomm_job.diagnostics["grouped_rows"] == 2
+        assert ecomm_job.diagnostics["associated_rows"] == 3
+        assert any("SKU 002" in item for item in ecomm_job.diagnostics["conflicts"])
         assert ml_job.diagnostics["rows_accepted"] == 2
+        assert run.summary["total_ecomm_rows"] == 5
         assert run.summary["total_products"] == 3 and run.summary["total_listings"] == 2
         assert (
             run.summary["ALREADY_PUBLISHED"] == 1

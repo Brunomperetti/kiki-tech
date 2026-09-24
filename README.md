@@ -82,7 +82,22 @@ API: `http://localhost:8000`; documentación OpenAPI: `/docs`; frontend: `http:/
 
 La fila de encabezados se detecta por la mejor combinación de aliases conocidos, sin depender de una posición: funcionan tanto planillas simples como exportaciones con filas informativas. Ecomm-App requiere al menos SKU de producto, SKU de variante o EAN; Mercado Libre acepta además número de publicación. Los códigos se leen como identificadores string. Para preservar ceros iniciales, el archivo fuente debe almacenarlos como texto: Excel no permite recuperar ceros que ya eliminó antes de exportar.
 
-Cuando existen ambos SKU, el **SKU de variante** representa el artículo concreto y se usa como `sku_effective`; si está vacío, se usa el **SKU de producto**. Se conservan ambos valores y `sku_source` registra la decisión por fila. Para precios Ecomm-App se prioriza `Precio Marketplace` y se usa `Precio Lista` solamente como fallback. El dashboard muestra filas leídas, aceptadas y descartadas, fila de encabezado, columnas reconocidas/ignoradas y advertencias de cada última importación.
+Cuando existen ambos SKU, el **SKU de variante** representa el artículo concreto y se usa como `sku_effective`; si está vacío, se usa el **SKU de producto**. Se conservan ambos valores y `sku_source` registra la decisión por fila. El dashboard muestra filas leídas, aceptadas y descartadas, fila de encabezado, columnas reconocidas/ignoradas y advertencias de cada última importación.
+
+### Canonicalización de Ecomm-App
+
+La importación conserva primero cada fila como una asociación de canal (`EcommChannelRow`) y genera después los productos canónicos contra los que se ejecuta la conciliación. Una fila de canal conserva marketplace, tienda, publicación, estado, `marketplace_price`, `list_price`, costo, stock y ambos SKU; por eso varias publicaciones del mismo artículo no se consideran automáticamente productos duplicados.
+
+La clave de agrupación se elige de forma conservadora, en este orden:
+
+1. ID interno + SKU de variante.
+2. ID interno + SKU de producto cuando no existe variante.
+3. ID interno solo, únicamente cuando no existe ningún SKU.
+4. Sin ID interno, SKU de variante o SKU de producto en namespaces separados; EAN es el último fallback.
+
+Nunca se agrupa por nombre. Dos IDs internos diferentes permanecen como productos canónicos diferentes; si comparten un SKU que debería ser único, la validación los marca como duplicados reales. Al agrupar, se conserva la primera ocurrencia no vacía de cada campo canónico y se exponen todas las diferencias como conflictos, sin eliminar las filas originales.
+
+El precio canónico es exclusivamente `Precio Lista`, porque representa el valor del producto. `Precio Marketplace` pertenece a cada canal y permanece en la fila asociada; nunca se promueve implícitamente a precio canónico. Ambos precios y el costo se conservan. El dashboard separa filas Ecomm importadas, productos únicos, filas asociadas, publicaciones ML y resultados de conciliación, y el diagnóstico informa productos creados, filas agrupadas y conflictos calculados.
 
 ## Estados
 
