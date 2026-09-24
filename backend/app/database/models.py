@@ -13,7 +13,14 @@ class ImportJobRecord(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     source: Mapped[str] = mapped_column(String(30)); filename: Mapped[str] = mapped_column(String(255))
     records: Mapped[int] = mapped_column(Integer, default=0); processed: Mapped[int] = mapped_column(Integer, default=0); errors: Mapped[int] = mapped_column(Integer, default=0)
-    status: Mapped[str] = mapped_column(String(30)); unknown_columns: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(30)); unknown_columns: Mapped[list | dict] = mapped_column(JSON, default=list)
+    @property
+    def diagnostics(self) -> dict:
+        # Diagnostics live in the existing JSON audit column so this hardening
+        # remains deployable without a destructive schema change.
+        return self.unknown_columns if isinstance(self.unknown_columns, dict) else {
+            "ignored_columns": self.unknown_columns or [], "warnings": []
+        }
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)); finished_at: Mapped[datetime|None] = mapped_column(DateTime(timezone=True), nullable=True)
 class ReconciliationRun(Base):
     __tablename__="reconciliation_runs"

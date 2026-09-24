@@ -80,7 +80,9 @@ API: `http://localhost:8000`; documentación OpenAPI: `/docs`; frontend: `http:/
 4. Volver al Dashboard y pulsar **Analizar catálogo**.
 5. Consultar Productos con búsqueda/filtros y los casos accionables en Revisión.
 
-Las columnas se detectan por encabezado y aliases, nunca por posición. Ecomm-App requiere al menos SKU o EAN; Mercado Libre requiere ID, SKU o EAN. Los códigos se leen como identificadores string. Para preservar ceros iniciales, el archivo fuente debe almacenarlos como texto: Excel no permite recuperar ceros que ya eliminó antes de exportar.
+La fila de encabezados se detecta por la mejor combinación de aliases conocidos, sin depender de una posición: funcionan tanto planillas simples como exportaciones con filas informativas. Ecomm-App requiere al menos SKU de producto, SKU de variante o EAN; Mercado Libre acepta además número de publicación. Los códigos se leen como identificadores string. Para preservar ceros iniciales, el archivo fuente debe almacenarlos como texto: Excel no permite recuperar ceros que ya eliminó antes de exportar.
+
+Cuando existen ambos SKU, el **SKU de variante** representa el artículo concreto y se usa como `sku_effective`; si está vacío, se usa el **SKU de producto**. Se conservan ambos valores y `sku_source` registra la decisión por fila. Para precios Ecomm-App se prioriza `Precio Marketplace` y se usa `Precio Lista` solamente como fallback. El dashboard muestra filas leídas, aceptadas y descartadas, fila de encabezado, columnas reconocidas/ignoradas y advertencias de cada última importación.
 
 ## Estados
 

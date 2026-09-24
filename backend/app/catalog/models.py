@@ -30,6 +30,10 @@ class Severity(StrEnum):
 class Product(BaseModel):
     ecomm_id: str | None = None
     sku: str | None = None
+    sku_product: str | None = None
+    sku_variant: str | None = None
+    sku_effective: str | None = None
+    sku_source: str | None = None
     ean: str | None = None
     name: str | None = None
     brand: str | None = None
@@ -42,11 +46,16 @@ class ChannelListing(BaseModel):
     channel: Channel = Channel.MERCADOLIBRE
     external_id: str | None = None
     sku: str | None = None
+    sku_product: str | None = None
+    variant_sku: str | None = None
+    sku_effective: str | None = None
+    sku_source: str | None = None
     ean: str | None = None
     title: str | None = None
     status: str | None = None
     price: Decimal | None = None
     url: str | None = None
+    inventory_linked: str | None = None
 
 class ValidationIssue(BaseModel):
     field: str

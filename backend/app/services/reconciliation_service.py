@@ -16,7 +16,8 @@ class ReconciliationService:
         logger.info("import_started source=%s filename=%s", source, filename)
         report=importer.read(content); payload=[x.model_dump(mode="json") for x in report.records]
         self.repo.save_snapshot(source,payload)
-        job=self.repo.add_job(ImportJobRecord(source=source,filename=filename,records=len(payload),processed=len(payload),errors=0,status="COMPLETED",unknown_columns=report.unknown_columns,finished_at=datetime.now(timezone.utc)))
+        diagnostics={"rows_read":report.rows_read,"rows_accepted":report.rows_accepted,"rows_discarded":report.rows_discarded,"header_row":report.header_row,"recognized_columns":report.mapped_columns,"ignored_columns":report.unknown_columns,"warnings":report.warnings}
+        job=self.repo.add_job(ImportJobRecord(source=source,filename=filename,records=report.rows_read,processed=report.rows_accepted,errors=report.rows_discarded,status="COMPLETED",unknown_columns=diagnostics,finished_at=datetime.now(timezone.utc)))
         logger.info("import_finished source=%s records=%d warnings=%d",source,len(payload),len(report.unknown_columns)); return job
     def analyze(self):
         products=[Product.model_validate(x) for x in self.repo.snapshot("ECOMM_APP")]; listings=[ChannelListing.model_validate(x) for x in self.repo.snapshot("MERCADOLIBRE")]
