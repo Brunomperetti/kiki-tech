@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class Channel(StrEnum):
     MERCADOLIBRE = "MERCADOLIBRE"
+    MERCADOLIBRE_API = "MERCADOLIBRE_API"
 
 
 class ReconciliationStatus(StrEnum):

@@ -1,12 +1,13 @@
 import logging
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
 from ..catalog.canonicalizer import EcommCanonicalizer
 from ..catalog.models import ChannelListing, EcommChannelRow, Product
 from ..catalog.reconciler import CatalogReconciler
+from ..core.config import get_settings
 from ..database.models import ImportJobRecord, ReconciliationRun
 from ..integrations.ecomm_app.excel_importer import EcommExcelImporter
 from ..integrations.mercadolibre.excel_importer import MercadoLibreExcelImporter
@@ -78,7 +79,7 @@ class ReconciliationService:
         )
         return job
 
-    def analyze(self):
+    def analyze(self, ml_source: str = "AUTO"):
         products = [
             Product.model_validate(item) for item in self.repo.snapshot("ECOMM_APP")
         ]
@@ -86,9 +87,9 @@ class ReconciliationService:
             EcommChannelRow.model_validate(item)
             for item in self.repo.snapshot("ECOMM_APP_RAW")
         ]
+        source = self._choose_ml_source(ml_source)
         listings = [
-            ChannelListing.model_validate(item)
-            for item in self.repo.snapshot("MERCADOLIBRE")
+            ChannelListing.model_validate(item) for item in self.repo.snapshot(source)
         ]
         logger.info(
             "reconciliation_started products=%d listings=%d",
@@ -103,6 +104,7 @@ class ReconciliationService:
             for row in raw_rows
         )
         summary = {
+            "mercadolibre_source": source,
             "total_ecomm_rows": len(raw_rows),
             "total_products": len(products),
             "total_ecomm_associated_rows": associated_rows,
@@ -127,3 +129,23 @@ class ReconciliationService:
         run = self.repo.add_run(ReconciliationRun(results=serialized, summary=summary))
         logger.info("reconciliation_finished results=%d", len(results))
         return run
+
+    def _choose_ml_source(self, requested: str) -> str:
+        requested = requested.upper()
+        if requested not in {"AUTO", "API", "XLSX"}:
+            raise ValueError("La fuente debe ser AUTO, API o XLSX.")
+        if requested == "XLSX":
+            return "MERCADOLIBRE"
+        api_snapshot = self.repo.snapshot_record("MERCADOLIBRE_API")
+        if requested == "API":
+            if not api_snapshot:
+                raise ValueError("No existe un snapshot de Mercado Libre API.")
+            return "MERCADOLIBRE_API"
+        if api_snapshot:
+            updated = api_snapshot.updated_at
+            if updated.tzinfo is None:
+                updated = updated.replace(tzinfo=timezone.utc)
+            max_age = timedelta(hours=get_settings().ml_snapshot_fresh_hours)
+            if datetime.now(timezone.utc) - updated <= max_age:
+                return "MERCADOLIBRE_API"
+        return "MERCADOLIBRE"

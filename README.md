@@ -1,6 +1,6 @@
 # KIKI Tech — Catalog Reconciler
 
-Plataforma interna de KIKI Market para automatizar, de forma trazable y segura, procesos entre **Ecomm-App**, **Mercado Libre** y, en etapas futuras, Tiendanube. Este MVP compara exportaciones XLSX y clasifica productos; **no publica, edita ni elimina información en sistemas externos**.
+Plataforma interna de KIKI Market para automatizar, de forma trazable y segura, procesos entre **Ecomm-App**, **Mercado Libre** y, en etapas futuras, Tiendanube. Admite tanto el XLSX existente como la API oficial read-only de Mercado Libre; **no publica, edita ni elimina información en sistemas externos**.
 
 ## Problema que resuelve
 
@@ -57,9 +57,33 @@ Para PostgreSQL local: `docker compose up -d db` y use la URL incluida en `.env.
 | `CORS_ORIGINS` | Orígenes frontend separados por coma |
 | `MAX_UPLOAD_MB` | Límite por XLSX |
 | `VITE_API_URL` | URL pública del backend para el build frontend |
-| `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `ML_REDIRECT_URI` | Reservadas para MVP 2; no se usan ahora |
+| `ML_CLIENT_ID` | App ID creado en Mercado Libre Developers |
+| `ML_CLIENT_SECRET` | Secret de la app; solo backend, nunca `VITE_*` |
+| `ML_REDIRECT_URI` | URL HTTPS exacta del callback: `https://API/api/mercadolibre/callback` |
 
-Nunca registre ni confirme secretos reales.
+Nunca registre ni confirme secretos reales. Los tokens se guardan únicamente en PostgreSQL y las respuestas públicas nunca incluyen `access_token`, `refresh_token` ni el client secret.
+
+## Integración Mercado Libre API (MVP 2)
+
+El backend genera un `state` aleatorio de un solo uso, persiste solamente su hash con vencimiento y realiza el intercambio del código en `POST /oauth/token` como `application/x-www-form-urlencoded`. Luego valida la identidad mediante `GET /users/me`. Antes de sincronizar renueva preventivamente un token próximo a vencer; ante un `401`, renueva una vez y repite la lectura. Un `403` o rate limit se informa sin reintentos ilimitados.
+
+Endpoints internos:
+
+- `GET /api/mercadolibre/status`: estado seguro, usuario, vencimiento y última sincronización.
+- `GET /api/mercadolibre/auth-url`: URL OAuth con `state` seguro.
+- `GET /api/mercadolibre/callback`: valida `state`, intercambia el código e identifica la cuenta.
+- `POST /api/mercadolibre/sync`: dispara exclusivamente lecturas; no escribe en Mercado Libre.
+
+La búsqueda usa `search_type=scan` y continúa mediante `scroll_id`, por lo que no supone un máximo de 1.000 publicaciones. El detalle se solicita a `/items/bulk` en lotes de 20. Se extraen publicación, título, estado, precio, permalink, SKU del producto o `seller_custom_field`, SKU por variación y GTIN/EAN. Cada sincronización conserva un registro histórico inmutable y actualiza el snapshot corriente `MERCADOLIBRE_API`; el XLSX continúa separado como `MERCADOLIBRE`.
+
+El análisis acepta `AUTO`, `API` o `XLSX`. En automático prefiere un snapshot API de hasta 24 horas y, si no existe o está vencido, vuelve al XLSX sin mezclar fuentes. La fuente efectivamente utilizada queda guardada en el resumen y visible en el dashboard.
+
+### Configuración manual
+
+1. En Mercado Libre Developers, crear/configurar la aplicación y registrar exactamente la URL HTTPS indicada en `ML_REDIRECT_URI`.
+2. En el servicio **backend** de Render, cargar manualmente `ML_CLIENT_ID`, `ML_CLIENT_SECRET` y `ML_REDIRECT_URI`. `render.yaml` solo declara sus nombres con `sync: false` y no contiene valores.
+3. Desplegar el backend para crear las nuevas tablas mediante el arranque actual y usar **Conectar Mercado Libre** en el dashboard.
+4. No cargar estos valores en el sitio estático ni usar prefijos `VITE_` para credenciales.
 
 ## Ejecución
 
@@ -101,7 +125,7 @@ El matching prueba primero cualquiera de los SKU del producto, después cualquie
 
 El precio canónico es exclusivamente `Precio Lista`, porque representa el valor del producto. `Precio Marketplace` pertenece a cada canal y permanece en la fila asociada; nunca se promueve implícitamente a precio canónico. Ambos precios y el costo se conservan. El dashboard separa filas Ecomm importadas, productos únicos, filas asociadas, publicaciones ML y resultados de conciliación, y el diagnóstico informa productos creados, filas agrupadas y conflictos calculados.
 
-Un modelo explícito `Product → ProductVariant` queda como decisión arquitectónica futura para el publicador. No se implementa en este MVP: esta etapa solamente reconcilia de forma read-only el catálogo existente y no incorpora API, OAuth ni publicación en Mercado Libre.
+Un modelo explícito `Product → ProductVariant` queda como decisión arquitectónica futura para el publicador. La integración API actual solamente reconcilia en modo read-only; no incorpora publicación en Mercado Libre.
 
 ## Estados
 
@@ -133,15 +157,14 @@ Backend local: `docker build -t kiki-api backend && docker run --env-file .env -
 
 ## Limitaciones actuales
 
-- Solo XLSX; cada nueva importación reemplaza el snapshot vigente del origen, conservando el historial del job.
+- La API y XLSX mantienen snapshots separados; el selector nunca los mezcla silenciosamente.
 - No hay autenticación ni migraciones Alembic todavía.
 - La similitud textual es deliberadamente conservadora y requiere validación humana.
 - No existe escritura hacia Ecomm-App, Mercado Libre o Tiendanube, ni Selenium, n8n o agentes de IA.
 
 ## Roadmap (no implementado)
 
-1. **MVP 2:** API real de Mercado Libre.
-2. **MVP 3:** Product Readiness Engine (SKU, EAN, precio, stock, imágenes, categoría y atributos).
+1. **MVP 3:** Product Readiness Engine (SKU, EAN, precio, stock, imágenes, categoría y atributos).
 3. **MVP 4:** preview de publicación.
 4. **MVP 5:** publicador Mercado Libre.
 5. **MVP 6:** verificación de publicación.
@@ -149,4 +172,4 @@ Backend local: `docker build -t kiki-api backend && docker run --env-file .env -
 7. **MVP 8:** Tiendanube.
 8. **MVP 9:** n8n, webhooks y automatizaciones.
 
-El próximo paso recomendado es validar aliases con exportaciones reales anonimizadas, agregar Alembic/autenticación y recién después construir el cliente **read-only** de Mercado Libre para MVP 2.
+El próximo paso recomendado es validar la API con una cuenta sandbox/real de solo lectura, agregar Alembic y autenticación de usuarios internos. La publicación automática continúa explícitamente fuera de alcance.
