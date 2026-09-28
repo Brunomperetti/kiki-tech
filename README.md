@@ -57,11 +57,25 @@ Para PostgreSQL local: `docker compose up -d db` y use la URL incluida en `.env.
 | `CORS_ORIGINS` | Orígenes frontend separados por coma |
 | `MAX_UPLOAD_MB` | Límite por XLSX |
 | `VITE_API_URL` | URL pública del backend para el build frontend |
+| `KIKI_ADMIN_USERNAME` | Único usuario administrador interno |
+| `KIKI_ADMIN_PASSWORD_HASH` | Hash Argon2id de la contraseña; nunca la contraseña real |
+| `APP_SESSION_SECRET` | Secreto aleatorio para derivar tokens CSRF por sesión |
+| `APP_ENCRYPTION_KEY` | Clave Fernet que cifra los tokens OAuth en PostgreSQL |
+| `SESSION_TTL_HOURS` | Duración máxima, no renovable, de una sesión (default: 12) |
+| `FRONTEND_URL` | URL del frontend usada al finalizar OAuth sin exponer tokens |
 | `ML_CLIENT_ID` | App ID creado en Mercado Libre Developers |
 | `ML_CLIENT_SECRET` | Secret de la app; solo backend, nunca `VITE_*` |
 | `ML_REDIRECT_URI` | URL HTTPS exacta del callback: `https://API/api/mercadolibre/callback` |
 
-Nunca registre ni confirme secretos reales. Los tokens se guardan únicamente en PostgreSQL y las respuestas públicas nunca incluyen `access_token`, `refresh_token` ni el client secret.
+Nunca registre ni confirme secretos reales. Genere el hash de contraseña de forma interactiva (la contraseña no se imprime ni se guarda en el repositorio):
+
+```bash
+python -c "from argon2 import PasswordHasher; print(PasswordHasher().hash(input('Password: ')))"
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+python -c "import secrets; print(secrets.token_urlsafe(48))" # APP_SESSION_SECRET
+```
+
+Las sesiones son server-side: el navegador recibe solamente `kiki_session` con `HttpOnly`, `Secure`, `SameSite=None` y el servidor persiste su SHA-256. El CSRF se deriva con HMAC y vive únicamente en memoria del frontend. Los tokens de Mercado Libre se cifran con Fernet antes de persistirse; las respuestas nunca incluyen `access_token`, `refresh_token` ni secretos.
 
 ## Integración Mercado Libre API (MVP 2)
 
@@ -70,7 +84,7 @@ El backend genera un `state` aleatorio de un solo uso, persiste solamente su has
 Endpoints internos:
 
 - `GET /api/mercadolibre/status`: estado seguro, usuario, vencimiento y última sincronización.
-- `GET /api/mercadolibre/auth-url`: URL OAuth con `state` seguro.
+- `POST /api/mercadolibre/auth-url`: URL OAuth con `state` seguro (sesión y CSRF obligatorios).
 - `GET /api/mercadolibre/callback`: valida `state`, intercambia el código e identifica la cuenta.
 - `POST /api/mercadolibre/sync`: dispara exclusivamente lecturas; no escribe en Mercado Libre.
 
@@ -81,7 +95,7 @@ El análisis acepta `AUTO`, `API` o `XLSX`. En automático prefiere un snapshot 
 ### Configuración manual
 
 1. En Mercado Libre Developers, crear/configurar la aplicación y registrar exactamente la URL HTTPS indicada en `ML_REDIRECT_URI`.
-2. En el servicio **backend** de Render, cargar manualmente `ML_CLIENT_ID`, `ML_CLIENT_SECRET` y `ML_REDIRECT_URI`. `render.yaml` solo declara sus nombres con `sync: false` y no contiene valores.
+2. En el servicio **backend** de Render, cargar manualmente `KIKI_ADMIN_USERNAME`, `KIKI_ADMIN_PASSWORD_HASH`, `APP_SESSION_SECRET`, `APP_ENCRYPTION_KEY`, `SESSION_TTL_HOURS`, `FRONTEND_URL`, `CORS_ORIGINS`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET` y `ML_REDIRECT_URI`. `render.yaml` solo declara sus nombres con `sync: false` y no contiene valores. Ningún secreto se configura en el frontend.
 3. Desplegar el backend para crear las nuevas tablas mediante el arranque actual y usar **Conectar Mercado Libre** en el dashboard.
 4. No cargar estos valores en el sitio estático ni usar prefijos `VITE_` para credenciales.
 
@@ -94,7 +108,7 @@ uvicorn app.main:app --reload
 npm run dev
 ```
 
-API: `http://localhost:8000`; documentación OpenAPI: `/docs`; frontend: `http://localhost:5173`.
+API: `http://localhost:8000`; frontend: `http://localhost:5173`. Solamente `GET /health`, `POST /api/auth/login` y `GET /api/mercadolibre/callback` son públicos. Dashboard, productos, importaciones, conciliaciones y estado/sync OAuth requieren sesión; todo `POST` interno, incluido logout y generación de state OAuth, exige además `X-CSRF-Token`.
 
 ## Importación y uso
 
@@ -158,7 +172,7 @@ Backend local: `docker build -t kiki-api backend && docker run --env-file .env -
 ## Limitaciones actuales
 
 - La API y XLSX mantienen snapshots separados; el selector nunca los mezcla silenciosamente.
-- No hay autenticación ni migraciones Alembic todavía.
+- No hay registro público, recuperación de contraseña, múltiples roles ni migraciones Alembic todavía.
 - La similitud textual es deliberadamente conservadora y requiere validación humana.
 - No existe escritura hacia Ecomm-App, Mercado Libre o Tiendanube, ni Selenium, n8n o agentes de IA.
 

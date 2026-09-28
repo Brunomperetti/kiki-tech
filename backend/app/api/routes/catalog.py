@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from ...catalog.models import ReconciliationStatus
 from ...core.config import get_settings
+from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...integrations.common.excel import ExcelImportError
 from ...repositories.catalog_repository import CatalogRepository
@@ -14,7 +15,10 @@ logger = logging.getLogger(__name__)
 
 @router.post("/imports/{source}", status_code=201)
 async def import_catalog(
-    source: str, file: UploadFile = File(...), db: Session = Depends(get_db)
+    source: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
 ):
     source = source.upper()
     if source not in {"ECOMM_APP", "MERCADOLIBRE"}:
@@ -41,7 +45,11 @@ async def import_catalog(
 
 
 @router.post("/reconciliations", status_code=201)
-def analyze(ml_source: str = "AUTO", db: Session = Depends(get_db)):
+def analyze(
+    ml_source: str = "AUTO",
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
     try:
         return ReconciliationService(db).analyze(ml_source)
     except ValueError as exc:
@@ -52,7 +60,7 @@ def analyze(ml_source: str = "AUTO", db: Session = Depends(get_db)):
 
 
 @router.get("/dashboard")
-def dashboard(db: Session = Depends(get_db)):
+def dashboard(db: Session = Depends(get_db), _session=Depends(require_session)):
     repo = CatalogRepository(db)
     run = repo.latest_run()
     summary = dict(run.summary) if run else {"total_products": 0, "total_listings": 0}
@@ -69,6 +77,7 @@ def products(
     search: str = "",
     review_only: bool = False,
     db: Session = Depends(get_db),
+    _session=Depends(require_session),
 ):
     run = CatalogRepository(db).latest_run()
     items = run.results if run else []
@@ -102,7 +111,7 @@ def products(
 
 
 @router.get("/imports")
-def imports(db: Session = Depends(get_db)):
+def imports(db: Session = Depends(get_db), _session=Depends(require_session)):
     return [
         {
             "id": job.id,

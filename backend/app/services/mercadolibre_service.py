@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
+from cryptography.fernet import Fernet, InvalidToken
 
 from ..core.config import get_settings
 from ..database.models import (
@@ -28,6 +29,23 @@ class MercadoLibreService:
         self.settings = get_settings()
         self.transport = transport or HTTPTransport()
         self.repo = CatalogRepository(db)
+
+    def _fernet(self) -> Fernet:
+        if not self.settings.app_encryption_key:
+            raise ValueError("El cifrado de Mercado Libre no está configurado.")
+        try:
+            return Fernet(self.settings.app_encryption_key.encode())
+        except (ValueError, TypeError) as exc:
+            raise ValueError("El cifrado de Mercado Libre no está configurado.") from exc
+
+    def _encrypt(self, value: str) -> str:
+        return self._fernet().encrypt(value.encode()).decode()
+
+    def _decrypt(self, value: str) -> str:
+        try:
+            return self._fernet().decrypt(value.encode()).decode()
+        except InvalidToken as exc:
+            raise ValueError("No se pudieron leer las credenciales de Mercado Libre.") from exc
 
     def auth_url(self) -> str:
         if not all(
@@ -73,8 +91,8 @@ class MercadoLibreService:
         connection = self.repo.ml_connection()
         values = {
             "user_id": str(user["id"]),
-            "access_token": token["access_token"],
-            "refresh_token": token["refresh_token"],
+            "access_token": self._encrypt(token["access_token"]),
+            "refresh_token": self._encrypt(token["refresh_token"]),
             "expires_at": OAuthManager.expires_at(token),
             "updated_at": now,
         }
@@ -116,7 +134,7 @@ class MercadoLibreService:
             raise ValueError("Mercado Libre no está conectado.")
         self._refresh_if_needed(connection)
         client = MercadoLibreClient(
-            self.settings, connection.access_token, self.transport
+            self.settings, self._decrypt(connection.access_token), self.transport
         )
         try:
             item_ids = client.list_item_ids(connection.user_id)
@@ -126,7 +144,7 @@ class MercadoLibreService:
                 raise
             self._refresh(connection)
             client = MercadoLibreClient(
-                self.settings, connection.access_token, self.transport
+                self.settings, self._decrypt(connection.access_token), self.transport
             )
             item_ids = client.list_item_ids(connection.user_id)
             items = client.get_items_bulk(item_ids)
@@ -149,10 +167,11 @@ class MercadoLibreService:
 
     def _refresh(self, connection):
         token = MercadoLibreClient(
-            self.settings, connection.access_token, self.transport
-        ).refresh_access_token(connection.refresh_token)
-        connection.access_token = token["access_token"]
-        connection.refresh_token = token.get("refresh_token", connection.refresh_token)
+            self.settings, self._decrypt(connection.access_token), self.transport
+        ).refresh_access_token(self._decrypt(connection.refresh_token))
+        connection.access_token = self._encrypt(token["access_token"])
+        if token.get("refresh_token"):
+            connection.refresh_token = self._encrypt(token["refresh_token"])
         connection.expires_at = OAuthManager.expires_at(token)
         connection.updated_at = datetime.now(timezone.utc)
         self.db.commit()

@@ -6,6 +6,7 @@ from urllib.error import HTTPError
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from cryptography.fernet import Fernet
 
 from app.catalog.models import Channel
 from app.database.models import Base, MercadoLibreConnection, MercadoLibreOAuthState
@@ -21,6 +22,12 @@ from app.services.mercadolibre_service import MercadoLibreService
 from app.services.reconciliation_service import ReconciliationService
 
 
+TEST_ENCRYPTION_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
+def encrypted(value: str) -> str:
+    return Fernet(TEST_ENCRYPTION_KEY.encode()).encrypt(value.encode()).decode()
+
+
 SETTINGS = SimpleNamespace(
     ml_client_id="client-id",
     ml_client_secret="secret",
@@ -29,6 +36,7 @@ SETTINGS = SimpleNamespace(
     ml_authorization_url="https://auth.mercadolibre.com.ar/authorization",
     ml_state_ttl_minutes=10,
     ml_snapshot_fresh_hours=24,
+    app_encryption_key=TEST_ENCRYPTION_KEY,
 )
 
 
@@ -93,6 +101,9 @@ def test_token_exchange_is_form_encoded_and_users_me_is_read(db):
     db.commit()
     connection = service.connect("auth-code", state)
     assert connection.user_id == "1234"
+    assert connection.access_token != "access"
+    assert connection.refresh_token != "refresh"
+    assert service._decrypt(connection.access_token) == "access"
     assert transport.calls[0][0] == "POST"
     assert (
         transport.calls[0][2]["headers"]["Content-Type"]
@@ -231,8 +242,8 @@ def test_expired_token_refreshes_and_sync_creates_api_snapshot_history(db):
     db.add(
         MercadoLibreConnection(
             user_id="7",
-            access_token="old",
-            refresh_token="refresh",
+            access_token=encrypted("old"),
+            refresh_token=encrypted("refresh"),
             expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
             connected_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
@@ -267,8 +278,8 @@ def test_expired_token_refreshes_and_sync_creates_api_snapshot_history(db):
 def test_partially_successful_batch_does_not_replace_previous_snapshot(db):
     connection = MercadoLibreConnection(
         user_id="7",
-        access_token="valid",
-        refresh_token="refresh",
+        access_token=encrypted("valid"),
+        refresh_token=encrypted("refresh"),
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         connected_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
@@ -302,8 +313,8 @@ def test_partially_successful_batch_does_not_replace_previous_snapshot(db):
 def test_successful_complete_sync_replaces_previous_snapshot(db):
     connection = MercadoLibreConnection(
         user_id="7",
-        access_token="valid",
-        refresh_token="refresh",
+        access_token=encrypted("valid"),
+        refresh_token=encrypted("refresh"),
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         connected_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
@@ -346,8 +357,8 @@ def test_successful_complete_sync_replaces_previous_snapshot(db):
 def test_401_is_refreshed_once(db):
     connection = MercadoLibreConnection(
         user_id="7",
-        access_token="valid",
-        refresh_token="refresh",
+        access_token=encrypted("valid"),
+        refresh_token=encrypted("refresh"),
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         connected_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
@@ -364,7 +375,7 @@ def test_401_is_refreshed_once(db):
     service = MercadoLibreService(db, transport)
     service.settings = SETTINGS
     assert service.sync()["listing_count"] == 0
-    assert connection.access_token == "new"
+    assert service._decrypt(connection.access_token) == "new"
 
 
 @pytest.mark.parametrize("status", [403, 429])
@@ -372,8 +383,8 @@ def test_external_errors_are_not_swallowed(db, status):
     db.add(
         MercadoLibreConnection(
             user_id="7",
-            access_token="valid",
-            refresh_token="refresh",
+            access_token=encrypted("valid"),
+            refresh_token=encrypted("refresh"),
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
             connected_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),

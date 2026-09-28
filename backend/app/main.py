@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .api.routes.catalog import router
 from .api.routes.mercadolibre import router as mercadolibre_router
+from .api.routes.auth import router as auth_router
 from .core.config import get_settings
 from .core.logging import configure_logging
 from .database.models import Base
@@ -22,11 +23,13 @@ app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[x.strip() for x in settings.cors_origins.split(",")],
+    allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 app.include_router(router)
 app.include_router(mercadolibre_router)
+app.include_router(auth_router)
 
 
 @app.get("/health")
