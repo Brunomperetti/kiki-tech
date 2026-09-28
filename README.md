@@ -63,6 +63,10 @@ Para PostgreSQL local: `docker compose up -d db` y use la URL incluida en `.env.
 | `APP_ENCRYPTION_KEY` | Clave Fernet que cifra los tokens OAuth en PostgreSQL |
 | `SESSION_TTL_HOURS` | Duración máxima, no renovable, de una sesión (default: 12) |
 | `FRONTEND_URL` | URL del frontend usada al finalizar OAuth sin exponer tokens |
+| `AUTH_MAX_ATTEMPTS` | Intentos fallidos permitidos por IP y usuario dentro de la ventana (default: 5) |
+| `AUTH_WINDOW_MINUTES` | Ventana del contador de intentos de login (default: 15) |
+| `AUTH_BLOCK_MINUTES` | Duración del bloqueo temporal de login (default: 15) |
+| `ENABLE_API_DOCS` | Habilita `/docs`, `/redoc` y `/openapi.json`; default seguro: `false` |
 | `ML_CLIENT_ID` | App ID creado en Mercado Libre Developers |
 | `ML_CLIENT_SECRET` | Secret de la app; solo backend, nunca `VITE_*` |
 | `ML_REDIRECT_URI` | URL HTTPS exacta del callback: `https://API/api/mercadolibre/callback` |
@@ -76,6 +80,8 @@ python -c "import secrets; print(secrets.token_urlsafe(48))" # APP_SESSION_SECRE
 ```
 
 Las sesiones son server-side: el navegador recibe solamente `kiki_session` con `HttpOnly`, `Secure`, `SameSite=None` y el servidor persiste su SHA-256. El CSRF se deriva con HMAC y vive únicamente en memoria del frontend. Los tokens de Mercado Libre se cifran con Fernet antes de persistirse; las respuestas nunca incluyen `access_token`, `refresh_token` ni secretos.
+
+El login limita intentos persistentemente por la combinación hasheada SHA-256 de IP origen y username normalizado. Después de cinco fallos en quince minutos, el siguiente intento responde `429` con `Retry-After`; un acceso correcto reinicia el contador. Nunca se persiste la IP en claro ni se confía en `X-Forwarded-For` enviado por el cliente. La documentación OpenAPI está deshabilitada por defecto y en Render; para desarrollo puede activarse manualmente con `ENABLE_API_DOCS=true`.
 
 ## Integración Mercado Libre API (MVP 2)
 
@@ -95,7 +101,7 @@ El análisis acepta `AUTO`, `API` o `XLSX`. En automático prefiere un snapshot 
 ### Configuración manual
 
 1. En Mercado Libre Developers, crear/configurar la aplicación y registrar exactamente la URL HTTPS indicada en `ML_REDIRECT_URI`.
-2. En el servicio **backend** de Render, cargar manualmente `KIKI_ADMIN_USERNAME`, `KIKI_ADMIN_PASSWORD_HASH`, `APP_SESSION_SECRET`, `APP_ENCRYPTION_KEY`, `SESSION_TTL_HOURS`, `FRONTEND_URL`, `CORS_ORIGINS`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET` y `ML_REDIRECT_URI`. `render.yaml` solo declara sus nombres con `sync: false` y no contiene valores. Ningún secreto se configura en el frontend.
+2. En el servicio **backend** de Render, cargar manualmente `KIKI_ADMIN_USERNAME`, `KIKI_ADMIN_PASSWORD_HASH`, `APP_SESSION_SECRET`, `APP_ENCRYPTION_KEY`, `SESSION_TTL_HOURS`, `FRONTEND_URL`, `AUTH_MAX_ATTEMPTS`, `AUTH_WINDOW_MINUTES`, `AUTH_BLOCK_MINUTES`, `CORS_ORIGINS`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET` y `ML_REDIRECT_URI`. `ENABLE_API_DOCS` permanece en `false`. `render.yaml` no contiene secretos. Ningún secreto se configura en el frontend.
 3. Desplegar el backend para crear las nuevas tablas mediante el arranque actual y usar **Conectar Mercado Libre** en el dashboard.
 4. No cargar estos valores en el sitio estático ni usar prefijos `VITE_` para credenciales.
 
@@ -108,7 +114,7 @@ uvicorn app.main:app --reload
 npm run dev
 ```
 
-API: `http://localhost:8000`; frontend: `http://localhost:5173`. Solamente `GET /health`, `POST /api/auth/login` y `GET /api/mercadolibre/callback` son públicos. Dashboard, productos, importaciones, conciliaciones y estado/sync OAuth requieren sesión; todo `POST` interno, incluido logout y generación de state OAuth, exige además `X-CSRF-Token`.
+API: `http://localhost:8000`; frontend: `http://localhost:5173`. Solamente `GET /health`, `POST /api/auth/login` y `GET /api/mercadolibre/callback` son públicos. Dashboard, productos, importaciones, conciliaciones y estado/sync OAuth requieren sesión; todo `POST` interno, incluido logout y generación de state OAuth, exige además `X-CSRF-Token`. `/docs`, `/redoc` y `/openapi.json` no existen salvo que un desarrollador habilite expresamente `ENABLE_API_DOCS`.
 
 ## Importación y uso
 

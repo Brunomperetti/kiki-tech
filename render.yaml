@@ -23,6 +23,14 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: AUTH_MAX_ATTEMPTS
+        sync: false
+      - key: AUTH_WINDOW_MINUTES
+        sync: false
+      - key: AUTH_BLOCK_MINUTES
+        sync: false
+      - key: ENABLE_API_DOCS
+        value: "false"
       - key: ML_CLIENT_ID
         sync: false
       - key: ML_CLIENT_SECRET

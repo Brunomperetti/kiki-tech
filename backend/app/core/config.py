@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     app_encryption_key: str = ""
     session_ttl_hours: int = 12
     frontend_url: str = "http://localhost:5173"
+    auth_max_attempts: int = 5
+    auth_window_minutes: int = 15
+    auth_block_minutes: int = 15
+    enable_api_docs: bool = False
 
     @field_validator("database_url")
     @classmethod

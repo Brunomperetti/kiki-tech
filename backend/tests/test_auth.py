@@ -10,9 +10,9 @@ from sqlalchemy.pool import StaticPool
 from app.core.config import get_settings
 from app.core.config import Settings
 from app.core.security import aware, utcnow
-from app.database.models import AdminSession, Base
+from app.database.models import AdminSession, AuthLoginThrottle, Base
 from app.database.session import get_db
-from app.main import app
+from app.main import app, create_app
 
 
 @pytest.fixture
@@ -130,3 +130,66 @@ def test_cors_requires_explicit_origins_and_credentials_are_enabled():
     )
     assert cors.kwargs["allow_credentials"] is True
     assert "*" not in cors.kwargs["allow_origins"]
+
+
+def test_login_allows_five_failures_then_rate_limits(auth_client):
+    client, factory = auth_client
+    for _ in range(5):
+        response = login(client, password="wrong")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Usuario o contraseña incorrectos."
+    blocked = login(client, password="wrong")
+    assert blocked.status_code == 429
+    assert blocked.json()["detail"] == "Usuario o contraseña incorrectos."
+    assert int(blocked.headers["Retry-After"]) > 0
+    with factory() as db:
+        throttle = db.scalar(select(AuthLoginThrottle))
+        assert throttle.attempts == 5
+        assert len(throttle.key_hash) == 64
+        assert "admin" not in throttle.key_hash
+
+
+def test_login_block_expires(auth_client):
+    client, factory = auth_client
+    for _ in range(5):
+        login(client, password="wrong")
+    with factory() as db:
+        throttle = db.scalar(select(AuthLoginThrottle))
+        throttle.blocked_until = utcnow() - timedelta(seconds=1)
+        throttle.window_started_at = utcnow() - timedelta(minutes=16)
+        db.commit()
+    response = login(client)
+    assert response.status_code == 200
+
+
+def test_successful_login_resets_failures(auth_client):
+    client, factory = auth_client
+    for _ in range(3):
+        assert login(client, password="wrong").status_code == 401
+    assert login(client).status_code == 200
+    with factory() as db:
+        assert db.scalar(select(AuthLoginThrottle)) is None
+    for _ in range(5):
+        assert login(client, password="wrong").status_code == 401
+
+
+def test_unknown_username_uses_same_throttle_policy_and_message(auth_client):
+    client, _ = auth_client
+    for _ in range(5):
+        response = login(client, username="does-not-exist")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Usuario o contraseña incorrectos."
+    response = login(client, username="does-not-exist")
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Usuario o contraseña incorrectos."
+
+
+def test_api_docs_disabled_by_default_and_explicitly_enabled():
+    disabled_paths = {route.path for route in app.routes}
+    assert "/docs" not in disabled_paths
+    assert "/redoc" not in disabled_paths
+    assert "/openapi.json" not in disabled_paths
+
+    enabled = create_app(Settings(enable_api_docs=True, _env_file=None))
+    enabled_paths = {route.path for route in enabled.routes}
+    assert {"/docs", "/redoc", "/openapi.json"} <= enabled_paths

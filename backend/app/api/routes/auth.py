@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
@@ -13,6 +13,7 @@ from ...core.security import (
 )
 from ...database.models import AdminSession
 from ...database.session import get_db
+from ...services.auth_throttle_service import AuthThrottleService, LOGIN_ERROR
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -31,9 +32,22 @@ def auth_response(session: AdminSession) -> dict:
 
 
 @router.post("/login")
-def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    # Request.client is populated by the trusted ASGI server/proxy configuration;
+    # deliberately ignore user-controlled forwarding headers here.
+    client_host = request.client.host if request.client else "unknown"
+    throttle = AuthThrottleService(db)
+    key_hash = throttle.key_hash(client_host, payload.username)
+    throttle.check(key_hash)
     if not verify_credentials(payload.username, payload.password):
-        raise HTTPException(401, "Usuario o contraseña incorrectos.")
+        throttle.failed(key_hash)
+        raise HTTPException(401, LOGIN_ERROR)
+    throttle.succeeded(key_hash)
     token, session = create_session(db)
     response.set_cookie(
         SESSION_COOKIE,
