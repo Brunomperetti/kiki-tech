@@ -126,8 +126,8 @@ def test_scan_pagination_supports_more_than_1000_items():
 def test_bulk_batches_and_uses_current_endpoint():
     transport = QueueTransport(
         [
-            [{"code": 200, "body": {"id": str(i)}} for i in range(20)],
-            [{"code": 200, "body": {"id": "20"}}],
+            [{"status_code": 200, "body": {"id": str(i)}} for i in range(20)],
+            [{"status_code": 200, "body": {"id": "20"}}],
         ]
     )
     items = MercadoLibreClient(SETTINGS, "token", transport).get_items_bulk(
@@ -135,6 +135,40 @@ def test_bulk_batches_and_uses_current_endpoint():
     )
     assert len(items) == 21
     assert all("/items/bulk?" in call[1] for call in transport.calls)
+
+
+def test_bulk_accepts_legacy_code_200():
+    transport = QueueTransport([[{"code": 200, "body": {"id": "MLA1"}}]])
+    items = MercadoLibreClient(SETTINGS, "token", transport).get_items_bulk(["MLA1"])
+    assert items == [{"id": "MLA1"}]
+
+
+@pytest.mark.parametrize("status", [404, 500])
+def test_bulk_non_200_status_raises_controlled_error(status):
+    transport = QueueTransport(
+        [[{"status_code": status, "body": {"message": "failed"}}]]
+    )
+    with pytest.raises(MercadoLibreHTTPError) as error:
+        MercadoLibreClient(SETTINGS, "token", transport).get_items_bulk(["MLA1"])
+    assert error.value.status_code == status
+
+
+def test_bulk_without_status_does_not_assume_success():
+    transport = QueueTransport([[{"body": {"id": "MLA1"}}]])
+    with pytest.raises(MercadoLibreHTTPError) as error:
+        MercadoLibreClient(SETTINGS, "token", transport).get_items_bulk(["MLA1"])
+    assert error.value.status_code == 502
+
+
+def test_bulk_incomplete_response_raises_controlled_error():
+    transport = QueueTransport(
+        [[{"status_code": 200, "body": {"id": "MLA1"}}]]
+    )
+    with pytest.raises(MercadoLibreHTTPError) as error:
+        MercadoLibreClient(SETTINGS, "token", transport).get_items_bulk(
+            ["MLA1", "MLA2"]
+        )
+    assert error.value.status_code == 502
 
 
 def test_transform_product_sku_gtin_and_fields():
@@ -211,7 +245,7 @@ def test_expired_token_refreshes_and_sync_creates_api_snapshot_history(db):
             {"results": ["MLA1"]},
             [
                 {
-                    "code": 200,
+                    "status_code": 200,
                     "body": {
                         "id": "MLA1",
                         "title": "A",
@@ -228,6 +262,85 @@ def test_expired_token_refreshes_and_sync_creates_api_snapshot_history(db):
     assert result["listing_count"] == 1
     assert service.repo.snapshot("MERCADOLIBRE_API")[0]["sku"] == "SKU"
     assert service.repo.latest_ml_sync().listing_count == 1
+
+
+def test_partially_successful_batch_does_not_replace_previous_snapshot(db):
+    connection = MercadoLibreConnection(
+        user_id="7",
+        access_token="valid",
+        refresh_token="refresh",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        connected_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(connection)
+    db.commit()
+    service = MercadoLibreService(
+        db,
+        QueueTransport(
+            [
+                {"results": ["MLA1", "MLA2"]},
+                [
+                    {"status_code": 200, "body": {"id": "MLA1"}},
+                    {"status_code": 500, "body": {"message": "failed"}},
+                ],
+            ]
+        ),
+    )
+    service.settings = SETTINGS
+    previous = [{"external_id": "PREVIOUS", "channel": "MERCADOLIBRE_API"}]
+    service.repo.save_snapshot("MERCADOLIBRE_API", previous)
+
+    with pytest.raises(MercadoLibreHTTPError) as error:
+        service.sync()
+
+    assert error.value.status_code == 500
+    assert service.repo.snapshot("MERCADOLIBRE_API") == previous
+    assert service.repo.latest_ml_sync() is None
+
+
+def test_successful_complete_sync_replaces_previous_snapshot(db):
+    connection = MercadoLibreConnection(
+        user_id="7",
+        access_token="valid",
+        refresh_token="refresh",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        connected_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(connection)
+    db.commit()
+    service = MercadoLibreService(
+        db,
+        QueueTransport(
+            [
+                {"results": ["MLA1"]},
+                [
+                    {
+                        "status_code": 200,
+                        "body": {
+                            "id": "MLA1",
+                            "title": "Current",
+                            "price": 10,
+                            "seller_custom_field": "CURRENT-SKU",
+                        },
+                    }
+                ],
+            ]
+        ),
+    )
+    service.settings = SETTINGS
+    service.repo.save_snapshot(
+        "MERCADOLIBRE_API",
+        [{"external_id": "PREVIOUS", "channel": "MERCADOLIBRE_API"}],
+    )
+
+    result = service.sync()
+
+    snapshot = service.repo.snapshot("MERCADOLIBRE_API")
+    assert result["listing_count"] == 1
+    assert snapshot[0]["external_id"] == "MLA1"
+    assert snapshot[0]["sku"] == "CURRENT-SKU"
 
 
 def test_401_is_refreshed_once(db):

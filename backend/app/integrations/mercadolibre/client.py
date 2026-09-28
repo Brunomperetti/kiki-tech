@@ -46,15 +46,30 @@ class MercadoLibreClient:
     def get_items_bulk(self, item_ids: list[str], batch_size: int = 20) -> list[dict]:
         items = []
         for offset in range(0, len(item_ids), batch_size):
+            batch = item_ids[offset : offset + batch_size]
             data = self._get(
-                "/items/bulk", {"ids": ",".join(item_ids[offset : offset + batch_size])}
+                "/items/bulk", {"ids": ",".join(batch)}
             )
+            if not isinstance(data, list) or len(data) != len(batch):
+                raise MercadoLibreHTTPError(
+                    502, "Mercado Libre returned an incomplete bulk batch"
+                )
             for entry in data or []:
-                if isinstance(entry, dict) and "body" in entry:
-                    if entry.get("code", 200) == 200:
-                        items.append(entry["body"])
-                elif isinstance(entry, dict):
-                    items.append(entry)
+                if not isinstance(entry, dict):
+                    raise MercadoLibreHTTPError(
+                        502, "Mercado Libre returned an invalid bulk item"
+                    )
+                status = entry.get("status_code", entry.get("code"))
+                if status != 200:
+                    raise MercadoLibreHTTPError(
+                        status if isinstance(status, int) else 502,
+                        "Mercado Libre bulk item failed",
+                    )
+                if "body" not in entry or not isinstance(entry["body"], dict):
+                    raise MercadoLibreHTTPError(
+                        502, "Mercado Libre returned an invalid bulk item body"
+                    )
+                items.append(entry["body"])
         return items
 
     def refresh_access_token(self, refresh_token: str) -> dict:
