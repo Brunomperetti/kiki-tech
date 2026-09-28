@@ -15,6 +15,16 @@ class Settings(BaseSettings):
     ml_authorization_url: str = "https://auth.mercadolibre.com.ar/authorization"
     ml_state_ttl_minutes: int = 10
     ml_snapshot_fresh_hours: int = 24
+    kiki_admin_username: str = ""
+    kiki_admin_password_hash: str = ""
+    app_session_secret: str = ""
+    app_encryption_key: str = ""
+    session_ttl_hours: int = 12
+    frontend_url: str = "http://localhost:5173"
+    auth_max_attempts: int = 5
+    auth_window_minutes: int = 15
+    auth_block_minutes: int = 15
+    enable_api_docs: bool = False
 
     @field_validator("database_url")
     @classmethod
@@ -24,6 +34,14 @@ class Settings(BaseSettings):
         if value.startswith("postgresql://") and "+" not in value.split("://", 1)[0]:
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def require_explicit_cors_origins(cls, value: str) -> str:
+        origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+        if not origins or "*" in origins:
+            raise ValueError("CORS_ORIGINS debe contener orígenes explícitos")
+        return ",".join(origins)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

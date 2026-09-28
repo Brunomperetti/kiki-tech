@@ -1,9 +1,12 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from ...database.session import get_db
+from ...core.config import get_settings
+from ...core.security import require_csrf, require_session
 from ...integrations.mercadolibre.transport import MercadoLibreHTTPError
 from ...services.mercadolibre_service import MercadoLibreService
 
@@ -12,12 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/status")
-def status(db: Session = Depends(get_db)):
+def status(db: Session = Depends(get_db), _session=Depends(require_session)):
     return MercadoLibreService(db).status()
 
 
-@router.get("/auth-url")
-def auth_url(db: Session = Depends(get_db)):
+@router.post("/auth-url")
+def auth_url(db: Session = Depends(get_db), _session=Depends(require_csrf)):
     try:
         return {"url": MercadoLibreService(db).auth_url()}
     except ValueError as exc:
@@ -27,8 +30,8 @@ def auth_url(db: Session = Depends(get_db)):
 @router.get("/callback")
 def callback(code: str, state: str, db: Session = Depends(get_db)):
     try:
-        connection = MercadoLibreService(db).connect(code, state)
-        return {"connected": True, "user_id": connection.user_id}
+        MercadoLibreService(db).connect(code, state)
+        return RedirectResponse(f"{get_settings().frontend_url.rstrip('/')}/?mercadolibre=connected")
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except MercadoLibreHTTPError as exc:
@@ -37,7 +40,7 @@ def callback(code: str, state: str, db: Session = Depends(get_db)):
 
 
 @router.post("/sync", status_code=201)
-def sync(db: Session = Depends(get_db)):
+def sync(db: Session = Depends(get_db), _session=Depends(require_csrf)):
     """Triggers reads only; it never writes to a Mercado Libre commercial resource."""
     try:
         return MercadoLibreService(db).sync()
