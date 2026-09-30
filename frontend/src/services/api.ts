@@ -1,4 +1,4 @@
-import type {EnrichmentReport, ImportJob, MercadoLibreStatus, ReadinessReport, Result, Summary} from '../types/catalog';
+import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ImportJob, MercadoLibreStatus, ReadinessReport, Result, Summary} from '../types/catalog';
 
 const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 let csrfToken = '';
@@ -34,6 +34,12 @@ export const api = {
   products: (query = '') => request<Result[]>(`/api/products${query}`),
   publicationReadiness: () => request<ReadinessReport>('/api/publication-readiness'),
   enrichmentPilot: (limit = 20) => request<EnrichmentReport>(`/api/enrichment-pilot?limit=${limit}`),
+  enrichmentReviewQueue: () => request<EnrichmentReviewQueue>('/api/enrichment-review-queue'),
+  saveEnrichmentDecision: (productKey: string, status: EnrichmentReviewStatus, note?: string) => request<EnrichmentReviewItem>('/api/enrichment-review-decisions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({product_key: productKey, status, note: note || null}),
+  }),
   imports: () => request<ImportJob[]>('/api/imports'),
   analyze: (source = 'AUTO') => request<unknown>(`/api/reconciliations?ml_source=${source}`, {method: 'POST'}),
   mlStatus: () => request<MercadoLibreStatus>('/api/mercadolibre/status'),
