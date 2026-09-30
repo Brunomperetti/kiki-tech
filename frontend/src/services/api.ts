@@ -1,4 +1,4 @@
-import type {ImportJob, MercadoLibreStatus, ReadinessReport, Result, Summary} from '../types/catalog';
+import type {EnrichmentReport, ImportJob, MercadoLibreStatus, ReadinessReport, Result, Summary} from '../types/catalog';
 
 const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 let csrfToken = '';
@@ -33,6 +33,7 @@ export const api = {
   dashboard: () => request<Summary>('/api/dashboard'),
   products: (query = '') => request<Result[]>(`/api/products${query}`),
   publicationReadiness: () => request<ReadinessReport>('/api/publication-readiness'),
+  enrichmentPilot: (limit = 20) => request<EnrichmentReport>(`/api/enrichment-pilot?limit=${limit}`),
   imports: () => request<ImportJob[]>('/api/imports'),
   analyze: (source = 'AUTO') => request<unknown>(`/api/reconciliations?ml_source=${source}`, {method: 'POST'}),
   mlStatus: () => request<MercadoLibreStatus>('/api/mercadolibre/status'),
