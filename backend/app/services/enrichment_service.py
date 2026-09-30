@@ -66,7 +66,6 @@ class EnrichmentService:
         r"\bPACK\s*X\s*\d+\b",
         r"\bCOMBO\b",
         r"\bKIT\b",
-        r"\bX\s*\d+\s*$",
     )
     BULK_WORDS = ("GRANEL", "SUELTA", "SUELTO", "FRACCIONADO", "FRACCIONADA")
     ARTISANAL_WORDS = ("ARTESANAL", "ARTESANALES", "CASERO", "CASERA", "CASEROS", "CASERAS")
@@ -75,7 +74,7 @@ class EnrichmentService:
         "CAPSULAS",
         "COMPRIMIDO",
         "COMPRIMIDOS",
-        "BARrita",
+        "BARRITA",
         "ALFAJOR",
         "TOFU",
         "PREPIZZA",
@@ -193,7 +192,7 @@ class EnrichmentService:
         name = cls._normalize(product.get("name"))
 
         if any(re.search(pattern, name) for pattern in cls.PACK_PATTERNS):
-            return cls.PACK_OR_KIT, "El título indica pack, kit, combo o múltiples unidades."
+            return cls.PACK_OR_KIT, "El título indica pack, kit o combo."
 
         bulk_match = next((word for word in cls.BULK_WORDS if word in name), None)
         if bulk_match:
@@ -206,7 +205,7 @@ class EnrichmentService:
         if product.get("brand") or product.get("ean"):
             return cls.STANDARD_UNIT, "El catálogo ya contiene marca o EAN para la presentación."
 
-        unit_match = next((word for word in cls.UNIT_WORDS if word.upper() in name), None)
+        unit_match = next((word for word in cls.UNIT_WORDS if word in name), None)
         if unit_match:
             return cls.STANDARD_UNIT, (
                 f"El título contiene una presentación de unidad reconocible: '{unit_match.lower()}'."
