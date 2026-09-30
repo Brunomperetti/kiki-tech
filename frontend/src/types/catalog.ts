@@ -11,6 +11,8 @@ export interface ReadinessItem {product:Product;reconciliation_status:Status;rea
 export interface ReadinessReasonSummary {code:string;label:string;count:number}
 export interface ReadinessReport {reconciliation_run_id:number;mercadolibre_source?:string;summary:{total_products:number;actionable_with_stock:number;READY_CORE_DATA:number;REVIEW_REQUIRED:number;BLOCKED:number;NO_STOCK:number;ALREADY_PUBLISHED:number};reason_summary:ReadinessReasonSummary[];pending_external_checks:string[];items:ReadinessItem[]}
 export type EnrichmentResearchStatus='PENDING_RESEARCH';
+export type EnrichmentNature='PACK_OR_KIT'|'BULK_OR_FRACTIONED'|'ARTISANAL'|'STANDARD_UNIT'|'AMBIGUOUS_GENERIC';
 export interface EnrichmentProposal {ean?:string|null;brand?:string|null;source_name?:string|null;source_url?:string|null;confidence?:string|null;notes?:string|null}
-export interface EnrichmentItem {product:Product;readiness_status:ReadinessStatus;reason_codes:string[];missing_fields:string[];research_status:EnrichmentResearchStatus;proposal:EnrichmentProposal}
-export interface EnrichmentReport {reconciliation_run_id:number;mercadolibre_source?:string;summary:{total_eligible:number;missing_ean:number;missing_brand:number;missing_both:number;pilot_size:number;pilot_limit:number};policy:{mode:string;description:string};items:EnrichmentItem[]}
+export interface EnrichmentItem {product:Product;readiness_status:ReadinessStatus;reason_codes:string[];missing_fields:string[];research_status:EnrichmentResearchStatus;nature_code:EnrichmentNature;nature_label:string;nature_basis:string;research_strategy:string;proposal:EnrichmentProposal}
+export interface EnrichmentClassificationSummary {code:EnrichmentNature;label:string;count:number;strategy:string}
+export interface EnrichmentReport {reconciliation_run_id:number;mercadolibre_source?:string;summary:{total_eligible:number;missing_ean:number;missing_brand:number;missing_both:number;pilot_size:number;pilot_limit:number};classification_summary:EnrichmentClassificationSummary[];policy:{mode:string;description:string};items:EnrichmentItem[]}
