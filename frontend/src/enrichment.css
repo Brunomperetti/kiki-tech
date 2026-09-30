@@ -1,0 +1,10 @@
+.enrichment-cards{grid-template-columns:repeat(5,1fr)}
+.enrichment-cards article small{display:block;color:#7b8a82;margin-top:4px;font-size:11px}
+.enrichment-plan{display:flex;justify-content:space-between;align-items:center;gap:24px}
+.enrichment-plan h2{margin-bottom:7px}
+.enrichment-plan p{max-width:900px}
+.missing-tags{display:flex;flex-wrap:wrap;gap:6px}
+.missing-tags span{background:#fff0cf;color:#805c12;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:700;white-space:nowrap}
+.research-pending{display:inline-block;background:#e4f0fb;color:#245d8a;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+@media(max-width:1100px){.enrichment-cards{grid-template-columns:repeat(3,1fr)}.enrichment-plan{align-items:flex-start;flex-direction:column}}
+@media(max-width:700px){.enrichment-cards{grid-template-columns:1fr 1fr}}
