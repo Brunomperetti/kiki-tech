@@ -23,6 +23,7 @@ class PublicationReadinessService:
 
     REASON_LABELS = {
         "EAN_MISSING": "Falta EAN/GTIN",
+        "BRAND_MISSING": "Falta marca",
         "STOCK_MISSING": "Falta stock informado",
         "SKU_DUPLICATE": "SKU duplicado",
         "SKU_MISSING": "Falta SKU",
