@@ -77,6 +77,28 @@ class ReconciliationRun(Base):
     )
 
 
+class EnrichmentReviewDecision(Base):
+    """Persistent internal review state; never writes to Ecomm-App or Mercado Libre."""
+
+    __tablename__ = "enrichment_review_decisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    reconciliation_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    proposed_brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    proposed_ean: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    product_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class MercadoLibreConnection(Base):
     __tablename__ = "mercadolibre_connections"
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
