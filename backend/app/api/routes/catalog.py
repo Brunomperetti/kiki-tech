@@ -7,6 +7,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...integrations.common.excel import ExcelImportError
 from ...repositories.catalog_repository import CatalogRepository
+from ...services.enrichment_service import EnrichmentService
 from ...services.publication_readiness_service import PublicationReadinessService
 from ...services.reconciliation_service import ReconciliationService
 
@@ -83,6 +84,21 @@ def publication_readiness(
     except Exception as exc:
         logger.exception("publication_readiness_failed")
         raise HTTPException(500, "No se pudo preparar la validación de publicación.") from exc
+
+
+@router.get("/enrichment-pilot")
+def enrichment_pilot(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return EnrichmentService(db).report(limit=limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("enrichment_pilot_failed")
+        raise HTTPException(500, "No se pudo preparar el piloto de enriquecimiento.") from exc
 
 
 @router.get("/products")
