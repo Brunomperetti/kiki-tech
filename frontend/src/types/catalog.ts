@@ -6,3 +6,6 @@ export interface ImportDiagnostics {source:string;filename:string;rows_read:numb
 export interface Summary {total_products:number;total_listings:number;total_ecomm_rows?:number;total_ecomm_associated_rows?:number;mercadolibre_source?:string;import_diagnostics?:ImportDiagnostics[];[key:string]:number|string|ImportDiagnostics[]|undefined}
 export interface ImportJob {id:number;filename:string;source:string;started_at:string;records:number;processed:number;errors:number;status:string;unknown_columns:string[];diagnostics:ImportDiagnostics}
 export interface MercadoLibreStatus {connected:boolean;user_id?:string;token_expiration?:string;token_expired:boolean;last_sync?:string;listing_count:number}
+export type ReadinessStatus='READY_CORE_DATA'|'REVIEW_REQUIRED'|'BLOCKED'|'NO_STOCK'|'ALREADY_PUBLISHED';
+export interface ReadinessItem {product:Product;reconciliation_status:Status;readiness_status:ReadinessStatus;reasons:string[];issues:{severity:string;code?:string;message:string}[];matched_listing_ids:string[]}
+export interface ReadinessReport {reconciliation_run_id:number;mercadolibre_source?:string;summary:{total_products:number;actionable_with_stock:number;READY_CORE_DATA:number;REVIEW_REQUIRED:number;BLOCKED:number;NO_STOCK:number;ALREADY_PUBLISHED:number};pending_external_checks:string[];items:ReadinessItem[]}
