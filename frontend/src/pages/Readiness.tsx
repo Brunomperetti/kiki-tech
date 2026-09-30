@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {api} from '../services/api';
 import type {ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
+import '../readiness.css';
 
 const labels:Record<ReadinessStatus,string>={
   READY_CORE_DATA:'Datos centrales OK',
