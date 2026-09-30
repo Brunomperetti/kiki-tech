@@ -1,11 +1,19 @@
 from app.services.enrichment_service import EnrichmentService
 
 
-def item(*, sku, stock, ean=None, brand=None, status="REVIEW_REQUIRED"):
+def item(
+    *,
+    sku,
+    stock,
+    ean=None,
+    brand=None,
+    name=None,
+    status="REVIEW_REQUIRED",
+):
     return {
         "product": {
             "sku": sku,
-            "name": f"Producto {sku}",
+            "name": name or f"Producto {sku}",
             "stock": stock,
             "price": 1000,
             "ean": ean,
@@ -75,3 +83,67 @@ def test_enrichment_pilot_has_blank_proposal_and_read_only_policy():
     assert entry["proposal"]["ean"] is None
     assert entry["proposal"]["source_url"] is None
     assert result["policy"]["mode"] == "READ_ONLY_RESEARCH_PILOT"
+
+
+def test_product_nature_detects_pack_without_reusing_unit_gtin():
+    nature, basis = EnrichmentService.classify_nature(
+        {"name": "Pack X 10 Yerba Mate Orgánica Pampa 1/2 Kg", "brand": None, "ean": None}
+    )
+    assert nature == "PACK_OR_KIT"
+    assert "pack" in basis.lower()
+
+
+def test_product_nature_detects_bulk_and_artisanal():
+    bulk, _ = EnrichmentService.classify_nature(
+        {"name": "MANZANILLA FLOR SUELTA X 25 GRS", "brand": None, "ean": None}
+    )
+    artisan, _ = EnrichmentService.classify_nature(
+        {"name": "GALLETAS DE AVENA CASERAS X 250", "brand": None, "ean": None}
+    )
+    assert bulk == "BULK_OR_FRACTIONED"
+    assert artisan == "ARTISANAL"
+
+
+def test_product_nature_detects_standard_unit_and_ambiguous_generic():
+    standard, _ = EnrichmentService.classify_nature(
+        {
+            "name": "Valeriana Sedante Natural Natufarma X 40 Cápsulas",
+            "brand": None,
+            "ean": None,
+        }
+    )
+    ambiguous, _ = EnrichmentService.classify_nature(
+        {"name": "NUEZ PECAN X 100 GRS", "brand": None, "ean": None}
+    )
+    assert standard == "STANDARD_UNIT"
+    assert ambiguous == "AMBIGUOUS_GENERIC"
+
+
+def test_report_exposes_classification_summary_and_strategy():
+    result = EnrichmentService.build_report(
+        report(
+            [
+                item(
+                    sku="PACK",
+                    stock=5,
+                    name="Pack X 2 Valeriana Natufarma X 40 Cápsulas",
+                ),
+                item(
+                    sku="UNIT",
+                    stock=4,
+                    name="Alfajor Blanco Felices las Vacas",
+                ),
+                item(
+                    sku="GENERIC",
+                    stock=3,
+                    name="NUEZ PECAN X 100 GRS",
+                ),
+            ]
+        )
+    )
+
+    counts = {entry["code"]: entry["count"] for entry in result["classification_summary"]}
+    assert counts["PACK_OR_KIT"] == 1
+    assert counts["STANDARD_UNIT"] == 1
+    assert counts["AMBIGUOUS_GENERIC"] == 1
+    assert result["items"][0]["research_strategy"]
