@@ -147,3 +147,94 @@ def test_report_exposes_classification_summary_and_strategy():
     assert counts["STANDARD_UNIT"] == 1
     assert counts["AMBIGUOUS_GENERIC"] == 1
     assert result["items"][0]["research_strategy"]
+
+
+def test_internal_evidence_finds_known_brand_when_brand_is_in_title():
+    result = EnrichmentService.build_report(
+        report(
+            [
+                item(
+                    sku="KNOWN",
+                    stock=2,
+                    brand="Natufarma",
+                    ean="7795379101108",
+                    name="Valeriana Natufarma x 40 cápsulas",
+                    status="ALREADY_PUBLISHED",
+                ),
+                item(
+                    sku="TARGET",
+                    stock=20,
+                    name="Valeriana Sedante Natural Natufarma X 40 Cápsulas",
+                ),
+            ]
+        )
+    )
+
+    evidence = result["items"][0]["internal_evidence"]
+    assert evidence["brand_candidate"] == "Natufarma"
+    assert evidence["confidence"] == "HIGH"
+    assert evidence["method"] == "BRAND_IN_TITLE"
+    assert result["summary"]["known_brands_in_catalog"] == 1
+    assert result["summary"]["internal_brand_candidates"] == 1
+
+
+def test_internal_evidence_can_suggest_unique_brand_from_similar_catalog_product():
+    result = EnrichmentService.build_report(
+        report(
+            [
+                item(
+                    sku="KNOWN",
+                    stock=2,
+                    brand="MarcaZ",
+                    ean="7790000000001",
+                    name="Alfajor Blanco MarcaZ 60 grs",
+                    status="ALREADY_PUBLISHED",
+                ),
+                item(
+                    sku="TARGET",
+                    stock=20,
+                    name="Alfajor Blanco 60 grs",
+                ),
+            ]
+        )
+    )
+
+    evidence = result["items"][0]["internal_evidence"]
+    assert evidence["brand_candidate"] == "MarcaZ"
+    assert evidence["method"] == "SIMILAR_INTERNAL_PRODUCT"
+    assert evidence["confidence"] in {"HIGH", "MEDIUM"}
+    assert evidence["related_sku"] == "KNOWN"
+
+
+def test_internal_evidence_does_not_choose_between_similar_competing_brands():
+    result = EnrichmentService.build_report(
+        report(
+            [
+                item(
+                    sku="LASFOR",
+                    stock=2,
+                    brand="Lasfor",
+                    name="Almohaditas Pasta Mani Lasfor 250 grs",
+                    status="ALREADY_PUBLISHED",
+                ),
+                item(
+                    sku="GRANIX",
+                    stock=2,
+                    brand="Granix",
+                    name="Almohaditas Pasta Mani Granix 250 grs",
+                    status="ALREADY_PUBLISHED",
+                ),
+                item(
+                    sku="TARGET",
+                    stock=20,
+                    name="Almohaditas Pasta Mani 250 grs",
+                ),
+            ]
+        )
+    )
+
+    evidence = result["items"][0]["internal_evidence"]
+    assert evidence["brand_candidate"] is None
+    assert set(evidence["candidate_brands"]) == {"Lasfor", "Granix"}
+    assert evidence["method"] == "SIMILAR_PRODUCTS_AMBIGUOUS"
+    assert result["summary"]["internal_evidence_ambiguous"] == 1
