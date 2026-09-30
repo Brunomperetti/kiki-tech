@@ -1,4 +1,4 @@
-import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ImportJob, MercadoLibreStatus, ReadinessReport, Result, Summary} from '../types/catalog';
+import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, ImportJob, MercadoLibreStatus, ReadinessReport, Result, Summary} from '../types/catalog';
 
 const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 let csrfToken = '';
@@ -39,6 +39,12 @@ export const api = {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({product_key: productKey, status, note: note || null}),
+  }),
+  externalResearchQueue: () => request<ExternalResearchQueue>('/api/enrichment-external-research'),
+  saveExternalResearch: (payload: ExternalResearchPayload) => request<ExternalResearchItem>('/api/enrichment-external-research', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
   }),
   imports: () => request<ImportJob[]>('/api/imports'),
   analyze: (source = 'AUTO') => request<unknown>(`/api/reconciliations?ml_source=${source}`, {method: 'POST'}),

@@ -99,6 +99,31 @@ class EnrichmentReviewDecision(Base):
     )
 
 
+class EnrichmentExternalResearch(Base):
+    """Source-backed research prepared inside KIKI Tech; never writes externally."""
+
+    __tablename__ = "enrichment_external_research"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    reconciliation_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    proposed_brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    proposed_ean: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    product_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    internal_evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class MercadoLibreConnection(Base):
     __tablename__ = "mercadolibre_connections"
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
