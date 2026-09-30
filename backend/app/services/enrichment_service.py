@@ -1,6 +1,6 @@
 import re
 import unicodedata
-from collections import Counter
+from collections import Counter, defaultdict
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -12,8 +12,8 @@ class EnrichmentService:
     """Build a controlled research queue for missing EAN/GTIN and brand data.
 
     The service is intentionally read-only. Product nature is inferred conservatively
-    from existing catalog data to choose a research strategy before looking for GTINs.
-    No inferred classification is written back to Ecomm-App or Mercado Libre.
+    and internal catalog evidence is used only to suggest where to research next.
+    Nothing inferred here is written back to Ecomm-App or Mercado Libre.
     """
 
     PENDING_RESEARCH = "PENDING_RESEARCH"
@@ -85,6 +85,36 @@ class EnrichmentService:
         "SOBRES",
         "CAJA",
     )
+    TOKEN_STOPWORDS = {
+        "DE",
+        "DEL",
+        "LA",
+        "LAS",
+        "EL",
+        "LOS",
+        "Y",
+        "CON",
+        "SIN",
+        "PARA",
+        "POR",
+        "EN",
+        "UNA",
+        "UNO",
+        "UN",
+        "PACK",
+        "COMBO",
+        "KIT",
+        "GRS",
+        "GR",
+        "GRAMOS",
+        "KG",
+        "KGS",
+        "ML",
+        "CC",
+        "CM",
+        "UNIDAD",
+        "UNIDADES",
+    }
 
     def __init__(self, db: Session):
         self.readiness = PublicationReadinessService(db)
@@ -98,9 +128,12 @@ class EnrichmentService:
         if limit < 1 or limit > 100:
             raise ValueError("El límite del piloto debe estar entre 1 y 100 productos.")
 
+        raw_items = readiness_report.get("items") or []
+        evidence_index = cls._build_internal_evidence_index(raw_items)
+
         eligible = []
-        for item in readiness_report.get("items") or []:
-            enrichment_item = cls._to_enrichment_item(item)
+        for item in raw_items:
+            enrichment_item = cls._to_enrichment_item(item, evidence_index)
             if enrichment_item:
                 eligible.append(enrichment_item)
 
@@ -111,6 +144,15 @@ class EnrichmentService:
         missing_brand = sum("Marca" in item["missing_fields"] for item in eligible)
         missing_both = sum(len(item["missing_fields"]) == 2 for item in eligible)
         nature_counts = Counter(item["nature_code"] for item in eligible)
+        evidence_counts = Counter(item["internal_evidence"]["confidence"] for item in eligible)
+        internal_brand_candidates = sum(
+            bool(item["internal_evidence"].get("brand_candidate")) for item in eligible
+        )
+        ambiguous_internal_evidence = sum(
+            not item["internal_evidence"].get("brand_candidate")
+            and len(item["internal_evidence"].get("candidate_brands") or []) > 1
+            for item in eligible
+        )
 
         classification_summary = [
             {
@@ -133,21 +175,34 @@ class EnrichmentService:
                 "missing_both": missing_both,
                 "pilot_size": len(pilot),
                 "pilot_limit": limit,
+                "internal_brand_candidates": internal_brand_candidates,
+                "internal_evidence_ambiguous": ambiguous_internal_evidence,
+                "known_brands_in_catalog": evidence_index["brand_count"],
             },
             "classification_summary": classification_summary,
+            "internal_evidence_summary": {
+                "high": evidence_counts["HIGH"],
+                "medium": evidence_counts["MEDIUM"],
+                "none": evidence_counts["NONE"],
+                "description": (
+                    "La evidencia interna se calcula comparando el producto con marcas y "
+                    "productos ya identificados dentro del mismo catálogo. Es una pista para "
+                    "investigar, no un dato aprobado."
+                ),
+            },
             "policy": {
                 "mode": "READ_ONLY_RESEARCH_PILOT",
                 "description": (
-                    "La clasificación orienta la investigación pero no reemplaza una fuente. "
-                    "No modifica Ecomm-App ni Mercado Libre y no acepta datos sin evidencia "
-                    "verificable."
+                    "La clasificación y la evidencia interna orientan la investigación pero "
+                    "no reemplazan una fuente externa verificable. No modifica Ecomm-App ni "
+                    "Mercado Libre y no aprueba datos automáticamente."
                 ),
             },
             "items": pilot,
         }
 
     @classmethod
-    def _to_enrichment_item(cls, item: dict) -> dict | None:
+    def _to_enrichment_item(cls, item: dict, evidence_index: dict | None = None) -> dict | None:
         if item.get("readiness_status") != PublicationReadinessService.REVIEW_REQUIRED:
             return None
 
@@ -166,6 +221,7 @@ class EnrichmentService:
 
         nature_code, basis = cls.classify_nature(product)
         nature = cls.NATURES[nature_code]
+        internal_evidence = cls._find_internal_evidence(product, evidence_index or cls._empty_evidence())
 
         return {
             "product": product,
@@ -177,6 +233,7 @@ class EnrichmentService:
             "nature_label": nature["label"],
             "nature_basis": basis,
             "research_strategy": nature["strategy"],
+            "internal_evidence": internal_evidence,
             "proposal": {
                 "ean": None,
                 "brand": None,
@@ -217,6 +274,158 @@ class EnrichmentService:
         )
 
     @classmethod
+    def _build_internal_evidence_index(cls, items: list[dict]) -> dict:
+        brand_spellings = defaultdict(Counter)
+        references = []
+
+        for item in items:
+            product = item.get("product") or {}
+            brand = str(product.get("brand") or "").strip()
+            name = str(product.get("name") or "").strip()
+            if not brand or not name:
+                continue
+
+            normalized_brand = cls._normalize(brand)
+            if len(normalized_brand) < 4:
+                continue
+
+            brand_spellings[normalized_brand][brand] += 1
+            tokens = cls._informative_tokens(name)
+            if len(tokens) >= 2:
+                references.append(
+                    {
+                        "sku": str(product.get("sku") or ""),
+                        "name": name,
+                        "brand": brand,
+                        "ean": product.get("ean"),
+                        "tokens": tokens,
+                    }
+                )
+
+        brands = {
+            normalized: counts.most_common(1)[0][0]
+            for normalized, counts in brand_spellings.items()
+        }
+        return {
+            "brands": brands,
+            "references": references,
+            "brand_count": len(brands),
+        }
+
+    @classmethod
+    def _find_internal_evidence(cls, product: dict, evidence_index: dict) -> dict:
+        name = cls._normalize(product.get("name"))
+        sku = str(product.get("sku") or "")
+        brands = evidence_index.get("brands") or {}
+
+        direct = []
+        for normalized_brand, display_brand in brands.items():
+            pattern = rf"(?<![A-Z0-9]){re.escape(normalized_brand)}(?![A-Z0-9])"
+            if re.search(pattern, name):
+                direct.append(display_brand)
+
+        direct = sorted(set(direct), key=lambda value: (-len(value), value.casefold()))
+        if len(direct) == 1:
+            return {
+                "brand_candidate": direct[0],
+                "candidate_brands": direct,
+                "confidence": "HIGH",
+                "method": "BRAND_IN_TITLE",
+                "reason": (
+                    f"La marca '{direct[0]}' ya existe en el catálogo y aparece literalmente "
+                    "en el título de este producto."
+                ),
+                "related_sku": None,
+                "related_name": None,
+                "related_ean": None,
+                "similarity": None,
+            }
+        if len(direct) > 1:
+            return {
+                "brand_candidate": None,
+                "candidate_brands": direct[:3],
+                "confidence": "NONE",
+                "method": "MULTIPLE_BRANDS_IN_TITLE",
+                "reason": (
+                    "El título coincide con más de una marca conocida del catálogo; no se "
+                    "elige una automáticamente."
+                ),
+                "related_sku": None,
+                "related_name": None,
+                "related_ean": None,
+                "similarity": None,
+            }
+
+        target_tokens = cls._informative_tokens(product.get("name"))
+        if len(target_tokens) < 2:
+            return cls._empty_internal_evidence_result()
+
+        best_by_brand = {}
+        for ref in evidence_index.get("references") or []:
+            if sku and ref["sku"] == sku:
+                continue
+
+            ref_tokens = ref["tokens"]
+            intersection = target_tokens & ref_tokens
+            if len(intersection) < 2:
+                continue
+
+            union = target_tokens | ref_tokens
+            jaccard = len(intersection) / len(union) if union else 0
+            coverage = len(intersection) / len(target_tokens)
+            score = (jaccard * 0.6) + (coverage * 0.4)
+            if score < 0.72:
+                continue
+
+            current = best_by_brand.get(ref["brand"])
+            if current is None or score > current["score"]:
+                best_by_brand[ref["brand"]] = {"score": score, "ref": ref}
+
+        ranked = sorted(
+            best_by_brand.items(),
+            key=lambda entry: (-entry[1]["score"], entry[0].casefold()),
+        )
+        if not ranked:
+            return cls._empty_internal_evidence_result()
+
+        top_brand, top = ranked[0]
+        runner_up_score = ranked[1][1]["score"] if len(ranked) > 1 else 0
+        lead = top["score"] - runner_up_score
+        candidate_brands = [entry[0] for entry in ranked[:3]]
+
+        if len(ranked) > 1 and lead < 0.12:
+            return {
+                "brand_candidate": None,
+                "candidate_brands": candidate_brands,
+                "confidence": "NONE",
+                "method": "SIMILAR_PRODUCTS_AMBIGUOUS",
+                "reason": (
+                    "Hay productos internos similares asociados a más de una marca y la "
+                    "diferencia no alcanza para sugerir una sola."
+                ),
+                "related_sku": top["ref"]["sku"] or None,
+                "related_name": top["ref"]["name"],
+                "related_ean": top["ref"]["ean"],
+                "similarity": round(top["score"], 3),
+            }
+
+        confidence = "HIGH" if top["score"] >= 0.9 else "MEDIUM"
+        return {
+            "brand_candidate": top_brand,
+            "candidate_brands": candidate_brands,
+            "confidence": confidence,
+            "method": "SIMILAR_INTERNAL_PRODUCT",
+            "reason": (
+                f"Un producto ya identificado en el catálogo tiene una descripción muy similar "
+                f"y está asociado a la marca '{top_brand}'. Validar antes de aprobar."
+            ),
+            "related_sku": top["ref"]["sku"] or None,
+            "related_name": top["ref"]["name"],
+            "related_ean": top["ref"]["ean"],
+            "similarity": round(top["score"], 3),
+        }
+
+    @classmethod
     def _priority_key(cls, item: dict) -> tuple:
         product = item.get("product") or {}
         stock = cls._decimal(product.get("stock")) or Decimal("0")
@@ -227,6 +436,34 @@ class EnrichmentService:
             str(product.get("name") or "").casefold(),
             str(product.get("sku") or ""),
         )
+
+    @classmethod
+    def _informative_tokens(cls, value) -> set[str]:
+        text = cls._normalize(value)
+        tokens = set()
+        for token in re.findall(r"[A-Z0-9]+", text):
+            if token.isdigit() or len(token) < 3 or token in cls.TOKEN_STOPWORDS:
+                continue
+            tokens.add(token)
+        return tokens
+
+    @staticmethod
+    def _empty_evidence() -> dict:
+        return {"brands": {}, "references": [], "brand_count": 0}
+
+    @staticmethod
+    def _empty_internal_evidence_result() -> dict:
+        return {
+            "brand_candidate": None,
+            "candidate_brands": [],
+            "confidence": "NONE",
+            "method": "NO_MATCH",
+            "reason": "No se encontró evidencia interna suficientemente fuerte.",
+            "related_sku": None,
+            "related_name": None,
+            "related_ean": None,
+            "similarity": None,
+        }
 
     @staticmethod
     def _normalize(value) -> str:
