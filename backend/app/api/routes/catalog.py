@@ -7,6 +7,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...integrations.common.excel import ExcelImportError
 from ...repositories.catalog_repository import CatalogRepository
+from ...services.publication_readiness_service import PublicationReadinessService
 from ...services.reconciliation_service import ReconciliationService
 
 router = APIRouter(prefix="/api", tags=["catalog"])
@@ -69,6 +70,19 @@ def dashboard(db: Session = Depends(get_db), _session=Depends(require_session)):
         for job in repo.latest_jobs_by_source()
     ]
     return summary
+
+
+@router.get("/publication-readiness")
+def publication_readiness(
+    db: Session = Depends(get_db), _session=Depends(require_session)
+):
+    try:
+        return PublicationReadinessService(db).report()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("publication_readiness_failed")
+        raise HTTPException(500, "No se pudo preparar la validación de publicación.") from exc
 
 
 @router.get("/products")
