@@ -8,6 +8,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...integrations.common.excel import ExcelImportError
 from ...repositories.catalog_repository import CatalogRepository
+from ...services.enrichment_external_research_service import EnrichmentExternalResearchService
 from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.publication_readiness_service import PublicationReadinessService
@@ -21,6 +22,17 @@ class EnrichmentDecisionRequest(BaseModel):
     product_key: str
     status: str
     note: str | None = None
+
+
+class EnrichmentExternalResearchRequest(BaseModel):
+    product_key: str
+    status: str
+    proposed_brand: str | None = None
+    proposed_ean: str | None = None
+    source_name: str | None = None
+    source_url: str | None = None
+    confidence: str | None = None
+    notes: str | None = None
 
 
 @router.post("/imports/{source}", status_code=201)
@@ -140,6 +152,44 @@ def enrichment_review_decision(
     except Exception as exc:
         logger.exception("enrichment_review_decision_failed")
         raise HTTPException(500, "No se pudo guardar la decisión de revisión.") from exc
+
+
+@router.get("/enrichment-external-research")
+def enrichment_external_research_queue(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return EnrichmentExternalResearchService(db).queue()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("enrichment_external_research_queue_failed")
+        raise HTTPException(500, "No se pudo preparar la investigación externa.") from exc
+
+
+@router.post("/enrichment-external-research")
+def enrichment_external_research_save(
+    request: EnrichmentExternalResearchRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return EnrichmentExternalResearchService(db).save(
+            product_key=request.product_key,
+            status=request.status,
+            proposed_brand=request.proposed_brand,
+            proposed_ean=request.proposed_ean,
+            source_name=request.source_name,
+            source_url=request.source_url,
+            confidence=request.confidence,
+            notes=request.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("enrichment_external_research_save_failed")
+        raise HTTPException(500, "No se pudo guardar la investigación externa.") from exc
 
 
 @router.get("/products")
