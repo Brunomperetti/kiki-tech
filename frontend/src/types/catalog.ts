@@ -7,5 +7,6 @@ export interface Summary {total_products:number;total_listings:number;total_ecom
 export interface ImportJob {id:number;filename:string;source:string;started_at:string;records:number;processed:number;errors:number;status:string;unknown_columns:string[];diagnostics:ImportDiagnostics}
 export interface MercadoLibreStatus {connected:boolean;user_id?:string;token_expiration?:string;token_expired:boolean;last_sync?:string;listing_count:number}
 export type ReadinessStatus='READY_CORE_DATA'|'REVIEW_REQUIRED'|'BLOCKED'|'NO_STOCK'|'ALREADY_PUBLISHED';
-export interface ReadinessItem {product:Product;reconciliation_status:Status;readiness_status:ReadinessStatus;reasons:string[];issues:{severity:string;code?:string;message:string}[];matched_listing_ids:string[]}
-export interface ReadinessReport {reconciliation_run_id:number;mercadolibre_source?:string;summary:{total_products:number;actionable_with_stock:number;READY_CORE_DATA:number;REVIEW_REQUIRED:number;BLOCKED:number;NO_STOCK:number;ALREADY_PUBLISHED:number};pending_external_checks:string[];items:ReadinessItem[]}
+export interface ReadinessItem {product:Product;reconciliation_status:Status;readiness_status:ReadinessStatus;reason_codes:string[];reasons:string[];issues:{severity:string;code?:string;message:string}[];matched_listing_ids:string[]}
+export interface ReadinessReasonSummary {code:string;label:string;count:number}
+export interface ReadinessReport {reconciliation_run_id:number;mercadolibre_source?:string;summary:{total_products:number;actionable_with_stock:number;READY_CORE_DATA:number;REVIEW_REQUIRED:number;BLOCKED:number;NO_STOCK:number;ALREADY_PUBLISHED:number};reason_summary:ReadinessReasonSummary[];pending_external_checks:string[];items:ReadinessItem[]}
