@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ...core.security import require_csrf, require_session
@@ -19,7 +19,7 @@ class ImageReviewRequest(BaseModel):
     source_type: str | None = None
     source_name: str | None = None
     source_url: str | None = None
-    image_urls: list[str] = []
+    image_urls: list[str] = Field(default_factory=list)
     match_basis: str | None = None
     exact_match: bool = False
     authorized_for_use: bool = False
