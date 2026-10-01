@@ -40,6 +40,7 @@ export function Prepublication(){
       <article><span>En pre-publicación</span><strong>{s.total.toLocaleString('es-AR')}</strong></article>
       <article><span>Desde Ecomm validado</span><strong>{s.from_ecomm_core.toLocaleString('es-AR')}</strong></article>
       <article><span>Desde evidencia aceptada</span><strong>{s.from_accepted_evidence.toLocaleString('es-AR')}</strong></article>
+      <article><span>Imágenes aprobadas</span><strong>{s.approved_images.toLocaleString('es-AR')}</strong></article>
       <article><span>Esperando imágenes</span><strong>{s.waiting_images.toLocaleString('es-AR')}</strong></article>
       <article><span>Listos para preview</span><strong>{s.ready_for_preview.toLocaleString('es-AR')}</strong></article>
     </section>

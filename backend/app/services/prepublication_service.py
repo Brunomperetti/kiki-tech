@@ -2,7 +2,11 @@ from collections import Counter
 
 from sqlalchemy.orm import Session
 
-from ..database.models import EnrichmentExternalResearch, MercadoLibreConnection
+from ..database.models import (
+    EnrichmentExternalResearch,
+    MercadoLibreConnection,
+    PrepublicationImageReview,
+)
 from .enrichment_review_service import EnrichmentReviewService
 from .publication_readiness_service import PublicationReadinessService
 
@@ -29,10 +33,17 @@ class PrepublicationService:
             .filter(EnrichmentExternalResearch.status == "EVIDENCE_ACCEPTED")
             .all()
         }
+        approved_images = {
+            row.product_key: row
+            for row in self.db.query(PrepublicationImageReview)
+            .filter(PrepublicationImageReview.status == "APPROVED")
+            .all()
+        }
         ml_connected = self.db.query(MercadoLibreConnection).first() is not None
 
         items = []
         source_counts = Counter()
+        image_passed = 0
         for item in readiness.get("items") or []:
             product = dict(item.get("product") or {})
             key = EnrichmentReviewService.product_key(product)
@@ -75,6 +86,9 @@ class PrepublicationService:
                 continue
 
             source_counts[source] += 1
+            images_status = "PASSED" if key in approved_images else "WAITING_IMAGE_DATA"
+            if images_status == "PASSED":
+                image_passed += 1
             category_status = "READY_TO_VALIDATE" if ml_connected else "WAITING_ML_CONNECTION"
             attributes_status = "READY_TO_VALIDATE" if ml_connected else "WAITING_ML_CONNECTION"
             items.append(
@@ -87,7 +101,7 @@ class PrepublicationService:
                     "status": self.WAITING_EXTERNAL_CONTROLS,
                     "checks": {
                         "core_data": "PASSED",
-                        "images": "WAITING_IMAGE_DATA",
+                        "images": images_status,
                         "category": category_status,
                         "attributes": attributes_status,
                         "preview": "BLOCKED",
@@ -108,7 +122,8 @@ class PrepublicationService:
                 "total": len(items),
                 "from_ecomm_core": source_counts["ECOMM_CORE"],
                 "from_accepted_evidence": source_counts["ACCEPTED_EVIDENCE"],
-                "waiting_images": len(items),
+                "approved_images": image_passed,
+                "waiting_images": len(items) - image_passed,
                 "waiting_ml_connection": 0 if ml_connected else len(items),
                 "ready_for_preview": 0,
             },
