@@ -47,7 +47,7 @@ export function Prepublication(){
     <section className="panel prepub-roadmap">
       <h2>Qué falta para publicar</h2>
       <div className="prepub-flow"><span className="done">Datos centrales ✓</span><b>→</b><span>Imágenes</span><b>→</b><span>Categoría ML</span><b>→</b><span>Atributos</span><b>→</b><span>Preview</span><b>→</b><span>Confirmación humana</span></div>
-      <p>{report.mercadolibre_connected?'Mercado Libre está conectado: categoría y atributos quedan listos para la próxima validación.':'Mercado Libre todavía no está conectado. Mañana, al autorizar Guillermo, podremos avanzar con categoría y atributos usando la API.'}</p>
+      <p>{report.mercadolibre_connected?'Mercado Libre está conectado: categoría y atributos quedan listos para la próxima validación.':'Mercado Libre todavía no está conectado.'}</p>
     </section>
 
     <section className="panel">
