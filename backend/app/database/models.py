@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, JSON, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -115,6 +115,31 @@ class EnrichmentExternalResearch(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     product_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
     internal_evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class PrepublicationImageReview(Base):
+    """Persistent image-source review. It never copies or publishes an image by itself."""
+
+    __tablename__ = "prepublication_image_reviews"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    source_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_urls: Mapped[list] = mapped_column(JSON, default=list)
+    match_basis: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    exact_match: Mapped[bool] = mapped_column(Boolean, default=False)
+    authorized_for_use: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    product_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
     history: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
