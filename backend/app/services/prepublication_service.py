@@ -39,17 +39,16 @@ class PrepublicationService:
             readiness_status = item.get("readiness_status")
             evidence = accepted.get(key)
 
-            if readiness_status == PublicationReadinessService.ALREADY_PUBLISHED:
-                continue
-            if readiness_status == PublicationReadinessService.NO_STOCK:
+            if readiness_status in {
+                PublicationReadinessService.ALREADY_PUBLISHED,
+                PublicationReadinessService.NO_STOCK,
+            }:
                 continue
 
             source = None
             source_label = None
             verified = None
             if readiness_status == PublicationReadinessService.READY_CORE_DATA:
-                source = "ECOMM_CORE"
-                source_label = "Datos centrales validados desde Ecomm-App"
                 verified = {
                     "brand": product.get("brand"),
                     "ean": product.get("ean"),
@@ -57,17 +56,22 @@ class PrepublicationService:
                     "source_url": None,
                     "confidence": "CATALOG",
                 }
+                if verified["brand"] and verified["ean"]:
+                    source = "ECOMM_CORE"
+                    source_label = "Datos centrales validados desde Ecomm-App"
             elif evidence is not None:
-                source = "ACCEPTED_EVIDENCE"
-                source_label = "Evidencia externa aceptada"
                 verified = {
-                    "brand": evidence.proposed_brand or product.get("brand"),
-                    "ean": evidence.proposed_ean or product.get("ean"),
+                    "brand": product.get("brand") or evidence.proposed_brand,
+                    "ean": product.get("ean") or evidence.proposed_ean,
                     "source_name": evidence.source_name,
                     "source_url": evidence.source_url,
                     "confidence": evidence.confidence,
                 }
-            else:
+                if verified["brand"] and verified["ean"]:
+                    source = "ACCEPTED_EVIDENCE"
+                    source_label = "Evidencia externa aceptada"
+
+            if not source or not verified:
                 continue
 
             source_counts[source] += 1
@@ -118,9 +122,9 @@ class PrepublicationService:
             "policy": {
                 "mode": "READ_ONLY_PREPUBLICATION",
                 "description": (
-                    "Esta etapa no publica nada. Una evidencia aceptada resuelve solamente "
-                    "datos centrales; todavía exige imágenes, categoría, atributos, preview "
-                    "y confirmación humana antes de cualquier futura escritura en Mercado Libre."
+                    "Esta etapa no publica nada. Solo ingresan productos con marca y EAN/GTIN "
+                    "resueltos. Todavía exige imágenes, categoría, atributos, preview y "
+                    "confirmación humana antes de cualquier futura escritura en Mercado Libre."
                 ),
             },
             "items": items,
