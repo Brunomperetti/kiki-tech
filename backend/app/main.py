@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from .api.routes.catalog import router
 from .api.routes.mercadolibre import router as mercadolibre_router
 from .api.routes.auth import router as auth_router
+from .api.routes.prepublication import router as prepublication_router
 from .core.config import get_settings
 from .core.logging import configure_logging
 from .database.models import Base
@@ -39,6 +40,7 @@ def create_app(settings=None) -> FastAPI:
     application.include_router(router)
     application.include_router(mercadolibre_router)
     application.include_router(auth_router)
+    application.include_router(prepublication_router)
 
     @application.get("/health")
     def health():
