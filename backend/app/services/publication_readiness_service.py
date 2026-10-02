@@ -3,7 +3,9 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from ..database.reconciliation_review import ReconciliationReviewDecision
 from ..repositories.catalog_repository import CatalogRepository
+from .reconciliation_review_service import ReconciliationReviewService
 
 
 class PublicationReadinessService:
@@ -40,6 +42,7 @@ class PublicationReadinessService:
     }
 
     def __init__(self, db: Session):
+        self.db = db
         self.repo = CatalogRepository(db)
 
     def report(self) -> dict:
@@ -49,13 +52,37 @@ class PublicationReadinessService:
                 "Primero ejecutá una reconciliación para preparar los candidatos de publicación."
             )
 
+        decisions = {
+            row.product_key: row
+            for row in self.db.query(ReconciliationReviewDecision).all()
+        }
+
         items = []
         counts: Counter[str] = Counter()
         attention_reasons: Counter[str] = Counter()
-        for result in run.results or []:
-            product = result.get("product")
+        for raw_result in run.results or []:
+            product = raw_result.get("product")
             if not product:
                 continue
+
+            original_status = raw_result.get("status")
+            manual_decision = None
+            result = dict(raw_result)
+            if original_status == "REVIEW_REQUIRED":
+                try:
+                    key = ReconciliationReviewService.product_key(product)
+                except ValueError:
+                    key = None
+                decision = decisions.get(key) if key else None
+                if decision and decision.decision != ReconciliationReviewService.PENDING:
+                    manual_decision = decision.decision
+                    if decision.decision == ReconciliationReviewService.CONFIRMED_MATCH:
+                        result["status"] = "ALREADY_PUBLISHED"
+                        result["reason"] = "Coincidencia confirmada manualmente en KIKI Tech."
+                    elif decision.decision == ReconciliationReviewService.NOT_MATCH:
+                        result["status"] = "CANDIDATE_TO_PUBLISH"
+                        result["reason"] = "Coincidencia descartada manualmente; se trata como candidato."
+
             readiness_status, reasons = self.classify(result)
             reason_codes = self.reason_codes(result, readiness_status)
             counts[readiness_status] += 1
@@ -65,6 +92,8 @@ class PublicationReadinessService:
                 {
                     "product": product,
                     "reconciliation_status": result.get("status"),
+                    "original_reconciliation_status": original_status,
+                    "manual_reconciliation_decision": manual_decision,
                     "readiness_status": readiness_status,
                     "reason_codes": reason_codes,
                     "reasons": reasons,
