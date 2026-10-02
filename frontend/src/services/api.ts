@@ -1,4 +1,5 @@
 import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, ImportJob, MercadoLibreStatus, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
+import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 
 const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 let csrfToken = '';
@@ -32,6 +33,12 @@ export const api = {
   logout: () => request<{authenticated: boolean}>('/api/auth/logout', {method: 'POST'}).finally(() => { csrfToken = ''; }),
   dashboard: () => request<Summary>('/api/dashboard'),
   products: (query = '') => request<Result[]>(`/api/products${query}`),
+  reconciliationReviewQueue: () => request<ReconciliationReviewQueue>('/api/reconciliation-review'),
+  saveReconciliationReviewDecision: (productKey: string, decision: ReconciliationReviewDecision, note?: string) => request<ReconciliationReviewItem>('/api/reconciliation-review', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({product_key: productKey, decision, note: note || null}),
+  }),
   publicationReadiness: () => request<ReadinessReport>('/api/publication-readiness'),
   enrichmentPilot: (limit = 20) => request<EnrichmentReport>(`/api/enrichment-pilot?limit=${limit}`),
   enrichmentReviewQueue: () => request<EnrichmentReviewQueue>('/api/enrichment-review-queue'),
