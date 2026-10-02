@@ -3,8 +3,10 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from ..database.duplicate_review import DuplicateReviewDecision
 from ..database.reconciliation_review import ReconciliationReviewDecision
 from ..repositories.catalog_repository import CatalogRepository
+from .duplicate_review_service import DuplicateReviewService
 from .reconciliation_review_service import ReconciliationReviewService
 
 
@@ -52,10 +54,12 @@ class PublicationReadinessService:
                 "Primero ejecutá una reconciliación para preparar los candidatos de publicación."
             )
 
-        decisions = {
+        reconciliation_decisions = {
             row.product_key: row
             for row in self.db.query(ReconciliationReviewDecision).all()
         }
+        duplicate_rows = self.db.query(DuplicateReviewDecision).all()
+        duplicate_decisions = DuplicateReviewService.product_decision_index(duplicate_rows)
 
         items = []
         counts: Counter[str] = Counter()
@@ -67,13 +71,15 @@ class PublicationReadinessService:
 
             original_status = raw_result.get("status")
             manual_decision = None
+            manual_duplicate_decision = None
             result = dict(raw_result)
+
             if original_status == "REVIEW_REQUIRED":
                 try:
                     key = ReconciliationReviewService.product_key(product)
                 except ValueError:
                     key = None
-                decision = decisions.get(key) if key else None
+                decision = reconciliation_decisions.get(key) if key else None
                 if decision and decision.decision != ReconciliationReviewService.PENDING:
                     manual_decision = decision.decision
                     if decision.decision == ReconciliationReviewService.CONFIRMED_MATCH:
@@ -82,6 +88,24 @@ class PublicationReadinessService:
                     elif decision.decision == ReconciliationReviewService.NOT_MATCH:
                         result["status"] = "CANDIDATE_TO_PUBLISH"
                         result["reason"] = "Coincidencia descartada manualmente; se trata como candidato."
+
+            if original_status == "POSSIBLE_DUPLICATE":
+                try:
+                    duplicate_key = DuplicateReviewService.product_key(product)
+                except ValueError:
+                    duplicate_key = None
+                duplicate_decision = duplicate_decisions.get(duplicate_key) if duplicate_key else None
+                if duplicate_decision:
+                    manual_duplicate_decision = duplicate_decision.decision
+                    if duplicate_decision.decision == DuplicateReviewService.DUPLICATE_CONFIRMED:
+                        result["reason"] = (
+                            "Duplicado confirmado manualmente; requiere corrección en el catálogo de origen."
+                        )
+                    elif duplicate_decision.decision in {
+                        DuplicateReviewService.DISTINCT_PRODUCTS,
+                        DuplicateReviewService.VARIANTS,
+                    }:
+                        result = DuplicateReviewService.reclassify_resolved_duplicate(result)
 
             readiness_status, reasons = self.classify(result)
             reason_codes = self.reason_codes(result, readiness_status)
@@ -94,6 +118,7 @@ class PublicationReadinessService:
                     "reconciliation_status": result.get("status"),
                     "original_reconciliation_status": original_status,
                     "manual_reconciliation_decision": manual_decision,
+                    "manual_duplicate_decision": manual_duplicate_decision,
                     "readiness_status": readiness_status,
                     "reason_codes": reason_codes,
                     "reasons": reasons,
