@@ -1,13 +1,30 @@
 from app.services.publication_readiness_service import PublicationReadinessService
 
 
-def result(status, *, stock=5, ean="7791234567890", issues=None, reason=""):
+def result(
+    status,
+    *,
+    stock=5,
+    ean="7791234567890",
+    sku="2562",
+    sku_product=None,
+    sku_variant=None,
+    sku_aliases=None,
+    ean_aliases=None,
+    issues=None,
+    reason="",
+):
     return {
         "status": status,
         "reason": reason,
         "product": {
-            "sku": "ABC-1",
+            "sku": sku,
+            "sku_effective": sku,
+            "sku_product": sku_product,
+            "sku_variant": sku_variant,
+            "sku_aliases": sku_aliases or [sku],
             "ean": ean,
+            "ean_aliases": ean_aliases or ([ean] if ean else []),
             "name": "Producto de prueba",
             "price": 1000,
             "stock": stock,
@@ -85,3 +102,59 @@ def test_already_published_is_excluded():
     assert PublicationReadinessService.reason_codes(item, status) == [
         "ALREADY_PUBLISHED"
     ]
+
+
+def test_five_plus_digit_sku_with_unique_four_digit_base_is_excluded_from_bulk():
+    items = [
+        result("CANDIDATE_TO_PUBLISH", sku="2562"),
+        result("CANDIDATE_TO_PUBLISH", sku="2562000"),
+    ]
+    rules = PublicationReadinessService._bulk_rules(items)
+
+    assert rules[0] is None
+    assert rules[1]["action"] == "EXCLUDE"
+    assert rules[1]["base_sku"] == "2562"
+
+    items[1]["bulk_rule"] = rules[1]
+    status, reasons = PublicationReadinessService.classify(items[1])
+    assert status == "EXCLUDED_BULK"
+    assert "masivo" in reasons[0].lower()
+    assert PublicationReadinessService.reason_codes(items[1], status) == [
+        "ASSOCIATED_SKU_OUT_OF_BULK"
+    ]
+
+
+def test_five_plus_digit_sku_without_four_digit_base_requires_review():
+    item = result("CANDIDATE_TO_PUBLISH", sku="2562000")
+    rule = PublicationReadinessService._bulk_rules([item])[0]
+    item["bulk_rule"] = rule
+
+    assert rule["action"] == "REVIEW"
+    assert rule["reason_code"] == "EAN_BASE_SKU_MISSING"
+    status, reasons = PublicationReadinessService.classify(item)
+    assert status == "REVIEW_REQUIRED"
+    assert "4 dígitos" in reasons[0]
+
+
+def test_multiple_four_digit_base_skus_for_same_ean_require_review():
+    items = [
+        result("CANDIDATE_TO_PUBLISH", sku="2562"),
+        result("CANDIDATE_TO_PUBLISH", sku="3000"),
+    ]
+    rules = PublicationReadinessService._bulk_rules(items)
+
+    assert rules[0]["action"] == "REVIEW"
+    assert rules[0]["reason_code"] == "EAN_BASE_SKU_AMBIGUOUS"
+    assert rules[1]["action"] == "REVIEW"
+
+
+def test_no_stock_keeps_priority_over_current_bulk_rule():
+    items = [
+        result("CANDIDATE_TO_PUBLISH", sku="2562"),
+        result("CANDIDATE_TO_PUBLISH", sku="2562000", stock=0),
+    ]
+    rules = PublicationReadinessService._bulk_rules(items)
+    items[1]["bulk_rule"] = rules[1]
+
+    status, _ = PublicationReadinessService.classify(items[1])
+    assert status == "NO_STOCK"
