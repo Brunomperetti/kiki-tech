@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ class PublicationReadinessService:
     READY_CORE_DATA = "READY_CORE_DATA"
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
     BLOCKED = "BLOCKED"
+    EXCLUDED_BULK = "EXCLUDED_BULK"
     NO_STOCK = "NO_STOCK"
     ALREADY_PUBLISHED = "ALREADY_PUBLISHED"
 
@@ -38,6 +39,9 @@ class PublicationReadinessService:
         "STOCK_INVALID": "Stock inválido",
         "RECONCILIATION_REVIEW": "Conciliación requiere revisión",
         "DATA_ERROR": "Datos inconsistentes",
+        "EAN_BASE_SKU_MISSING": "EAN sin SKU base único de 4 dígitos",
+        "EAN_BASE_SKU_AMBIGUOUS": "EAN con más de un SKU base de 4 dígitos",
+        "ASSOCIATED_SKU_OUT_OF_BULK": "SKU asociado / combo fuera del masivo actual",
         "NO_STOCK": "Sin stock",
         "ALREADY_PUBLISHED": "Ya publicado",
         "CORE_DATA_OK": "Datos centrales OK",
@@ -61,10 +65,12 @@ class PublicationReadinessService:
         duplicate_rows = self.db.query(DuplicateReviewDecision).all()
         duplicate_decisions = DuplicateReviewService.product_decision_index(duplicate_rows)
 
+        raw_results = run.results or []
+        bulk_rules = self._bulk_rules(raw_results)
         items = []
         counts: Counter[str] = Counter()
         attention_reasons: Counter[str] = Counter()
-        for raw_result in run.results or []:
+        for index, raw_result in enumerate(raw_results):
             product = raw_result.get("product")
             if not product:
                 continue
@@ -73,6 +79,7 @@ class PublicationReadinessService:
             manual_decision = None
             manual_duplicate_decision = None
             result = dict(raw_result)
+            result["bulk_rule"] = bulk_rules[index]
 
             if original_status == "REVIEW_REQUIRED":
                 try:
@@ -106,6 +113,7 @@ class PublicationReadinessService:
                         DuplicateReviewService.VARIANTS,
                     }:
                         result = DuplicateReviewService.reclassify_resolved_duplicate(result)
+                        result["bulk_rule"] = bulk_rules[index]
 
             readiness_status, reasons = self.classify(result)
             reason_codes = self.reason_codes(result, readiness_status)
@@ -124,6 +132,7 @@ class PublicationReadinessService:
                     "reasons": reasons,
                     "issues": result.get("issues") or [],
                     "matched_listing_ids": result.get("matched_listing_ids") or [],
+                    "bulk_rule": result.get("bulk_rule"),
                 }
             )
 
@@ -149,10 +158,21 @@ class PublicationReadinessService:
                 self.READY_CORE_DATA: counts[self.READY_CORE_DATA],
                 self.REVIEW_REQUIRED: counts[self.REVIEW_REQUIRED],
                 self.BLOCKED: counts[self.BLOCKED],
+                self.EXCLUDED_BULK: counts[self.EXCLUDED_BULK],
                 self.NO_STOCK: counts[self.NO_STOCK],
                 self.ALREADY_PUBLISHED: counts[self.ALREADY_PUBLISHED],
             },
             "reason_summary": reason_summary,
+            "bulk_policy": {
+                "mode": "CURRENT_ML_BULK_RULE",
+                "excluded_count": counts[self.EXCLUDED_BULK],
+                "description": (
+                    "Para el masivo actual, un SKU numérico de 5 o más dígitos asociado al mismo "
+                    "EAN que un único SKU base de 4 dígitos se identifica como combo/asociado y no "
+                    "avanza a publicación masiva. Si el EAN no tiene un único SKU base de 4 dígitos, "
+                    "el caso requiere revisión."
+                ),
+            },
             "pending_external_checks": [
                 "Imágenes disponibles y aptas para Mercado Libre",
                 "Categoría de Mercado Libre",
@@ -163,12 +183,17 @@ class PublicationReadinessService:
 
     @classmethod
     def reason_codes(cls, result: dict, readiness_status: str) -> list[str]:
+        bulk_rule = result.get("bulk_rule") or {}
         if readiness_status == cls.ALREADY_PUBLISHED:
             return ["ALREADY_PUBLISHED"]
         if readiness_status == cls.NO_STOCK:
             return ["NO_STOCK"]
+        if readiness_status == cls.EXCLUDED_BULK:
+            return [bulk_rule.get("reason_code") or "ASSOCIATED_SKU_OUT_OF_BULK"]
         if readiness_status == cls.READY_CORE_DATA:
             return ["CORE_DATA_OK"]
+        if bulk_rule.get("action") == "REVIEW":
+            return [bulk_rule.get("reason_code") or "DATA_ERROR"]
 
         issue_codes = [
             issue.get("code")
@@ -197,6 +222,12 @@ class PublicationReadinessService:
         stock = cls._decimal(product.get("stock"))
         if stock is not None and stock <= 0:
             return cls.NO_STOCK, ["El producto no tiene stock disponible."]
+
+        bulk_rule = result.get("bulk_rule") or {}
+        if bulk_rule.get("action") == "EXCLUDE":
+            return cls.EXCLUDED_BULK, [bulk_rule["message"]]
+        if bulk_rule.get("action") == "REVIEW":
+            return cls.REVIEW_REQUIRED, [bulk_rule["message"]]
 
         if status in {
             "POSSIBLE_DUPLICATE",
@@ -228,6 +259,108 @@ class PublicationReadinessService:
         return cls.READY_CORE_DATA, [
             "Datos centrales de Ecomm validados; faltan controles externos de imágenes, categoría y atributos."
         ]
+
+    @classmethod
+    def _bulk_rules(cls, results: list[dict]) -> list[dict | None]:
+        """Build the current business-rule decision for each reconciled Ecomm product.
+
+        Business rule supplied by KIKI: an EAN should have one numeric 4-digit base SKU.
+        Numeric SKUs with 5+ digits under that EAN are associated SKUs / combos and are
+        temporarily excluded from the new-publication bulk flow. No EAN-prefix rule is
+        encoded here because that instruction still needs exact confirmation.
+        """
+
+        ean_to_skus: dict[str, set[str]] = defaultdict(set)
+        products: list[dict] = []
+        for raw_result in results:
+            product = raw_result.get("product") or {}
+            products.append(product)
+            eans = cls._ean_values(product)
+            skus = cls._sku_values(product)
+            for ean in eans:
+                for sku in skus:
+                    if sku.isdigit():
+                        ean_to_skus[ean].add(sku)
+
+        rules: list[dict | None] = []
+        for product in products:
+            effective_sku = str(
+                product.get("sku_effective") or product.get("sku") or ""
+            ).strip()
+            eans = cls._ean_values(product)
+            if not effective_sku.isdigit() or not eans:
+                rules.append(None)
+                continue
+
+            base_skus = sorted(
+                {
+                    sku
+                    for ean in eans
+                    for sku in ean_to_skus.get(ean, set())
+                    if len(sku) == 4
+                }
+            )
+
+            if len(base_skus) > 1:
+                rules.append(
+                    {
+                        "action": "REVIEW",
+                        "reason_code": "EAN_BASE_SKU_AMBIGUOUS",
+                        "base_skus": base_skus,
+                        "message": (
+                            "El EAN está asociado a más de un SKU numérico de 4 dígitos "
+                            f"({', '.join(base_skus)}). Hay que confirmar cuál es el SKU base único."
+                        ),
+                    }
+                )
+                continue
+
+            if len(effective_sku) >= 5:
+                if len(base_skus) == 1:
+                    rules.append(
+                        {
+                            "action": "EXCLUDE",
+                            "reason_code": "ASSOCIATED_SKU_OUT_OF_BULK",
+                            "base_sku": base_skus[0],
+                            "message": (
+                                f"SKU {effective_sku} asociado al SKU base {base_skus[0]} para el "
+                                "mismo EAN. Se considera combo/asociado y no entra al masivo "
+                                "actual de nuevas publicaciones de Mercado Libre."
+                            ),
+                        }
+                    )
+                else:
+                    rules.append(
+                        {
+                            "action": "REVIEW",
+                            "reason_code": "EAN_BASE_SKU_MISSING",
+                            "message": (
+                                f"SKU {effective_sku} tiene 5 o más dígitos, pero para su EAN no "
+                                "se encontró un SKU base único de 4 dígitos en Ecomm-App."
+                            ),
+                        }
+                    )
+                continue
+
+            rules.append(None)
+
+        return rules
+
+    @staticmethod
+    def _sku_values(product: dict) -> list[str]:
+        values = [
+            product.get("sku_effective"),
+            product.get("sku"),
+            product.get("sku_variant"),
+            product.get("sku_product"),
+            *(product.get("sku_aliases") or []),
+        ]
+        return list(dict.fromkeys(str(value).strip() for value in values if value is not None and str(value).strip()))
+
+    @staticmethod
+    def _ean_values(product: dict) -> list[str]:
+        values = [product.get("ean"), *(product.get("ean_aliases") or [])]
+        return list(dict.fromkeys(str(value).strip() for value in values if value is not None and str(value).strip()))
 
     @staticmethod
     def _decimal(value) -> Decimal | None:
