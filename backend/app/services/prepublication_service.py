@@ -53,6 +53,7 @@ class PrepublicationService:
             if readiness_status in {
                 PublicationReadinessService.ALREADY_PUBLISHED,
                 PublicationReadinessService.NO_STOCK,
+                PublicationReadinessService.EXCLUDED_BULK,
             }:
                 continue
 
@@ -138,8 +139,9 @@ class PrepublicationService:
                 "mode": "READ_ONLY_PREPUBLICATION",
                 "description": (
                     "Esta etapa no publica nada. Solo ingresan productos con marca y EAN/GTIN "
-                    "resueltos. Todavía exige imágenes, categoría, atributos, preview y "
-                    "confirmación humana antes de cualquier futura escritura en Mercado Libre."
+                    "resueltos que además no estén excluidos por las reglas vigentes del masivo. "
+                    "Todavía exige imágenes, categoría, atributos, preview y confirmación humana "
+                    "antes de cualquier futura escritura en Mercado Libre."
                 ),
             },
             "items": items,
