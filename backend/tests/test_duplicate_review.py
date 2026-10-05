@@ -65,7 +65,7 @@ def test_duplicate_queue_groups_products_by_shared_alias_and_persists_history():
         assert len(db.query(DuplicateReviewDecision).one().history) == 2
 
 
-def test_resolved_distinct_products_stop_blocking_readiness():
+def test_resolved_distinct_products_stop_duplicate_block_but_bulk_rule_still_applies():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -76,7 +76,8 @@ def test_resolved_distinct_products_stop_blocking_readiness():
 
         report = PublicationReadinessService(db).report()
         assert report["summary"]["BLOCKED"] == 0
-        assert report["summary"]["READY_CORE_DATA"] == 2
+        assert report["summary"]["READY_CORE_DATA"] == 1
+        assert report["summary"]["EXCLUDED_BULK"] == 1
 
 
 def test_resolved_variants_keep_exact_ml_matches_as_published_but_confirmed_duplicate_stays_blocked():
