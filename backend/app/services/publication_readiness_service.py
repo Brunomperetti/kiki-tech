@@ -192,14 +192,16 @@ class PublicationReadinessService:
             return [bulk_rule.get("reason_code") or "ASSOCIATED_SKU_OUT_OF_BULK"]
         if readiness_status == cls.READY_CORE_DATA:
             return ["CORE_DATA_OK"]
-        if bulk_rule.get("action") == "REVIEW":
-            return [bulk_rule.get("reason_code") or "DATA_ERROR"]
 
         issue_codes = [
             issue.get("code")
             for issue in result.get("issues") or []
             if issue.get("code")
         ]
+        if readiness_status == cls.BLOCKED and issue_codes:
+            return list(dict.fromkeys(issue_codes))
+        if bulk_rule.get("action") == "REVIEW":
+            return [bulk_rule.get("reason_code") or "DATA_ERROR"]
         if issue_codes:
             return list(dict.fromkeys(issue_codes))
         if readiness_status == cls.REVIEW_REQUIRED:
@@ -223,12 +225,6 @@ class PublicationReadinessService:
         if stock is not None and stock <= 0:
             return cls.NO_STOCK, ["El producto no tiene stock disponible."]
 
-        bulk_rule = result.get("bulk_rule") or {}
-        if bulk_rule.get("action") == "EXCLUDE":
-            return cls.EXCLUDED_BULK, [bulk_rule["message"]]
-        if bulk_rule.get("action") == "REVIEW":
-            return cls.REVIEW_REQUIRED, [bulk_rule["message"]]
-
         if status in {
             "POSSIBLE_DUPLICATE",
             "INVALID_SKU",
@@ -247,6 +243,12 @@ class PublicationReadinessService:
             return cls.REVIEW_REQUIRED, [
                 "El estado de conciliación requiere revisión antes de continuar."
             ]
+
+        bulk_rule = result.get("bulk_rule") or {}
+        if bulk_rule.get("action") == "EXCLUDE":
+            return cls.EXCLUDED_BULK, [bulk_rule["message"]]
+        if bulk_rule.get("action") == "REVIEW":
+            return cls.REVIEW_REQUIRED, [bulk_rule["message"]]
 
         reasons: list[str] = []
         if stock is None:
@@ -355,12 +357,24 @@ class PublicationReadinessService:
             product.get("sku_product"),
             *(product.get("sku_aliases") or []),
         ]
-        return list(dict.fromkeys(str(value).strip() for value in values if value is not None and str(value).strip()))
+        return list(
+            dict.fromkeys(
+                str(value).strip()
+                for value in values
+                if value is not None and str(value).strip()
+            )
+        )
 
     @staticmethod
     def _ean_values(product: dict) -> list[str]:
         values = [product.get("ean"), *(product.get("ean_aliases") or [])]
-        return list(dict.fromkeys(str(value).strip() for value in values if value is not None and str(value).strip()))
+        return list(
+            dict.fromkeys(
+                str(value).strip()
+                for value in values
+                if value is not None and str(value).strip()
+            )
+        )
 
     @staticmethod
     def _decimal(value) -> Decimal | None:
