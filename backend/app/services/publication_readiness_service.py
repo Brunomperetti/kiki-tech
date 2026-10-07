@@ -193,6 +193,12 @@ class PublicationReadinessService:
         if readiness_status == cls.READY_CORE_DATA:
             return ["CORE_DATA_OK"]
 
+        product = result.get("product") or {}
+        derived_codes = []
+        if not product.get("ean"):
+            derived_codes.append("EAN_MISSING")
+        if not product.get("brand"):
+            derived_codes.append("BRAND_MISSING")
         issue_codes = [
             issue.get("code")
             for issue in result.get("issues") or []
@@ -202,8 +208,9 @@ class PublicationReadinessService:
             return list(dict.fromkeys(issue_codes))
         if bulk_rule.get("action") == "REVIEW":
             return [bulk_rule.get("reason_code") or "DATA_ERROR"]
-        if issue_codes:
-            return list(dict.fromkeys(issue_codes))
+        combined_codes = list(dict.fromkeys([*derived_codes, *issue_codes]))
+        if combined_codes:
+            return combined_codes
         if readiness_status == cls.REVIEW_REQUIRED:
             return ["RECONCILIATION_REVIEW"]
         return ["DATA_ERROR"]
@@ -255,6 +262,8 @@ class PublicationReadinessService:
             reasons.append("Falta stock informado.")
         if not product.get("ean") or "EAN_MISSING" in issue_codes:
             reasons.append("Falta EAN/GTIN; requiere revisión antes de publicar.")
+        if not product.get("brand") or "BRAND_MISSING" in issue_codes:
+            reasons.append("Falta marca; requiere revisión antes de publicar.")
         if reasons:
             return cls.REVIEW_REQUIRED, reasons
 
