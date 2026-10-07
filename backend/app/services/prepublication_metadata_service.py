@@ -47,7 +47,7 @@ class PrepublicationMetadataService:
         for item in items:
             summary[item["metadata_status"]] += 1
             if item["metadata_status"] == self.APPROVED:
-                if item["required_missing"]:
+                if item["required_missing"] or item["conditional_pending"]:
                     summary["attributes_pending"] += 1
                 else:
                     summary["attributes_complete"] += 1
@@ -338,6 +338,7 @@ class PrepublicationMetadataService:
                 "candidates": [],
                 "attributes": [],
                 "required_missing": [],
+                "conditional_pending": [],
                 "notes": None,
                 "updated_at": None,
                 "history_count": 0,
@@ -355,6 +356,11 @@ class PrepublicationMetadataService:
             "candidates": row.candidates or [],
             "attributes": row.attributes or [],
             "required_missing": row.required_missing or [],
+            "conditional_pending": [
+                {"id": attribute.get("id"), "name": attribute.get("name")}
+                for attribute in (row.attributes or [])
+                if attribute.get("conditional_required")
+            ],
             "notes": row.notes,
             "updated_at": row.updated_at,
             "history_count": len(row.history or []),
