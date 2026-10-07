@@ -19,6 +19,7 @@ export function MetadataReview(){
   const [busy,setBusy]=useState('');
   const [categories,setCategories]=useState<Record<string,string>>({});
   const [notes,setNotes]=useState<Record<string,string>>({});
+  const [itemFeedback,setItemFeedback]=useState<Record<string,{kind:'success'|'error';text:string}>>({});
 
   async function load(){
     try{
@@ -79,16 +80,18 @@ export function MetadataReview(){
   async function validateConditional(item:PrepublicationMetadataItem){
     const busyKey='conditional:'+item.product_key;
     setBusy(busyKey);setMessage('');setError('');
+    setItemFeedback(current=>({...current,[item.product_key]:{kind:'success',text:'Consultando a Mercado Libre…'}}));
     try{
       const result=await api.validateConditionalMetadata(item.product_key);
-      if(result.conditional_validation_status==='VALIDATED'&&result.conditional_pending.length===0){
-        setMessage(result.conditional_required.length?'Mercado Libre validó los atributos condicionales y los requeridos ya están cubiertos.':'Mercado Libre validó los atributos condicionales: no exige datos adicionales para este borrador.');
-      }else{
-        setMessage('Mercado Libre validó las condiciones. Quedan '+result.conditional_pending.length+' atributo(s) condicional(es) por completar.');
-      }
+      const text=result.conditional_validation_status==='VALIDATED'&&result.conditional_pending.length===0
+        ? (result.conditional_required.length?'Mercado Libre validó los atributos condicionales y los requeridos ya están cubiertos.':'Mercado Libre validó los atributos condicionales: no exige datos adicionales para este borrador.')
+        : 'Mercado Libre validó las condiciones. Quedan '+result.conditional_pending.length+' atributo(s) condicional(es) por completar.';
+      setItemFeedback(current=>({...current,[item.product_key]:{kind:'success',text}}));
       await load();
-    }catch(err){setError(err instanceof Error?err.message:'No se pudieron validar los atributos condicionales.')}
-    finally{setBusy('')}
+    }catch(err){
+      const text=err instanceof Error?err.message:'No se pudieron validar los atributos condicionales.';
+      setItemFeedback(current=>({...current,[item.product_key]:{kind:'error',text}}));
+    }finally{setBusy('')}
   }
 
   async function save(item:PrepublicationMetadataItem,next:MetadataReviewStatus){
@@ -175,6 +178,7 @@ export function MetadataReview(){
                 <button className="secondary" onClick={()=>analyze(item.product_key)} disabled={busy===item.product_key}>Volver a analizar</button>
                 <button className="danger-outline" onClick={()=>save(item,'REJECTED')} disabled={busy===item.product_key}>Descartar propuesta</button>
               </div>
+              {itemFeedback[item.product_key]&&<p className={itemFeedback[item.product_key].kind==='error'?'metadata-result pending':'metadata-result complete'}><strong>{itemFeedback[item.product_key].kind==='error'?'No se pudo validar: ':'Resultado: '}</strong>{itemFeedback[item.product_key].text}</p>}
               {item.metadata_status==='APPROVED'&&<p className={(item.required_missing.length||item.conditional_pending.length||item.conditional_validation_status==='PENDING')?'metadata-result pending':'metadata-result complete'}>{item.required_missing.length?'Categoría aprobada. Todavía faltan '+item.required_missing.length+' atributo(s) obligatorio(s).':item.conditional_validation_status==='PENDING'?'Categoría aprobada. Falta consultar a Mercado Libre cuáles atributos condicionales aplican a este borrador.':item.conditional_pending.length?'Mercado Libre confirmó '+item.conditional_pending.length+' atributo(s) condicional(es) obligatorios que todavía faltan completar.':'Categoría aprobada y atributos obligatorios validados para avanzar al preview.'}</p>}
             </>
           }
