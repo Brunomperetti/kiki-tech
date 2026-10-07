@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from ..database.models import PrepublicationMetadataReview
+from ..database.models import PrepublicationImageReview, PrepublicationMetadataReview
 from .mercadolibre_service import MercadoLibreService
 from .prepublication_service import PrepublicationService
 
@@ -241,7 +241,20 @@ class PrepublicationMetadataService:
         if not conditional:
             return self._serialize(item, row)
 
-        payload = self._conditional_payload(item, row, attributes)
+        image_review = (
+            self.db.query(PrepublicationImageReview)
+            .filter(
+                PrepublicationImageReview.product_key == product_key,
+                PrepublicationImageReview.status == "APPROVED",
+            )
+            .one_or_none()
+        )
+        payload = self._conditional_payload(
+            item,
+            row,
+            attributes,
+            list(image_review.image_urls or []) if image_review else [],
+        )
         required = self.ml.conditional_attributes(row.category_id, payload)
         required_index = {
             str(attribute.get("id")): attribute
@@ -305,6 +318,7 @@ class PrepublicationMetadataService:
         item: dict,
         row: PrepublicationMetadataReview,
         attributes: list[dict],
+        image_urls: list[str] | None = None,
     ) -> dict:
         product = item.get("product") or {}
         title = str(product.get("name") or "").strip()
@@ -326,7 +340,7 @@ class PrepublicationMetadataService:
             if attribute_id and value not in {None, ""}:
                 known_attributes.append({"id": attribute_id, "value_name": str(value)})
 
-        return {
+        payload = {
             "title": title,
             "category_id": row.category_id,
             "price": price,
@@ -337,6 +351,13 @@ class PrepublicationMetadataService:
             "listing_type_id": cls.CONDITIONAL_VALIDATION_DEFAULTS["listing_type_id"],
             "attributes": known_attributes,
         }
+        if image_urls:
+            payload["pictures"] = [
+                {"source": url}
+                for url in image_urls[:12]
+                if isinstance(url, str) and url.startswith(("http://", "https://"))
+            ]
+        return payload
 
     @staticmethod
     def _conditional_state(attributes: list[dict]) -> tuple[str, list[dict], list[dict]]:
