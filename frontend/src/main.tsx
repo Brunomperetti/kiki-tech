@@ -12,6 +12,7 @@ import {Enrichment} from './pages/Enrichment';
 import {ExternalResearch} from './pages/ExternalResearch';
 import {Prepublication} from './pages/Prepublication';
 import {ImageReview} from './pages/ImageReview';
+import {MetadataReview} from './pages/MetadataReview';
 import {api} from './services/api';
 import './styles.css';
 
@@ -41,7 +42,7 @@ function App() {
   useEffect(() => { api.me().then(() => setState('authenticated')).catch(() => setState('anonymous')); }, []);
   if (state === 'loading') return <div className="auth-loading">Verificando sesión…</div>;
   if (state === 'anonymous') return <Login onLogin={() => setState('authenticated')} />;
-  return <BrowserRouter><Routes><Route element={<Layout/>}><Route path="/" element={<Dashboard/>}/><Route path="/products" element={<Products/>}/><Route path="/readiness" element={<Readiness/>}/><Route path="/enrichment" element={<Enrichment/>}/><Route path="/external-research" element={<ExternalResearch/>}/><Route path="/prepublication" element={<Prepublication/>}/><Route path="/images" element={<ImageReview/>}/><Route path="/review" element={<Review/>}/><Route path="/duplicate-review" element={<DuplicateReview/>}/><Route path="/imports" element={<Imports/>}/></Route></Routes></BrowserRouter>;
+  return <BrowserRouter><Routes><Route element={<Layout/>}><Route path="/" element={<Dashboard/>}/><Route path="/products" element={<Products/>}/><Route path="/readiness" element={<Readiness/>}/><Route path="/enrichment" element={<Enrichment/>}/><Route path="/external-research" element={<ExternalResearch/>}/><Route path="/prepublication" element={<Prepublication/>}/><Route path="/images" element={<ImageReview/>}/><Route path="/metadata" element={<MetadataReview/>}/><Route path="/review" element={<Review/>}/><Route path="/duplicate-review" element={<DuplicateReview/>}/><Route path="/imports" element={<Imports/>}/></Route></Routes></BrowserRouter>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
