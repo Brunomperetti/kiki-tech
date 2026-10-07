@@ -58,6 +58,15 @@ class FakeMercadoLibre:
             },
         ]
 
+    def conditional_attributes(self, category_id, payload):
+        assert category_id == "MLA123"
+        assert payload["category_id"] == "MLA123"
+        assert payload["currency_id"] == "ARS"
+        assert payload["buying_mode"] == "buy_it_now"
+        assert payload["condition"] == "new"
+        assert payload["listing_type_id"] == "gold_special"
+        return []
+
 
 def prepublication_report():
     return {
@@ -96,6 +105,7 @@ def test_analyze_metadata_uses_ml_predictor_and_keeps_human_approval():
         assert analyzed["category_id"] == "MLA123"
         assert len(analyzed["candidates"]) == 2
         assert analyzed["required_missing"] == [{"id": "MODEL", "name": "Modelo"}]
+        assert analyzed["conditional_validation_status"] == "PENDING"
         assert analyzed["conditional_pending"] == [{"id": "COLOR", "name": "Color"}]
         brand = next(a for a in analyzed["attributes"] if a["id"] == "BRAND")
         gtin = next(a for a in analyzed["attributes"] if a["id"] == "GTIN")
@@ -126,3 +136,62 @@ def test_queue_does_not_call_ml_until_user_or_batch_analyzes():
         assert queue["summary"]["total"] == 1
         assert queue["summary"]["DRAFT"] == 1
         assert queue["items"][0]["candidates"] == []
+
+
+def test_conditional_validation_clears_gate_when_ml_requires_nothing_extra():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = PrepublicationMetadataService(db, FakeMercadoLibre())
+        service.prepublication.report = prepublication_report
+
+        service.analyze("ECOMM:1")
+        service.save(
+            product_key="ECOMM:1",
+            status="APPROVED",
+            category_id="MLA123",
+        )
+        validated = service.validate_conditional("ECOMM:1")
+
+        assert validated["conditional_validation_status"] == "VALIDATED"
+        assert validated["conditional_required"] == []
+        assert validated["conditional_pending"] == []
+        assert validated["history_count"] == 3
+
+
+def test_conditional_validation_keeps_required_missing_attribute_blocked():
+    class ConditionalColorRequired(FakeMercadoLibre):
+        def conditional_attributes(self, category_id, payload):
+            assert category_id == "MLA123"
+            assert payload["attributes"]
+            return [{"id": "COLOR", "name": "Color"}]
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = PrepublicationMetadataService(db, ConditionalColorRequired())
+        service.prepublication.report = prepublication_report
+
+        service.analyze("ECOMM:1")
+        service.save(
+            product_key="ECOMM:1",
+            status="APPROVED",
+            category_id="MLA123",
+        )
+        validated = service.validate_conditional("ECOMM:1")
+
+        assert validated["conditional_validation_status"] == "VALIDATED"
+        assert validated["conditional_required"] == [{"id": "COLOR", "name": "Color"}]
+        assert validated["conditional_pending"] == [{"id": "COLOR", "name": "Color"}]
+
+
+def test_conditional_validation_requires_approved_category():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = PrepublicationMetadataService(db, FakeMercadoLibre())
+        service.prepublication.report = prepublication_report
+        service.analyze("ECOMM:1")
+
+        with pytest.raises(ValueError, match="aprobá la categoría"):
+            service.validate_conditional("ECOMM:1")
