@@ -129,7 +129,7 @@ export function MetadataReview(){
 
     <section className="panel metadata-intro">
       <div className="panel-title-row"><div><h2>Cómo funciona</h2><p>KIKI Tech envía el título al predictor oficial de Mercado Libre, trae hasta 3 categorías candidatas y consulta los atributos declarados para la categoría seleccionada.</p></div><button onClick={analyzePending} disabled={!queue.mercadolibre_connected||busy==='batch'}>{busy==='batch'?'Analizando…':'Analizar pendientes (10)'}</button></div>
-      <details><summary><strong>¿Qué significa “atributo pendiente”?</strong></summary><p>Mercado Libre puede exigir datos específicos según la categoría. KIKI Tech completa automáticamente solo lo que ya tiene validado, por ejemplo Marca, EAN/GTIN o SKU. Cuando un atributo tiene la regla conditional_required, KIKI Tech consulta el validador oficial con el borrador del ítem para saber si realmente es obligatorio antes del preview.</p></details>
+      <details><summary><strong>¿Qué significa “atributo pendiente”?</strong></summary><p>Mercado Libre puede exigir datos específicos según la categoría. KIKI Tech completa automáticamente solo lo que ya tiene validado, por ejemplo Marca, EAN/GTIN o SKU. Cuando un atributo tiene la regla conditional_required, KIKI Tech consulta el validador oficial con el borrador del ítem para saber si realmente es obligatorio antes del preview.</p><p>Contexto provisional usado para validar: {queue.policy.conditional_validation_defaults.currency_id}, compra inmediata, condición nueva y tipo {queue.policy.conditional_validation_defaults.listing_type_id}. Esto no publica nada y se volverá a validar si el borrador final cambia.</p></details>
     </section>
 
     <section className="panel">
