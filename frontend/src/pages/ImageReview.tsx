@@ -77,7 +77,15 @@ export function ImageReview(){
   },[queue,search,status]);
 
   function setField<K extends keyof Draft>(key:string,field:K,value:Draft[K]){
-    setDrafts(current=>({...current,[key]:{...(current[key]||draftFrom(queue!.items.find(item=>item.product_key===key)!)),[field]:value}}));
+    setDrafts(current=>{
+      const base=current[key]||draftFrom(queue!.items.find(item=>item.product_key===key)!);
+      const next={...base,[field]:value};
+      if(field==='source_type'){
+        const source=value as ImageSourceType|'';
+        if(!base.source_name.trim())next.source_name=source?sourceLabel(source):'';
+      }
+      return {...current,[key]:next};
+    });
   }
 
   async function save(item:PrepublicationImageItem,nextStatus:ImageReviewStatus){
@@ -87,7 +95,7 @@ export function ImageReview(){
       product_key:item.product_key,
       status:nextStatus,
       source_type:draft.source_type||undefined,
-      source_name:draft.source_name||undefined,
+      source_name:draft.source_name.trim()||(draft.source_type?sourceLabel(draft.source_type):undefined),
       source_url:draft.source_url||undefined,
       image_urls:imageUrls,
       match_basis:draft.match_basis||undefined,
@@ -101,7 +109,10 @@ export function ImageReview(){
       setSuccess(nextStatus==='APPROVED'?'Imágenes aprobadas dentro de KIKI Tech. No se publicó nada.':'Revisión de imágenes guardada.');
       setDrafts(current=>{const next={...current};delete next[item.product_key];return next});
       await load();
-    }catch(error){setMessage(error instanceof Error?error.message:'No se pudo guardar la revisión de imágenes.')}
+    }catch(error){
+      setMessage(error instanceof Error?error.message:'No se pudo guardar la revisión de imágenes.');
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
     finally{setBusy('')}
   }
 
