@@ -83,6 +83,7 @@ def prepublication_report():
                     "brand": "Natufarma",
                     "ean": "7795379101108",
                     "stock": 10,
+                    "price": 8000,
                 },
                 "verified_core_data": {
                     "brand": "Natufarma",
