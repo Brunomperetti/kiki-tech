@@ -76,6 +76,21 @@ export function MetadataReview(){
     finally{setBusy('')}
   }
 
+  async function validateConditional(item:PrepublicationMetadataItem){
+    const busyKey='conditional:'+item.product_key;
+    setBusy(busyKey);setMessage('');setError('');
+    try{
+      const result=await api.validateConditionalMetadata(item.product_key);
+      if(result.conditional_validation_status==='VALIDATED'&&result.conditional_pending.length===0){
+        setMessage(result.conditional_required.length?'Mercado Libre validó los atributos condicionales y los requeridos ya están cubiertos.':'Mercado Libre validó los atributos condicionales: no exige datos adicionales para este borrador.');
+      }else{
+        setMessage('Mercado Libre validó las condiciones. Quedan '+result.conditional_pending.length+' atributo(s) condicional(es) por completar.');
+      }
+      await load();
+    }catch(err){setError(err instanceof Error?err.message:'No se pudieron validar los atributos condicionales.')}
+    finally{setBusy('')}
+  }
+
   async function save(item:PrepublicationMetadataItem,next:MetadataReviewStatus){
     setBusy(item.product_key);setMessage('');setError('');
     try{
@@ -114,7 +129,7 @@ export function MetadataReview(){
 
     <section className="panel metadata-intro">
       <div className="panel-title-row"><div><h2>Cómo funciona</h2><p>KIKI Tech envía el título al predictor oficial de Mercado Libre, trae hasta 3 categorías candidatas y consulta los atributos declarados para la categoría seleccionada.</p></div><button onClick={analyzePending} disabled={!queue.mercadolibre_connected||busy==='batch'}>{busy==='batch'?'Analizando…':'Analizar pendientes (10)'}</button></div>
-      <details><summary><strong>¿Qué significa “atributo pendiente”?</strong></summary><p>Mercado Libre puede exigir datos específicos según la categoría. KIKI Tech completa automáticamente solo lo que ya tiene validado, por ejemplo Marca, EAN/GTIN o SKU. Los demás quedan visibles para completar o revisar. Los atributos condicionalmente obligatorios todavía se validarán en una etapa posterior.</p></details>
+      <details><summary><strong>¿Qué significa “atributo pendiente”?</strong></summary><p>Mercado Libre puede exigir datos específicos según la categoría. KIKI Tech completa automáticamente solo lo que ya tiene validado, por ejemplo Marca, EAN/GTIN o SKU. Cuando un atributo tiene la regla conditional_required, KIKI Tech consulta el validador oficial con el borrador del ítem para saber si realmente es obligatorio antes del preview.</p></details>
     </section>
 
     <section className="panel">
@@ -148,17 +163,19 @@ export function MetadataReview(){
               <details className="attribute-details" open={item.metadata_status==='READY_FOR_REVIEW'}>
                 <summary><strong>Ver atributos de la categoría</strong></summary>
                 {required.length===0?<p>No aparecen atributos con tag obligatorio en la respuesta actual de esta categoría.</p>:<div className="attribute-list">{required.map(attribute=><div key={attribute.id} className={attribute.verified_value?'resolved':'missing'}><span>{attribute.name}<small>{attribute.id}</small></span><strong>{attribute.verified_value||'Falta completar'}</strong>{attribute.suggested_value&&!attribute.verified_value&&<em>Sugerencia ML: {attribute.suggested_value}</em>}</div>)}</div>}
-                {conditional.length>0&&<p className="conditional-note">{conditional.length} atributo(s) tienen condición de obligatoriedad y se validarán en la etapa posterior.</p>}
+                {conditional.length>0&&item.conditional_validation_status==='PENDING'&&<p className="conditional-note">{conditional.length} atributo(s) tienen obligatoriedad condicional. Aprobá la categoría y validalos con Mercado Libre antes del preview.</p>}
+                {conditional.length>0&&item.conditional_validation_status==='VALIDATED'&&<p className="conditional-note">{item.conditional_required.length===0?'Validación condicional completa: Mercado Libre no exige atributos adicionales para este borrador.':'Mercado Libre exige '+item.conditional_required.map(attribute=>attribute.name||attribute.id).join(', ')+(item.conditional_pending.length?' · faltan '+item.conditional_pending.length+' por completar.':' · todos ya están cubiertos con datos validados.')}</p>}
               </details>
 
               <label className="metadata-note">Nota opcional<textarea value={noteFor(item)} onChange={e=>setNotes(current=>({...current,[item.product_key]:e.target.value}))} placeholder="Por qué confirmás o descartás esta categoría"/></label>
 
               <div className="metadata-actions">
                 <button onClick={()=>save(item,'APPROVED')} disabled={busy===item.product_key}>{busy===item.product_key?'Guardando…':'Aprobar categoría'}</button>
+                {item.metadata_status==='APPROVED'&&conditional.length>0&&<button className="secondary" onClick={()=>validateConditional(item)} disabled={busy==='conditional:'+item.product_key}>{busy==='conditional:'+item.product_key?'Validando…':item.conditional_validation_status==='VALIDATED'?'Revalidar condicionales':'Validar atributos condicionales'}</button>}
                 <button className="secondary" onClick={()=>analyze(item.product_key)} disabled={busy===item.product_key}>Volver a analizar</button>
                 <button className="danger-outline" onClick={()=>save(item,'REJECTED')} disabled={busy===item.product_key}>Descartar propuesta</button>
               </div>
-              {item.metadata_status==='APPROVED'&&<p className={(item.required_missing.length||item.conditional_pending.length)?'metadata-result pending':'metadata-result complete'}>{item.required_missing.length?'Categoría aprobada. Todavía faltan '+item.required_missing.length+' atributo(s) obligatorio(s).':item.conditional_pending.length?'Categoría aprobada. Hay '+item.conditional_pending.length+' atributo(s) condicional(es) que todavía deben validarse con el payload completo antes del preview.':'Categoría aprobada y atributos obligatorios cubiertos con los datos disponibles.'}</p>}
+              {item.metadata_status==='APPROVED'&&<p className={(item.required_missing.length||item.conditional_pending.length||item.conditional_validation_status==='PENDING')?'metadata-result pending':'metadata-result complete'}>{item.required_missing.length?'Categoría aprobada. Todavía faltan '+item.required_missing.length+' atributo(s) obligatorio(s).':item.conditional_validation_status==='PENDING'?'Categoría aprobada. Falta consultar a Mercado Libre cuáles atributos condicionales aplican a este borrador.':item.conditional_pending.length?'Mercado Libre confirmó '+item.conditional_pending.length+' atributo(s) condicional(es) obligatorios que todavía faltan completar.':'Categoría aprobada y atributos obligatorios validados para avanzar al preview.'}</p>}
             </>
           }
         </article>;
