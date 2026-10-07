@@ -6,6 +6,7 @@ from ..database.models import (
     EnrichmentExternalResearch,
     MercadoLibreConnection,
     PrepublicationImageReview,
+    PrepublicationMetadataReview,
 )
 from .enrichment_review_service import EnrichmentReviewService
 from .publication_readiness_service import PublicationReadinessService
@@ -39,11 +40,20 @@ class PrepublicationService:
             .filter(PrepublicationImageReview.status == "APPROVED")
             .all()
         }
+        approved_metadata = {
+            row.product_key: row
+            for row in self.db.query(PrepublicationMetadataReview)
+            .filter(PrepublicationMetadataReview.status == "APPROVED")
+            .all()
+        }
         ml_connected = self.db.query(MercadoLibreConnection).first() is not None
 
         items = []
         source_counts = Counter()
         image_passed = 0
+        category_passed = 0
+        attributes_passed = 0
+        ready_for_preview = 0
         for item in readiness.get("items") or []:
             product = dict(item.get("product") or {})
             key = EnrichmentReviewService.product_key(product)
@@ -90,8 +100,28 @@ class PrepublicationService:
             images_status = "PASSED" if key in approved_images else "WAITING_IMAGE_DATA"
             if images_status == "PASSED":
                 image_passed += 1
-            category_status = "READY_TO_VALIDATE" if ml_connected else "WAITING_ML_CONNECTION"
-            attributes_status = "READY_TO_VALIDATE" if ml_connected else "WAITING_ML_CONNECTION"
+            metadata = approved_metadata.get(key)
+            if metadata is not None:
+                category_status = "PASSED"
+                category_passed += 1
+                if metadata.required_missing:
+                    attributes_status = "READY_TO_VALIDATE"
+                else:
+                    attributes_status = "PASSED"
+                    attributes_passed += 1
+            else:
+                category_status = "READY_TO_VALIDATE" if ml_connected else "WAITING_ML_CONNECTION"
+                attributes_status = "READY_TO_VALIDATE" if ml_connected else "WAITING_ML_CONNECTION"
+
+            preview_status = (
+                "READY_TO_VALIDATE"
+                if images_status == "PASSED"
+                and category_status == "PASSED"
+                and attributes_status == "PASSED"
+                else "BLOCKED"
+            )
+            if preview_status == "READY_TO_VALIDATE":
+                ready_for_preview += 1
             items.append(
                 {
                     "product_key": key,
@@ -105,8 +135,19 @@ class PrepublicationService:
                         "images": images_status,
                         "category": category_status,
                         "attributes": attributes_status,
-                        "preview": "BLOCKED",
+                        "preview": preview_status,
                     },
+                    "ml_metadata": (
+                        {
+                            "category_id": metadata.category_id,
+                            "category_name": metadata.category_name,
+                            "domain_id": metadata.domain_id,
+                            "domain_name": metadata.domain_name,
+                            "required_missing": metadata.required_missing or [],
+                        }
+                        if metadata is not None
+                        else None
+                    ),
                 }
             )
 
@@ -126,7 +167,9 @@ class PrepublicationService:
                 "approved_images": image_passed,
                 "waiting_images": len(items) - image_passed,
                 "waiting_ml_connection": 0 if ml_connected else len(items),
-                "ready_for_preview": 0,
+                "approved_categories": category_passed,
+                "attributes_complete": attributes_passed,
+                "ready_for_preview": ready_for_preview,
             },
             "mercadolibre_connected": ml_connected,
             "pending_controls": [
