@@ -197,3 +197,46 @@ def test_conditional_validation_requires_approved_category():
 
         with pytest.raises(ValueError, match="aprobá la categoría"):
             service.validate_conditional("ECOMM:1")
+
+
+def test_conditional_gtin_is_satisfied_by_verified_ean():
+    class ConditionalGtin(FakeMercadoLibre):
+        def category_attributes(self, category_id):
+            return [
+                {
+                    "id": "BRAND",
+                    "name": "Marca",
+                    "value_type": "string",
+                    "tags": {"required": True},
+                },
+                {
+                    "id": "GTIN",
+                    "name": "Código universal de producto",
+                    "value_type": "string",
+                    "tags": {"conditional_required": True},
+                },
+            ]
+
+        def conditional_attributes(self, category_id, payload):
+            gtin = next(attribute for attribute in payload["attributes"] if attribute["id"] == "GTIN")
+            assert gtin["value_name"] == "7795379101108"
+            return [{"id": "GTIN", "name": "Código universal de producto"}]
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = PrepublicationMetadataService(db, ConditionalGtin())
+        service.prepublication.report = prepublication_report
+
+        service.analyze("ECOMM:1")
+        service.save(
+            product_key="ECOMM:1",
+            status="APPROVED",
+            category_id="MLA123",
+        )
+        validated = service.validate_conditional("ECOMM:1")
+
+        assert validated["conditional_required"] == [
+            {"id": "GTIN", "name": "Código universal de producto"}
+        ]
+        assert validated["conditional_pending"] == []
