@@ -23,6 +23,10 @@ class MetadataBatchAnalyzeRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=20)
 
 
+class MetadataConditionalValidateRequest(BaseModel):
+    product_key: str
+
+
 class MetadataReviewRequest(BaseModel):
     product_key: str
     status: str
@@ -131,6 +135,34 @@ def analyze_metadata(
     except Exception as exc:
         logger.exception("prepublication_metadata_analyze_failed")
         raise HTTPException(500, "No se pudo analizar categoría y atributos.") from exc
+
+
+@router.post("/metadata/validate-conditional")
+def validate_conditional_metadata(
+    request: MetadataConditionalValidateRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return PrepublicationMetadataService(db).validate_conditional(
+            request.product_key
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except MercadoLibreHTTPError as exc:
+        if exc.status_code in {401, 403}:
+            raise HTTPException(exc.status_code, "Mercado Libre requiere reconexión.") from exc
+        if exc.status_code == 429:
+            raise HTTPException(503, "Límite de Mercado Libre agotado; reintentá más tarde.") from exc
+        logger.warning("prepublication_conditional_ml_failed status=%s", exc.status_code)
+        raise HTTPException(
+            502, "Mercado Libre no pudo validar los atributos condicionales."
+        ) from exc
+    except Exception as exc:
+        logger.exception("prepublication_conditional_validation_failed")
+        raise HTTPException(
+            500, "No se pudieron validar los atributos condicionales."
+        ) from exc
 
 
 @router.post("/metadata/analyze-pending")

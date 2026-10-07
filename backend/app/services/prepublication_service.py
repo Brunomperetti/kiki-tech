@@ -102,12 +102,14 @@ class PrepublicationService:
                 image_passed += 1
             metadata = approved_metadata.get(key)
             conditional_pending = []
+            conditional_required = []
+            conditional_validation_status = "NOT_APPLICABLE"
             if metadata is not None:
-                conditional_pending = [
-                    {"id": attribute.get("id"), "name": attribute.get("name")}
-                    for attribute in (metadata.attributes or [])
-                    if attribute.get("conditional_required")
-                ]
+                (
+                    conditional_validation_status,
+                    conditional_required,
+                    conditional_pending,
+                ) = self._conditional_state(metadata.attributes or [])
                 category_status = "PASSED"
                 category_passed += 1
                 if metadata.required_missing or conditional_pending:
@@ -150,6 +152,8 @@ class PrepublicationService:
                             "domain_id": metadata.domain_id,
                             "domain_name": metadata.domain_name,
                             "required_missing": metadata.required_missing or [],
+                            "conditional_validation_status": conditional_validation_status,
+                            "conditional_required": conditional_required,
                             "conditional_pending": conditional_pending,
                         }
                         if metadata is not None
@@ -196,6 +200,33 @@ class PrepublicationService:
             },
             "items": items,
         }
+
+    @staticmethod
+    def _conditional_state(attributes: list[dict]) -> tuple[str, list[dict], list[dict]]:
+        candidates = [
+            attribute for attribute in attributes if attribute.get("conditional_required")
+        ]
+        if not candidates:
+            return "NOT_APPLICABLE", [], []
+        if not all(attribute.get("conditional_evaluated") for attribute in candidates):
+            pending = [
+                {"id": attribute.get("id"), "name": attribute.get("name")}
+                for attribute in candidates
+            ]
+            return "PENDING", [], pending
+        required = [
+            attribute for attribute in candidates if attribute.get("conditional_required_now")
+        ]
+        pending = [
+            {"id": attribute.get("id"), "name": attribute.get("name")}
+            for attribute in required
+            if attribute.get("verified_value") in {None, ""}
+        ]
+        return (
+            "VALIDATED",
+            [{"id": attribute.get("id"), "name": attribute.get("name")} for attribute in required],
+            pending,
+        )
 
     @staticmethod
     def _stock_value(value) -> float:

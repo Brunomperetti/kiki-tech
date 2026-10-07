@@ -18,7 +18,7 @@ class MercadoLibreHTTPError(RuntimeError):
 
 
 class HTTPTransport:
-    """Small injectable JSON transport. Commercial methods are deliberately GET-only."""
+    """Small injectable JSON transport. Commercial writes are deliberately not exposed."""
 
     def __init__(self, retries: int = 2, sleep=time.sleep):
         self.retries = retries
@@ -27,7 +27,7 @@ class HTTPTransport:
     def request(self, method: str, url: str, *, headers=None, data=None) -> Response:
         if method not in {"GET", "POST"}:
             raise ValueError(
-                "Mercado Libre integration only permits GET and OAuth POST"
+                "Mercado Libre integration only permits GET and controlled POST requests"
             )
         body = data.encode() if isinstance(data, str) else data
         for attempt in range(self.retries + 1):

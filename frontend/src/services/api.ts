@@ -67,6 +67,11 @@ export const api = {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({product_key: productKey}),
   }),
+  validateConditionalMetadata: (productKey: string) => request<PrepublicationMetadataItem>('/api/prepublication/metadata/validate-conditional', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({product_key: productKey}),
+  }),
   analyzePendingMetadata: (limit = 10) => request<MetadataBatchResult>('/api/prepublication/metadata/analyze-pending', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},

@@ -165,6 +165,15 @@ class MercadoLibreService:
             lambda client: client.get_category_attributes(category_id)
         )
 
+    def conditional_attributes(
+        self, category_id: str, item_payload: dict
+    ) -> list[dict]:
+        return self._read_with_refresh(
+            lambda client: client.get_conditional_required_attributes(
+                category_id, item_payload
+            )
+        )
+
     def _read_with_refresh(self, action):
         connection = self.repo.ml_connection()
         if not connection:

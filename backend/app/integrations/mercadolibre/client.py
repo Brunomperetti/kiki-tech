@@ -1,3 +1,4 @@
+import json
 from urllib.parse import urlencode
 
 from .oauth import OAuthManager
@@ -5,7 +6,7 @@ from .transport import HTTPTransport, MercadoLibreHTTPError
 
 
 class MercadoLibreClient:
-    """Official Mercado Libre read-only client (OAuth POST is the sole POST)."""
+    """Official Mercado Libre client limited to reads and non-mutating validations."""
 
     def __init__(self, settings, access_token: str = "", transport=None):
         self.settings = settings
@@ -19,6 +20,23 @@ class MercadoLibreClient:
             url += f"?{urlencode(params)}"
         response = self.transport.request(
             "GET", url, headers={"Authorization": f"Bearer {self.access_token}"}
+        )
+        if response.status_code >= 400:
+            raise MercadoLibreHTTPError(
+                response.status_code, "Mercado Libre request failed"
+            )
+        return response.data
+
+    def _post_json(self, path: str, payload: dict):
+        url = f"{self.settings.ml_api_url}{path}"
+        response = self.transport.request(
+            "POST",
+            url,
+            headers={
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload, ensure_ascii=False),
         )
         if response.status_code >= 400:
             raise MercadoLibreHTTPError(
@@ -97,6 +115,29 @@ class MercadoLibreClient:
                 502, "Mercado Libre returned invalid category attributes"
             )
         return [attribute for attribute in data if isinstance(attribute, dict)]
+
+    def get_conditional_required_attributes(
+        self, category_id: str, item_payload: dict
+    ) -> list[dict]:
+        """Evaluate conditional_required attributes without creating an item."""
+        category_id = category_id.strip()
+        if not category_id:
+            raise ValueError("La categoría es obligatoria.")
+        if not isinstance(item_payload, dict) or not item_payload:
+            raise ValueError("El payload del producto es obligatorio.")
+        data = self._post_json(
+            f"/categories/{category_id}/attributes/conditional", item_payload
+        )
+        if not isinstance(data, dict):
+            raise MercadoLibreHTTPError(
+                502, "Mercado Libre returned invalid conditional attributes"
+            )
+        required = data.get("required_attributes") or []
+        if not isinstance(required, list):
+            raise MercadoLibreHTTPError(
+                502, "Mercado Libre returned invalid conditional attributes"
+            )
+        return [attribute for attribute in required if isinstance(attribute, dict)]
 
     def refresh_access_token(self, refresh_token: str) -> dict:
         return self.oauth.refresh(refresh_token)
