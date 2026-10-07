@@ -150,16 +150,33 @@ def validate_conditional_metadata(
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except MercadoLibreHTTPError as exc:
-        if exc.status_code in {401, 403}:
-            raise HTTPException(exc.status_code, "Mercado Libre requiere reconexión.") from exc
+        detail = str(exc).strip() or "Mercado Libre rechazó la validación."
+        if exc.status_code == 401:
+            logger.warning(
+                "prepublication_conditional_ml_unauthorized detail=%s",
+                detail,
+            )
+            raise HTTPException(
+                401,
+                "Mercado Libre rechazó la credencial incluso después del intento de renovación. "
+                "Hay que reconectar la cuenta.",
+            ) from exc
+        if exc.status_code == 403:
+            logger.warning(
+                "prepublication_conditional_ml_forbidden detail=%s",
+                detail,
+            )
+            raise HTTPException(
+                403,
+                f"Mercado Libre autenticó la cuenta pero no autorizó este recurso (HTTP 403): {detail}",
+            ) from exc
         if exc.status_code == 429:
             raise HTTPException(503, "Límite de Mercado Libre agotado; reintentá más tarde.") from exc
         logger.warning(
             "prepublication_conditional_ml_failed status=%s detail=%s",
             exc.status_code,
-            str(exc),
+            detail,
         )
-        detail = str(exc).strip() or "Mercado Libre rechazó la validación."
         raise HTTPException(
             502,
             f"Mercado Libre rechazó la validación (HTTP {exc.status_code}): {detail}",
