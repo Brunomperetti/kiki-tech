@@ -15,6 +15,12 @@ class PrepublicationMetadataService:
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     ALLOWED_STATUSES = {DRAFT, READY_FOR_REVIEW, APPROVED, REJECTED}
+    CONDITIONAL_VALIDATION_DEFAULTS = {
+        "currency_id": "ARS",
+        "buying_mode": "buy_it_now",
+        "condition": "new",
+        "listing_type_id": "gold_special",
+    }
 
     def __init__(
         self,
@@ -63,9 +69,11 @@ class PrepublicationMetadataService:
                     "No crea ni modifica publicaciones."
                 ),
                 "conditional_attributes": (
-                    "Los atributos condicionalmente obligatorios todavía no se evalúan en esta "
-                    "etapa; se muestran como pendientes de una validación posterior."
+                    "Los atributos con conditional_required se validan contra el recurso oficial "
+                    "de Mercado Libre usando el borrador actual del ítem. La llamada solo valida; "
+                    "no crea ni modifica publicaciones."
                 ),
+                "conditional_validation_defaults": self.CONDITIONAL_VALIDATION_DEFAULTS,
             },
             "items": items,
         }
@@ -218,6 +226,142 @@ class PrepublicationMetadataService:
         self.db.refresh(row)
         return self._serialize(item, row)
 
+    def validate_conditional(self, product_key: str) -> dict:
+        item = self._find_item(product_key)
+        row = self._row(product_key)
+        if not row or row.status != self.APPROVED or not row.category_id:
+            raise ValueError(
+                "Primero aprobá la categoría antes de validar atributos condicionales."
+            )
+
+        attributes = [dict(attribute) for attribute in (row.attributes or [])]
+        conditional = [
+            attribute for attribute in attributes if attribute.get("conditional_required")
+        ]
+        if not conditional:
+            return self._serialize(item, row)
+
+        payload = self._conditional_payload(item, row, attributes)
+        required = self.ml.conditional_attributes(row.category_id, payload)
+        required_index = {
+            str(attribute.get("id")): attribute
+            for attribute in required
+            if attribute.get("id")
+        }
+
+        known_ids = {str(attribute.get("id")) for attribute in attributes}
+        for attribute in attributes:
+            if not attribute.get("conditional_required"):
+                continue
+            attribute_id = str(attribute.get("id") or "")
+            attribute["conditional_evaluated"] = True
+            attribute["conditional_required_now"] = attribute_id in required_index
+
+        product = item.get("product") or {}
+        verified = item.get("verified_core_data") or {}
+        for attribute_id, required_attribute in required_index.items():
+            if attribute_id in known_ids:
+                continue
+            attributes.append(
+                {
+                    "id": attribute_id,
+                    "name": required_attribute.get("name") or attribute_id,
+                    "value_type": None,
+                    "required": False,
+                    "conditional_required": True,
+                    "catalog_required": False,
+                    "verified_value": self._verified_value(attribute_id, product, verified),
+                    "suggested_value_id": None,
+                    "suggested_value": None,
+                    "conditional_evaluated": True,
+                    "conditional_required_now": True,
+                }
+            )
+
+        now = datetime.now(timezone.utc)
+        history = list(row.history or [])
+        history.append(
+            {
+                "at": now.isoformat(),
+                "action": "VALIDATE_CONDITIONAL",
+                "category_id": row.category_id,
+                "required_attribute_ids": sorted(required_index),
+                "validation_context": dict(self.CONDITIONAL_VALIDATION_DEFAULTS),
+            }
+        )
+        row.attributes = attributes
+        row.history = history[-100:]
+        row.updated_at = now
+        self.db.commit()
+        self.db.refresh(row)
+        return self._serialize(item, row)
+
+    @classmethod
+    def _conditional_payload(
+        cls,
+        item: dict,
+        row: PrepublicationMetadataReview,
+        attributes: list[dict],
+    ) -> dict:
+        product = item.get("product") or {}
+        title = str(product.get("name") or "").strip()
+        if not title:
+            raise ValueError("El producto no tiene título para validar atributos.")
+        try:
+            price = float(product.get("price"))
+        except (TypeError, ValueError):
+            raise ValueError("El producto no tiene un precio válido para la validación.")
+        try:
+            quantity = max(1, int(float(product.get("stock"))))
+        except (TypeError, ValueError):
+            raise ValueError("El producto no tiene stock válido para la validación.")
+
+        known_attributes = []
+        for attribute in attributes:
+            value = attribute.get("verified_value")
+            attribute_id = str(attribute.get("id") or "").strip()
+            if attribute_id and value not in {None, ""}:
+                known_attributes.append({"id": attribute_id, "value_name": str(value)})
+
+        return {
+            "title": title,
+            "category_id": row.category_id,
+            "price": price,
+            "currency_id": cls.CONDITIONAL_VALIDATION_DEFAULTS["currency_id"],
+            "available_quantity": quantity,
+            "buying_mode": cls.CONDITIONAL_VALIDATION_DEFAULTS["buying_mode"],
+            "condition": cls.CONDITIONAL_VALIDATION_DEFAULTS["condition"],
+            "listing_type_id": cls.CONDITIONAL_VALIDATION_DEFAULTS["listing_type_id"],
+            "attributes": known_attributes,
+        }
+
+    @staticmethod
+    def _conditional_state(attributes: list[dict]) -> tuple[str, list[dict], list[dict]]:
+        candidates = [
+            attribute for attribute in attributes if attribute.get("conditional_required")
+        ]
+        if not candidates:
+            return "NOT_APPLICABLE", [], []
+        if not all(attribute.get("conditional_evaluated") for attribute in candidates):
+            pending = [
+                {"id": attribute.get("id"), "name": attribute.get("name")}
+                for attribute in candidates
+            ]
+            return "PENDING", [], pending
+        required = [
+            attribute for attribute in candidates if attribute.get("conditional_required_now")
+        ]
+        pending = [
+            {"id": attribute.get("id"), "name": attribute.get("name")}
+            for attribute in required
+            if attribute.get("verified_value") in {None, ""}
+        ]
+        return (
+            "VALIDATED",
+            [{"id": attribute.get("id"), "name": attribute.get("name")} for attribute in required],
+            pending,
+        )
+
     def _find_item(self, product_key: str) -> dict:
         report = self.prepublication.report()
         item = next(
@@ -338,11 +482,17 @@ class PrepublicationMetadataService:
                 "candidates": [],
                 "attributes": [],
                 "required_missing": [],
+                "conditional_validation_status": "NOT_APPLICABLE",
+                "conditional_required": [],
                 "conditional_pending": [],
                 "notes": None,
                 "updated_at": None,
                 "history_count": 0,
             }
+        attributes = row.attributes or []
+        conditional_status, conditional_required, conditional_pending = (
+            PrepublicationMetadataService._conditional_state(attributes)
+        )
         return {
             "product_key": item["product_key"],
             "product": product,
@@ -354,13 +504,11 @@ class PrepublicationMetadataService:
             "domain_id": row.domain_id,
             "domain_name": row.domain_name,
             "candidates": row.candidates or [],
-            "attributes": row.attributes or [],
+            "attributes": attributes,
             "required_missing": row.required_missing or [],
-            "conditional_pending": [
-                {"id": attribute.get("id"), "name": attribute.get("name")}
-                for attribute in (row.attributes or [])
-                if attribute.get("conditional_required")
-            ],
+            "conditional_validation_status": conditional_status,
+            "conditional_required": conditional_required,
+            "conditional_pending": conditional_pending,
             "notes": row.notes,
             "updated_at": row.updated_at,
             "history_count": len(row.history or []),
