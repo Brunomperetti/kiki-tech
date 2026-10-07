@@ -1,7 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.database.models import Base, EnrichmentExternalResearch, PrepublicationMetadataReview
+from app.database.models import (
+    Base,
+    EnrichmentExternalResearch,
+    PrepublicationImageReview,
+    PrepublicationMetadataReview,
+)
 from app.services.prepublication_service import PrepublicationService
 
 
@@ -199,3 +204,90 @@ def test_prepublication_keeps_attributes_pending_when_conditional_rules_exist():
         ]
         assert report["summary"]["attributes_complete"] == 0
         assert report["summary"]["ready_for_preview"] == 0
+
+
+def test_prepublication_unlocks_attributes_after_conditional_validation_is_satisfied():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(
+            EnrichmentExternalResearch(
+                product_key="ECOMM:20",
+                reconciliation_run_id=1,
+                status="EVIDENCE_ACCEPTED",
+                proposed_brand="Bernard",
+                proposed_ean="062558102636",
+                source_name="Distribuidor",
+                source_url="https://example.com/maple",
+                confidence="HIGH",
+                product_snapshot={},
+                internal_evidence={},
+                history=[],
+            )
+        )
+        db.add(
+            PrepublicationImageReview(
+                product_key="ECOMM:20",
+                status="APPROVED",
+                source_type="MANUFACTURER",
+                source_name="Bernard",
+                source_url="https://example.com/maple",
+                image_urls=["https://example.com/maple.jpg"],
+                match_basis="GTIN_EXACT",
+                exact_match=True,
+                authorized_for_use=True,
+                product_snapshot={},
+                history=[],
+            )
+        )
+        db.add(
+            PrepublicationMetadataReview(
+                product_key="ECOMM:20",
+                status="APPROVED",
+                category_id="MLA420162",
+                category_name="Jarabes",
+                domain_id="MLA-SYRUPS",
+                domain_name="Jarabes para alimentos y bebidas",
+                candidates=[],
+                attributes=[
+                    {
+                        "id": "GTIN",
+                        "name": "Código universal",
+                        "required": False,
+                        "conditional_required": True,
+                        "conditional_evaluated": True,
+                        "conditional_required_now": True,
+                        "verified_value": "062558102636",
+                    }
+                ],
+                required_missing=[],
+                product_snapshot={},
+                history=[],
+            )
+        )
+        db.commit()
+
+        service = PrepublicationService(db)
+        service.readiness.report = lambda: {
+            "items": [
+                readiness_item(
+                    ecomm_id="20",
+                    sku="1175000",
+                    name="Jarabe Bernard",
+                    brand=None,
+                    ean=None,
+                    status="REVIEW_REQUIRED",
+                )
+            ]
+        }
+
+        report = service.report()
+        item = report["items"][0]
+
+        assert item["checks"]["images"] == "PASSED"
+        assert item["checks"]["category"] == "PASSED"
+        assert item["checks"]["attributes"] == "PASSED"
+        assert item["checks"]["preview"] == "READY_TO_VALIDATE"
+        assert item["ml_metadata"]["conditional_validation_status"] == "VALIDATED"
+        assert item["ml_metadata"]["conditional_pending"] == []
+        assert report["summary"]["ready_for_preview"] == 1
