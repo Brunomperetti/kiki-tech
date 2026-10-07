@@ -96,6 +96,7 @@ def test_analyze_metadata_uses_ml_predictor_and_keeps_human_approval():
         assert analyzed["category_id"] == "MLA123"
         assert len(analyzed["candidates"]) == 2
         assert analyzed["required_missing"] == [{"id": "MODEL", "name": "Modelo"}]
+        assert analyzed["conditional_pending"] == [{"id": "COLOR", "name": "Color"}]
         brand = next(a for a in analyzed["attributes"] if a["id"] == "BRAND")
         gtin = next(a for a in analyzed["attributes"] if a["id"] == "GTIN")
         assert brand["verified_value"] == "Natufarma"
@@ -110,6 +111,7 @@ def test_analyze_metadata_uses_ml_predictor_and_keeps_human_approval():
         assert approved["metadata_status"] == "APPROVED"
         assert approved["history_count"] == 2
         assert approved["required_missing"][0]["id"] == "MODEL"
+        assert approved["conditional_pending"][0]["id"] == "COLOR"
 
 
 def test_queue_does_not_call_ml_until_user_or_batch_analyzes():
