@@ -6,6 +6,7 @@ def result(
     *,
     stock=5,
     ean="7791234567890",
+    brand="Marca Test",
     sku="2562",
     sku_product=None,
     sku_variant=None,
@@ -25,6 +26,7 @@ def result(
             "sku_aliases": sku_aliases or [sku],
             "ean": ean,
             "ean_aliases": ean_aliases or ([ean] if ean else []),
+            "brand": brand,
             "name": "Producto de prueba",
             "price": 1000,
             "stock": stock,
@@ -37,6 +39,14 @@ def test_candidate_with_core_data_is_ready_for_enrichment():
     status, reasons = PublicationReadinessService.classify(result("CANDIDATE_TO_PUBLISH"))
     assert status == "READY_CORE_DATA"
     assert "imágenes" in reasons[0]
+
+
+def test_candidate_without_brand_requires_review():
+    item = result("CANDIDATE_TO_PUBLISH", brand=None)
+    status, reasons = PublicationReadinessService.classify(item)
+    assert status == "REVIEW_REQUIRED"
+    assert "marca" in reasons[0].lower()
+    assert PublicationReadinessService.reason_codes(item, status) == ["BRAND_MISSING"]
 
 
 def test_candidate_without_stock_is_no_stock():
