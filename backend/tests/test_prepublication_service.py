@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.database.models import Base, EnrichmentExternalResearch
+from app.database.models import Base, EnrichmentExternalResearch, PrepublicationMetadataReview
 from app.services.prepublication_service import PrepublicationService
 
 
@@ -128,3 +128,74 @@ def test_prepublication_never_overwrites_existing_catalog_values_with_evidence()
         item = report["items"][0]
         assert item["verified_core_data"]["brand"] == "Marca Ecomm"
         assert item["verified_core_data"]["ean"] == "7795379101108"
+
+
+
+def test_prepublication_keeps_attributes_pending_when_conditional_rules_exist():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(
+            EnrichmentExternalResearch(
+                product_key="ECOMM:20",
+                reconciliation_run_id=1,
+                status="EVIDENCE_ACCEPTED",
+                proposed_brand="Bernard",
+                proposed_ean="062558102636",
+                source_name="Distribuidor",
+                source_url="https://example.com/maple",
+                confidence="MEDIUM",
+                product_snapshot={},
+                internal_evidence={},
+                history=[],
+            )
+        )
+        db.add(
+            PrepublicationMetadataReview(
+                product_key="ECOMM:20",
+                status="APPROVED",
+                category_id="MLA420162",
+                category_name="Jarabes",
+                domain_id="MLA-SYRUPS",
+                domain_name="Jarabes para alimentos y bebidas",
+                candidates=[],
+                attributes=[
+                    {
+                        "id": "GTIN",
+                        "name": "Código universal",
+                        "required": False,
+                        "conditional_required": True,
+                    }
+                ],
+                required_missing=[],
+                product_snapshot={},
+                history=[],
+            )
+        )
+        db.commit()
+
+        service = PrepublicationService(db)
+        service.readiness.report = lambda: {
+            "items": [
+                readiness_item(
+                    ecomm_id="20",
+                    sku="1175000",
+                    name="Jarabe Bernard",
+                    brand=None,
+                    ean=None,
+                    status="REVIEW_REQUIRED",
+                )
+            ]
+        }
+
+        report = service.report()
+        item = report["items"][0]
+
+        assert item["checks"]["category"] == "PASSED"
+        assert item["checks"]["attributes"] == "READY_TO_VALIDATE"
+        assert item["checks"]["preview"] == "BLOCKED"
+        assert item["ml_metadata"]["conditional_pending"] == [
+            {"id": "GTIN", "name": "Código universal"}
+        ]
+        assert report["summary"]["attributes_complete"] == 0
+        assert report["summary"]["ready_for_preview"] == 0

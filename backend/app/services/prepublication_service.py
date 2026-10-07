@@ -101,10 +101,16 @@ class PrepublicationService:
             if images_status == "PASSED":
                 image_passed += 1
             metadata = approved_metadata.get(key)
+            conditional_pending = []
             if metadata is not None:
+                conditional_pending = [
+                    {"id": attribute.get("id"), "name": attribute.get("name")}
+                    for attribute in (metadata.attributes or [])
+                    if attribute.get("conditional_required")
+                ]
                 category_status = "PASSED"
                 category_passed += 1
-                if metadata.required_missing:
+                if metadata.required_missing or conditional_pending:
                     attributes_status = "READY_TO_VALIDATE"
                 else:
                     attributes_status = "PASSED"
@@ -144,6 +150,7 @@ class PrepublicationService:
                             "domain_id": metadata.domain_id,
                             "domain_name": metadata.domain_name,
                             "required_missing": metadata.required_missing or [],
+                            "conditional_pending": conditional_pending,
                         }
                         if metadata is not None
                         else None

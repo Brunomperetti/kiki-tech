@@ -158,7 +158,7 @@ export function MetadataReview(){
                 <button className="secondary" onClick={()=>analyze(item.product_key)} disabled={busy===item.product_key}>Volver a analizar</button>
                 <button className="danger-outline" onClick={()=>save(item,'REJECTED')} disabled={busy===item.product_key}>Descartar propuesta</button>
               </div>
-              {item.metadata_status==='APPROVED'&&<p className={item.required_missing.length?'metadata-result pending':'metadata-result complete'}>{item.required_missing.length?'Categoría aprobada. Todavía faltan '+item.required_missing.length+' atributo(s) obligatorio(s).':'Categoría aprobada y atributos obligatorios cubiertos con los datos disponibles.'}</p>}
+              {item.metadata_status==='APPROVED'&&<p className={(item.required_missing.length||item.conditional_pending.length)?'metadata-result pending':'metadata-result complete'}>{item.required_missing.length?'Categoría aprobada. Todavía faltan '+item.required_missing.length+' atributo(s) obligatorio(s).':item.conditional_pending.length?'Categoría aprobada. Hay '+item.conditional_pending.length+' atributo(s) condicional(es) que todavía deben validarse con el payload completo antes del preview.':'Categoría aprobada y atributos obligatorios cubiertos con los datos disponibles.'}</p>}
             </>
           }
         </article>;
