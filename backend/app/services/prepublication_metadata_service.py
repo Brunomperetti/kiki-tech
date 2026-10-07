@@ -251,11 +251,14 @@ class PrepublicationMetadataService:
 
         known_ids = {str(attribute.get("id")) for attribute in attributes}
         for attribute in attributes:
-            if not attribute.get("conditional_required"):
-                continue
             attribute_id = str(attribute.get("id") or "")
-            attribute["conditional_evaluated"] = True
-            attribute["conditional_required_now"] = attribute_id in required_index
+            if attribute.get("conditional_required"):
+                attribute["conditional_evaluated"] = True
+                attribute["conditional_required_now"] = attribute_id in required_index
+            elif attribute_id in required_index:
+                attribute["conditional_required"] = True
+                attribute["conditional_evaluated"] = True
+                attribute["conditional_required_now"] = True
 
         product = item.get("product") or {}
         verified = item.get("verified_core_data") or {}
