@@ -33,7 +33,7 @@ function Login({onLogin}: {onLogin: () => void}) {
       <label>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
       {error && <p className="login-error" role="alert">{error}</p>}
       <button type="submit" disabled={busy}>{busy ? 'Verificando…' : 'Iniciar sesión'}</button>
-    </form><p className="secure-note">Sesión privada · Mercado Libre en modo lectura</p>
+    </form><p className="secure-note">Sesión privada · Sin publicación automática en Mercado Libre</p>
   </section></main>;
 }
 
