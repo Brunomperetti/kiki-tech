@@ -1,4 +1,4 @@
-import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, ImportJob, MercadoLibreStatus, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
+import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, ImportJob, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
 
@@ -61,6 +61,22 @@ export const api = {
     body: JSON.stringify(payload),
   }),
   prepublication: () => request<PrepublicationReport>('/api/prepublication'),
+  prepublicationMetadata: () => request<PrepublicationMetadataQueue>('/api/prepublication/metadata'),
+  analyzePrepublicationMetadata: (productKey: string) => request<PrepublicationMetadataItem>('/api/prepublication/metadata/analyze', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({product_key: productKey}),
+  }),
+  analyzePendingMetadata: (limit = 10) => request<MetadataBatchResult>('/api/prepublication/metadata/analyze-pending', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({limit}),
+  }),
+  savePrepublicationMetadata: (payload: PrepublicationMetadataPayload) => request<PrepublicationMetadataItem>('/api/prepublication/metadata', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  }),
   prepublicationImages: () => request<PrepublicationImageQueue>('/api/prepublication/images'),
   savePrepublicationImages: (payload: PrepublicationImagePayload) => request<PrepublicationImageItem>('/api/prepublication/images', {
     method: 'POST',
