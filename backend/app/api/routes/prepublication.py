@@ -154,9 +154,15 @@ def validate_conditional_metadata(
             raise HTTPException(exc.status_code, "Mercado Libre requiere reconexión.") from exc
         if exc.status_code == 429:
             raise HTTPException(503, "Límite de Mercado Libre agotado; reintentá más tarde.") from exc
-        logger.warning("prepublication_conditional_ml_failed status=%s", exc.status_code)
+        logger.warning(
+            "prepublication_conditional_ml_failed status=%s detail=%s",
+            exc.status_code,
+            str(exc),
+        )
+        detail = str(exc).strip() or "Mercado Libre rechazó la validación."
         raise HTTPException(
-            502, "Mercado Libre no pudo validar los atributos condicionales."
+            502,
+            f"Mercado Libre rechazó la validación (HTTP {exc.status_code}): {detail}",
         ) from exc
     except Exception as exc:
         logger.exception("prepublication_conditional_validation_failed")
