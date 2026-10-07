@@ -45,6 +45,10 @@ services:
     envVars:
       - key: VITE_API_URL
         sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 databases:
   - name: kiki-tech-db
     plan: free
