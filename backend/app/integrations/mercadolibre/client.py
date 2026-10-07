@@ -47,9 +47,7 @@ class MercadoLibreClient:
         items = []
         for offset in range(0, len(item_ids), batch_size):
             batch = item_ids[offset : offset + batch_size]
-            data = self._get(
-                "/items/bulk", {"ids": ",".join(batch)}
-            )
+            data = self._get("/items/bulk", {"ids": ",".join(batch)})
             if not isinstance(data, list) or len(data) != len(batch):
                 raise MercadoLibreHTTPError(
                     502, "Mercado Libre returned an incomplete bulk batch"
@@ -71,6 +69,34 @@ class MercadoLibreClient:
                     )
                 items.append(entry["body"])
         return items
+
+    def predict_categories(
+        self, title: str, *, site_id: str = "MLA", limit: int = 3
+    ) -> list[dict]:
+        """Read Mercado Libre's category predictor for the supplied local title."""
+        if not title.strip():
+            raise ValueError("El título es obligatorio para predecir categoría.")
+        safe_limit = max(1, min(int(limit), 8))
+        data = self._get(
+            f"/sites/{site_id}/domain_discovery/search",
+            {"q": title.strip(), "limit": safe_limit},
+        )
+        if not isinstance(data, list):
+            raise MercadoLibreHTTPError(
+                502, "Mercado Libre returned an invalid category prediction"
+            )
+        return [candidate for candidate in data if isinstance(candidate, dict)]
+
+    def get_category_attributes(self, category_id: str) -> list[dict]:
+        """Read the attributes declared by Mercado Libre for one category."""
+        if not category_id.strip():
+            raise ValueError("La categoría es obligatoria.")
+        data = self._get(f"/categories/{category_id.strip()}/attributes")
+        if not isinstance(data, list):
+            raise MercadoLibreHTTPError(
+                502, "Mercado Libre returned invalid category attributes"
+            )
+        return [attribute for attribute in data if isinstance(attribute, dict)]
 
     def refresh_access_token(self, refresh_token: str) -> dict:
         return self.oauth.refresh(refresh_token)

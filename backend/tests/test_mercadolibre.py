@@ -438,3 +438,28 @@ def test_reconciliation_auto_api_and_xlsx_fallback(db, monkeypatch):
     service.repo.save_snapshot("MERCADOLIBRE_API", [{"external_id": "API"}])
     assert service._choose_ml_source("AUTO") == "MERCADOLIBRE_API"
     assert service._choose_ml_source("XLSX") == "MERCADOLIBRE"
+
+
+
+def test_category_predictor_uses_mla_domain_discovery():
+    transport = QueueTransport(
+        [[{"category_id": "MLA123", "category_name": "Suplementos"}]]
+    )
+    client = MercadoLibreClient(SETTINGS, "token", transport)
+    result = client.predict_categories("Valeriana Natufarma", limit=3)
+
+    assert result[0]["category_id"] == "MLA123"
+    assert "/sites/MLA/domain_discovery/search?" in transport.calls[0][1]
+    assert "limit=3" in transport.calls[0][1]
+
+
+def test_category_attributes_are_read_only_get():
+    transport = QueueTransport(
+        [[{"id": "BRAND", "name": "Marca", "tags": {"required": True}}]]
+    )
+    client = MercadoLibreClient(SETTINGS, "token", transport)
+    result = client.get_category_attributes("MLA123")
+
+    assert result[0]["id"] == "BRAND"
+    assert transport.calls[0][0] == "GET"
+    assert transport.calls[0][1].endswith("/categories/MLA123/attributes")

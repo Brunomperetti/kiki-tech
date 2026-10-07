@@ -2,9 +2,9 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
-from cryptography.fernet import Fernet, InvalidToken
 
 from ..core.config import get_settings
 from ..database.models import (
@@ -133,9 +133,7 @@ class MercadoLibreService:
         if not connection:
             raise ValueError("Mercado Libre no está conectado.")
         self._refresh_if_needed(connection)
-        client = MercadoLibreClient(
-            self.settings, self._decrypt(connection.access_token), self.transport
-        )
+        client = self._client(connection)
         try:
             item_ids = client.list_item_ids(connection.user_id)
             items = client.get_items_bulk(item_ids)
@@ -143,9 +141,7 @@ class MercadoLibreService:
             if exc.status_code != 401:
                 raise
             self._refresh(connection)
-            client = MercadoLibreClient(
-                self.settings, self._decrypt(connection.access_token), self.transport
-            )
+            client = self._client(connection)
             item_ids = client.list_item_ids(connection.user_id)
             items = client.get_items_bulk(item_ids)
         listings = [listing for item in items for listing in transform_item(item)]
@@ -158,6 +154,34 @@ class MercadoLibreService:
         self.db.commit()
         self.db.refresh(record)
         return {"listing_count": len(listings), "synced_at": record.created_at}
+
+    def predict_categories(self, title: str, limit: int = 3) -> list[dict]:
+        return self._read_with_refresh(
+            lambda client: client.predict_categories(title, site_id="MLA", limit=limit)
+        )
+
+    def category_attributes(self, category_id: str) -> list[dict]:
+        return self._read_with_refresh(
+            lambda client: client.get_category_attributes(category_id)
+        )
+
+    def _read_with_refresh(self, action):
+        connection = self.repo.ml_connection()
+        if not connection:
+            raise ValueError("Mercado Libre no está conectado.")
+        self._refresh_if_needed(connection)
+        try:
+            return action(self._client(connection))
+        except MercadoLibreHTTPError as exc:
+            if exc.status_code != 401:
+                raise
+            self._refresh(connection)
+            return action(self._client(connection))
+
+    def _client(self, connection) -> MercadoLibreClient:
+        return MercadoLibreClient(
+            self.settings, self._decrypt(connection.access_token), self.transport
+        )
 
     def _refresh_if_needed(self, connection):
         if _aware(connection.expires_at) <= datetime.now(timezone.utc) + timedelta(

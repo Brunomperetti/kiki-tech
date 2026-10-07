@@ -149,6 +149,30 @@ class PrepublicationImageReview(Base):
     )
 
 
+class PrepublicationMetadataReview(Base):
+    """Persistent ML category/attribute review; reads ML but never publishes."""
+
+    __tablename__ = "prepublication_metadata_reviews"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    category_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    category_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    domain_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    domain_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    candidates: Mapped[list] = mapped_column(JSON, default=list)
+    attributes: Mapped[list] = mapped_column(JSON, default=list)
+    required_missing: Mapped[list] = mapped_column(JSON, default=list)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    product_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
 class MercadoLibreConnection(Base):
     __tablename__ = "mercadolibre_connections"
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
