@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
@@ -451,6 +452,34 @@ def test_category_predictor_uses_mla_domain_discovery():
     assert result[0]["category_id"] == "MLA123"
     assert "/sites/MLA/domain_discovery/search?" in transport.calls[0][1]
     assert "limit=3" in transport.calls[0][1]
+
+
+def test_conditional_attributes_use_non_mutating_validation_post():
+    transport = QueueTransport(
+        [{"required_attributes": [{"id": "GTIN", "name": "Código universal"}]}]
+    )
+    client = MercadoLibreClient(SETTINGS, "token", transport)
+    payload = {
+        "title": "Producto de prueba",
+        "category_id": "MLA123",
+        "price": 1000,
+        "currency_id": "ARS",
+        "available_quantity": 5,
+        "buying_mode": "buy_it_now",
+        "condition": "new",
+        "listing_type_id": "gold_special",
+        "attributes": [],
+    }
+
+    result = client.get_conditional_required_attributes("MLA123", payload)
+
+    assert result == [{"id": "GTIN", "name": "Código universal"}]
+    assert transport.calls[0][0] == "POST"
+    assert transport.calls[0][1].endswith(
+        "/categories/MLA123/attributes/conditional"
+    )
+    assert transport.calls[0][2]["headers"]["Content-Type"] == "application/json"
+    assert json.loads(transport.calls[0][2]["data"]) == payload
 
 
 def test_category_attributes_are_read_only_get():
