@@ -99,7 +99,8 @@ class InventoryLinkageService:
             self.NO_ECOMM_MATCH: 1,
             self.REVIEW_AMBIGUOUS: 2,
             self.REVIEW_MULTIPLE_GTIN: 3,
-            self.INVALID_GTIN: 4,
+            self.REVIEW_IDENTIFIER_CONFLICT: 4,
+            self.INVALID_GTIN: 5,
         }
         items.sort(
             key=lambda item: (
@@ -122,6 +123,7 @@ class InventoryLinkageService:
                 "invalid_gtin": status_counts[self.INVALID_GTIN],
                 "ambiguous": status_counts[self.REVIEW_AMBIGUOUS],
                 "multiple_gtin": status_counts[self.REVIEW_MULTIPLE_GTIN],
+                "identifier_conflict": status_counts[self.REVIEW_IDENTIFIER_CONFLICT],
                 "distinct_unlinked_gtins": len(unlinked_gtins),
                 "data_quality_invalid_gtin_total": invalid_gtin_total,
                 "data_quality_multiple_gtin_total": multiple_gtin_total,
@@ -130,11 +132,13 @@ class InventoryLinkageService:
                 "mode": "READ_ONLY_EDIMA_RECONCILIATION",
                 "description": (
                     "KIKI Tech cruza el estado de vinculación informado por EDIMA con el catálogo "
-                    "canónico de Ecomm-App usando GTIN exacto. No modifica Ecomm-App ni Mercado Libre."
+                    "canónico de Ecomm-App usando primero el MLA exacto de las filas Ecomm y, como "
+                    "segunda evidencia, el GTIN exacto. No modifica Ecomm-App ni Mercado Libre."
                 ),
                 "safe_match": (
-                    "Una publicación queda Lista para vincular solo cuando EDIMA indica No, contiene "
-                    "un único GTIN válido y ese GTIN pertenece a un único producto canónico de Ecomm-App."
+                    "Una publicación queda Lista para vincular cuando EDIMA indica No, contiene un "
+                    "único GTIN válido y podemos identificar un único producto Ecomm por MLA exacto "
+                    "o por GTIN exacto. Si MLA y GTIN se contradicen, KIKI la manda a revisión."
                 ),
             },
             "items": items,
@@ -293,6 +297,7 @@ class InventoryLinkageService:
                 "invalid_gtin": 0,
                 "ambiguous": 0,
                 "multiple_gtin": 0,
+                "identifier_conflict": 0,
                 "distinct_unlinked_gtins": 0,
                 "data_quality_invalid_gtin_total": 0,
                 "data_quality_multiple_gtin_total": 0,
