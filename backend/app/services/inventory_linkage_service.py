@@ -228,7 +228,7 @@ class InventoryLinkageService:
                     self.REVIEW_IDENTIFIER_CONFLICT,
                     f"El MLA coincide con un producto Ecomm, pero EDIMA informa GTIN {gtin} y el producto tiene otro EAN/GTIN.",
                     matched,
-                    f"{mla_source}_GTIN_CONFLICT" if mla_source else f"{mla_source}_GTIN_CONFLICT" if mla_source else "MLA_GTIN_CONFLICT",
+                    f"{mla_source}_GTIN_CONFLICT" if mla_source else "MLA_GTIN_CONFLICT",
                 )
             if len(ean_matches) > 1:
                 return (
@@ -242,7 +242,7 @@ class InventoryLinkageService:
                     self.REVIEW_IDENTIFIER_CONFLICT,
                     f"El MLA coincide con un producto Ecomm, pero el GTIN {gtin} identifica otro producto canónico.",
                     matched,
-                    "MLA_GTIN_CONFLICT",
+                    f"{mla_source}_GTIN_CONFLICT" if mla_source else "MLA_GTIN_CONFLICT",
                 )
             return (
                 self.READY_TO_LINK,
