@@ -197,7 +197,14 @@ class InventoryLinkageService:
                     matched,
                     "MLA_EXACT_GTIN_CONFLICT",
                 )
-            if ean_matches and all(product is not matched for product in ean_matches):
+            if len(ean_matches) > 1:
+                return (
+                    self.REVIEW_AMBIGUOUS,
+                    f"El MLA coincide con un producto Ecomm, pero el GTIN {gtin} aparece en más de un producto canónico.",
+                    matched,
+                    "MLA_GTIN_AMBIGUOUS",
+                )
+            if len(ean_matches) == 1 and ean_matches[0] is not matched:
                 return (
                     self.REVIEW_IDENTIFIER_CONFLICT,
                     f"El MLA coincide con un producto Ecomm, pero el GTIN {gtin} identifica otro producto canónico.",
