@@ -5,7 +5,7 @@ from app.database.models import Base
 from app.services.inventory_linkage_service import InventoryLinkageService
 
 
-def product(ecomm_id, sku, ean, name):
+def product(ecomm_id, sku, ean, name, ecomm_rows=None):
     return {
         "ecomm_id": ecomm_id,
         "sku": sku,
@@ -15,6 +15,7 @@ def product(ecomm_id, sku, ean, name):
         "name": name,
         "brand": "Marca",
         "stock": 5,
+        "ecomm_rows": ecomm_rows or [],
     }
 
 
@@ -70,6 +71,7 @@ def test_inventory_linkage_matches_only_unique_exact_gtin():
         assert report["summary"]["review_required"] == 3
         ready = next(item for item in report["items"] if item["external_id"] == "MLA2")
         assert ready["status"] == "READY_TO_LINK"
+        assert ready["match_method"] == "GTIN_EXACT"
         assert ready["matched_product"]["sku"] == "1175"
         assert next(item for item in report["items"] if item["external_id"] == "MLA3")["status"] == "NO_ECOMM_MATCH"
         assert next(item for item in report["items"] if item["external_id"] == "MLA4")["status"] == "REVIEW_MULTIPLE_GTIN"
@@ -107,3 +109,117 @@ def test_inventory_linkage_is_optional_until_edima_is_imported():
 
         assert report["available"] is False
         assert report["items"] == []
+
+
+def test_inventory_linkage_uses_exact_mla_when_ecomm_gtin_is_missing():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "10",
+                    "1175",
+                    None,
+                    "Aceite MCT",
+                    ecomm_rows=[
+                        {
+                            "listing_id": "MLA1889257682",
+                            "marketplace_id": None,
+                        }
+                    ],
+                )
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1889257682",
+                    "No",
+                    "7798318384006",
+                    ["7798318384006"],
+                    "Aceite MCT ML",
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "READY_TO_LINK"
+        assert item["match_method"] == "MLA_EXACT"
+        assert item["matched_product"]["sku"] == "1175"
+        assert "MLA1889257682" in item["reason"]
+
+
+def test_inventory_linkage_blocks_when_mla_and_existing_gtin_conflict():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "10",
+                    "1175",
+                    "7798121272958",
+                    "Producto Ecomm",
+                    ecomm_rows=[{"listing_id": "MLA1889257682"}],
+                )
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1889257682",
+                    "No",
+                    "7798318384006",
+                    ["7798318384006"],
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_IDENTIFIER_CONFLICT"
+        assert item["match_method"] == "MLA_EXACT_GTIN_CONFLICT"
+        assert item["matched_product"]["sku"] == "1175"
+
+
+def test_inventory_linkage_accepts_numeric_marketplace_id_for_mla():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "10",
+                    "1175",
+                    None,
+                    "Aceite MCT",
+                    ecomm_rows=[{"marketplace_id": "1889257682"}],
+                )
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1889257682",
+                    "No",
+                    "7798318384006",
+                    ["7798318384006"],
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "READY_TO_LINK"
+        assert item["match_method"] == "MLA_EXACT"
