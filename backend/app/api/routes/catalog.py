@@ -11,6 +11,7 @@ from ...repositories.catalog_repository import CatalogRepository
 from ...services.enrichment_external_research_service import EnrichmentExternalResearchService
 from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
+from ...services.inventory_linkage_service import InventoryLinkageService
 from ...services.publication_readiness_service import PublicationReadinessService
 from ...services.reconciliation_service import ReconciliationService
 
@@ -43,7 +44,7 @@ async def import_catalog(
     _session=Depends(require_csrf),
 ):
     source = source.upper()
-    if source not in {"ECOMM_APP", "MERCADOLIBRE"}:
+    if source not in {"ECOMM_APP", "MERCADOLIBRE", "EDIMA_LINKAGE"}:
         raise HTTPException(400, "Origen de importación no válido.")
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(400, "El archivo debe tener formato XLSX.")
@@ -91,6 +92,17 @@ def dashboard(db: Session = Depends(get_db), _session=Depends(require_session)):
         for job in repo.latest_jobs_by_source()
     ]
     return summary
+
+
+@router.get("/inventory-linkage")
+def inventory_linkage(
+    db: Session = Depends(get_db), _session=Depends(require_session)
+):
+    try:
+        return InventoryLinkageService(db).report()
+    except Exception as exc:
+        logger.exception("inventory_linkage_failed")
+        raise HTTPException(500, "No se pudo analizar la vinculación de inventario.") from exc
 
 
 @router.get("/publication-readiness")

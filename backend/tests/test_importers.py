@@ -2,6 +2,7 @@ from io import BytesIO
 import pandas as pd
 import pytest
 from app.integrations.common.excel import ExcelImportError
+from app.integrations.ecomm_app.edima_linkage_importer import EdimaLinkageExcelImporter
 from app.integrations.ecomm_app.excel_importer import EcommExcelImporter
 from app.integrations.mercadolibre.excel_importer import MercadoLibreExcelImporter
 
@@ -126,3 +127,39 @@ def test_invalid_file():
 def test_missing_minimum_headers():
     with pytest.raises(ExcelImportError, match="encabezados"):
         EcommExcelImporter().read(excel(pd.DataFrame([{"Nombre": "Item"}])))
+
+
+def test_edima_linkage_real_headers_preserve_gtin_and_status():
+    rows = [
+        ["Obligatorio", "No modificar", "No modificar", "No modificar", "No modificar"],
+        [
+            "Título de la publicación",
+            "Nro. de la publicación",
+            "Publicacion Vinculada con Inventario",
+            "Fecha Última Modificación",
+            "Codigo de Barras (GTIN)",
+        ],
+        [
+            "Producto sin vincular",
+            "MLA1889257682",
+            "No",
+            "2026-10-07 02:16:31",
+            "074312017070",
+        ],
+        [
+            "Producto con dos códigos",
+            "MLA1620684715",
+            "Sí",
+            "2026-10-08 12:19:14",
+            "078895300024,078895300017",
+        ],
+    ]
+    report = EdimaLinkageExcelImporter().read(excel(pd.DataFrame(rows), header=False))
+
+    assert report.header_row == 2
+    assert report.rows_accepted == 2
+    assert report.records[0].external_id == "MLA1889257682"
+    assert report.records[0].inventory_linked == "No"
+    assert report.records[0].gtins == ["074312017070"]
+    assert report.records[1].gtins == ["078895300024", "078895300017"]
+    assert any("1 publicaciones vinculadas y 1 no vinculadas" in warning for warning in report.warnings)
