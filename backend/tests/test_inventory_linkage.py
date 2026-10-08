@@ -223,3 +223,39 @@ def test_inventory_linkage_accepts_numeric_marketplace_id_for_mla():
 
         assert item["status"] == "READY_TO_LINK"
         assert item["match_method"] == "MLA_EXACT"
+
+
+def test_inventory_linkage_blocks_ambiguous_gtin_even_when_mla_matches_one_product():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "10",
+                    "1000",
+                    "7798121272958",
+                    "Producto A",
+                    ecomm_rows=[{"listing_id": "MLA1889257682"}],
+                ),
+                product("20", "2000", "7798121272958", "Producto B"),
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1889257682",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_AMBIGUOUS"
+        assert item["match_method"] == "MLA_GTIN_AMBIGUOUS"
