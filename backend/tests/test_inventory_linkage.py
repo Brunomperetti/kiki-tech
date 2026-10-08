@@ -341,3 +341,113 @@ def test_reconciliation_mla_takes_priority_over_gtin_fallback():
 
         assert item["status"] == "REVIEW_IDENTIFIER_CONFLICT"
         assert item["match_method"] == "RECONCILIATION_MLA_GTIN_CONFLICT"
+
+
+def test_inventory_linkage_suggests_unique_exact_title_when_identifiers_fail():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "10",
+                    "1175",
+                    None,
+                    "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                )
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA3235792624",
+                    "No",
+                    "7793323024763",
+                    ["7793323024763"],
+                    "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_TITLE_CANDIDATE"
+        assert item["match_method"] == "TITLE_EXACT"
+        assert item["matched_product"]["sku"] == "1175"
+        assert service.report()["summary"]["title_candidates"] == 1
+
+
+def test_inventory_linkage_suggests_only_clear_high_confidence_title():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "10",
+                    "1175",
+                    None,
+                    "Aceite De Girasol Organico Dicomere 500ml",
+                ),
+                product(
+                    "20",
+                    "2000",
+                    None,
+                    "Aceite De Coco Organico 500ml",
+                ),
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA3235792624",
+                    "No",
+                    "7793323024763",
+                    ["7793323024763"],
+                    "Aceite De Girasol Organico Dicomere 500 Ml",
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_TITLE_CANDIDATE"
+        assert item["match_method"] in {"TITLE_EXACT", "TITLE_HIGH_CONFIDENCE"}
+        assert item["matched_product"]["sku"] == "1175"
+
+
+def test_inventory_linkage_does_not_use_ambiguous_title():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product("10", "1000", None, "Producto Natural 500 Ml"),
+                product("20", "2000", None, "Producto Natural 500 Ml"),
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA999",
+                    "No",
+                    "7793323024763",
+                    ["7793323024763"],
+                    "Producto Natural 500 Ml",
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "NO_ECOMM_MATCH"
+        assert item["matched_product"] is None
