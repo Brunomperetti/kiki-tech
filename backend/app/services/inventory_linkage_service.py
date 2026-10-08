@@ -11,6 +11,7 @@ class InventoryLinkageService:
     READY_TO_LINK = "READY_TO_LINK"
     REVIEW_AMBIGUOUS = "REVIEW_AMBIGUOUS"
     REVIEW_MULTIPLE_GTIN = "REVIEW_MULTIPLE_GTIN"
+    REVIEW_IDENTIFIER_CONFLICT = "REVIEW_IDENTIFIER_CONFLICT"
     INVALID_GTIN = "INVALID_GTIN"
     NO_ECOMM_MATCH = "NO_ECOMM_MATCH"
 
@@ -30,6 +31,7 @@ class InventoryLinkageService:
             )
 
         ean_index: dict[str, list[dict]] = defaultdict(list)
+        listing_index: dict[str, list[dict]] = defaultdict(list)
         for product in products:
             seen = set()
             for ean in [product.get("ean"), *(product.get("ean_aliases") or [])]:
@@ -37,6 +39,13 @@ class InventoryLinkageService:
                 if value and value not in seen:
                     ean_index[value].append(product)
                     seen.add(value)
+            listing_seen = set()
+            for ecomm_row in product.get("ecomm_rows") or []:
+                for raw_id in [ecomm_row.get("listing_id"), ecomm_row.get("marketplace_id")]:
+                    for key in self._listing_keys(raw_id):
+                        if key not in listing_seen:
+                            listing_index[key].append(product)
+                            listing_seen.add(key)
 
         linked = 0
         unlinked = 0
@@ -60,7 +69,13 @@ class InventoryLinkageService:
 
             unlinked += 1
             unlinked_gtins.update(valid_gtins)
-            status, reason, matched = self._classify_unlinked(gtins, valid_gtins, ean_index)
+            status, reason, matched, match_method = self._classify_unlinked(
+                row,
+                gtins,
+                valid_gtins,
+                ean_index,
+                listing_index,
+            )
             status_counts[status] += 1
             items.append(
                 {
@@ -74,6 +89,7 @@ class InventoryLinkageService:
                     "modified_at": row.get("modified_at"),
                     "status": status,
                     "reason": reason,
+                    "match_method": match_method,
                     "matched_product": self._product_view(matched) if matched else None,
                 }
             )
