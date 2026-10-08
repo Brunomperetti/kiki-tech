@@ -58,6 +58,20 @@ class EcommChannelRow(BaseModel):
     inventory_linked: str | None = None
 
 
+class EdimaLinkageRow(BaseModel):
+    """One Mercado Libre row exported from Ecomm-App EDIMA linkage report."""
+
+    external_id: str | None = None
+    variation_id: str | None = None
+    title: str | None = None
+    category: str | None = None
+    brand: str | None = None
+    inventory_linked: str | None = None
+    modified_at: str | None = None
+    gtin_raw: str | None = None
+    gtins: list[str] = Field(default_factory=list)
+
+
 class Product(BaseModel):
     ecomm_id: str | None = None
     sku: str | None = None
