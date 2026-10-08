@@ -1,7 +1,9 @@
 from collections import Counter, defaultdict
+from difflib import SequenceMatcher
 
 from sqlalchemy.orm import Session
 
+from ..catalog.normalizer import normalize_title
 from ..repositories.catalog_repository import CatalogRepository
 
 
@@ -12,6 +14,7 @@ class InventoryLinkageService:
     REVIEW_AMBIGUOUS = "REVIEW_AMBIGUOUS"
     REVIEW_MULTIPLE_GTIN = "REVIEW_MULTIPLE_GTIN"
     REVIEW_IDENTIFIER_CONFLICT = "REVIEW_IDENTIFIER_CONFLICT"
+    REVIEW_TITLE_CANDIDATE = "REVIEW_TITLE_CANDIDATE"
     INVALID_GTIN = "INVALID_GTIN"
     NO_ECOMM_MATCH = "NO_ECOMM_MATCH"
 
@@ -47,6 +50,14 @@ class InventoryLinkageService:
                         if key not in listing_seen:
                             listing_index[key].append(product)
                             listing_seen.add(key)
+
+        title_index: dict[str, list[dict]] = defaultdict(list)
+        normalized_products: list[tuple[dict, str]] = []
+        for product in products:
+            normalized = normalize_title(product.get("name"))
+            if normalized:
+                title_index[normalized].append(product)
+                normalized_products.append((product, normalized))
 
         latest_run = self.repo.latest_run()
         if latest_run:
@@ -91,6 +102,8 @@ class InventoryLinkageService:
                 ean_index,
                 listing_index,
                 reconciliation_index,
+                title_index,
+                normalized_products,
             )
             status_counts[status] += 1
             items.append(
@@ -116,7 +129,8 @@ class InventoryLinkageService:
             self.REVIEW_AMBIGUOUS: 2,
             self.REVIEW_MULTIPLE_GTIN: 3,
             self.REVIEW_IDENTIFIER_CONFLICT: 4,
-            self.INVALID_GTIN: 5,
+            self.REVIEW_TITLE_CANDIDATE: 5,
+            self.INVALID_GTIN: 6,
         }
         items.sort(
             key=lambda item: (
@@ -140,6 +154,7 @@ class InventoryLinkageService:
                 "ambiguous": status_counts[self.REVIEW_AMBIGUOUS],
                 "multiple_gtin": status_counts[self.REVIEW_MULTIPLE_GTIN],
                 "identifier_conflict": status_counts[self.REVIEW_IDENTIFIER_CONFLICT],
+                "title_candidates": status_counts[self.REVIEW_TITLE_CANDIDATE],
                 "distinct_unlinked_gtins": len(unlinked_gtins),
                 "data_quality_invalid_gtin_total": invalid_gtin_total,
                 "data_quality_multiple_gtin_total": multiple_gtin_total,
@@ -150,7 +165,8 @@ class InventoryLinkageService:
                     "KIKI Tech cruza el estado de vinculación informado por EDIMA con el catálogo "
                     "canónico de Ecomm-App usando primero el MLA exacto ya resuelto por la última "
                     "conciliación, luego el MLA guardado en las filas Ecomm y, como respaldo, el GTIN "
-                    "exacto. No modifica Ecomm-App ni Mercado Libre."
+                    "exacto. Si los identificadores no alcanzan, el título se usa solo para sugerir "
+                    "un candidato de revisión. No modifica Ecomm-App ni Mercado Libre."
                 ),
                 "safe_match": (
                     "Una publicación queda Lista para vincular cuando EDIMA indica No, contiene un "
@@ -170,6 +186,8 @@ class InventoryLinkageService:
         ean_index,
         listing_index,
         reconciliation_index,
+        title_index,
+        normalized_products,
     ):
         if not gtins or not valid_gtins:
             return (
@@ -265,12 +283,72 @@ class InventoryLinkageService:
                 None,
                 "GTIN_AMBIGUOUS",
             )
+        title_match = self._title_match(row, title_index, normalized_products)
+        if title_match:
+            matched, method, confidence = title_match
+            known_eans = {
+                str(value).strip()
+                for value in [matched.get("ean"), *(matched.get("ean_aliases") or [])]
+                if str(value or "").strip()
+            }
+            if known_eans and gtin not in known_eans:
+                return (
+                    self.REVIEW_IDENTIFIER_CONFLICT,
+                    f"El título sugiere un producto Ecomm, pero EDIMA informa GTIN {gtin} y ese producto tiene otro EAN/GTIN.",
+                    matched,
+                    f"{method}_GTIN_CONFLICT",
+                )
+            return (
+                self.REVIEW_TITLE_CANDIDATE,
+                f"No hubo match por MLA/GTIN. El título sugiere un único producto Ecomm con {confidence:.0%} de similitud; requiere confirmación humana.",
+                matched,
+                method,
+            )
         return (
             self.NO_ECOMM_MATCH,
-            f"Ni el MLA {row.get('external_id') or '—'} ni el GTIN {gtin} se encontraron asociados a un único producto Ecomm.",
+            f"Ni el MLA {row.get('external_id') or '—'}, ni el GTIN {gtin}, ni el título identificaron un producto Ecomm con suficiente seguridad.",
             None,
             "NONE",
         )
+
+    @classmethod
+    def _title_match(cls, row: dict, title_index, normalized_products):
+        title = normalize_title(row.get("title"))
+        if not title:
+            return None
+
+        exact = cls._brand_compatible(row, title_index.get(title, []))
+        if len(exact) == 1:
+            return exact[0], "TITLE_EXACT", 1.0
+        if len(exact) > 1:
+            return None
+
+        scored = []
+        for product, candidate_title in normalized_products:
+            if not cls._brand_compatible(row, [product]):
+                continue
+            score = SequenceMatcher(None, title, candidate_title).ratio()
+            if score >= 0.90:
+                scored.append((score, product))
+        if not scored:
+            return None
+        scored.sort(key=lambda item: item[0], reverse=True)
+        best_score, best_product = scored[0]
+        second_score = scored[1][0] if len(scored) > 1 else 0.0
+        if best_score < 0.94 or best_score - second_score < 0.05:
+            return None
+        return best_product, "TITLE_HIGH_CONFIDENCE", best_score
+
+    @staticmethod
+    def _brand_compatible(row: dict, products: list[dict]) -> list[dict]:
+        edima_brand = normalize_title(row.get("brand"))
+        result = []
+        for product in products:
+            product_brand = normalize_title(product.get("brand"))
+            if edima_brand and product_brand and edima_brand != product_brand:
+                continue
+            result.append(product)
+        return result
 
     @staticmethod
     def _listing_keys(value) -> set[str]:
@@ -338,6 +416,7 @@ class InventoryLinkageService:
                 "ambiguous": 0,
                 "multiple_gtin": 0,
                 "identifier_conflict": 0,
+                "title_candidates": 0,
                 "distinct_unlinked_gtins": 0,
                 "data_quality_invalid_gtin_total": 0,
                 "data_quality_multiple_gtin_total": 0,
