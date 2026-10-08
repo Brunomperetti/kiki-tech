@@ -11,6 +11,10 @@ export interface BulkRule {action:'EXCLUDE'|'REVIEW';reason_code:string;message:
 export interface ReadinessItem {product:Product;reconciliation_status:Status;readiness_status:ReadinessStatus;reason_codes:string[];reasons:string[];issues:{severity:string;code?:string;message:string}[];matched_listing_ids:string[];bulk_rule?:BulkRule|null}
 export interface ReadinessReasonSummary {code:string;label:string;count:number}
 export interface ReadinessReport {reconciliation_run_id:number;mercadolibre_source?:string;summary:{total_products:number;actionable_with_stock:number;READY_CORE_DATA:number;REVIEW_REQUIRED:number;BLOCKED:number;EXCLUDED_BULK:number;NO_STOCK:number;ALREADY_PUBLISHED:number};reason_summary:ReadinessReasonSummary[];bulk_policy:{mode:string;excluded_count:number;description:string};pending_external_checks:string[];items:ReadinessItem[]}
+export type InventoryLinkageStatus='READY_TO_LINK'|'REVIEW_AMBIGUOUS'|'REVIEW_MULTIPLE_GTIN'|'INVALID_GTIN'|'NO_ECOMM_MATCH';
+export interface InventoryLinkageMatchedProduct {ecomm_id?:string|null;sku?:string|null;name?:string|null;brand?:string|null;ean?:string|null;stock?:number|null}
+export interface InventoryLinkageItem {external_id?:string|null;variation_id?:string|null;title?:string|null;brand?:string|null;gtin_raw?:string|null;gtins:string[];inventory_linked?:string|null;modified_at?:string|null;status:InventoryLinkageStatus;reason:string;matched_product?:InventoryLinkageMatchedProduct|null}
+export interface InventoryLinkageReport {available:boolean;message?:string|null;summary:{total_publications:number;linked:number;unlinked:number;ready_to_link:number;review_required:number;no_ecomm_match:number;invalid_gtin:number;ambiguous:number;multiple_gtin:number;distinct_unlinked_gtins:number;data_quality_invalid_gtin_total:number;data_quality_multiple_gtin_total:number};policy:{mode:string;description:string;safe_match:string};items:InventoryLinkageItem[]}
 export type EnrichmentResearchStatus='PENDING_RESEARCH';
 export type EnrichmentNature='PACK_OR_KIT'|'BULK_OR_FRACTIONED'|'ARTISANAL'|'STANDARD_UNIT'|'AMBIGUOUS_GENERIC';
 export type InternalEvidenceConfidence='HIGH'|'MEDIUM'|'NONE';
