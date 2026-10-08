@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.database.models import Base
+from app.database.models import Base, ReconciliationRun
 from app.services.inventory_linkage_service import InventoryLinkageService
 
 
@@ -149,7 +149,7 @@ def test_inventory_linkage_uses_exact_mla_when_ecomm_gtin_is_missing():
         item = service.report()["items"][0]
 
         assert item["status"] == "READY_TO_LINK"
-        assert item["match_method"] == "MLA_EXACT"
+        assert item["match_method"] == "ECOMM_MLA"
         assert item["matched_product"]["sku"] == "1175"
         assert "MLA1889257682" in item["reason"]
 
@@ -186,7 +186,7 @@ def test_inventory_linkage_blocks_when_mla_and_existing_gtin_conflict():
         item = service.report()["items"][0]
 
         assert item["status"] == "REVIEW_IDENTIFIER_CONFLICT"
-        assert item["match_method"] == "MLA_EXACT_GTIN_CONFLICT"
+        assert item["match_method"] == "ECOMM_MLA_GTIN_CONFLICT"
         assert item["matched_product"]["sku"] == "1175"
 
 
@@ -222,7 +222,7 @@ def test_inventory_linkage_accepts_numeric_marketplace_id_for_mla():
         item = service.report()["items"][0]
 
         assert item["status"] == "READY_TO_LINK"
-        assert item["match_method"] == "MLA_EXACT"
+        assert item["match_method"] == "ECOMM_MLA"
 
 
 def test_inventory_linkage_blocks_ambiguous_gtin_even_when_mla_matches_one_product():
@@ -258,4 +258,86 @@ def test_inventory_linkage_blocks_ambiguous_gtin_even_when_mla_matches_one_produ
         item = service.report()["items"][0]
 
         assert item["status"] == "REVIEW_AMBIGUOUS"
-        assert item["match_method"] == "MLA_GTIN_AMBIGUOUS"
+        assert item["match_method"] == "ECOMM_MLA_GTIN_AMBIGUOUS"
+
+
+def test_inventory_linkage_uses_latest_reconciliation_mla_when_raw_ecomm_has_no_listing_id():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        canonical = product("10", "1175", None, "Aceite MCT")
+        service.repo.save_snapshot("ECOMM_APP", [canonical])
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1889257682",
+                    "No",
+                    "7798318384006",
+                    ["7798318384006"],
+                    "Aceite MCT ML",
+                )
+            ],
+        )
+        service.repo.add_run(
+            ReconciliationRun(
+                results=[
+                    {
+                        "product": canonical,
+                        "listing": {
+                            "external_id": "MLA1889257682",
+                            "title": "Aceite MCT ML",
+                        },
+                        "matched_listing_ids": ["MLA1889257682"],
+                        "status": "ALREADY_PUBLISHED",
+                    }
+                ],
+                summary={"total_products": 1, "total_listings": 1},
+            )
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "READY_TO_LINK"
+        assert item["match_method"] == "RECONCILIATION_MLA"
+        assert item["matched_product"]["sku"] == "1175"
+
+
+def test_reconciliation_mla_takes_priority_over_gtin_fallback():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        published = product("10", "1175", None, "Aceite MCT")
+        another = product("20", "2000", "7798318384006", "Otro producto")
+        service.repo.save_snapshot("ECOMM_APP", [published, another])
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1889257682",
+                    "No",
+                    "7798318384006",
+                    ["7798318384006"],
+                )
+            ],
+        )
+        service.repo.add_run(
+            ReconciliationRun(
+                results=[
+                    {
+                        "product": published,
+                        "listing": {"external_id": "MLA1889257682"},
+                        "matched_listing_ids": ["MLA1889257682"],
+                        "status": "ALREADY_PUBLISHED",
+                    }
+                ],
+                summary={"total_products": 2, "total_listings": 1},
+            )
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_IDENTIFIER_CONFLICT"
+        assert item["match_method"] == "RECONCILIATION_MLA_GTIN_CONFLICT"

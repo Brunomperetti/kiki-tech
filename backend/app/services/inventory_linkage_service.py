@@ -32,6 +32,7 @@ class InventoryLinkageService:
 
         ean_index: dict[str, list[dict]] = defaultdict(list)
         listing_index: dict[str, list[dict]] = defaultdict(list)
+        reconciliation_index: dict[str, list[dict]] = defaultdict(list)
         for product in products:
             seen = set()
             for ean in [product.get("ean"), *(product.get("ean_aliases") or [])]:
@@ -46,6 +47,20 @@ class InventoryLinkageService:
                         if key not in listing_seen:
                             listing_index[key].append(product)
                             listing_seen.add(key)
+
+        latest_run = self.repo.latest_run()
+        if latest_run:
+            for result in latest_run.results or []:
+                product = result.get("product")
+                if not product:
+                    continue
+                raw_ids = list(result.get("matched_listing_ids") or [])
+                listing = result.get("listing") or {}
+                if listing.get("external_id"):
+                    raw_ids.append(listing.get("external_id"))
+                for raw_id in raw_ids:
+                    for key in self._listing_keys(raw_id):
+                        reconciliation_index[key].append(product)
 
         linked = 0
         unlinked = 0
@@ -75,6 +90,7 @@ class InventoryLinkageService:
                 valid_gtins,
                 ean_index,
                 listing_index,
+                reconciliation_index,
             )
             status_counts[status] += 1
             items.append(
@@ -132,13 +148,15 @@ class InventoryLinkageService:
                 "mode": "READ_ONLY_EDIMA_RECONCILIATION",
                 "description": (
                     "KIKI Tech cruza el estado de vinculación informado por EDIMA con el catálogo "
-                    "canónico de Ecomm-App usando primero el MLA exacto de las filas Ecomm y, como "
-                    "segunda evidencia, el GTIN exacto. No modifica Ecomm-App ni Mercado Libre."
+                    "canónico de Ecomm-App usando primero el MLA exacto ya resuelto por la última "
+                    "conciliación, luego el MLA guardado en las filas Ecomm y, como respaldo, el GTIN "
+                    "exacto. No modifica Ecomm-App ni Mercado Libre."
                 ),
                 "safe_match": (
                     "Una publicación queda Lista para vincular cuando EDIMA indica No, contiene un "
-                    "único GTIN válido y podemos identificar un único producto Ecomm por MLA exacto "
-                    "o por GTIN exacto. Si MLA y GTIN se contradicen, KIKI la manda a revisión."
+                    "único GTIN válido y podemos identificar un único producto Ecomm por el MLA que "
+                    "KIKI ya concilió, por un MLA directo en Ecomm o por GTIN exacto. Si MLA y GTIN se "
+                    "contradicen, KIKI la manda a revisión."
                 ),
             },
             "items": items,
@@ -151,6 +169,7 @@ class InventoryLinkageService:
         valid_gtins: list[str],
         ean_index,
         listing_index,
+        reconciliation_index,
     ):
         if not gtins or not valid_gtins:
             return (
@@ -168,10 +187,24 @@ class InventoryLinkageService:
             )
 
         gtin = valid_gtins[0]
-        mla_matches = self._unique_products(
+        listing_keys = self._listing_keys(row.get("external_id"))
+        reconciliation_matches = self._unique_products(
             product
-            for key in self._listing_keys(row.get("external_id"))
+            for key in listing_keys
+            for product in reconciliation_index.get(key, [])
+        )
+        raw_ecomm_matches = self._unique_products(
+            product
+            for key in listing_keys
             for product in listing_index.get(key, [])
+        )
+        mla_matches = reconciliation_matches or raw_ecomm_matches
+        mla_source = (
+            "RECONCILIATION_MLA"
+            if reconciliation_matches
+            else "ECOMM_MLA"
+            if raw_ecomm_matches
+            else None
         )
         ean_matches = self._unique_products(ean_index.get(gtin, []))
 
@@ -180,7 +213,7 @@ class InventoryLinkageService:
                 self.REVIEW_AMBIGUOUS,
                 f"La publicación {row.get('external_id') or 'ML'} aparece asociada a más de un producto Ecomm.",
                 None,
-                "MLA_AMBIGUOUS",
+                f"{mla_source}_AMBIGUOUS" if mla_source else "MLA_AMBIGUOUS",
             )
 
         if len(mla_matches) == 1:
@@ -195,27 +228,27 @@ class InventoryLinkageService:
                     self.REVIEW_IDENTIFIER_CONFLICT,
                     f"El MLA coincide con un producto Ecomm, pero EDIMA informa GTIN {gtin} y el producto tiene otro EAN/GTIN.",
                     matched,
-                    "MLA_EXACT_GTIN_CONFLICT",
+                    f"{mla_source}_GTIN_CONFLICT" if mla_source else "MLA_GTIN_CONFLICT",
                 )
             if len(ean_matches) > 1:
                 return (
                     self.REVIEW_AMBIGUOUS,
                     f"El MLA coincide con un producto Ecomm, pero el GTIN {gtin} aparece en más de un producto canónico.",
                     matched,
-                    "MLA_GTIN_AMBIGUOUS",
+                    f"{mla_source}_GTIN_AMBIGUOUS" if mla_source else "MLA_GTIN_AMBIGUOUS",
                 )
             if len(ean_matches) == 1 and ean_matches[0] is not matched:
                 return (
                     self.REVIEW_IDENTIFIER_CONFLICT,
                     f"El MLA coincide con un producto Ecomm, pero el GTIN {gtin} identifica otro producto canónico.",
                     matched,
-                    "MLA_GTIN_CONFLICT",
+                    f"{mla_source}_GTIN_CONFLICT" if mla_source else "MLA_GTIN_CONFLICT",
                 )
             return (
                 self.READY_TO_LINK,
                 f"MLA {row.get('external_id')} coincide exactamente con un único producto Ecomm; GTIN {gtin} queda como evidencia del vínculo.",
                 matched,
-                "MLA_EXACT",
+                mla_source or "MLA_EXACT",
             )
 
         if len(ean_matches) == 1:
