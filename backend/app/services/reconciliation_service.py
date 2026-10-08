@@ -9,6 +9,7 @@ from ..catalog.models import ChannelListing, EcommChannelRow, Product
 from ..catalog.reconciler import CatalogReconciler
 from ..core.config import get_settings
 from ..database.models import ImportJobRecord, ReconciliationRun
+from ..integrations.ecomm_app.edima_linkage_importer import EdimaLinkageExcelImporter
 from ..integrations.ecomm_app.excel_importer import EcommExcelImporter
 from ..integrations.mercadolibre.excel_importer import MercadoLibreExcelImporter
 from ..repositories.catalog_repository import CatalogRepository
@@ -21,11 +22,12 @@ class ReconciliationService:
         self.repo = CatalogRepository(db)
 
     def import_file(self, source: str, filename: str, content: bytes):
-        importer = (
-            EcommExcelImporter()
-            if source == "ECOMM_APP"
-            else MercadoLibreExcelImporter()
-        )
+        if source == "ECOMM_APP":
+            importer = EcommExcelImporter()
+        elif source == "EDIMA_LINKAGE":
+            importer = EdimaLinkageExcelImporter()
+        else:
+            importer = MercadoLibreExcelImporter()
         logger.info("import_started source=%s filename=%s", source, filename)
         report = importer.read(content)
         payload = [item.model_dump(mode="json") for item in report.records]
