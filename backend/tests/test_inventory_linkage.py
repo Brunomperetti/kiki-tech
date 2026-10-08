@@ -222,7 +222,7 @@ def test_inventory_linkage_accepts_numeric_marketplace_id_for_mla():
         item = service.report()["items"][0]
 
         assert item["status"] == "READY_TO_LINK"
-        assert item["match_method"] == "MLA_EXACT"
+        assert item["match_method"] == "ECOMM_MLA"
 
 
 def test_inventory_linkage_blocks_ambiguous_gtin_even_when_mla_matches_one_product():
