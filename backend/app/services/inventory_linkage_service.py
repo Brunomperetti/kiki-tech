@@ -140,38 +140,117 @@ class InventoryLinkageService:
             "items": items,
         }
 
-    def _classify_unlinked(self, gtins: list[str], valid_gtins: list[str], ean_index):
+    def _classify_unlinked(
+        self,
+        row: dict,
+        gtins: list[str],
+        valid_gtins: list[str],
+        ean_index,
+        listing_index,
+    ):
         if not gtins or not valid_gtins:
             return (
                 self.INVALID_GTIN,
                 "La publicación no tiene un GTIN utilizable para identificar el producto con seguridad.",
                 None,
+                "NONE",
             )
         if len(gtins) > 1:
             return (
                 self.REVIEW_MULTIPLE_GTIN,
                 "EDIMA informa más de un código de barras; requiere revisión antes de vincular.",
                 None,
+                "MULTIPLE_GTIN",
             )
+
         gtin = valid_gtins[0]
-        matches = ean_index.get(gtin, [])
-        if len(matches) == 1:
+        mla_matches = self._unique_products(
+            product
+            for key in self._listing_keys(row.get("external_id"))
+            for product in listing_index.get(key, [])
+        )
+        ean_matches = self._unique_products(ean_index.get(gtin, []))
+
+        if len(mla_matches) > 1:
+            return (
+                self.REVIEW_AMBIGUOUS,
+                f"La publicación {row.get('external_id') or 'ML'} aparece asociada a más de un producto Ecomm.",
+                None,
+                "MLA_AMBIGUOUS",
+            )
+
+        if len(mla_matches) == 1:
+            matched = mla_matches[0]
+            known_eans = {
+                str(value).strip()
+                for value in [matched.get("ean"), *(matched.get("ean_aliases") or [])]
+                if str(value or "").strip()
+            }
+            if known_eans and gtin not in known_eans:
+                return (
+                    self.REVIEW_IDENTIFIER_CONFLICT,
+                    f"El MLA coincide con un producto Ecomm, pero EDIMA informa GTIN {gtin} y el producto tiene otro EAN/GTIN.",
+                    matched,
+                    "MLA_EXACT_GTIN_CONFLICT",
+                )
+            if ean_matches and all(product is not matched for product in ean_matches):
+                return (
+                    self.REVIEW_IDENTIFIER_CONFLICT,
+                    f"El MLA coincide con un producto Ecomm, pero el GTIN {gtin} identifica otro producto canónico.",
+                    matched,
+                    "MLA_GTIN_CONFLICT",
+                )
+            return (
+                self.READY_TO_LINK,
+                f"MLA {row.get('external_id')} coincide exactamente con un único producto Ecomm; GTIN {gtin} queda como evidencia del vínculo.",
+                matched,
+                "MLA_EXACT",
+            )
+
+        if len(ean_matches) == 1:
             return (
                 self.READY_TO_LINK,
                 f"GTIN {gtin} coincide exactamente con un único producto de Ecomm-App.",
-                matches[0],
+                ean_matches[0],
+                "GTIN_EXACT",
             )
-        if len(matches) > 1:
+        if len(ean_matches) > 1:
             return (
                 self.REVIEW_AMBIGUOUS,
                 f"GTIN {gtin} pertenece a más de un producto canónico de Ecomm-App.",
                 None,
+                "GTIN_AMBIGUOUS",
             )
         return (
             self.NO_ECOMM_MATCH,
-            f"GTIN {gtin} no se encontró en el catálogo canónico actual de Ecomm-App.",
+            f"Ni el MLA {row.get('external_id') or '—'} ni el GTIN {gtin} se encontraron asociados a un único producto Ecomm.",
             None,
+            "NONE",
         )
+
+    @staticmethod
+    def _listing_keys(value) -> set[str]:
+        text = str(value or "").strip().upper().replace(" ", "")
+        if not text:
+            return set()
+        keys = {text}
+        digits = "".join(char for char in text if char.isdigit())
+        if digits:
+            keys.add(digits)
+            keys.add(f"MLA{digits}")
+        return keys
+
+    @staticmethod
+    def _unique_products(products) -> list[dict]:
+        result = []
+        seen = set()
+        for product in products:
+            key = product.get("ecomm_id") or id(product)
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(product)
+        return result
 
     @staticmethod
     def _product_view(product: dict) -> dict:
