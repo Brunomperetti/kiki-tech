@@ -16,7 +16,16 @@ class MercadoLibreExcelImporter(ExcelImporter):
         },
         "sku_product": {"SKU", "Código SKU", "Codigo SKU", "Seller SKU"},
         "sku_variant": {"SKU de la Variante", "SKU variante"},
-        "ean": {"EAN", "GTIN", "Código universal", "Codigo universal"},
+        "ean": {
+            "EAN",
+            "GTIN",
+            "Código universal",
+            "Codigo universal",
+            "Codigo de Barras (GTIN)",
+            "Código de Barras (GTIN)",
+            "Codigo de Barras",
+            "Código de Barras",
+        },
         "title": {
             "Título",
             "Titulo",
