@@ -64,6 +64,11 @@ export const api = {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({external_id: externalId, note: note || null}),
   }),
+  saveInventoryEcommAction: (externalId: string, action: string, note?: string) => request<InventoryLinkageItem>('/api/inventory-linkage/ecomm-action', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({external_id: externalId, action, note: note || null}),
+  }),
   enrichmentPilot: (limit = 20) => request<EnrichmentReport>(`/api/enrichment-pilot?limit=${limit}`),
   enrichmentReviewQueue: () => request<EnrichmentReviewQueue>('/api/enrichment-review-queue'),
   saveEnrichmentDecision: (productKey: string, status: EnrichmentReviewStatus, note?: string) => request<EnrichmentReviewItem>('/api/enrichment-review-decisions', {
