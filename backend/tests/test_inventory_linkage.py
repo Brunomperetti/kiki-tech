@@ -1075,8 +1075,8 @@ def test_candidate_search_does_not_suggest_different_flavor_variant():
                     **edima(
                         "MLA1447707817",
                         "No",
-                        "770721631452",
-                        ["770721631452"],
+                        "7798121272958",
+                        ["7798121272958"],
                         "Pack X 2 Café Liofilizado Clásico Juan Valdez 50gr",
                     ),
                     "brand": "Juan Valdez",
@@ -1115,8 +1115,8 @@ def test_manual_assignment_blocks_different_flavor_variant():
                     **edima(
                         "MLA1447707817",
                         "No",
-                        "770721631452",
-                        ["770721631452"],
+                        "7798121272958",
+                        ["7798121272958"],
                         "Pack X 2 Café Liofilizado Clásico Juan Valdez 50gr",
                     ),
                     "brand": "Juan Valdez",
