@@ -20,6 +20,7 @@ class InventoryLinkageService:
     REVIEW_TITLE_CANDIDATE = "REVIEW_TITLE_CANDIDATE"
     REVIEW_OFFLINE_CANDIDATE = "REVIEW_OFFLINE_CANDIDATE"
     REVIEW_PRESENTATION_CONFLICT = "REVIEW_PRESENTATION_CONFLICT"
+    PENDING_ECOMM_CATALOG = "PENDING_ECOMM_CATALOG"
     INVALID_GTIN = "INVALID_GTIN"
     NO_ECOMM_MATCH = "NO_ECOMM_MATCH"
 
@@ -152,11 +153,36 @@ class InventoryLinkageService:
             decision_at = None
             decision_source = "AUTOMATIC_IDENTIFIERS" if status == self.READY_TO_LINK else "NONE"
             decision = decisions.get(str(row.get("external_id") or ""))
+            pending_ecomm_decision = (
+                decision
+                and decision.decision == "NO_ECOMM_PRODUCT"
+                and status == self.NO_ECOMM_MATCH
+            )
+            if pending_ecomm_decision:
+                snapshot = decision.source_snapshot or {}
+                same_source = (
+                    str(snapshot.get("title") or "") == str(row.get("title") or "")
+                    and str(snapshot.get("gtin_raw") or "") == str(row.get("gtin_raw") or "")
+                )
+                decision_note = decision.note
+                decision_at = decision.updated_at.isoformat() if decision.updated_at else None
+                decision_source = "HUMAN_KIKI"
+                if same_source:
+                    decision_status = "PENDING_ECOMM"
+                    status = self.PENDING_ECOMM_CATALOG
+                    reason = (
+                        "Revisado humanamente: no se encontró una coincidencia válida en el catálogo "
+                        "Ecomm actual. Requiere alta/corrección en Ecomm o importar un inventario más "
+                        "nuevo antes de intentar vincular."
+                    )
+                    match_method = "HUMAN_NO_ECOMM_MATCH"
+                else:
+                    decision_status = "STALE"
             manual_decision = (
                 decision
                 and (decision.source_snapshot or {}).get("match_method") == "MANUAL_SEARCH"
             )
-            if manual_decision and status != self.READY_TO_LINK:
+            if not pending_ecomm_decision and manual_decision and status != self.READY_TO_LINK:
                 manual_product = product_by_ecomm_id.get(str(decision.ecomm_id or "").strip())
                 if manual_product:
                     decision_status = self._decision_state(decision, row, manual_product)
@@ -178,7 +204,8 @@ class InventoryLinkageService:
                             "Debe revisarse nuevamente."
                         )
             elif (
-                decision
+                not pending_ecomm_decision
+                and decision
                 and status
                 in {self.REVIEW_TITLE_CANDIDATE, self.REVIEW_OFFLINE_CANDIDATE}
                 and matched is not None
@@ -255,7 +282,8 @@ class InventoryLinkageService:
             self.REVIEW_TITLE_CANDIDATE: 5,
             self.REVIEW_OFFLINE_CANDIDATE: 6,
             self.REVIEW_PRESENTATION_CONFLICT: 7,
-            self.INVALID_GTIN: 8,
+            self.PENDING_ECOMM_CATALOG: 8,
+            self.INVALID_GTIN: 9,
         }
         items.sort(
             key=lambda item: (
@@ -283,6 +311,7 @@ class InventoryLinkageService:
                 "title_candidates": status_counts[self.REVIEW_TITLE_CANDIDATE],
                 "offline_candidates": status_counts[self.REVIEW_OFFLINE_CANDIDATE],
                 "presentation_conflict": status_counts[self.REVIEW_PRESENTATION_CONFLICT],
+                "pending_ecomm_catalog": status_counts[self.PENDING_ECOMM_CATALOG],
                 "distinct_unlinked_gtins": len(unlinked_gtins),
                 "data_quality_invalid_gtin_total": invalid_gtin_total,
                 "data_quality_multiple_gtin_total": multiple_gtin_total,
@@ -574,6 +603,80 @@ class InventoryLinkageService:
             "decision_source": "HUMAN_KIKI",
             "matched_product": product_view,
         }
+
+    def mark_pending_ecomm_catalog(
+        self,
+        external_id: str,
+        note: str | None = None,
+    ) -> dict:
+        external_id = str(external_id or "").strip()
+        if not external_id:
+            raise ValueError("La publicación ML es obligatoria.")
+
+        item = self._decision_candidate(external_id)
+        if item.get("status") != self.NO_ECOMM_MATCH:
+            raise ValueError(
+                "Solo se puede enviar a catálogo Ecomm una publicación que siga sin coincidencia."
+            )
+
+        now = datetime.now(timezone.utc)
+        source_snapshot = {
+            "title": item.get("title"),
+            "gtin_raw": item.get("gtin_raw"),
+            "matched_ecomm_id": None,
+            "match_method": "NO_ECOMM_PRODUCT",
+        }
+        history_entry = {
+            "at": now.isoformat(),
+            "decision": "NO_ECOMM_PRODUCT",
+            "ecomm_id": None,
+            "note": note,
+            "source_snapshot": source_snapshot,
+        }
+        row = (
+            self.db.query(InventoryLinkageDecision)
+            .filter(InventoryLinkageDecision.external_id == external_id)
+            .one_or_none()
+        )
+        if row is None:
+            row = InventoryLinkageDecision(
+                external_id=external_id,
+                decision="NO_ECOMM_PRODUCT",
+                ecomm_id=None,
+                source_snapshot=source_snapshot,
+                product_snapshot={},
+                note=note,
+                history=[history_entry],
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(row)
+        else:
+            history = list(row.history or [])
+            history.append(history_entry)
+            row.decision = "NO_ECOMM_PRODUCT"
+            row.ecomm_id = None
+            row.source_snapshot = source_snapshot
+            row.product_snapshot = {}
+            row.note = note
+            row.history = history[-100:]
+            row.updated_at = now
+
+        self.db.commit()
+
+        item = dict(item)
+        item["status"] = self.PENDING_ECOMM_CATALOG
+        item["reason"] = (
+            "Revisado humanamente: no se encontró una coincidencia válida en el catálogo Ecomm "
+            "actual. Requiere alta/corrección en Ecomm o importar un inventario más nuevo."
+        )
+        item["match_method"] = "HUMAN_NO_ECOMM_MATCH"
+        item["decision_status"] = "PENDING_ECOMM"
+        item["decision_note"] = note
+        item["decision_at"] = now.isoformat()
+        item["decision_source"] = "HUMAN_KIKI"
+        item["matched_product"] = None
+        return item
 
     def save_decision(
         self,
@@ -1163,6 +1266,7 @@ class InventoryLinkageService:
                 "title_candidates": 0,
                 "offline_candidates": 0,
                 "presentation_conflict": 0,
+                "pending_ecomm_catalog": 0,
                 "distinct_unlinked_gtins": 0,
                 "data_quality_invalid_gtin_total": 0,
                 "data_quality_multiple_gtin_total": 0,
