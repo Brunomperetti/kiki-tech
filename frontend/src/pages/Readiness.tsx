@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {api} from '../services/api';
-import type {InventoryLinkageItem,InventoryLinkageReport,InventoryLinkageStatus,ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
+import type {InventoryLinkageCandidate,InventoryLinkageItem,InventoryLinkageReport,InventoryLinkageStatus,ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
 import '../readiness.css';
 
 const linkageLabels:Record<InventoryLinkageStatus,string>={
@@ -42,6 +42,12 @@ export function Readiness(){
   const [message,setMessage]=useState('');
   const [linkageMessage,setLinkageMessage]=useState('');
   const [linkageBusy,setLinkageBusy]=useState('');
+  const [candidateItem,setCandidateItem]=useState<InventoryLinkageItem|null>(null);
+  const [candidateQuery,setCandidateQuery]=useState('');
+  const [candidateResults,setCandidateResults]=useState<InventoryLinkageCandidate[]>([]);
+  const [candidateSearching,setCandidateSearching]=useState(false);
+  const [candidateSaving,setCandidateSaving]=useState('');
+  const [candidateError,setCandidateError]=useState('');
   useEffect(()=>{
     api.publicationReadiness().then(setReport).catch(error=>setMessage(error.message));
     api.inventoryLinkage().then(setLinkage).catch(()=>setLinkage(null));
@@ -96,6 +102,65 @@ export function Readiness(){
       setLinkageMessage(error instanceof Error?error.message:'No se pudo guardar la decisión.');
     }finally{
       setLinkageBusy('');
+    }
+  }
+
+  async function loadManualCandidates(item:InventoryLinkageItem,query=''){
+    const externalId=String(item.external_id||'');
+    if(!externalId)return;
+    setCandidateSearching(true);
+    setCandidateError('');
+    try{
+      const result=await api.inventoryLinkageCandidates(externalId,query,10);
+      setCandidateResults(result.candidates);
+    }catch(error){
+      setCandidateError(error instanceof Error?error.message:'No se pudieron buscar candidatos.');
+      setCandidateResults([]);
+    }finally{
+      setCandidateSearching(false);
+    }
+  }
+
+  async function openManualCandidateSearch(item:InventoryLinkageItem){
+    setCandidateItem(item);
+    setCandidateQuery('');
+    setCandidateResults([]);
+    setCandidateError('');
+    await loadManualCandidates(item,'');
+  }
+
+  async function confirmManualCandidate(candidate:InventoryLinkageCandidate){
+    if(!candidateItem?.external_id||!candidate.ecomm_id)return;
+    setCandidateSaving(String(candidate.ecomm_id));
+    setCandidateError('');
+    try{
+      const saved=await api.saveInventoryManualAssignment(
+        String(candidateItem.external_id),
+        String(candidate.ecomm_id),
+        'Asignación manual confirmada desde la búsqueda de candidatos de KIKI Tech.',
+      );
+      setLinkage(current=>{
+        if(!current)return current;
+        return {
+          ...current,
+          items:current.items.map(item=>item.external_id===saved.external_id?saved:item),
+          summary:{
+            ...current.summary,
+            ready_to_link:current.summary.ready_to_link+1,
+            confirmed_by_human:current.summary.confirmed_by_human+1,
+            review_required:Math.max(0,current.summary.review_required-1),
+            no_ecomm_match:Math.max(0,current.summary.no_ecomm_match-1),
+          },
+        };
+      });
+      setLinkageMessage('Producto Ecomm asignado manualmente. La publicación pasó a Lista para vincular.');
+      setCandidateItem(null);
+      setCandidateResults([]);
+      setCandidateQuery('');
+    }catch(error){
+      setCandidateError(error instanceof Error?error.message:'No se pudo guardar la asignación manual.');
+    }finally{
+      setCandidateSaving('');
     }
   }
 
@@ -180,12 +245,13 @@ export function Readiness(){
           <div><h3>Cola operativa · Listas para vincular</h3><p>Estas coincidencias ya tienen evidencia suficiente o confirmación humana. Todavía no se ejecuta ningún cambio externo.</p></div>
           <button onClick={exportReadyLinkage} disabled={!readyLinkage.length}>Exportar CSV ({readyLinkage.length})</button>
         </div>
-        {readyLinkage.length===0?<p className="evidence-note">Todavía no hay publicaciones listas para vincular.</p>:<div className="table-wrap ready-linkage-table-wrap"><table className="ready-linkage-table"><thead><tr><th>Publicación</th><th>Producto EDIMA</th><th>Producto Ecomm</th><th>Evidencia</th></tr></thead><tbody>{readyLinkage.map((item,index)=><tr key={item.external_id||index}><td><strong className="mono">{item.external_id||'—'}</strong><small className="linkage-meta">GTIN: <span className="mono">{item.gtin_raw||'—'}</span></small></td><td><strong>{item.title||'—'}</strong>{item.brand&&<small className="linkage-meta">Marca: {item.brand}</small>}</td><td><strong>{item.matched_product?.name||'—'}</strong><small className="linkage-meta">ID Ecomm: <span className="mono">{item.matched_product?.ecomm_id||'—'}</span> · SKU: <span className="mono">{item.matched_product?.sku||'—'}</span></small></td><td><strong>{item.decision_source==='HUMAN_KIKI'?'Confirmación humana':'Coincidencia por identificadores'}</strong><small className="linkage-meta">{item.match_method==='HUMAN_CONFIRMED_OFFLINE'?'Evidencia offline confirmada':item.match_method==='HUMAN_CONFIRMED_TITLE'?'Título confirmado':item.match_method||'—'}</small>{item.decision_at&&<small className="linkage-meta">{new Date(item.decision_at).toLocaleString('es-AR')}</small>}</td></tr>)}</tbody></table></div>}
+        {readyLinkage.length===0?<p className="evidence-note">Todavía no hay publicaciones listas para vincular.</p>:<div className="table-wrap ready-linkage-table-wrap"><table className="ready-linkage-table"><thead><tr><th>Publicación</th><th>Producto EDIMA</th><th>Producto Ecomm</th><th>Evidencia</th></tr></thead><tbody>{readyLinkage.map((item,index)=><tr key={item.external_id||index}><td><strong className="mono">{item.external_id||'—'}</strong><small className="linkage-meta">GTIN: <span className="mono">{item.gtin_raw||'—'}</span></small></td><td><strong>{item.title||'—'}</strong>{item.brand&&<small className="linkage-meta">Marca: {item.brand}</small>}</td><td><strong>{item.matched_product?.name||'—'}</strong><small className="linkage-meta">ID Ecomm: <span className="mono">{item.matched_product?.ecomm_id||'—'}</span> · SKU: <span className="mono">{item.matched_product?.sku||'—'}</span></small></td><td><strong>{item.decision_source==='HUMAN_KIKI'?'Confirmación humana':'Coincidencia por identificadores'}</strong><small className="linkage-meta">{item.match_method==='HUMAN_CONFIRMED_OFFLINE'?'Evidencia offline confirmada':item.match_method==='HUMAN_CONFIRMED_TITLE'?'Título confirmado':item.match_method==='HUMAN_CONFIRMED_MANUAL'?'Asignación manual confirmada':item.match_method||'—'}</small>{item.decision_at&&<small className="linkage-meta">{new Date(item.decision_at).toLocaleString('es-AR')}</small>}</td></tr>)}</tbody></table></div>}
       </section>
-      <div className="table-wrap linkage-table-wrap"><table className="linkage-table"><thead><tr><th>Publicación</th><th>Producto EDIMA</th><th>Coincidencia Ecomm</th><th>Estado</th><th>Acción / motivo</th></tr></thead><tbody>{linkage.items.map((item,index)=><tr key={item.external_id||index}><td><strong className="mono">{item.external_id||'—'}</strong><small className="linkage-meta">GTIN: <span className="mono">{item.gtin_raw||'—'}</span></small></td><td><strong>{item.title||'—'}</strong>{item.brand&&<small className="linkage-meta">Marca: {item.brand}</small>}</td><td>{item.matched_product?<><strong>{item.matched_product.name||'Producto Ecomm'}</strong><small className="linkage-meta">SKU: <span className="mono">{item.matched_product.sku||'—'}</span></small><small className="linkage-meta">Método: {item.match_method==='RECONCILIATION_MLA'?'MLA conciliado':item.match_method==='ECOMM_MLA'?'MLA en Ecomm':item.match_method==='GTIN_EXACT'?'GTIN exacto':item.match_method==='TITLE_EXACT'?'Título exacto':item.match_method==='TITLE_HIGH_CONFIDENCE'?'Título sugerido':item.match_method==='HUMAN_CONFIRMED_TITLE'?'Título confirmado':item.match_method==='HUMAN_CONFIRMED_OFFLINE'?'Evidencia confirmada':item.match_method?.startsWith('OFFLINE_SKU_EXACT')?'Control offline · SKU exacto':item.match_method?.startsWith('OFFLINE_TITLE')?'Control offline · título':item.match_method?.startsWith('OFFLINE_')?'Control offline':item.match_method||'—'}</small></>:<span>—</span>}</td><td><span className={`badge ${item.status==='READY_TO_LINK'?'READY_CORE_DATA':'REVIEW_REQUIRED'}`}>{linkageLabels[item.status]}</span>{item.decision_status==='REJECTED'&&<small className="decision-note">Rechazado previamente</small>}{item.decision_status==='STALE'&&<small className="decision-note">Decisión anterior desactualizada</small>}</td><td><div className="linkage-action-cell">{['REVIEW_TITLE_CANDIDATE','REVIEW_OFFLINE_CANDIDATE'].includes(item.status)&&item.matched_product?.ecomm_id?<div className="linkage-actions"><button onClick={()=>decideLinkage(item,'CONFIRMED')} disabled={linkageBusy===item.external_id}>{linkageBusy===item.external_id?'Guardando…':'Confirmar'}</button><button className="danger-outline" onClick={()=>decideLinkage(item,'REJECTED')} disabled={linkageBusy===item.external_id}>Rechazar</button></div>:item.decision_status==='CONFIRMED'?<strong>Confirmado</strong>:null}{item.offline_evidence?.note&&<small className="linkage-meta">Referencia offline: {item.offline_evidence.note}</small>}<small className="linkage-reason">{item.reason}</small></div></td></tr>)}</tbody></table></div>
+      <div className="table-wrap linkage-table-wrap"><table className="linkage-table"><thead><tr><th>Publicación</th><th>Producto EDIMA</th><th>Coincidencia Ecomm</th><th>Estado</th><th>Acción / motivo</th></tr></thead><tbody>{linkage.items.map((item,index)=><tr key={item.external_id||index}><td><strong className="mono">{item.external_id||'—'}</strong><small className="linkage-meta">GTIN: <span className="mono">{item.gtin_raw||'—'}</span></small></td><td><strong>{item.title||'—'}</strong>{item.brand&&<small className="linkage-meta">Marca: {item.brand}</small>}</td><td>{item.matched_product?<><strong>{item.matched_product.name||'Producto Ecomm'}</strong><small className="linkage-meta">SKU: <span className="mono">{item.matched_product.sku||'—'}</span></small><small className="linkage-meta">Método: {item.match_method==='RECONCILIATION_MLA'?'MLA conciliado':item.match_method==='ECOMM_MLA'?'MLA en Ecomm':item.match_method==='GTIN_EXACT'?'GTIN exacto':item.match_method==='TITLE_EXACT'?'Título exacto':item.match_method==='TITLE_HIGH_CONFIDENCE'?'Título sugerido':item.match_method==='HUMAN_CONFIRMED_TITLE'?'Título confirmado':item.match_method==='HUMAN_CONFIRMED_OFFLINE'?'Evidencia confirmada':item.match_method?.startsWith('OFFLINE_SKU_EXACT')?'Control offline · SKU exacto':item.match_method?.startsWith('OFFLINE_TITLE')?'Control offline · título':item.match_method?.startsWith('OFFLINE_')?'Control offline':item.match_method||'—'}</small></>:<span>—</span>}</td><td><span className={`badge ${item.status==='READY_TO_LINK'?'READY_CORE_DATA':'REVIEW_REQUIRED'}`}>{linkageLabels[item.status]}</span>{item.decision_status==='REJECTED'&&<small className="decision-note">Rechazado previamente</small>}{item.decision_status==='STALE'&&<small className="decision-note">Decisión anterior desactualizada</small>}</td><td><div className="linkage-action-cell">{['REVIEW_TITLE_CANDIDATE','REVIEW_OFFLINE_CANDIDATE'].includes(item.status)&&item.matched_product?.ecomm_id?<div className="linkage-actions"><button onClick={()=>decideLinkage(item,'CONFIRMED')} disabled={linkageBusy===item.external_id}>{linkageBusy===item.external_id?'Guardando…':'Confirmar'}</button><button className="danger-outline" onClick={()=>decideLinkage(item,'REJECTED')} disabled={linkageBusy===item.external_id}>Rechazar</button></div>:item.status==='NO_ECOMM_MATCH'?<div className="linkage-actions"><button onClick={()=>openManualCandidateSearch(item)}>Buscar candidato</button></div>:item.decision_status==='CONFIRMED'?<strong>Confirmado</strong>:null}{item.offline_evidence?.note&&<small className="linkage-meta">Referencia offline: {item.offline_evidence.note}</small>}<small className="linkage-reason">{item.reason}</small></div></td></tr>)}</tbody></table></div>
       <p className="evidence-note">{linkage.policy.description}</p>
     </>}
   </section>
+  {candidateItem&&<div className="candidate-modal-overlay" role="presentation" onClick={()=>setCandidateItem(null)}><section className="candidate-modal" role="dialog" aria-modal="true" aria-label="Buscar producto Ecomm" onClick={event=>event.stopPropagation()}><div className="candidate-modal-header"><div><p className="eyebrow">ASIGNACIÓN MANUAL</p><h3>Buscar producto Ecomm</h3><p><strong>{candidateItem.title||'Publicación EDIMA'}</strong></p><small className="linkage-meta">{candidateItem.external_id||'—'} · GTIN {candidateItem.gtin_raw||'—'}</small></div><button className="danger-outline" onClick={()=>setCandidateItem(null)}>Cerrar</button></div><form className="candidate-search-form" onSubmit={event=>{event.preventDefault();void loadManualCandidates(candidateItem,candidateQuery)}}><input autoFocus placeholder="Buscar por producto, SKU, EAN o ID Ecomm" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}/><button type="submit" disabled={candidateSearching}>{candidateSearching?'Buscando…':'Buscar'}</button></form>{candidateError&&<div className="notice warning">{candidateError}</div>}<p className="evidence-note">KIKI muestra sugerencias del catálogo Ecomm. Elegí un producto solo si estás seguro de que corresponde a esta publicación.</p><div className="candidate-results">{candidateSearching&&candidateResults.length===0?<p>Buscando candidatos…</p>:candidateResults.length===0?<p>No encontramos candidatos con suficiente similitud. Probá buscar por una palabra, SKU, EAN o ID interno.</p>:candidateResults.map(candidate=><article className="candidate-card" key={candidate.ecomm_id||candidate.sku||candidate.name}><div><strong>{candidate.name||'Producto Ecomm'}</strong><small className="linkage-meta">ID: <span className="mono">{candidate.ecomm_id||'—'}</span> · SKU: <span className="mono">{candidate.sku||'—'}</span></small><small className="linkage-meta">Marca: {candidate.brand||'—'} · EAN: <span className="mono">{candidate.ean||'—'}</span> · Stock: {candidate.stock??'—'}</small><small className="linkage-meta">{candidate.reasons.join(' · ')||'Coincidencia manual'}</small></div><button onClick={()=>confirmManualCandidate(candidate)} disabled={candidateSaving===candidate.ecomm_id}>{candidateSaving===candidate.ecomm_id?'Guardando…':'Elegir y confirmar'}</button></article>)}</div></section></div>}
   <details className="notice"><summary><strong>¿Cómo leer estos estados?</strong></summary><p>“Ya publicados” salen del flujo de alta. “Sin stock” se apartan temporalmente y no se priorizan mientras no tengan unidades disponibles. “Fuera del masivo actual” son productos que no están necesariamente mal: una regla comercial vigente indica que ciertos SKU asociados o combos no se incluyen todavía en el alta masiva. “Requieren revisión” y “Bloqueados” necesitan una corrección o una decisión. “Datos centrales OK” son candidatos con stock informado y positivo, marca y EAN/GTIN presentes y sin bloqueos conocidos de conciliación. No significa que deban tener a la vez SKU de variante y SKU de producto, ni que ya estén listos para Mercado Libre: después todavía deben validar imágenes, categoría, atributos, preview y confirmación humana.</p></details>
   <details className="notice"><summary><strong>Regla SKU del masivo actual</strong></summary><p>{report.bulk_policy.description}</p><p>En simple: si un EAN tiene un único SKU base numérico de 4 dígitos, los SKU numéricos de 5 o más dígitos asociados a ese mismo EAN se consideran combos/asociados y quedan fuera del masivo por ahora. Si el EAN no tiene un único SKU base de 4 dígitos, KIKI Tech lo manda a revisión en vez de decidir solo.</p></details>
   <section className="panel"><div className="panel-title-row"><div><h2>Motivos que requieren atención</h2><p>Hacé clic en un motivo para ver únicamente los productos afectados.</p></div><button onClick={exportReview}>Exportar revisión CSV</button></div><div className="reason-grid">{report.reason_summary.map(reason=><button key={reason.code} className={`reason-card ${reasonCode===reason.code?'active':''}`} onClick={()=>selectReason(reason.code)}><span>{reason.label}</span><strong>{reason.count.toLocaleString('es-AR')}</strong></button>)}</div>{reasonCode&&<button className="text-button" onClick={()=>setReasonCode('')}>Limpiar filtro por motivo</button>}</section>
