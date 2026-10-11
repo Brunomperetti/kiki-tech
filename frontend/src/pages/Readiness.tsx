@@ -54,6 +54,10 @@ export function Readiness(){
       return matchesSearch(item,term);
     });
   },[report,status,reasonCode,search]);
+  const readyLinkage=useMemo(
+    ()=>(linkage?.items||[]).filter(item=>item.status==='READY_TO_LINK'),
+    [linkage],
+  );
   if(message)return <><header><div><p className="eyebrow">PREPARACIÓN MERCADO LIBRE</p><h1>Validador de publicación</h1></div></header><div className="notice warning">{message}</div></>;
   if(!report)return <div className="auth-loading">Preparando validación…</div>;
   const s=report.summary;
@@ -100,6 +104,36 @@ export function Readiness(){
     setStatus('');
   }
 
+  function exportReadyLinkage(){
+    if(!readyLinkage.length)return;
+    const rows=[
+      ['MLA','GTIN','Producto EDIMA','Marca EDIMA','ID Ecomm','Producto Ecomm','SKU Ecomm','Método','Confirmación','Fecha confirmación','Motivo'],
+      ...readyLinkage.map(item=>[
+        item.external_id||'',
+        item.gtin_raw||'',
+        item.title||'',
+        item.brand||'',
+        item.matched_product?.ecomm_id||'',
+        item.matched_product?.name||'',
+        item.matched_product?.sku||'',
+        item.match_method||'',
+        item.decision_source==='HUMAN_KIKI'?'Confirmación humana KIKI':'Coincidencia automática por identificadores',
+        item.decision_at?new Date(item.decision_at).toLocaleString('es-AR'):'',
+        item.reason||'',
+      ]),
+    ];
+    const csv='\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;
+    link.download=`kiki-listas-para-vincular-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function exportReview(){
     const term=search.trim().toLowerCase();
     const exportItems=report!.items.filter(item=>{
@@ -141,6 +175,13 @@ export function Readiness(){
       <p className="evidence-note">{linkage.policy.safe_match}</p>
       <p className="result-count">Calidad del reporte: <strong>{linkage.summary.data_quality_invalid_gtin_total.toLocaleString('es-AR')}</strong> publicaciones con GTIN inválido o no utilizable · <strong>{linkage.summary.data_quality_multiple_gtin_total.toLocaleString('es-AR')}</strong> con más de un código · <strong>{linkage.summary.title_candidates.toLocaleString('es-AR')}</strong> con candidato sugerido por título · <strong>{linkage.summary.offline_candidates.toLocaleString('es-AR')}</strong> con candidato de evidencia offline.</p>
       {linkageMessage&&<div className="notice">{linkageMessage}</div>}
+      <section className="linkage-ready-queue">
+        <div className="panel-title-row">
+          <div><h3>Cola operativa · Listas para vincular</h3><p>Estas coincidencias ya tienen evidencia suficiente o confirmación humana. Todavía no se ejecuta ningún cambio externo.</p></div>
+          <button onClick={exportReadyLinkage} disabled={!readyLinkage.length}>Exportar CSV ({readyLinkage.length})</button>
+        </div>
+        {readyLinkage.length===0?<p className="evidence-note">Todavía no hay publicaciones listas para vincular.</p>:<div className="table-wrap ready-linkage-table-wrap"><table className="ready-linkage-table"><thead><tr><th>Publicación</th><th>Producto EDIMA</th><th>Producto Ecomm</th><th>Evidencia</th></tr></thead><tbody>{readyLinkage.map((item,index)=><tr key={item.external_id||index}><td><strong className="mono">{item.external_id||'—'}</strong><small className="linkage-meta">GTIN: <span className="mono">{item.gtin_raw||'—'}</span></small></td><td><strong>{item.title||'—'}</strong>{item.brand&&<small className="linkage-meta">Marca: {item.brand}</small>}</td><td><strong>{item.matched_product?.name||'—'}</strong><small className="linkage-meta">ID Ecomm: <span className="mono">{item.matched_product?.ecomm_id||'—'}</span> · SKU: <span className="mono">{item.matched_product?.sku||'—'}</span></small></td><td><strong>{item.decision_source==='HUMAN_KIKI'?'Confirmación humana':'Coincidencia por identificadores'}</strong><small className="linkage-meta">{item.match_method==='HUMAN_CONFIRMED_OFFLINE'?'Evidencia offline confirmada':item.match_method==='HUMAN_CONFIRMED_TITLE'?'Título confirmado':item.match_method||'—'}</small>{item.decision_at&&<small className="linkage-meta">{new Date(item.decision_at).toLocaleString('es-AR')}</small>}</td></tr>)}</tbody></table></div>}
+      </section>
       <div className="table-wrap linkage-table-wrap"><table className="linkage-table"><thead><tr><th>Publicación</th><th>Producto EDIMA</th><th>Coincidencia Ecomm</th><th>Estado</th><th>Acción / motivo</th></tr></thead><tbody>{linkage.items.map((item,index)=><tr key={item.external_id||index}><td><strong className="mono">{item.external_id||'—'}</strong><small className="linkage-meta">GTIN: <span className="mono">{item.gtin_raw||'—'}</span></small></td><td><strong>{item.title||'—'}</strong>{item.brand&&<small className="linkage-meta">Marca: {item.brand}</small>}</td><td>{item.matched_product?<><strong>{item.matched_product.name||'Producto Ecomm'}</strong><small className="linkage-meta">SKU: <span className="mono">{item.matched_product.sku||'—'}</span></small><small className="linkage-meta">Método: {item.match_method==='RECONCILIATION_MLA'?'MLA conciliado':item.match_method==='ECOMM_MLA'?'MLA en Ecomm':item.match_method==='GTIN_EXACT'?'GTIN exacto':item.match_method==='TITLE_EXACT'?'Título exacto':item.match_method==='TITLE_HIGH_CONFIDENCE'?'Título sugerido':item.match_method==='HUMAN_CONFIRMED_TITLE'?'Título confirmado':item.match_method==='HUMAN_CONFIRMED_OFFLINE'?'Evidencia confirmada':item.match_method?.startsWith('OFFLINE_SKU_EXACT')?'Control offline · SKU exacto':item.match_method?.startsWith('OFFLINE_TITLE')?'Control offline · título':item.match_method?.startsWith('OFFLINE_')?'Control offline':item.match_method||'—'}</small></>:<span>—</span>}</td><td><span className={`badge ${item.status==='READY_TO_LINK'?'READY_CORE_DATA':'REVIEW_REQUIRED'}`}>{linkageLabels[item.status]}</span>{item.decision_status==='REJECTED'&&<small className="decision-note">Rechazado previamente</small>}{item.decision_status==='STALE'&&<small className="decision-note">Decisión anterior desactualizada</small>}</td><td><div className="linkage-action-cell">{['REVIEW_TITLE_CANDIDATE','REVIEW_OFFLINE_CANDIDATE'].includes(item.status)&&item.matched_product?.ecomm_id?<div className="linkage-actions"><button onClick={()=>decideLinkage(item,'CONFIRMED')} disabled={linkageBusy===item.external_id}>{linkageBusy===item.external_id?'Guardando…':'Confirmar'}</button><button className="danger-outline" onClick={()=>decideLinkage(item,'REJECTED')} disabled={linkageBusy===item.external_id}>Rechazar</button></div>:item.decision_status==='CONFIRMED'?<strong>Confirmado</strong>:null}{item.offline_evidence?.note&&<small className="linkage-meta">Referencia offline: {item.offline_evidence.note}</small>}<small className="linkage-reason">{item.reason}</small></div></td></tr>)}</tbody></table></div>
       <p className="evidence-note">{linkage.policy.description}</p>
     </>}
