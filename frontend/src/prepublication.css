@@ -1,1 +1,33 @@
 .prepub-cards{grid-template-columns:repeat(5,minmax(0,1fr))}.prepub-roadmap{margin-top:20px}.prepub-flow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0}.prepub-flow span{padding:10px 12px;border-radius:10px;background:#f3f5f2;border:1px solid #dfe6df}.prepub-flow .done{background:#e8f5df;border-color:#cde7ba;color:#244d26}.prepub-filters{grid-template-columns:minmax(0,1fr) 260px}.prepub-list{display:grid;gap:16px;margin-top:16px}.prepub-item{border:1px solid #dfe5df;border-radius:14px;padding:18px;background:#fff}.prepub-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.prepub-head h2{margin:0 0 6px;font-size:18px}.prepub-head p{margin:0;color:#68726a}.prepub-source{font-size:12px;font-weight:700;padding:7px 10px;border-radius:999px;white-space:nowrap}.prepub-source.ECOMM_CORE{background:#edf3ea;color:#31563b}.prepub-source.ACCEPTED_EVIDENCE{background:#e3f3dd;color:#27602c}.prepub-core{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}.prepub-core>div{padding:12px;border-radius:10px;background:#f6f8f5}.prepub-core small{display:block;color:#707971;margin-bottom:4px}.prepub-core a{color:#1f5a3b;font-weight:700}.prepub-checks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.prepub-checks>span{padding:10px;border-radius:10px;text-align:center;font-weight:700;font-size:12px}.prepub-checks small{display:block;font-weight:500;margin-top:4px}.prepub-checks .PASSED{background:#e5f4db;color:#2d5b2d}.prepub-checks .WAITING_IMAGE_DATA{background:#fff1d6;color:#765412}.prepub-checks .WAITING_ML_CONNECTION{background:#eef0f2;color:#5a6268}.prepub-checks .READY_TO_VALIDATE{background:#e4eef8;color:#275278}.prepub-checks .BLOCKED{background:#f8e8e6;color:#87352e}.prepub-empty{padding:24px;text-align:center;color:#68726a}@media(max-width:1100px){.prepub-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.prepub-core,.prepub-checks{grid-template-columns:1fr 1fr}.prepub-head{flex-direction:column}.prepub-filters{grid-template-columns:1fr}}@media(max-width:700px){.prepub-cards,.prepub-core,.prepub-checks{grid-template-columns:1fr}.prepub-flow b{display:none}}
+
+.final-ml-queue{margin-top:20px;background:#fbfdfb}
+.final-queue-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:16px 0}
+.final-queue-summary button{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 12px;background:#fff;color:#203b2f;border:1px solid #dce6df;border-radius:10px}
+.final-queue-summary button.active{background:#1b513c;color:#fff;border-color:#1b513c}
+.final-queue-list{display:grid;gap:12px;margin-top:14px}
+.final-queue-item{border:1px solid #dfe5df;border-radius:14px;padding:16px;background:#fff}
+.final-queue-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.final-queue-head h3{margin:0 0 5px;font-size:17px}
+.final-queue-head p{margin:0;color:#68726a}
+.final-status{display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.final-status.READY_FOR_FINAL_REVIEW{background:#e4eef8;color:#275278}
+.final-status.APPROVED_FOR_PUBLICATION{background:#e5f4db;color:#2d5b2d}
+.final-status.STALE_APPROVAL{background:#fff1d6;color:#765412}
+.final-status.BLOCKED{background:#eef0f2;color:#5a6268}
+.final-preview-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:14px 0}
+.final-preview-grid>div{padding:10px;border-radius:10px;background:#f6f8f5;min-width:0}
+.final-preview-grid small{display:block;color:#707971;margin-bottom:4px}
+.final-preview-grid strong{display:block;overflow-wrap:anywhere}
+.final-blockers{margin:10px 0;padding:10px 12px;border-radius:10px;background:#fff3d9;color:#765412}
+.final-queue-actions{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:12px}
+.final-queue-actions span{color:#31563b;font-weight:700}
+@media(max-width:1100px){
+  .final-queue-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .final-preview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  .final-queue-summary,.final-preview-grid{grid-template-columns:1fr}
+  .final-queue-head,.final-queue-actions{flex-direction:column;align-items:stretch}
+  .final-status{align-self:flex-start}
+  .final-queue-actions button{width:100%}
+}
