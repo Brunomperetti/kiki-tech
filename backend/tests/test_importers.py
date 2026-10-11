@@ -193,6 +193,6 @@ def test_offline_linkage_evidence_headers_and_identifiers():
     assert row.external_id == "MLA1903337428"
     assert row.gtin == "7798151952332"
     assert row.candidate_ecomm_id == "6708437"
-    assert row.candidate_sku_product == "246_m"
+    assert row.candidate_sku_product == "246_M"
     assert row.evidence_type == "SKU_EXACT_HISTORICAL"
     assert any("1 filas con candidato Ecomm" in warning for warning in report.warnings)
