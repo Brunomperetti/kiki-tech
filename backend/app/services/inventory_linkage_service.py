@@ -171,7 +171,7 @@ class InventoryLinkageService:
                     )
                 elif decision_status == "REJECTED":
                     reason = (
-                        "El candidato sugerido por título fue rechazado humanamente. "
+                        "El candidato sugerido fue rechazado humanamente. "
                         "La publicación sigue requiriendo identificación."
                     )
                 elif decision_status == "STALE":
@@ -255,8 +255,9 @@ class InventoryLinkageService:
                     "Una publicación queda Lista para vincular cuando EDIMA indica No, contiene un "
                     "único GTIN válido y podemos identificar un único producto Ecomm por el MLA que "
                     "KIKI ya concilió, por un MLA directo en Ecomm o por GTIN exacto. Si MLA y GTIN se "
-                    "contradicen, KIKI la manda a revisión. Los candidatos encontrados solo por título "
-                    "pueden pasar a Lista para vincular únicamente después de una confirmación humana."
+                    "contradicen, KIKI la manda a revisión. Los candidatos encontrados por título o "
+                    "por evidencia offline solo pueden pasar a Lista para vincular después de una "
+                    "confirmación humana."
                 ),
             },
             "items": items,
