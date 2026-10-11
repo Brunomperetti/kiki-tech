@@ -65,9 +65,26 @@ export function Readiness(){
     setLinkageBusy(externalId);
     setLinkageMessage('');
     try{
-      await api.saveInventoryLinkageDecision(externalId,decision,ecommId);
-      const refreshed=await api.inventoryLinkage();
-      setLinkage(refreshed);
+      const saved=await api.saveInventoryLinkageDecision(externalId,decision,ecommId);
+      setLinkage(current=>{
+        if(!current)return current;
+        const wasReady=item.status==='READY_TO_LINK';
+        const nowReady=saved.status==='READY_TO_LINK';
+        const wasOffline=item.status==='REVIEW_OFFLINE_CANDIDATE';
+        const wasTitle=item.status==='REVIEW_TITLE_CANDIDATE';
+        return {
+          ...current,
+          items:current.items.map(candidate=>candidate.external_id===saved.external_id?saved:candidate),
+          summary:{
+            ...current.summary,
+            ready_to_link:current.summary.ready_to_link+(nowReady&&!wasReady?1:0),
+            confirmed_by_human:current.summary.confirmed_by_human+(decision==='CONFIRMED'&&!wasReady?1:0),
+            review_required:current.summary.review_required-(nowReady&&!wasReady?1:0),
+            offline_candidates:current.summary.offline_candidates-(decision==='CONFIRMED'&&wasOffline?1:0),
+            title_candidates:current.summary.title_candidates-(decision==='CONFIRMED'&&wasTitle?1:0),
+          },
+        };
+      });
       setLinkageMessage(decision==='CONFIRMED'
         ? 'Coincidencia confirmada. La publicación pasó a Lista para vincular.'
         : 'Candidato rechazado. La publicación permanece en revisión.');
