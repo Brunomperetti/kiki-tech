@@ -11,6 +11,9 @@ from ..core.config import get_settings
 from ..database.models import ImportJobRecord, ReconciliationRun
 from ..integrations.ecomm_app.edima_linkage_importer import EdimaLinkageExcelImporter
 from ..integrations.ecomm_app.excel_importer import EcommExcelImporter
+from ..integrations.ecomm_app.offline_linkage_evidence_importer import (
+    OfflineLinkageEvidenceExcelImporter,
+)
 from ..integrations.mercadolibre.excel_importer import MercadoLibreExcelImporter
 from ..repositories.catalog_repository import CatalogRepository
 
@@ -26,6 +29,8 @@ class ReconciliationService:
             importer = EcommExcelImporter()
         elif source == "EDIMA_LINKAGE":
             importer = EdimaLinkageExcelImporter()
+        elif source == "OFFLINE_LINKAGE_EVIDENCE":
+            importer = OfflineLinkageEvidenceExcelImporter()
         else:
             importer = MercadoLibreExcelImporter()
         logger.info("import_started source=%s filename=%s", source, filename)

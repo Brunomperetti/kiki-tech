@@ -4,6 +4,7 @@ import pytest
 from app.integrations.common.excel import ExcelImportError
 from app.integrations.ecomm_app.edima_linkage_importer import EdimaLinkageExcelImporter
 from app.integrations.ecomm_app.excel_importer import EcommExcelImporter
+from app.integrations.ecomm_app.offline_linkage_evidence_importer import OfflineLinkageEvidenceExcelImporter
 from app.integrations.mercadolibre.excel_importer import MercadoLibreExcelImporter
 
 
@@ -163,3 +164,35 @@ def test_edima_linkage_real_headers_preserve_gtin_and_status():
     assert report.records[0].gtins == ["074312017070"]
     assert report.records[1].gtins == ["078895300024", "078895300017"]
     assert any("1 publicaciones vinculadas y 1 no vinculadas" in warning for warning in report.warnings)
+
+
+def test_offline_linkage_evidence_headers_and_identifiers():
+    frame = pd.DataFrame(
+        [
+            {
+                "ML ID": "MLA1903337428",
+                "GTIN EDIMA": "7798151952332",
+                "Título EDIMA": "Pasta De Mani Natural Mani King X 485g",
+                "Marca EDIMA": "Maní King",
+                "Estado histórico": "COINCIDENCIA SKU - NO DUPLICAR",
+                "ID interno candidato": "6708437",
+                "Producto candidato": "Pasta De Mani Natural Mani King X 485g Sin Tacc",
+                "SKU producto candidato": "246_m",
+                "SKU variante candidato": "246",
+                "Tipo evidencia": "SKU_EXACT_HISTORICAL",
+                "Recomendación": "CONFIRMAR CANDIDATO",
+                "Observación": "Coincidencia histórica por SKU exacto.",
+            }
+        ]
+    )
+
+    report = OfflineLinkageEvidenceExcelImporter().read(excel(frame))
+    row = report.records[0]
+
+    assert report.rows_accepted == 1
+    assert row.external_id == "MLA1903337428"
+    assert row.gtin == "7798151952332"
+    assert row.candidate_ecomm_id == "6708437"
+    assert row.candidate_sku_product == "246_M"
+    assert row.evidence_type == "SKU_EXACT_HISTORICAL"
+    assert any("1 filas con candidato Ecomm" in warning for warning in report.warnings)

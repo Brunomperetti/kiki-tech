@@ -72,6 +72,23 @@ class EdimaLinkageRow(BaseModel):
     gtins: list[str] = Field(default_factory=list)
 
 
+class OfflineLinkageEvidenceRow(BaseModel):
+    """Offline evidence used to assist EDIMA inventory-linkage review."""
+
+    external_id: str
+    gtin: str | None = None
+    title: str | None = None
+    brand: str | None = None
+    historical_status: str | None = None
+    candidate_ecomm_id: str | None = None
+    candidate_product: str | None = None
+    candidate_sku_product: str | None = None
+    candidate_sku_variant: str | None = None
+    evidence_type: str | None = None
+    recommendation: str | None = None
+    note: str | None = None
+
+
 class Product(BaseModel):
     ecomm_id: str | None = None
     sku: str | None = None
