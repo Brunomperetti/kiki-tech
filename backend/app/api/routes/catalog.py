@@ -37,6 +37,12 @@ class InventoryLinkagePendingEcommRequest(BaseModel):
     note: str | None = None
 
 
+class InventoryLinkageEcommActionRequest(BaseModel):
+    external_id: str
+    action: str
+    note: str | None = None
+
+
 class EnrichmentDecisionRequest(BaseModel):
     product_key: str
     status: str
@@ -147,6 +153,25 @@ def inventory_linkage_candidates(
     except Exception as exc:
         logger.exception("inventory_linkage_candidates_failed")
         raise HTTPException(500, "No se pudieron buscar candidatos Ecomm.") from exc
+
+
+@router.post("/inventory-linkage/ecomm-action")
+def inventory_linkage_ecomm_action(
+    request: InventoryLinkageEcommActionRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return InventoryLinkageService(db).save_pending_ecomm_action(
+            external_id=request.external_id,
+            action=request.action,
+            note=request.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("inventory_linkage_ecomm_action_failed")
+        raise HTTPException(500, "No se pudo guardar la acción de catálogo Ecomm.") from exc
 
 
 @router.post("/inventory-linkage/pending-ecomm")
