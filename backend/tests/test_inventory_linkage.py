@@ -872,3 +872,163 @@ def test_manual_assignment_does_not_override_identifier_conflict():
 
         with pytest.raises(ValueError, match="conflicto de identificadores"):
             service.save_manual_assignment("MLA100", "20")
+
+
+def test_candidate_search_does_not_suggest_wrong_brand_or_size_automatically():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                {
+                    **product("10", "1000", None, "Aceite De Girasol Orgánico Pampagourmet X 5L"),
+                    "brand": "Pampa Gourmet",
+                },
+                {
+                    **product("20", "2000", None, "Aceite De Oliva Organico Zuelo 500 ml"),
+                    "brand": None,
+                },
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                {
+                    **edima(
+                        "MLA100",
+                        "No",
+                        "7793323024763",
+                        ["7793323024763"],
+                        "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                    ),
+                    "brand": "Dicomere",
+                }
+            ],
+        )
+
+        result = service.search_candidates("MLA100")
+
+        assert result["candidates"] == []
+
+
+def test_candidate_search_marks_explicit_mismatched_size_as_warning():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                {
+                    **product("10", "1000", None, "Aceite De Girasol Orgánico Dicomere X 5L"),
+                    "brand": "Dicomere",
+                }
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                {
+                    **edima(
+                        "MLA100",
+                        "No",
+                        "7793323024763",
+                        ["7793323024763"],
+                        "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                    ),
+                    "brand": "Dicomere",
+                }
+            ],
+        )
+
+        result = service.search_candidates("MLA100", search="1000")
+
+        assert len(result["candidates"]) == 1
+        assert "⚠ Presentación distinta" in result["candidates"][0]["reasons"]
+        assert result["candidates"][0]["score"] <= 0.45
+
+
+def test_confirmed_pack_x2_is_reopened_if_candidate_is_unit_product():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                {
+                    **product("10", "3370", None, "Potasio Natier X 50 Caps"),
+                    "brand": "Natier",
+                }
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                {
+                    **edima(
+                        "MLA100",
+                        "No",
+                        "7798121272958",
+                        ["7798121272958"],
+                        "Potasio En Capsulas X 50 Sabor Neutro Natier Pack X2",
+                    ),
+                    "brand": "Natier",
+                }
+            ],
+        )
+        service.repo.save_snapshot(
+            "OFFLINE_LINKAGE_EVIDENCE",
+            [
+                {
+                    "external_id": "MLA100",
+                    "gtin": "7798121272958",
+                    "candidate_ecomm_id": "10",
+                    "candidate_product": "Potasio Natier X 50 Caps",
+                    "evidence_type": "TITLE_INVENTORY_HISTORICAL",
+                }
+            ],
+        )
+
+        service.save_decision("MLA100", "CONFIRMED", "10")
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_PRESENTATION_CONFLICT"
+        assert item["decision_status"] == "STALE"
+        assert "PACK X2" in item["reason"]
+
+
+def test_manual_assignment_blocks_mismatched_volume():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                {
+                    **product("10", "1000", None, "Aceite De Girasol Dicomere 5 L"),
+                    "brand": "Dicomere",
+                }
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                {
+                    **edima(
+                        "MLA100",
+                        "No",
+                        "7793323024763",
+                        ["7793323024763"],
+                        "Aceite De Girasol Dicomere 500 Ml",
+                    ),
+                    "brand": "Dicomere",
+                }
+            ],
+        )
+
+        with pytest.raises(ValueError, match="presentación no coincide"):
+            service.save_manual_assignment("MLA100", "10")
