@@ -51,7 +51,12 @@ async def import_catalog(
     _session=Depends(require_csrf),
 ):
     source = source.upper()
-    if source not in {"ECOMM_APP", "MERCADOLIBRE", "EDIMA_LINKAGE"}:
+    if source not in {
+        "ECOMM_APP",
+        "MERCADOLIBRE",
+        "EDIMA_LINKAGE",
+        "OFFLINE_LINKAGE_EVIDENCE",
+    }:
         raise HTTPException(400, "Origen de importación no válido.")
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(400, "El archivo debe tener formato XLSX.")
