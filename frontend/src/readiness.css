@@ -46,3 +46,22 @@
   .ready-linkage-table tr{padding:12px;border-top:1px solid #e7ede9}
   .ready-linkage-table td{border:0;padding:6px 0}
 }
+
+.candidate-modal-overlay{position:fixed;inset:0;background:rgba(16,44,33,.45);display:flex;align-items:center;justify-content:center;padding:24px;z-index:1000}
+.candidate-modal{width:min(860px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.22)}
+.candidate-modal-header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:16px}
+.candidate-modal-header h3{margin:0 0 6px;font-size:22px}
+.candidate-search-form{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:14px}
+.candidate-search-form input{min-width:0}
+.candidate-results{display:grid;gap:10px;margin-top:12px}
+.candidate-card{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;border:1px solid #dce6df;border-radius:12px;padding:14px;background:#fbfdfb}
+.candidate-card strong{display:block}
+.candidate-card button{white-space:nowrap}
+@media(max-width:700px){
+  .candidate-modal-overlay{padding:10px}
+  .candidate-modal{padding:14px;max-height:94vh}
+  .candidate-modal-header{flex-direction:column}
+  .candidate-search-form{grid-template-columns:1fr}
+  .candidate-card{grid-template-columns:1fr}
+  .candidate-card button{width:100%}
+}
