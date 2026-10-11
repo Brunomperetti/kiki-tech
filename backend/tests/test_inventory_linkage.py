@@ -600,3 +600,95 @@ def test_human_confirmation_rejects_changed_product_identifier():
                 "CONFIRMED",
                 "999",
             )
+
+
+def test_offline_evidence_surfaces_candidate_when_normal_matching_fails():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("6708437", "246", None, "Pasta De Mani Natural Mani King X 485g Sin Tacc")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1903337428",
+                    "No",
+                    "7798151952332",
+                    ["7798151952332"],
+                    "Publicación con título diferente",
+                )
+            ],
+        )
+        service.repo.save_snapshot(
+            "OFFLINE_LINKAGE_EVIDENCE",
+            [
+                {
+                    "external_id": "MLA1903337428",
+                    "gtin": "7798151952332",
+                    "candidate_ecomm_id": "6708437",
+                    "candidate_product": "Pasta De Mani Natural Mani King X 485g Sin Tacc",
+                    "evidence_type": "SKU_EXACT_HISTORICAL",
+                    "recommendation": "CONFIRMAR CANDIDATO",
+                    "note": "Coincidencia histórica por SKU exacto.",
+                }
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_OFFLINE_CANDIDATE"
+        assert item["matched_product"]["ecomm_id"] == "6708437"
+        assert item["match_method"] == "OFFLINE_SKU_EXACT_HISTORICAL"
+        assert item["offline_evidence"]["recommendation"] == "CONFIRMAR CANDIDATO"
+        assert service.report()["summary"]["offline_candidates"] == 1
+
+
+def test_human_confirmation_promotes_offline_candidate_to_ready():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("6708437", "246", None, "Pasta De Mani Natural Mani King X 485g Sin Tacc")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA1903337428",
+                    "No",
+                    "7798151952332",
+                    ["7798151952332"],
+                    "Publicación con título diferente",
+                )
+            ],
+        )
+        service.repo.save_snapshot(
+            "OFFLINE_LINKAGE_EVIDENCE",
+            [
+                {
+                    "external_id": "MLA1903337428",
+                    "gtin": "7798151952332",
+                    "candidate_ecomm_id": "6708437",
+                    "evidence_type": "SKU_EXACT_HISTORICAL",
+                    "recommendation": "CONFIRMAR CANDIDATO",
+                    "note": "Coincidencia histórica por SKU exacto.",
+                }
+            ],
+        )
+
+        saved = service.save_decision(
+            "MLA1903337428",
+            "CONFIRMED",
+            "6708437",
+        )
+
+        assert saved["status"] == "READY_TO_LINK"
+        assert saved["match_method"] == "HUMAN_CONFIRMED_OFFLINE"
+        assert saved["decision_status"] == "CONFIRMED"
+        assert service.report()["summary"]["confirmed_by_human"] == 1
