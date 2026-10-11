@@ -442,6 +442,16 @@ class InventoryLinkageService:
         if self._is_linked(row.get("inventory_linked")):
             raise ValueError("La publicación ya figura vinculada en EDIMA.")
 
+        current = self._decision_candidate(external_id)
+        if current.get("status") not in {
+            self.NO_ECOMM_MATCH,
+            self.REVIEW_TITLE_CANDIDATE,
+            self.REVIEW_OFFLINE_CANDIDATE,
+        }:
+            raise ValueError(
+                "Esta publicación tiene un conflicto de identificadores que debe resolverse antes de asignarla manualmente."
+            )
+
         product = next(
             (
                 candidate
