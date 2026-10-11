@@ -147,6 +147,8 @@ class InventoryLinkageService:
                     )
             decision_status = "NONE"
             decision_note = None
+            decision_at = None
+            decision_source = "AUTOMATIC_IDENTIFIERS" if status == self.READY_TO_LINK else "NONE"
             decision = decisions.get(str(row.get("external_id") or ""))
             if (
                 decision
@@ -156,6 +158,8 @@ class InventoryLinkageService:
             ):
                 decision_status = self._decision_state(decision, row, matched)
                 decision_note = decision.note
+                decision_at = decision.updated_at.isoformat() if decision.updated_at else None
+                decision_source = "HUMAN_KIKI"
                 if decision_status == "CONFIRMED":
                     original_method = match_method
                     status = self.READY_TO_LINK
@@ -197,6 +201,8 @@ class InventoryLinkageService:
                     "offline_evidence": offline_item or None,
                     "decision_status": decision_status,
                     "decision_note": decision_note,
+                    "decision_at": decision_at,
+                    "decision_source": decision_source,
                     "matched_product": self._product_view(matched) if matched else None,
                 }
             )
@@ -338,6 +344,8 @@ class InventoryLinkageService:
         item = dict(item)
         item["decision_status"] = decision_value
         item["decision_note"] = note
+        item["decision_at"] = now.isoformat()
+        item["decision_source"] = "HUMAN_KIKI"
         if decision_value == "CONFIRMED":
             item["status"] = self.READY_TO_LINK
             item["match_method"] = (
@@ -468,6 +476,8 @@ class InventoryLinkageService:
             "offline_evidence": offline_item or None,
             "decision_status": "NONE",
             "decision_note": None,
+            "decision_at": None,
+            "decision_source": "AUTOMATIC_IDENTIFIERS" if status == self.READY_TO_LINK else "NONE",
             "matched_product": self._product_view(matched) if matched else None,
         }
 
