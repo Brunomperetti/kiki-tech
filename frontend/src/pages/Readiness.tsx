@@ -10,6 +10,7 @@ const linkageLabels:Record<InventoryLinkageStatus,string>={
   REVIEW_IDENTIFIER_CONFLICT:'Revisar conflicto MLA/GTIN',
   REVIEW_TITLE_CANDIDATE:'Revisar candidato por título',
   REVIEW_OFFLINE_CANDIDATE:'Revisar evidencia offline',
+  REVIEW_PRESENTATION_CONFLICT:'Revisar presentación',
   INVALID_GTIN:'GTIN inválido',
   NO_ECOMM_MATCH:'Sin coincidencia Ecomm',
 };
@@ -238,7 +239,7 @@ export function Readiness(){
     {!linkage?<p>Consultando el último reporte EDIMA…</p>:!linkage.available?<div className="notice"><strong>EDIMA todavía no está cargado.</strong><p>{linkage.message}</p><p>Subilo desde <strong>Importaciones → EDIMA · Vinculación inventario ML</strong>.</p></div>:<>
       <section className="cards readiness-cards"><article><span>Publicaciones EDIMA</span><strong>{linkage.summary.total_publications.toLocaleString('es-AR')}</strong></article><article><span>Vinculadas</span><strong>{linkage.summary.linked.toLocaleString('es-AR')}</strong></article><article><span>Sin vincular</span><strong>{linkage.summary.unlinked.toLocaleString('es-AR')}</strong></article><article><span>Listas para vincular</span><strong>{linkage.summary.ready_to_link.toLocaleString('es-AR')}</strong></article><article><span>Confirmadas por vos</span><strong>{linkage.summary.confirmed_by_human.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{linkage.summary.review_required.toLocaleString('es-AR')}</strong></article><article><span>GTIN únicos sin vincular</span><strong>{linkage.summary.distinct_unlinked_gtins.toLocaleString('es-AR')}</strong></article></section>
       <p className="evidence-note">{linkage.policy.safe_match}</p>
-      <p className="result-count">Calidad del reporte: <strong>{linkage.summary.data_quality_invalid_gtin_total.toLocaleString('es-AR')}</strong> publicaciones con GTIN inválido o no utilizable · <strong>{linkage.summary.data_quality_multiple_gtin_total.toLocaleString('es-AR')}</strong> con más de un código · <strong>{linkage.summary.title_candidates.toLocaleString('es-AR')}</strong> con candidato sugerido por título · <strong>{linkage.summary.offline_candidates.toLocaleString('es-AR')}</strong> con candidato de evidencia offline.</p>
+      <p className="result-count">Calidad del reporte: <strong>{linkage.summary.data_quality_invalid_gtin_total.toLocaleString('es-AR')}</strong> publicaciones con GTIN inválido o no utilizable · <strong>{linkage.summary.data_quality_multiple_gtin_total.toLocaleString('es-AR')}</strong> con más de un código · <strong>{linkage.summary.title_candidates.toLocaleString('es-AR')}</strong> con candidato sugerido por título · <strong>{linkage.summary.offline_candidates.toLocaleString('es-AR')}</strong> con candidato de evidencia offline · <strong>{linkage.summary.presentation_conflict.toLocaleString('es-AR')}</strong> con conflicto de presentación.</p>
       {linkageMessage&&<div className="notice">{linkageMessage}</div>}
       <section className="linkage-ready-queue">
         <div className="panel-title-row">
