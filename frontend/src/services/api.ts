@@ -1,4 +1,4 @@
-import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
+import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
 
@@ -83,6 +83,12 @@ export const api = {
     body: JSON.stringify(payload),
   }),
   prepublication: () => request<PrepublicationReport>('/api/prepublication'),
+  finalPublicationQueue: () => request<FinalPublicationQueueReport>('/api/prepublication/final-queue'),
+  saveFinalPublicationApproval: (productKey: string, action: 'APPROVE'|'REVOKE', note?: string) => request<FinalPublicationQueueItem>('/api/prepublication/final-queue', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({product_key: productKey, action, note: note || null}),
+  }),
   prepublicationMetadata: () => request<PrepublicationMetadataQueue>('/api/prepublication/metadata'),
   analyzePrepublicationMetadata: (productKey: string) => request<PrepublicationMetadataItem>('/api/prepublication/metadata/analyze', {
     method: 'POST',
