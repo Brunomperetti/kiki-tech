@@ -17,6 +17,7 @@ class InventoryLinkageService:
     REVIEW_MULTIPLE_GTIN = "REVIEW_MULTIPLE_GTIN"
     REVIEW_IDENTIFIER_CONFLICT = "REVIEW_IDENTIFIER_CONFLICT"
     REVIEW_TITLE_CANDIDATE = "REVIEW_TITLE_CANDIDATE"
+    REVIEW_OFFLINE_CANDIDATE = "REVIEW_OFFLINE_CANDIDATE"
     INVALID_GTIN = "INVALID_GTIN"
     NO_ECOMM_MATCH = "NO_ECOMM_MATCH"
 
@@ -27,6 +28,7 @@ class InventoryLinkageService:
     def report(self, apply_decisions: bool = True) -> dict:
         edima = self.repo.snapshot("EDIMA_LINKAGE")
         products = self.repo.snapshot("ECOMM_APP")
+        offline_evidence = self.repo.snapshot("OFFLINE_LINKAGE_EVIDENCE")
         if not edima:
             return self._unavailable(
                 "Importá el reporte EDIMA de Mercado Libre para analizar la vinculación de inventario."
@@ -35,6 +37,17 @@ class InventoryLinkageService:
             return self._unavailable(
                 "Importá primero el catálogo de Ecomm-App para cruzar los GTIN de EDIMA."
             )
+
+        product_by_ecomm_id = {
+            str(product.get("ecomm_id") or "").strip(): product
+            for product in products
+            if str(product.get("ecomm_id") or "").strip()
+        }
+        offline_by_mla = {
+            str(item.get("external_id") or "").strip(): item
+            for item in offline_evidence
+            if str(item.get("external_id") or "").strip()
+        }
 
         ean_index: dict[str, list[dict]] = defaultdict(list)
         listing_index: dict[str, list[dict]] = defaultdict(list)
@@ -118,22 +131,42 @@ class InventoryLinkageService:
                 title_index,
                 normalized_products,
             )
+            offline_item = offline_by_mla.get(str(row.get("external_id") or "").strip())
+            if status == self.NO_ECOMM_MATCH and offline_item:
+                offline_candidate = product_by_ecomm_id.get(
+                    str(offline_item.get("candidate_ecomm_id") or "").strip()
+                )
+                if offline_candidate:
+                    matched = offline_candidate
+                    status = self.REVIEW_OFFLINE_CANDIDATE
+                    evidence_type = str(offline_item.get("evidence_type") or "").strip()
+                    match_method = f"OFFLINE_{evidence_type or 'REFERENCE'}"
+                    reason = (
+                        "El documento de control offline propone este producto Ecomm como candidato. "
+                        "Requiere confirmación humana antes de usarlo para vinculación."
+                    )
             decision_status = "NONE"
             decision_note = None
             decision = decisions.get(str(row.get("external_id") or ""))
             if (
                 decision
-                and status == self.REVIEW_TITLE_CANDIDATE
+                and status
+                in {self.REVIEW_TITLE_CANDIDATE, self.REVIEW_OFFLINE_CANDIDATE}
                 and matched is not None
             ):
                 decision_status = self._decision_state(decision, row, matched)
                 decision_note = decision.note
                 if decision_status == "CONFIRMED":
+                    original_method = match_method
                     status = self.READY_TO_LINK
-                    match_method = "HUMAN_CONFIRMED_TITLE"
+                    match_method = (
+                        "HUMAN_CONFIRMED_OFFLINE"
+                        if str(original_method or "").startswith("OFFLINE_")
+                        else "HUMAN_CONFIRMED_TITLE"
+                    )
                     confirmed_by_human += 1
                     reason = (
-                        "Coincidencia por título confirmada humanamente dentro de KIKI Tech. "
+                        "Coincidencia confirmada humanamente dentro de KIKI Tech. "
                         "La publicación queda lista para el siguiente paso de vinculación asistida."
                     )
                 elif decision_status == "REJECTED":
@@ -161,6 +194,7 @@ class InventoryLinkageService:
                     "status": status,
                     "reason": reason,
                     "match_method": match_method,
+                    "offline_evidence": offline_item or None,
                     "decision_status": decision_status,
                     "decision_note": decision_note,
                     "matched_product": self._product_view(matched) if matched else None,
@@ -174,7 +208,8 @@ class InventoryLinkageService:
             self.REVIEW_MULTIPLE_GTIN: 3,
             self.REVIEW_IDENTIFIER_CONFLICT: 4,
             self.REVIEW_TITLE_CANDIDATE: 5,
-            self.INVALID_GTIN: 6,
+            self.REVIEW_OFFLINE_CANDIDATE: 6,
+            self.INVALID_GTIN: 7,
         }
         items.sort(
             key=lambda item: (
@@ -200,6 +235,7 @@ class InventoryLinkageService:
                 "multiple_gtin": status_counts[self.REVIEW_MULTIPLE_GTIN],
                 "identifier_conflict": status_counts[self.REVIEW_IDENTIFIER_CONFLICT],
                 "title_candidates": status_counts[self.REVIEW_TITLE_CANDIDATE],
+                "offline_candidates": status_counts[self.REVIEW_OFFLINE_CANDIDATE],
                 "distinct_unlinked_gtins": len(unlinked_gtins),
                 "data_quality_invalid_gtin_total": invalid_gtin_total,
                 "data_quality_multiple_gtin_total": multiple_gtin_total,
@@ -211,7 +247,9 @@ class InventoryLinkageService:
                     "canónico de Ecomm-App usando primero el MLA exacto ya resuelto por la última "
                     "conciliación, luego el MLA guardado en las filas Ecomm y, como respaldo, el GTIN "
                     "exacto. Si los identificadores no alcanzan, el título se usa solo para sugerir "
-                    "un candidato de revisión. No modifica Ecomm-App ni Mercado Libre."
+                    "un candidato de revisión. También puede usar evidencia offline importada para "
+                    "proponer candidatos históricos, siempre con confirmación humana. No modifica "
+                    "Ecomm-App ni Mercado Libre."
                 ),
                 "safe_match": (
                     "Una publicación queda Lista para vincular cuando EDIMA indica No, contiene un "
@@ -250,9 +288,12 @@ class InventoryLinkageService:
         )
         if not item:
             raise ValueError("La publicación EDIMA ya no está disponible.")
-        if item.get("status") != self.REVIEW_TITLE_CANDIDATE:
+        if item.get("status") not in {
+            self.REVIEW_TITLE_CANDIDATE,
+            self.REVIEW_OFFLINE_CANDIDATE,
+        }:
             raise ValueError(
-                "Solo se pueden confirmar o rechazar candidatos sugeridos por título."
+                "Solo se pueden confirmar o rechazar candidatos sugeridos para revisión."
             )
         matched = item.get("matched_product") or {}
         if str(matched.get("ecomm_id") or "") != ecomm_id:
@@ -570,6 +611,7 @@ class InventoryLinkageService:
                 "multiple_gtin": 0,
                 "identifier_conflict": 0,
                 "title_candidates": 0,
+                "offline_candidates": 0,
                 "distinct_unlinked_gtins": 0,
                 "data_quality_invalid_gtin_total": 0,
                 "data_quality_multiple_gtin_total": 0,
