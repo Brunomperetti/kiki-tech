@@ -1,3 +1,5 @@
+import pytest
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -451,3 +453,150 @@ def test_inventory_linkage_does_not_use_ambiguous_title():
 
         assert item["status"] == "NO_ECOMM_MATCH"
         assert item["matched_product"] is None
+
+
+def test_human_confirmation_promotes_title_candidate_to_ready():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1175", None, "Aceite De Girasol Orgánico Dicomere 500 Ml")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA3235792624",
+                    "No",
+                    "7793323024763",
+                    ["7793323024763"],
+                    "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                )
+            ],
+        )
+
+        before = service.report()["items"][0]
+        assert before["status"] == "REVIEW_TITLE_CANDIDATE"
+
+        saved = service.save_decision(
+            "MLA3235792624",
+            "CONFIRMED",
+            "10",
+        )
+
+        assert saved["status"] == "READY_TO_LINK"
+        assert saved["match_method"] == "HUMAN_CONFIRMED_TITLE"
+        assert saved["decision_status"] == "CONFIRMED"
+        report = service.report()
+        assert report["summary"]["ready_to_link"] == 1
+        assert report["summary"]["confirmed_by_human"] == 1
+        assert report["summary"]["review_required"] == 0
+
+
+def test_human_rejection_keeps_title_candidate_in_review():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1175", None, "Aceite De Girasol Orgánico Dicomere 500 Ml")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA3235792624",
+                    "No",
+                    "7793323024763",
+                    ["7793323024763"],
+                    "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                )
+            ],
+        )
+
+        saved = service.save_decision(
+            "MLA3235792624",
+            "REJECTED",
+            "10",
+        )
+
+        assert saved["status"] == "REVIEW_TITLE_CANDIDATE"
+        assert saved["decision_status"] == "REJECTED"
+        report = service.report()
+        assert report["summary"]["ready_to_link"] == 0
+        assert report["summary"]["review_required"] == 1
+
+
+def test_human_confirmation_becomes_stale_if_edima_evidence_changes():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1175", None, "Aceite De Girasol Orgánico Dicomere 500 Ml")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA3235792624",
+                    "No",
+                    "7793323024763",
+                    ["7793323024763"],
+                    "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                )
+            ],
+        )
+        service.save_decision("MLA3235792624", "CONFIRMED", "10")
+
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA3235792624",
+                    "No",
+                    "7798318384006",
+                    ["7798318384006"],
+                    "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                )
+            ],
+        )
+        item = service.report()["items"][0]
+
+        assert item["status"] == "REVIEW_TITLE_CANDIDATE"
+        assert item["decision_status"] == "STALE"
+        assert service.report()["summary"]["ready_to_link"] == 0
+
+
+def test_human_confirmation_rejects_changed_product_identifier():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1175", None, "Aceite De Girasol Orgánico Dicomere 500 Ml")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA3235792624",
+                    "No",
+                    "7793323024763",
+                    ["7793323024763"],
+                    "Aceite De Girasol Orgánico Dicomere 500 Ml",
+                )
+            ],
+        )
+
+        with pytest.raises(ValueError, match="producto Ecomm sugerido cambió"):
+            service.save_decision(
+                "MLA3235792624",
+                "CONFIRMED",
+                "999",
+            )

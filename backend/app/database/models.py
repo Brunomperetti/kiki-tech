@@ -77,6 +77,26 @@ class ReconciliationRun(Base):
     )
 
 
+class InventoryLinkageDecision(Base):
+    """Human confirmation for an EDIMA linkage suggestion; never writes externally."""
+
+    __tablename__ = "inventory_linkage_decisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    external_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    decision: Mapped[str] = mapped_column(String(30), index=True)
+    ecomm_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    product_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class EnrichmentReviewDecision(Base):
     """Persistent internal review state; never writes to Ecomm-App or Mercado Libre."""
 
