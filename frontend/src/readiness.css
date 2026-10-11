@@ -1,2 +1,28 @@
 .panel-title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}.panel-title-row h2{margin-bottom:6px}.reason-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}.reason-card{background:#f7f9f8;color:#16251d;border:1px solid #dce5df;text-align:left;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}.reason-card:hover,.reason-card.active{background:#edf8e3;border-color:#b9d98f}.reason-card span{font-size:13px;font-weight:600}.reason-card strong{font-size:20px}.text-button{margin-top:12px;background:transparent;color:#365e20;padding:6px 0}.text-button:hover{text-decoration:underline}@media(max-width:1000px){.reason-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.panel-title-row{flex-direction:column}.panel-title-row button{width:100%}.reason-grid{grid-template-columns:1fr}}
 .linkage-actions{display:flex;gap:8px;align-items:center}.linkage-actions button{white-space:nowrap;padding:8px 10px}.decision-note{display:block;margin-top:6px;color:#7c5a13;font-size:11px;line-height:1.25}@media(max-width:900px){.linkage-actions{flex-direction:column;align-items:stretch}}
+.linkage-table-wrap{overflow-x:hidden;min-width:0}
+.linkage-table{table-layout:fixed;width:100%}
+.linkage-table th:nth-child(1){width:14%}
+.linkage-table th:nth-child(2){width:22%}
+.linkage-table th:nth-child(3){width:22%}
+.linkage-table th:nth-child(4){width:17%}
+.linkage-table th:nth-child(5){width:25%}
+.linkage-table td{white-space:normal;overflow-wrap:anywhere}
+.linkage-table td strong{display:block}
+.linkage-meta{display:block;margin-top:5px;color:#68786f;font-size:11px;line-height:1.35}
+.linkage-reason{display:block;color:#68786f;font-size:11px;line-height:1.4}
+.linkage-action-cell{display:grid;gap:8px}
+.linkage-action-cell .linkage-actions{flex-wrap:wrap}
+@media(max-width:1100px){
+  .linkage-table th:nth-child(1){width:16%}
+  .linkage-table th:nth-child(2){width:22%}
+  .linkage-table th:nth-child(3){width:21%}
+  .linkage-table th:nth-child(4){width:17%}
+  .linkage-table th:nth-child(5){width:24%}
+}
+@media(max-width:760px){
+  .linkage-table thead{display:none}
+  .linkage-table,.linkage-table tbody,.linkage-table tr,.linkage-table td{display:block;width:100%}
+  .linkage-table tr{padding:12px;border-top:1px solid #e7ede9}
+  .linkage-table td{border:0;padding:6px 0}
+}
