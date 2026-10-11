@@ -278,17 +278,7 @@ class InventoryLinkageService:
         if not external_id or not ecomm_id:
             raise ValueError("La publicación ML y el producto Ecomm son obligatorios.")
 
-        base_report = self.report(apply_decisions=False)
-        item = next(
-            (
-                candidate
-                for candidate in base_report.get("items", [])
-                if str(candidate.get("external_id") or "") == external_id
-            ),
-            None,
-        )
-        if not item:
-            raise ValueError("La publicación EDIMA ya no está disponible.")
+        item = self._decision_candidate(external_id)
         if item.get("status") not in {
             self.REVIEW_TITLE_CANDIDATE,
             self.REVIEW_OFFLINE_CANDIDATE,
@@ -344,12 +334,142 @@ class InventoryLinkageService:
             row.updated_at = now
 
         self.db.commit()
-        refreshed = self.report()
-        return next(
-            item
-            for item in refreshed.get("items", [])
-            if str(item.get("external_id") or "") == external_id
+
+        item = dict(item)
+        item["decision_status"] = decision_value
+        item["decision_note"] = note
+        if decision_value == "CONFIRMED":
+            item["status"] = self.READY_TO_LINK
+            item["match_method"] = (
+                "HUMAN_CONFIRMED_OFFLINE"
+                if str(item.get("match_method") or "").startswith("OFFLINE_")
+                else "HUMAN_CONFIRMED_TITLE"
+            )
+            item["reason"] = (
+                "Coincidencia confirmada humanamente dentro de KIKI Tech. "
+                "La publicación queda lista para el siguiente paso de vinculación asistida."
+            )
+        else:
+            item["reason"] = (
+                "El candidato sugerido fue rechazado humanamente. "
+                "La publicación sigue requiriendo identificación."
+            )
+        return item
+
+    def _decision_candidate(self, external_id: str) -> dict:
+        edima = self.repo.snapshot("EDIMA_LINKAGE")
+        products = self.repo.snapshot("ECOMM_APP")
+        offline_evidence = self.repo.snapshot("OFFLINE_LINKAGE_EVIDENCE")
+        row = next(
+            (
+                candidate
+                for candidate in edima
+                if str(candidate.get("external_id") or "").strip() == external_id
+            ),
+            None,
         )
+        if not row:
+            raise ValueError("La publicación EDIMA ya no está disponible.")
+        if self._is_linked(row.get("inventory_linked")):
+            raise ValueError("La publicación ya figura vinculada en EDIMA.")
+
+        product_by_ecomm_id = {
+            str(product.get("ecomm_id") or "").strip(): product
+            for product in products
+            if str(product.get("ecomm_id") or "").strip()
+        }
+        offline_by_mla = {
+            str(candidate.get("external_id") or "").strip(): candidate
+            for candidate in offline_evidence
+            if str(candidate.get("external_id") or "").strip()
+        }
+
+        ean_index: dict[str, list[dict]] = defaultdict(list)
+        listing_index: dict[str, list[dict]] = defaultdict(list)
+        title_index: dict[str, list[dict]] = defaultdict(list)
+        normalized_products: list[tuple[dict, str]] = []
+        for product in products:
+            seen = set()
+            for ean in [product.get("ean"), *(product.get("ean_aliases") or [])]:
+                value = str(ean or "").strip()
+                if value and value not in seen:
+                    ean_index[value].append(product)
+                    seen.add(value)
+            listing_seen = set()
+            for ecomm_row in product.get("ecomm_rows") or []:
+                for raw_id in [ecomm_row.get("listing_id"), ecomm_row.get("marketplace_id")]:
+                    for key in self._listing_keys(raw_id):
+                        if key not in listing_seen:
+                            listing_index[key].append(product)
+                            listing_seen.add(key)
+            normalized = normalize_title(product.get("name"))
+            if normalized:
+                title_index[normalized].append(product)
+                normalized_products.append((product, normalized))
+
+        reconciliation_index: dict[str, list[dict]] = defaultdict(list)
+        latest_run = self.repo.latest_run()
+        if latest_run:
+            for result in latest_run.results or []:
+                product = result.get("product")
+                if not product:
+                    continue
+                raw_ids = list(result.get("matched_listing_ids") or [])
+                listing = result.get("listing") or {}
+                if listing.get("external_id"):
+                    raw_ids.append(listing.get("external_id"))
+                for raw_id in raw_ids:
+                    for key in self._listing_keys(raw_id):
+                        reconciliation_index[key].append(product)
+
+        gtins = [
+            str(value).strip()
+            for value in row.get("gtins") or []
+            if str(value).strip()
+        ]
+        valid_gtins = [value for value in gtins if self._valid_gtin(value)]
+        status, reason, matched, match_method = self._classify_unlinked(
+            row,
+            gtins,
+            valid_gtins,
+            ean_index,
+            listing_index,
+            reconciliation_index,
+            title_index,
+            normalized_products,
+        )
+        offline_item = offline_by_mla.get(external_id)
+        if status == self.NO_ECOMM_MATCH and offline_item:
+            offline_candidate = product_by_ecomm_id.get(
+                str(offline_item.get("candidate_ecomm_id") or "").strip()
+            )
+            if offline_candidate:
+                matched = offline_candidate
+                status = self.REVIEW_OFFLINE_CANDIDATE
+                evidence_type = str(offline_item.get("evidence_type") or "").strip()
+                match_method = f"OFFLINE_{evidence_type or 'REFERENCE'}"
+                reason = (
+                    "El documento de control offline propone este producto Ecomm como candidato. "
+                    "Requiere confirmación humana antes de usarlo para vinculación."
+                )
+
+        return {
+            "external_id": row.get("external_id"),
+            "variation_id": row.get("variation_id"),
+            "title": row.get("title"),
+            "brand": row.get("brand"),
+            "gtin_raw": row.get("gtin_raw"),
+            "gtins": gtins,
+            "inventory_linked": row.get("inventory_linked"),
+            "modified_at": row.get("modified_at"),
+            "status": status,
+            "reason": reason,
+            "match_method": match_method,
+            "offline_evidence": offline_item or None,
+            "decision_status": "NONE",
+            "decision_note": None,
+            "matched_product": self._product_view(matched) if matched else None,
+        }
 
     @staticmethod
     def _decision_state(
