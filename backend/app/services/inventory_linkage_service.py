@@ -21,6 +21,7 @@ class InventoryLinkageService:
     NO_ECOMM_MATCH = "NO_ECOMM_MATCH"
 
     def __init__(self, db: Session):
+        self.db = db
         self.repo = CatalogRepository(db)
 
     def report(self) -> dict:
