@@ -11,6 +11,7 @@ const linkageLabels:Record<InventoryLinkageStatus,string>={
   REVIEW_TITLE_CANDIDATE:'Revisar candidato por título',
   REVIEW_OFFLINE_CANDIDATE:'Revisar evidencia offline',
   REVIEW_PRESENTATION_CONFLICT:'Revisar presentación',
+  PENDING_ECOMM_CATALOG:'Pendiente de catálogo Ecomm',
   INVALID_GTIN:'GTIN inválido',
   NO_ECOMM_MATCH:'Sin coincidencia Ecomm',
 };
@@ -78,6 +79,10 @@ export function Readiness(){
   },[report,status,reasonCode,search]);
   const readyLinkage=useMemo(
     ()=>(linkage?.items||[]).filter(item=>item.status==='READY_TO_LINK'),
+    [linkage],
+  );
+  const pendingEcomm=useMemo(
+    ()=>(linkage?.items||[]).filter(item=>item.status==='PENDING_ECOMM_CATALOG'),
     [linkage],
   );
   const linkageGroups=useMemo(()=>{
@@ -203,6 +208,39 @@ export function Readiness(){
     }
   }
 
+  async function markPendingEcomm(){
+    if(!candidateItem?.external_id)return;
+    const externalId=String(candidateItem.external_id);
+    setCandidateSaving('__pending_ecomm__');
+    setCandidateError('');
+    try{
+      const saved=await api.markInventoryPendingEcomm(
+        externalId,
+        'Se revisaron los candidatos del catálogo Ecomm actual y ninguno corresponde a esta publicación.',
+      );
+      setLinkage(current=>{
+        if(!current)return current;
+        return {
+          ...current,
+          items:current.items.map(item=>item.external_id===saved.external_id?saved:item),
+          summary:{
+            ...current.summary,
+            no_ecomm_match:Math.max(0,current.summary.no_ecomm_match-1),
+            pending_ecomm_catalog:current.summary.pending_ecomm_catalog+1,
+          },
+        };
+      });
+      setLinkageMessage('La publicación quedó en Pendientes de catálogo Ecomm. No se vinculó nada.');
+      setCandidateItem(null);
+      setCandidateResults([]);
+      setCandidateQuery('');
+    }catch(error){
+      setCandidateError(error instanceof Error?error.message:'No se pudo guardar el pendiente de Ecomm.');
+    }finally{
+      setCandidateSaving('');
+    }
+  }
+
   function selectReason(code:string){
     setReasonCode(current=>current===code?'':code);
     setStatus('');
@@ -232,6 +270,32 @@ export function Readiness(){
     const link=document.createElement('a');
     link.href=url;
     link.download=`kiki-listas-para-vincular-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportPendingEcomm(){
+    if(!pendingEcomm.length)return;
+    const rows=[
+      ['MLA','GTIN','Producto EDIMA','Marca','Estado','Motivo','Fecha revisión'],
+      ...pendingEcomm.map(item=>[
+        item.external_id||'',
+        item.gtin_raw||'',
+        item.title||'',
+        item.brand||'',
+        'Pendiente de catálogo Ecomm',
+        item.reason||'',
+        item.decision_at?new Date(item.decision_at).toLocaleString('es-AR'):'',
+      ]),
+    ];
+    const csv='\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;
+    link.download=`kiki-pendientes-catalogo-ecomm-${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -275,7 +339,7 @@ export function Readiness(){
   <section className="cards readiness-cards"><article><span>Datos centrales OK</span><strong>{s.READY_CORE_DATA.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{s.REVIEW_REQUIRED.toLocaleString('es-AR')}</strong></article><article><span>Bloqueados</span><strong>{s.BLOCKED.toLocaleString('es-AR')}</strong></article><article><span>Fuera del masivo actual</span><strong>{s.EXCLUDED_BULK.toLocaleString('es-AR')}</strong></article><article><span>Sin stock</span><strong>{s.NO_STOCK.toLocaleString('es-AR')}</strong></article><article><span>Ya publicados</span><strong>{s.ALREADY_PUBLISHED.toLocaleString('es-AR')}</strong></article></section>
   <section className="panel"><div className="panel-title-row"><div><h2>Vinculación de inventario EDIMA</h2><p>Cruza las publicaciones de Mercado Libre con el catálogo de Ecomm-App usando el MLA exacto y el GTIN como evidencia.</p></div></div>
     {!linkage?<p>Consultando el último reporte EDIMA…</p>:!linkage.available?<div className="notice"><strong>EDIMA todavía no está cargado.</strong><p>{linkage.message}</p><p>Subilo desde <strong>Importaciones → EDIMA · Vinculación inventario ML</strong>.</p></div>:<>
-      <section className="cards readiness-cards"><article><span>Publicaciones EDIMA</span><strong>{linkage.summary.total_publications.toLocaleString('es-AR')}</strong></article><article><span>Vinculadas</span><strong>{linkage.summary.linked.toLocaleString('es-AR')}</strong></article><article><span>Sin vincular</span><strong>{linkage.summary.unlinked.toLocaleString('es-AR')}</strong></article><article><span>Listas para vincular</span><strong>{linkage.summary.ready_to_link.toLocaleString('es-AR')}</strong></article><article><span>Confirmadas por vos</span><strong>{linkage.summary.confirmed_by_human.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{linkage.summary.review_required.toLocaleString('es-AR')}</strong></article><article><span>GTIN únicos sin vincular</span><strong>{linkage.summary.distinct_unlinked_gtins.toLocaleString('es-AR')}</strong></article></section>
+      <section className="cards readiness-cards"><article><span>Publicaciones EDIMA</span><strong>{linkage.summary.total_publications.toLocaleString('es-AR')}</strong></article><article><span>Vinculadas</span><strong>{linkage.summary.linked.toLocaleString('es-AR')}</strong></article><article><span>Sin vincular</span><strong>{linkage.summary.unlinked.toLocaleString('es-AR')}</strong></article><article><span>Listas para vincular</span><strong>{linkage.summary.ready_to_link.toLocaleString('es-AR')}</strong></article><article><span>Confirmadas por vos</span><strong>{linkage.summary.confirmed_by_human.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{linkage.summary.review_required.toLocaleString('es-AR')}</strong></article><article><span>Pendientes de Ecomm</span><strong>{linkage.summary.pending_ecomm_catalog.toLocaleString('es-AR')}</strong></article><article><span>GTIN únicos sin vincular</span><strong>{linkage.summary.distinct_unlinked_gtins.toLocaleString('es-AR')}</strong></article></section>
       <p className="evidence-note">{linkage.policy.safe_match}</p>
       <p className="result-count">Calidad del reporte: <strong>{linkage.summary.data_quality_invalid_gtin_total.toLocaleString('es-AR')}</strong> publicaciones con GTIN inválido o no utilizable · <strong>{linkage.summary.data_quality_multiple_gtin_total.toLocaleString('es-AR')}</strong> con más de un código · <strong>{linkage.summary.title_candidates.toLocaleString('es-AR')}</strong> con candidato sugerido por título · <strong>{linkage.summary.offline_candidates.toLocaleString('es-AR')}</strong> con candidato de evidencia offline · <strong>{linkage.summary.presentation_conflict.toLocaleString('es-AR')}</strong> con conflicto de presentación.</p>
       {linkageMessage&&<div className="notice">{linkageMessage}</div>}
@@ -285,6 +349,13 @@ export function Readiness(){
           <button onClick={exportReadyLinkage} disabled={!readyLinkage.length}>Exportar CSV ({readyLinkage.length})</button>
         </div>
         {readyLinkage.length===0?<p className="evidence-note">Todavía no hay publicaciones listas para vincular.</p>:<div className="table-wrap ready-linkage-table-wrap"><table className="ready-linkage-table"><thead><tr><th>Publicación</th><th>Producto EDIMA</th><th>Producto Ecomm</th><th>Evidencia</th></tr></thead><tbody>{readyLinkage.map((item,index)=><tr key={item.external_id||index}><td><strong className="mono">{item.external_id||'—'}</strong><small className="linkage-meta">GTIN: <span className="mono">{item.gtin_raw||'—'}</span></small></td><td><strong>{item.title||'—'}</strong>{item.brand&&<small className="linkage-meta">Marca: {item.brand}</small>}</td><td><strong>{item.matched_product?.name||'—'}</strong><small className="linkage-meta">ID Ecomm: <span className="mono">{item.matched_product?.ecomm_id||'—'}</span> · SKU: <span className="mono">{item.matched_product?.sku||'—'}</span></small></td><td><strong>{item.decision_source==='HUMAN_KIKI'?'Confirmación humana':'Coincidencia por identificadores'}</strong><small className="linkage-meta">{linkageMethodLabel(item.match_method)}</small>{item.decision_at&&<small className="linkage-meta">{new Date(item.decision_at).toLocaleString('es-AR')}</small>}</td></tr>)}</tbody></table></div>}
+      </section>
+      <section className="linkage-ready-queue pending-ecomm-queue">
+        <div className="panel-title-row">
+          <div><h3>Pendientes de catálogo Ecomm</h3><p>Ya revisaste estos casos y no encontraste un producto Ecomm que corresponda. El siguiente paso es darlo de alta/corregirlo en Ecomm o importar un inventario actualizado.</p></div>
+          <button onClick={exportPendingEcomm} disabled={!pendingEcomm.length}>Exportar CSV ({pendingEcomm.length})</button>
+        </div>
+        {pendingEcomm.length===0?<p className="evidence-note">Todavía no marcaste publicaciones como pendientes de catálogo Ecomm.</p>:<div className="pending-ecomm-list">{pendingEcomm.map((item,index)=><article key={item.external_id||index}><div><strong>{item.title||'Producto sin título'}</strong><small className="linkage-meta">{item.external_id||'—'} · GTIN <span className="mono">{item.gtin_raw||'—'}</span>{item.brand?` · ${item.brand}`:''}</small></div><span className="badge REVIEW_REQUIRED">Pendiente Ecomm</span></article>)}</div>}
       </section>
       <div className="linkage-groups">
         {linkageGroups.map(group=><section className="linkage-group" key={group.key}>
@@ -303,7 +374,7 @@ export function Readiness(){
       <p className="evidence-note">{linkage.policy.description}</p>
     </>}
   </section>
-  {candidateItem&&<div className="candidate-modal-overlay" role="presentation" onClick={()=>setCandidateItem(null)}><section className="candidate-modal" role="dialog" aria-modal="true" aria-label="Buscar producto Ecomm" onClick={event=>event.stopPropagation()}><div className="candidate-modal-header"><div><p className="eyebrow">ASIGNACIÓN MANUAL</p><h3>Buscar producto Ecomm</h3><p><strong>{candidateItem.title||'Publicación EDIMA'}</strong></p><small className="linkage-meta">{candidateItem.external_id||'—'} · GTIN {candidateItem.gtin_raw||'—'}</small></div><button className="danger-outline" onClick={()=>setCandidateItem(null)}>Cerrar</button></div><form className="candidate-search-form" onSubmit={event=>{event.preventDefault();void loadManualCandidates(candidateItem,candidateQuery)}}><input autoFocus placeholder="Buscar por producto, SKU, EAN o ID Ecomm" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}/><button type="submit" disabled={candidateSearching}>{candidateSearching?'Buscando…':'Buscar'}</button></form>{candidateError&&<div className="notice warning">{candidateError}</div>}<p className="evidence-note">KIKI muestra sugerencias del catálogo Ecomm. Marca, cantidad, presentación y variante/sabor deben coincidir. Si cambia algo como Clásico vs Avellana, no confirmes.</p><div className="candidate-results">{candidateSearching&&candidateResults.length===0?<p>Buscando candidatos…</p>:candidateResults.length===0?<p>No encontramos candidatos con suficiente similitud. Probá buscar por una palabra, SKU, EAN o ID interno.</p>:candidateResults.map(candidate=><article className="candidate-card" key={candidate.ecomm_id||candidate.sku||candidate.name}><div><strong>{candidate.name||'Producto Ecomm'}</strong><small className="linkage-meta">ID: <span className="mono">{candidate.ecomm_id||'—'}</span> · SKU: <span className="mono">{candidate.sku||'—'}</span></small><small className="linkage-meta">Marca: {candidate.brand||'—'} · EAN: <span className="mono">{candidate.ean||'—'}</span> · Stock: {candidate.stock??'—'}</small><small className="linkage-meta">{candidate.reasons.join(' · ')||'Coincidencia manual'}</small></div><button onClick={()=>confirmManualCandidate(candidate)} disabled={candidateSaving===candidate.ecomm_id}>{candidateSaving===candidate.ecomm_id?'Guardando…':'Elegir y confirmar'}</button></article>)}</div></section></div>}
+  {candidateItem&&<div className="candidate-modal-overlay" role="presentation" onClick={()=>setCandidateItem(null)}><section className="candidate-modal" role="dialog" aria-modal="true" aria-label="Buscar producto Ecomm" onClick={event=>event.stopPropagation()}><div className="candidate-modal-header"><div><p className="eyebrow">ASIGNACIÓN MANUAL</p><h3>Buscar producto Ecomm</h3><p><strong>{candidateItem.title||'Publicación EDIMA'}</strong></p><small className="linkage-meta">{candidateItem.external_id||'—'} · GTIN {candidateItem.gtin_raw||'—'}</small></div><button className="danger-outline" onClick={()=>setCandidateItem(null)}>Cerrar</button></div><form className="candidate-search-form" onSubmit={event=>{event.preventDefault();void loadManualCandidates(candidateItem,candidateQuery)}}><input autoFocus placeholder="Buscar por producto, SKU, EAN o ID Ecomm" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}/><button type="submit" disabled={candidateSearching}>{candidateSearching?'Buscando…':'Buscar'}</button></form>{candidateError&&<div className="notice warning">{candidateError}</div>}<p className="evidence-note">KIKI muestra sugerencias del catálogo Ecomm. Marca, cantidad, presentación y variante/sabor deben coincidir. Si cambia algo como Clásico vs Avellana, no confirmes.</p><div className="candidate-results">{candidateSearching&&candidateResults.length===0?<p>Buscando candidatos…</p>:candidateResults.length===0?<p>No encontramos candidatos con suficiente similitud. Probá buscar por una palabra, SKU, EAN o ID interno.</p>:candidateResults.map(candidate=><article className="candidate-card" key={candidate.ecomm_id||candidate.sku||candidate.name}><div><strong>{candidate.name||'Producto Ecomm'}</strong><small className="linkage-meta">ID: <span className="mono">{candidate.ecomm_id||'—'}</span> · SKU: <span className="mono">{candidate.sku||'—'}</span></small><small className="linkage-meta">Marca: {candidate.brand||'—'} · EAN: <span className="mono">{candidate.ean||'—'}</span> · Stock: {candidate.stock??'—'}</small><small className="linkage-meta">{candidate.reasons.join(' · ')||'Coincidencia manual'}</small></div><button onClick={()=>confirmManualCandidate(candidate)} disabled={candidateSaving===candidate.ecomm_id}>{candidateSaving===candidate.ecomm_id?'Guardando…':'Elegir y confirmar'}</button></article>)}</div><div className="candidate-no-match"><div><strong>¿Ninguno corresponde?</strong><p>Marcá este caso como pendiente de catálogo Ecomm. No crea productos ni modifica Ecomm.</p></div><button className="secondary" onClick={()=>void markPendingEcomm()} disabled={candidateSaving==='__pending_ecomm__'}>{candidateSaving==='__pending_ecomm__'?'Guardando…':'Ninguno coincide · enviar a Ecomm'}</button></div></section></div>}
   <details className="notice"><summary><strong>¿Cómo leer estos estados?</strong></summary><p>“Ya publicados” salen del flujo de alta. “Sin stock” se apartan temporalmente y no se priorizan mientras no tengan unidades disponibles. “Fuera del masivo actual” son productos que no están necesariamente mal: una regla comercial vigente indica que ciertos SKU asociados o combos no se incluyen todavía en el alta masiva. “Requieren revisión” y “Bloqueados” necesitan una corrección o una decisión. “Datos centrales OK” son candidatos con stock informado y positivo, marca y EAN/GTIN presentes y sin bloqueos conocidos de conciliación. No significa que deban tener a la vez SKU de variante y SKU de producto, ni que ya estén listos para Mercado Libre: después todavía deben validar imágenes, categoría, atributos, preview y confirmación humana.</p></details>
   <details className="notice"><summary><strong>Regla SKU del masivo actual</strong></summary><p>{report.bulk_policy.description}</p><p>En simple: si un EAN tiene un único SKU base numérico de 4 dígitos, los SKU numéricos de 5 o más dígitos asociados a ese mismo EAN se consideran combos/asociados y quedan fuera del masivo por ahora. Si el EAN no tiene un único SKU base de 4 dígitos, KIKI Tech lo manda a revisión en vez de decidir solo.</p></details>
   <section className="panel"><div className="panel-title-row"><div><h2>Motivos que requieren atención</h2><p>Hacé clic en un motivo para ver únicamente los productos afectados.</p></div><button onClick={exportReview}>Exportar revisión CSV</button></div><div className="reason-grid">{report.reason_summary.map(reason=><button key={reason.code} className={`reason-card ${reasonCode===reason.code?'active':''}`} onClick={()=>selectReason(reason.code)}><span>{reason.label}</span><strong>{reason.count.toLocaleString('es-AR')}</strong></button>)}</div>{reasonCode&&<button className="text-button" onClick={()=>setReasonCode('')}>Limpiar filtro por motivo</button>}</section>
