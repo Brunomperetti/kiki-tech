@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...integrations.mercadolibre.transport import MercadoLibreHTTPError
+from ...services.final_publication_queue_service import FinalPublicationQueueService
 from ...services.prepublication_image_service import PrepublicationImageService
 from ...services.prepublication_metadata_service import PrepublicationMetadataService
 from ...services.prepublication_service import PrepublicationService
@@ -34,6 +35,12 @@ class MetadataReviewRequest(BaseModel):
     notes: str | None = None
 
 
+class FinalQueueApprovalRequest(BaseModel):
+    product_key: str
+    action: str
+    note: str | None = None
+
+
 class ImageReviewRequest(BaseModel):
     product_key: str
     status: str
@@ -59,6 +66,39 @@ def prepublication_report(
     except Exception as exc:
         logger.exception("prepublication_report_failed")
         raise HTTPException(500, "No se pudo preparar la etapa de pre-publicación.") from exc
+
+
+@router.get("/final-queue")
+def final_publication_queue(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return FinalPublicationQueueService(db).queue()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("final_publication_queue_failed")
+        raise HTTPException(500, "No se pudo preparar la cola final de Mercado Libre.") from exc
+
+
+@router.post("/final-queue")
+def save_final_publication_approval(
+    request: FinalQueueApprovalRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return FinalPublicationQueueService(db).save_approval(
+            product_key=request.product_key,
+            action=request.action,
+            note=request.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("final_publication_approval_failed")
+        raise HTTPException(500, "No se pudo guardar la aprobación final.") from exc
 
 
 @router.get("/images")

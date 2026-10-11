@@ -193,6 +193,27 @@ class PrepublicationMetadataReview(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
+class PrepublicationFinalApproval(Base):
+    """Human approval for the final Mercado Libre publication queue.
+
+    This is internal state only. It never writes to Mercado Libre by itself.
+    """
+
+    __tablename__ = "prepublication_final_approvals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    source_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class MercadoLibreConnection(Base):
     __tablename__ = "mercadolibre_connections"
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
