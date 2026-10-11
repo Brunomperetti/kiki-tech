@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
+import re
 
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,7 @@ class InventoryLinkageService:
     REVIEW_IDENTIFIER_CONFLICT = "REVIEW_IDENTIFIER_CONFLICT"
     REVIEW_TITLE_CANDIDATE = "REVIEW_TITLE_CANDIDATE"
     REVIEW_OFFLINE_CANDIDATE = "REVIEW_OFFLINE_CANDIDATE"
+    REVIEW_PRESENTATION_CONFLICT = "REVIEW_PRESENTATION_CONFLICT"
     INVALID_GTIN = "INVALID_GTIN"
     NO_ECOMM_MATCH = "NO_ECOMM_MATCH"
 
@@ -209,6 +211,18 @@ class InventoryLinkageService:
                         "Debe revisarse nuevamente antes de usarla."
                     )
 
+            if matched is not None and status == self.READY_TO_LINK:
+                presentation_issue = self._presentation_conflict(
+                    row.get("title"),
+                    matched.get("name"),
+                )
+                if presentation_issue:
+                    status = self.REVIEW_PRESENTATION_CONFLICT
+                    reason = presentation_issue
+                    match_method = f"{match_method}_PRESENTATION_CONFLICT"
+                    if decision_status == "CONFIRMED":
+                        decision_status = "STALE"
+
             status_counts[status] += 1
             items.append(
                 {
@@ -240,7 +254,8 @@ class InventoryLinkageService:
             self.REVIEW_IDENTIFIER_CONFLICT: 4,
             self.REVIEW_TITLE_CANDIDATE: 5,
             self.REVIEW_OFFLINE_CANDIDATE: 6,
-            self.INVALID_GTIN: 7,
+            self.REVIEW_PRESENTATION_CONFLICT: 7,
+            self.INVALID_GTIN: 8,
         }
         items.sort(
             key=lambda item: (
@@ -267,6 +282,7 @@ class InventoryLinkageService:
                 "identifier_conflict": status_counts[self.REVIEW_IDENTIFIER_CONFLICT],
                 "title_candidates": status_counts[self.REVIEW_TITLE_CANDIDATE],
                 "offline_candidates": status_counts[self.REVIEW_OFFLINE_CANDIDATE],
+                "presentation_conflict": status_counts[self.REVIEW_PRESENTATION_CONFLICT],
                 "distinct_unlinked_gtins": len(unlinked_gtins),
                 "data_quality_invalid_gtin_total": invalid_gtin_total,
                 "data_quality_multiple_gtin_total": multiple_gtin_total,
@@ -376,6 +392,15 @@ class InventoryLinkageService:
                 else:
                     continue
             else:
+                if self._presentation_conflict(row.get("title"), name):
+                    continue
+                if target_brand:
+                    brand_in_name = bool(name_norm and target_brand in name_norm)
+                    if brand_norm and target_brand != brand_norm:
+                        continue
+                    if not brand_norm and not brand_in_name:
+                        continue
+
                 similarity = (
                     SequenceMatcher(None, target_title, name_norm).ratio()
                     if target_title and name_norm
@@ -384,14 +409,22 @@ class InventoryLinkageService:
                 score = similarity
                 if similarity:
                     reasons.append(f"Nombre similar {similarity:.0%}")
-                if target_brand and brand_norm and target_brand == brand_norm:
-                    score += 0.12
+                if target_brand and (
+                    target_brand == brand_norm
+                    or (name_norm and target_brand in name_norm)
+                ):
+                    score += 0.15
                     reasons.append("Misma marca")
                 if target_gtins and eans.intersection(target_gtins):
                     score = max(score, 1.0)
                     reasons.append("GTIN exacto")
-                if score < 0.40:
+                if score < 0.68:
                     continue
+
+            presentation_issue = self._presentation_conflict(row.get("title"), name)
+            if presentation_issue and raw_search:
+                reasons.append("⚠ Presentación distinta")
+                score = min(score, 0.45)
 
             scored.append(
                 {
@@ -462,6 +495,13 @@ class InventoryLinkageService:
         )
         if not product:
             raise ValueError("El producto Ecomm seleccionado ya no está disponible.")
+
+        presentation_issue = self._presentation_conflict(
+            row.get("title"),
+            product.get("name"),
+        )
+        if presentation_issue:
+            raise ValueError(presentation_issue)
 
         now = datetime.now(timezone.utc)
         product_view = self._product_view(product)
@@ -561,6 +601,12 @@ class InventoryLinkageService:
         matched = item.get("matched_product") or {}
         if str(matched.get("ecomm_id") or "") != ecomm_id:
             raise ValueError("El producto Ecomm sugerido cambió; revisá nuevamente la fila.")
+        presentation_issue = self._presentation_conflict(
+            item.get("title"),
+            matched.get("name"),
+        )
+        if presentation_issue:
+            raise ValueError(presentation_issue)
 
         now = datetime.now(timezone.utc)
         row = (
@@ -940,6 +986,78 @@ class InventoryLinkageService:
             result.append(product)
         return result
 
+    @classmethod
+    def _presentation_conflict(cls, source_title, candidate_title) -> str | None:
+        source = normalize_title(source_title) or ""
+        candidate = normalize_title(candidate_title) or ""
+        if not source or not candidate:
+            return None
+
+        source_pack = cls._pack_count(source)
+        candidate_pack = cls._pack_count(candidate)
+        if source_pack and source_pack > 1 and (candidate_pack or 1) != source_pack:
+            return (
+                f"La publicación es PACK X{source_pack}, pero el producto Ecomm seleccionado "
+                "no tiene la misma presentación. Buscá un combo/SKU específico."
+            )
+        if candidate_pack and candidate_pack > 1 and (source_pack or 1) != candidate_pack:
+            return (
+                f"El producto Ecomm es PACK X{candidate_pack}, pero la publicación no tiene "
+                "la misma presentación."
+            )
+
+        source_quantities = cls._quantities(source)
+        candidate_quantities = cls._quantities(candidate)
+        for dimension in set(source_quantities).intersection(candidate_quantities):
+            if source_quantities[dimension] != candidate_quantities[dimension]:
+                return (
+                    "La presentación no coincide: "
+                    f"{cls._format_quantity(dimension, source_quantities[dimension])} en la publicación "
+                    f"vs {cls._format_quantity(dimension, candidate_quantities[dimension])} en Ecomm."
+                )
+        return None
+
+    @staticmethod
+    def _pack_count(normalized_title: str) -> int | None:
+        match = re.search(r"\bPACK(?:\s+DE)?\s+X?\s*(\d+)\b", normalized_title)
+        return int(match.group(1)) if match else None
+
+    @staticmethod
+    def _quantities(normalized_title: str) -> dict[str, int]:
+        result: dict[str, int] = {}
+        unit_map = {
+            "ML": ("VOLUME_ML", 1),
+            "CC": ("VOLUME_ML", 1),
+            "L": ("VOLUME_ML", 1000),
+            "LT": ("VOLUME_ML", 1000),
+            "LTS": ("VOLUME_ML", 1000),
+            "G": ("WEIGHT_G", 1),
+            "GR": ("WEIGHT_G", 1),
+            "GRS": ("WEIGHT_G", 1),
+            "KG": ("WEIGHT_G", 1000),
+            "CAP": ("COUNT_CAPS", 1),
+            "CAPS": ("COUNT_CAPS", 1),
+            "CAPSULA": ("COUNT_CAPS", 1),
+            "CAPSULAS": ("COUNT_CAPS", 1),
+        }
+        for value, unit in re.findall(
+            r"\b(\d+)\s*(ML|CC|LTS|LT|L|GRS|GR|G|KG|CAPSULAS|CAPSULA|CAPS|CAP)\b",
+            normalized_title,
+        ):
+            dimension, multiplier = unit_map[unit]
+            result[dimension] = int(value) * multiplier
+        return result
+
+    @staticmethod
+    def _format_quantity(dimension: str, value: int) -> str:
+        if dimension == "VOLUME_ML":
+            return f"{value} ml"
+        if dimension == "WEIGHT_G":
+            return f"{value} g"
+        if dimension == "COUNT_CAPS":
+            return f"{value} cápsulas"
+        return str(value)
+
     @staticmethod
     def _listing_keys(value) -> set[str]:
         text = str(value or "").strip().upper().replace(" ", "")
@@ -1009,6 +1127,7 @@ class InventoryLinkageService:
                 "identifier_conflict": 0,
                 "title_candidates": 0,
                 "offline_candidates": 0,
+                "presentation_conflict": 0,
                 "distinct_unlinked_gtins": 0,
                 "data_quality_invalid_gtin_total": 0,
                 "data_quality_multiple_gtin_total": 0,
