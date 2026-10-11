@@ -89,3 +89,13 @@
   .linkage-group-table tr{padding:12px;border-top:1px solid #e7ede9}
   .linkage-group-table td{border:0;padding:6px 0}
 }
+
+.pending-ecomm-queue{background:#fffaf0;border-color:#ead9ad}
+.pending-ecomm-list{display:grid;gap:8px}
+.pending-ecomm-list article{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 14px;border:1px solid #ead9ad;border-radius:10px;background:#fff}
+.candidate-no-match{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-top:16px;padding:14px;border:1px solid #ead9ad;border-radius:12px;background:#fffaf0}
+.candidate-no-match p{margin:4px 0 0;color:#68786f;font-size:12px;line-height:1.4}
+@media(max-width:700px){
+  .pending-ecomm-list article,.candidate-no-match{flex-direction:column;align-items:stretch}
+  .candidate-no-match button{width:100%}
+}
