@@ -32,6 +32,11 @@ class InventoryLinkageManualAssignmentRequest(BaseModel):
     note: str | None = None
 
 
+class InventoryLinkagePendingEcommRequest(BaseModel):
+    external_id: str
+    note: str | None = None
+
+
 class EnrichmentDecisionRequest(BaseModel):
     product_key: str
     status: str
@@ -142,6 +147,24 @@ def inventory_linkage_candidates(
     except Exception as exc:
         logger.exception("inventory_linkage_candidates_failed")
         raise HTTPException(500, "No se pudieron buscar candidatos Ecomm.") from exc
+
+
+@router.post("/inventory-linkage/pending-ecomm")
+def inventory_linkage_pending_ecomm(
+    request: InventoryLinkagePendingEcommRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return InventoryLinkageService(db).mark_pending_ecomm_catalog(
+            external_id=request.external_id,
+            note=request.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("inventory_linkage_pending_ecomm_failed")
+        raise HTTPException(500, "No se pudo guardar el pendiente de catálogo Ecomm.") from exc
 
 
 @router.post("/inventory-linkage/manual-assignment")
