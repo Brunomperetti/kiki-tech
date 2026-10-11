@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.database.models import Base, ReconciliationRun
+from app.database.models import Base, InventoryLinkageDecision, ReconciliationRun
 from app.services.inventory_linkage_service import InventoryLinkageService
 
 
@@ -992,7 +992,22 @@ def test_confirmed_pack_x2_is_reopened_if_candidate_is_unit_product():
             ],
         )
 
-        service.save_decision("MLA100", "CONFIRMED", "10")
+        db.add(
+            InventoryLinkageDecision(
+                external_id="MLA100",
+                decision="CONFIRMED",
+                ecomm_id="10",
+                source_snapshot={
+                    "title": "Potasio En Capsulas X 50 Sabor Neutro Natier Pack X2",
+                    "gtin_raw": "7798121272958",
+                    "matched_ecomm_id": "10",
+                    "match_method": "OFFLINE_TITLE_INVENTORY_HISTORICAL",
+                },
+                product_snapshot={"ecomm_id": "10", "sku": "3370", "name": "Potasio Natier X 50 Caps"},
+                history=[],
+            )
+        )
+        db.commit()
         item = service.report()["items"][0]
 
         assert item["status"] == "REVIEW_PRESENTATION_CONFLICT"
