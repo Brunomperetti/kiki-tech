@@ -1047,3 +1047,82 @@ def test_manual_assignment_blocks_mismatched_volume():
 
         with pytest.raises(ValueError, match="presentación no coincide"):
             service.save_manual_assignment("MLA100", "10")
+
+
+def test_candidate_search_does_not_suggest_different_flavor_variant():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                {
+                    **product(
+                        "10",
+                        "4559200",
+                        None,
+                        "Pack X 2 Café Instantáneo Liofilizado Juan Valdez Avellana",
+                    ),
+                    "brand": "Juan Valdez",
+                }
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                {
+                    **edima(
+                        "MLA1447707817",
+                        "No",
+                        "770721631452",
+                        ["770721631452"],
+                        "Pack X 2 Café Liofilizado Clásico Juan Valdez 50gr",
+                    ),
+                    "brand": "Juan Valdez",
+                }
+            ],
+        )
+
+        result = service.search_candidates("MLA1447707817")
+
+        assert result["candidates"] == []
+
+
+def test_manual_assignment_blocks_different_flavor_variant():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                {
+                    **product(
+                        "10",
+                        "4559200",
+                        None,
+                        "Pack X 2 Café Instantáneo Liofilizado Juan Valdez Avellana",
+                    ),
+                    "brand": "Juan Valdez",
+                }
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                {
+                    **edima(
+                        "MLA1447707817",
+                        "No",
+                        "770721631452",
+                        ["770721631452"],
+                        "Pack X 2 Café Liofilizado Clásico Juan Valdez 50gr",
+                    ),
+                    "brand": "Juan Valdez",
+                }
+            ],
+        )
+
+        with pytest.raises(ValueError, match="variante/sabor no coincide"):
+            service.save_manual_assignment("MLA1447707817", "10")
