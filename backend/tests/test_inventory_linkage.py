@@ -946,7 +946,7 @@ def test_candidate_search_marks_explicit_mismatched_size_as_warning():
         result = service.search_candidates("MLA100", search="1000")
 
         assert len(result["candidates"]) == 1
-        assert "⚠ Presentación distinta" in result["candidates"][0]["reasons"]
+        assert any("presentación no coincide" in reason for reason in result["candidates"][0]["reasons"])
         assert result["candidates"][0]["score"] <= 0.45
 
 
