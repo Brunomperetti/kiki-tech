@@ -65,3 +65,27 @@
   .candidate-card{grid-template-columns:1fr}
   .candidate-card button{width:100%}
 }
+
+.linkage-groups{display:grid;gap:14px;margin-top:14px}
+.linkage-group{border:1px solid #dce6df;border-radius:14px;background:#fff;overflow:hidden}
+.linkage-group-header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;padding:16px 18px;background:#f8fbf9;border-bottom:1px solid #e6ece8}
+.linkage-group-header h4{margin:2px 0 0;font-size:17px;line-height:1.3}
+.linkage-group-count{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;border-radius:999px;background:#eaf4ed;color:#214f39;padding:7px 10px;font-size:12px;font-weight:700}
+.linkage-group-note{padding:9px 18px;background:#eef7ed;color:#45634e;font-size:12px;border-bottom:1px solid #e6ece8}
+.linkage-group-note.warning{background:#fff3d9;color:#7d5d18}
+.linkage-group-table-wrap{overflow-x:hidden}
+.linkage-group-table{table-layout:fixed;width:100%}
+.linkage-group-table th:nth-child(1){width:16%}
+.linkage-group-table th:nth-child(2){width:27%}
+.linkage-group-table th:nth-child(3){width:17%}
+.linkage-group-table th:nth-child(4){width:40%}
+.linkage-group-table td{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+.linkage-group-table td strong{display:block}
+@media(max-width:760px){
+  .linkage-group-header{flex-direction:column}
+  .linkage-group-count{align-self:flex-start}
+  .linkage-group-table thead{display:none}
+  .linkage-group-table,.linkage-group-table tbody,.linkage-group-table tr,.linkage-group-table td{display:block;width:100%}
+  .linkage-group-table tr{padding:12px;border-top:1px solid #e7ede9}
+  .linkage-group-table td{border:0;padding:6px 0}
+}
