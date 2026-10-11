@@ -71,6 +71,7 @@ class FinalPublicationQueueService:
             else:
                 status = self.READY_FOR_FINAL_REVIEW
 
+            blockers = self._blockers(base)
             preview = self._preview(base, image, meta)
             summary["total"] += 1
             summary[status] += 1
@@ -82,6 +83,7 @@ class FinalPublicationQueueService:
                     "checks": base.get("checks") or {},
                     "queue_status": status,
                     "preview": preview,
+                    "blockers": blockers,
                     "approved_at": (
                         approval.updated_at.isoformat()
                         if approval and approval.status == "APPROVED"
@@ -212,6 +214,29 @@ class FinalPublicationQueueService:
             for candidate in refreshed["items"]
             if candidate["product_key"] == product_key
         )
+
+    @staticmethod
+    def _blockers(base: dict) -> list[str]:
+        checks = base.get("checks") or {}
+        labels = {
+            "core_data": "Datos centrales",
+            "images": "Imágenes",
+            "category": "Categoría ML",
+            "attributes": "Atributos",
+            "preview": "Preview",
+        }
+        expected = {
+            "core_data": "PASSED",
+            "images": "PASSED",
+            "category": "PASSED",
+            "attributes": "PASSED",
+            "preview": "READY_TO_VALIDATE",
+        }
+        return [
+            labels[key]
+            for key, value in expected.items()
+            if checks.get(key) != value
+        ]
 
     @staticmethod
     def _snapshot(base: dict, image, meta) -> dict:
