@@ -746,3 +746,129 @@ def test_save_decision_does_not_recompute_full_report():
         assert saved["status"] == "READY_TO_LINK"
         assert saved["decision_status"] == "CONFIRMED"
         assert saved["match_method"] == "HUMAN_CONFIRMED_OFFLINE"
+
+
+def test_manual_candidate_search_suggests_similar_ecomm_products():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product("10", "3370", None, "Potasio Natier X 50 Caps"),
+                product("20", "5154", None, "Vitamina K2 Natier 50 Caps"),
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA100",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                    "Capsulas De Potasio Natier X 50",
+                )
+            ],
+        )
+
+        result = service.search_candidates("MLA100")
+
+        assert result["external_id"] == "MLA100"
+        assert result["candidates"]
+        assert result["candidates"][0]["ecomm_id"] == "10"
+        assert result["candidates"][0]["score"] > 0.5
+
+
+def test_manual_candidate_search_supports_exact_sku():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product("10", "3370", None, "Potasio Natier X 50 Caps"),
+                product("20", "5154", None, "Vitamina K2 Natier 50 Caps"),
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [edima("MLA100", "No", "7799999999994", ["7799999999994"])],
+        )
+
+        result = service.search_candidates("MLA100", search="5154")
+
+        assert len(result["candidates"]) == 1
+        assert result["candidates"][0]["ecomm_id"] == "20"
+        assert result["candidates"][0]["score"] == 1.0
+        assert "Identificador exacto" in result["candidates"][0]["reasons"]
+
+
+def test_manual_assignment_promotes_unmatched_row_and_persists_decision():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "3370", None, "Potasio Natier X 50 Caps")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA100",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                    "Publicacion sin coincidencia automatica",
+                )
+            ],
+        )
+
+        before = service.report()["items"][0]
+        assert before["status"] == "NO_ECOMM_MATCH"
+
+        saved = service.save_manual_assignment("MLA100", "10", "Revisado manualmente")
+
+        assert saved["status"] == "READY_TO_LINK"
+        assert saved["match_method"] == "HUMAN_CONFIRMED_MANUAL"
+        assert saved["decision_source"] == "HUMAN_KIKI"
+        assert saved["matched_product"]["sku"] == "3370"
+
+        refreshed = service.report()["items"][0]
+        assert refreshed["status"] == "READY_TO_LINK"
+        assert refreshed["match_method"] == "HUMAN_CONFIRMED_MANUAL"
+        assert refreshed["decision_status"] == "CONFIRMED"
+        assert refreshed["matched_product"]["ecomm_id"] == "10"
+
+
+def test_manual_assignment_does_not_override_identifier_conflict():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "10",
+                    "1000",
+                    "7798121272958",
+                    "Producto A",
+                    ecomm_rows=[{"listing_id": "MLA100"}],
+                ),
+                product("20", "2000", "7798318384006", "Producto B"),
+            ],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [edima("MLA100", "No", "7798318384006", ["7798318384006"])],
+        )
+
+        assert service.report()["items"][0]["status"] == "REVIEW_IDENTIFIER_CONFLICT"
+
+        with pytest.raises(ValueError, match="conflicto de identificadores"):
+            service.save_manual_assignment("MLA100", "20")
