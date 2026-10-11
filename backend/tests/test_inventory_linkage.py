@@ -1126,3 +1126,86 @@ def test_manual_assignment_blocks_different_flavor_variant():
 
         with pytest.raises(ValueError, match="variante/sabor no coincide"):
             service.save_manual_assignment("MLA1447707817", "10")
+
+
+def test_mark_pending_ecomm_catalog_persists_unresolved_case():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1000", None, "Producto totalmente distinto")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA200",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                    "Colágeno + Magnesio PGN X 60 Capsulas",
+                )
+            ],
+        )
+
+        before = service.report()["items"][0]
+        assert before["status"] == "NO_ECOMM_MATCH"
+
+        saved = service.mark_pending_ecomm_catalog(
+            "MLA200",
+            "Se revisó el catálogo actual y no hay coincidencia.",
+        )
+
+        assert saved["status"] == "PENDING_ECOMM_CATALOG"
+        assert saved["decision_status"] == "PENDING_ECOMM"
+        assert saved["decision_source"] == "HUMAN_KIKI"
+
+        refreshed = service.report()
+        item = refreshed["items"][0]
+        assert item["status"] == "PENDING_ECOMM_CATALOG"
+        assert refreshed["summary"]["pending_ecomm_catalog"] == 1
+        assert refreshed["summary"]["no_ecomm_match"] == 0
+
+
+def test_pending_ecomm_catalog_does_not_hide_new_exact_match():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1000", None, "Producto totalmente distinto")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA200",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                    "Colágeno + Magnesio PGN X 60 Capsulas",
+                )
+            ],
+        )
+        service.mark_pending_ecomm_catalog("MLA200")
+
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "20",
+                    "2000",
+                    "7798121272958",
+                    "Colágeno + Magnesio PGN X 60 Capsulas",
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "READY_TO_LINK"
+        assert item["matched_product"]["ecomm_id"] == "20"
+        assert item["match_method"] == "GTIN_EXACT"
