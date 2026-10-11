@@ -26,6 +26,12 @@ class InventoryLinkageDecisionRequest(BaseModel):
     note: str | None = None
 
 
+class InventoryLinkageManualAssignmentRequest(BaseModel):
+    external_id: str
+    ecomm_id: str
+    note: str | None = None
+
+
 class EnrichmentDecisionRequest(BaseModel):
     product_key: str
     status: str
@@ -115,6 +121,46 @@ def inventory_linkage(
     except Exception as exc:
         logger.exception("inventory_linkage_failed")
         raise HTTPException(500, "No se pudo analizar la vinculación de inventario.") from exc
+
+
+@router.get("/inventory-linkage/candidates")
+def inventory_linkage_candidates(
+    external_id: str,
+    search: str = "",
+    limit: int = 8,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return InventoryLinkageService(db).search_candidates(
+            external_id=external_id,
+            search=search,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("inventory_linkage_candidates_failed")
+        raise HTTPException(500, "No se pudieron buscar candidatos Ecomm.") from exc
+
+
+@router.post("/inventory-linkage/manual-assignment")
+def inventory_linkage_manual_assignment(
+    request: InventoryLinkageManualAssignmentRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return InventoryLinkageService(db).save_manual_assignment(
+            external_id=request.external_id,
+            ecomm_id=request.ecomm_id,
+            note=request.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("inventory_linkage_manual_assignment_failed")
+        raise HTTPException(500, "No se pudo guardar la asignación manual.") from exc
 
 
 @router.post("/inventory-linkage/decision")
