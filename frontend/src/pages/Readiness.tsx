@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {api} from '../services/api';
-import type {InventoryLinkageReport,InventoryLinkageStatus,ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
+import type {InventoryLinkageItem,InventoryLinkageReport,InventoryLinkageStatus,ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
 import '../readiness.css';
 
 const linkageLabels:Record<InventoryLinkageStatus,string>={
@@ -39,6 +39,8 @@ export function Readiness(){
   const [reasonCode,setReasonCode]=useState('');
   const [search,setSearch]=useState('');
   const [message,setMessage]=useState('');
+  const [linkageMessage,setLinkageMessage]=useState('');
+  const [linkageBusy,setLinkageBusy]=useState('');
   useEffect(()=>{
     api.publicationReadiness().then(setReport).catch(error=>setMessage(error.message));
     api.inventoryLinkage().then(setLinkage).catch(()=>setLinkage(null));
@@ -54,6 +56,26 @@ export function Readiness(){
   if(message)return <><header><div><p className="eyebrow">PREPARACIÓN MERCADO LIBRE</p><h1>Validador de publicación</h1></div></header><div className="notice warning">{message}</div></>;
   if(!report)return <div className="auth-loading">Preparando validación…</div>;
   const s=report.summary;
+
+  async function decideLinkage(item:InventoryLinkageItem,decision:'CONFIRMED'|'REJECTED'){
+    const externalId=String(item.external_id||'');
+    const ecommId=String(item.matched_product?.ecomm_id||'');
+    if(!externalId||!ecommId)return;
+    setLinkageBusy(externalId);
+    setLinkageMessage('');
+    try{
+      await api.saveInventoryLinkageDecision(externalId,decision,ecommId);
+      const refreshed=await api.inventoryLinkage();
+      setLinkage(refreshed);
+      setLinkageMessage(decision==='CONFIRMED'
+        ? 'Coincidencia confirmada. La publicación pasó a Lista para vincular.'
+        : 'Candidato rechazado. La publicación permanece en revisión.');
+    }catch(error){
+      setLinkageMessage(error instanceof Error?error.message:'No se pudo guardar la decisión.');
+    }finally{
+      setLinkageBusy('');
+    }
+  }
 
   function selectReason(code:string){
     setReasonCode(current=>current===code?'':code);
@@ -97,10 +119,11 @@ export function Readiness(){
   <section className="cards readiness-cards"><article><span>Datos centrales OK</span><strong>{s.READY_CORE_DATA.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{s.REVIEW_REQUIRED.toLocaleString('es-AR')}</strong></article><article><span>Bloqueados</span><strong>{s.BLOCKED.toLocaleString('es-AR')}</strong></article><article><span>Fuera del masivo actual</span><strong>{s.EXCLUDED_BULK.toLocaleString('es-AR')}</strong></article><article><span>Sin stock</span><strong>{s.NO_STOCK.toLocaleString('es-AR')}</strong></article><article><span>Ya publicados</span><strong>{s.ALREADY_PUBLISHED.toLocaleString('es-AR')}</strong></article></section>
   <section className="panel"><div className="panel-title-row"><div><h2>Vinculación de inventario EDIMA</h2><p>Cruza las publicaciones de Mercado Libre con el catálogo de Ecomm-App usando el MLA exacto y el GTIN como evidencia.</p></div></div>
     {!linkage?<p>Consultando el último reporte EDIMA…</p>:!linkage.available?<div className="notice"><strong>EDIMA todavía no está cargado.</strong><p>{linkage.message}</p><p>Subilo desde <strong>Importaciones → EDIMA · Vinculación inventario ML</strong>.</p></div>:<>
-      <section className="cards readiness-cards"><article><span>Publicaciones EDIMA</span><strong>{linkage.summary.total_publications.toLocaleString('es-AR')}</strong></article><article><span>Vinculadas</span><strong>{linkage.summary.linked.toLocaleString('es-AR')}</strong></article><article><span>Sin vincular</span><strong>{linkage.summary.unlinked.toLocaleString('es-AR')}</strong></article><article><span>Listas para vincular</span><strong>{linkage.summary.ready_to_link.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{linkage.summary.review_required.toLocaleString('es-AR')}</strong></article><article><span>GTIN únicos sin vincular</span><strong>{linkage.summary.distinct_unlinked_gtins.toLocaleString('es-AR')}</strong></article></section>
+      <section className="cards readiness-cards"><article><span>Publicaciones EDIMA</span><strong>{linkage.summary.total_publications.toLocaleString('es-AR')}</strong></article><article><span>Vinculadas</span><strong>{linkage.summary.linked.toLocaleString('es-AR')}</strong></article><article><span>Sin vincular</span><strong>{linkage.summary.unlinked.toLocaleString('es-AR')}</strong></article><article><span>Listas para vincular</span><strong>{linkage.summary.ready_to_link.toLocaleString('es-AR')}</strong></article><article><span>Confirmadas por vos</span><strong>{linkage.summary.confirmed_by_human.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{linkage.summary.review_required.toLocaleString('es-AR')}</strong></article><article><span>GTIN únicos sin vincular</span><strong>{linkage.summary.distinct_unlinked_gtins.toLocaleString('es-AR')}</strong></article></section>
       <p className="evidence-note">{linkage.policy.safe_match}</p>
       <p className="result-count">Calidad del reporte: <strong>{linkage.summary.data_quality_invalid_gtin_total.toLocaleString('es-AR')}</strong> publicaciones con GTIN inválido o no utilizable · <strong>{linkage.summary.data_quality_multiple_gtin_total.toLocaleString('es-AR')}</strong> con más de un código · <strong>{linkage.summary.title_candidates.toLocaleString('es-AR')}</strong> con candidato sugerido por título.</p>
-      <div className="table-wrap"><table><thead><tr><th>Publicación ML</th><th>Producto</th><th>GTIN EDIMA</th><th>Producto Ecomm</th><th>SKU Ecomm</th><th>Método</th><th>Estado</th><th>Motivo</th></tr></thead><tbody>{linkage.items.map((item,index)=><tr key={item.external_id||index}><td className="mono">{item.external_id||'—'}</td><td>{item.title||'—'}</td><td className="mono">{item.gtin_raw||'—'}</td><td>{item.matched_product?.name||'—'}</td><td className="mono">{item.matched_product?.sku||'—'}</td><td>{item.match_method==='RECONCILIATION_MLA'?'MLA conciliado':item.match_method==='ECOMM_MLA'?'MLA en Ecomm':item.match_method==='GTIN_EXACT'?'GTIN exacto':item.match_method==='TITLE_EXACT'?'Título exacto':item.match_method==='TITLE_HIGH_CONFIDENCE'?'Título sugerido':item.match_method||'—'}</td><td><span className={`badge ${item.status==='READY_TO_LINK'?'READY_CORE_DATA':'REVIEW_REQUIRED'}`}>{linkageLabels[item.status]}</span></td><td>{item.reason}</td></tr>)}</tbody></table></div>
+      {linkageMessage&&<div className="notice">{linkageMessage}</div>}
+      <div className="table-wrap"><table><thead><tr><th>Publicación ML</th><th>Producto</th><th>GTIN EDIMA</th><th>Producto Ecomm</th><th>SKU Ecomm</th><th>Método</th><th>Estado</th><th>Acción</th><th>Motivo</th></tr></thead><tbody>{linkage.items.map((item,index)=><tr key={item.external_id||index}><td className="mono">{item.external_id||'—'}</td><td>{item.title||'—'}</td><td className="mono">{item.gtin_raw||'—'}</td><td>{item.matched_product?.name||'—'}</td><td className="mono">{item.matched_product?.sku||'—'}</td><td>{item.match_method==='RECONCILIATION_MLA'?'MLA conciliado':item.match_method==='ECOMM_MLA'?'MLA en Ecomm':item.match_method==='GTIN_EXACT'?'GTIN exacto':item.match_method==='TITLE_EXACT'?'Título exacto':item.match_method==='TITLE_HIGH_CONFIDENCE'?'Título sugerido':item.match_method==='HUMAN_CONFIRMED_TITLE'?'Título confirmado':item.match_method||'—'}</td><td><span className={`badge ${item.status==='READY_TO_LINK'?'READY_CORE_DATA':'REVIEW_REQUIRED'}`}>{linkageLabels[item.status]}</span>{item.decision_status==='REJECTED'&&<small className="decision-note">Rechazado previamente</small>}{item.decision_status==='STALE'&&<small className="decision-note">Decisión anterior desactualizada</small>}</td><td>{item.status==='REVIEW_TITLE_CANDIDATE'&&item.matched_product?.ecomm_id?<div className="linkage-actions"><button onClick={()=>decideLinkage(item,'CONFIRMED')} disabled={linkageBusy===item.external_id}>{linkageBusy===item.external_id?'Guardando…':'Confirmar'}</button><button className="danger-outline" onClick={()=>decideLinkage(item,'REJECTED')} disabled={linkageBusy===item.external_id}>Rechazar</button></div>:item.decision_status==='CONFIRMED'?<strong>Confirmado</strong>:'—'}</td><td>{item.reason}</td></tr>)}</tbody></table></div>
       <p className="evidence-note">{linkage.policy.description}</p>
     </>}
   </section>
