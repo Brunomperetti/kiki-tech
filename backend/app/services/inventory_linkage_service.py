@@ -212,13 +212,13 @@ class InventoryLinkageService:
                     )
 
             if matched is not None and status == self.READY_TO_LINK:
-                presentation_issue = self._presentation_conflict(
+                product_issue = self._product_identity_conflict(
                     row.get("title"),
                     matched.get("name"),
                 )
-                if presentation_issue:
+                if product_issue:
                     status = self.REVIEW_PRESENTATION_CONFLICT
-                    reason = presentation_issue
+                    reason = product_issue
                     match_method = f"{match_method}_PRESENTATION_CONFLICT"
                     if decision_status == "CONFIRMED":
                         decision_status = "STALE"
@@ -392,7 +392,7 @@ class InventoryLinkageService:
                 else:
                     continue
             else:
-                if self._presentation_conflict(row.get("title"), name):
+                if self._product_identity_conflict(row.get("title"), name):
                     continue
                 if target_brand:
                     brand_in_name = bool(name_norm and target_brand in name_norm)
@@ -421,10 +421,10 @@ class InventoryLinkageService:
                 if score < 0.68:
                     continue
 
-            presentation_issue = self._presentation_conflict(row.get("title"), name)
-            if presentation_issue and raw_search:
-                reasons.append("⚠ Presentación distinta")
-                score = min(score, 0.45)
+            product_issue = self._product_identity_conflict(row.get("title"), name)
+            if product_issue and raw_search:
+                reasons.append("⚠ " + product_issue)
+                score = min(score, 0.35)
 
             scored.append(
                 {
@@ -496,12 +496,12 @@ class InventoryLinkageService:
         if not product:
             raise ValueError("El producto Ecomm seleccionado ya no está disponible.")
 
-        presentation_issue = self._presentation_conflict(
+        product_issue = self._product_identity_conflict(
             row.get("title"),
             product.get("name"),
         )
-        if presentation_issue:
-            raise ValueError(presentation_issue)
+        if product_issue:
+            raise ValueError(product_issue)
 
         now = datetime.now(timezone.utc)
         product_view = self._product_view(product)
@@ -601,12 +601,12 @@ class InventoryLinkageService:
         matched = item.get("matched_product") or {}
         if str(matched.get("ecomm_id") or "") != ecomm_id:
             raise ValueError("El producto Ecomm sugerido cambió; revisá nuevamente la fila.")
-        presentation_issue = self._presentation_conflict(
+        product_issue = self._product_identity_conflict(
             item.get("title"),
             matched.get("name"),
         )
-        if presentation_issue:
-            raise ValueError(presentation_issue)
+        if product_issue:
+            raise ValueError(product_issue)
 
         now = datetime.now(timezone.utc)
         row = (
@@ -985,6 +985,41 @@ class InventoryLinkageService:
                 continue
             result.append(product)
         return result
+
+    @classmethod
+    def _product_identity_conflict(cls, source_title, candidate_title) -> str | None:
+        presentation = cls._presentation_conflict(source_title, candidate_title)
+        if presentation:
+            return presentation
+        return cls._variant_conflict(source_title, candidate_title)
+
+    @classmethod
+    def _variant_conflict(cls, source_title, candidate_title) -> str | None:
+        source = normalize_title(source_title) or ""
+        candidate = normalize_title(candidate_title) or ""
+        if not source or not candidate:
+            return None
+
+        variants = [
+            "SIN SABOR",
+            "CLASICO",
+            "ORIGINAL",
+            "AVELLANA",
+            "VAINILLA",
+            "CHOCOLATE",
+            "CARAMELO",
+            "NEUTRO",
+            "FRUTILLA",
+        ]
+        source_variants = [variant for variant in variants if variant in source]
+        candidate_variants = [variant for variant in variants if variant in candidate]
+        if source_variants and candidate_variants and set(source_variants) != set(candidate_variants):
+            return (
+                "La variante/sabor no coincide: "
+                f"{', '.join(source_variants)} en la publicación vs "
+                f"{', '.join(candidate_variants)} en Ecomm."
+            )
+        return None
 
     @classmethod
     def _presentation_conflict(cls, source_title, candidate_title) -> str | None:
