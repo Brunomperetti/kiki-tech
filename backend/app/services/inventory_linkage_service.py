@@ -150,7 +150,32 @@ class InventoryLinkageService:
             decision_at = None
             decision_source = "AUTOMATIC_IDENTIFIERS" if status == self.READY_TO_LINK else "NONE"
             decision = decisions.get(str(row.get("external_id") or ""))
-            if (
+            manual_decision = (
+                decision
+                and (decision.source_snapshot or {}).get("match_method") == "MANUAL_SEARCH"
+            )
+            if manual_decision and status != self.READY_TO_LINK:
+                manual_product = product_by_ecomm_id.get(str(decision.ecomm_id or "").strip())
+                if manual_product:
+                    decision_status = self._decision_state(decision, row, manual_product)
+                    decision_note = decision.note
+                    decision_at = decision.updated_at.isoformat() if decision.updated_at else None
+                    decision_source = "HUMAN_KIKI"
+                    if decision_status == "CONFIRMED":
+                        matched = manual_product
+                        status = self.READY_TO_LINK
+                        match_method = "HUMAN_CONFIRMED_MANUAL"
+                        confirmed_by_human += 1
+                        reason = (
+                            "Producto Ecomm elegido y confirmado manualmente dentro de KIKI Tech. "
+                            "La publicación queda lista para el siguiente paso de vinculación asistida."
+                        )
+                    elif decision_status == "STALE":
+                        reason = (
+                            "La asignación manual anterior quedó desactualizada porque cambió el EDIMA. "
+                            "Debe revisarse nuevamente."
+                        )
+            elif (
                 decision
                 and status
                 in {self.REVIEW_TITLE_CANDIDATE, self.REVIEW_OFFLINE_CANDIDATE}
@@ -267,6 +292,247 @@ class InventoryLinkageService:
                 ),
             },
             "items": items,
+        }
+
+    def search_candidates(
+        self,
+        external_id: str,
+        search: str = "",
+        limit: int = 8,
+    ) -> dict:
+        external_id = str(external_id or "").strip()
+        limit = max(1, min(int(limit or 8), 20))
+        edima = self.repo.snapshot("EDIMA_LINKAGE")
+        products = self.repo.snapshot("ECOMM_APP")
+        row = next(
+            (
+                candidate
+                for candidate in edima
+                if str(candidate.get("external_id") or "").strip() == external_id
+            ),
+            None,
+        )
+        if not row:
+            raise ValueError("La publicación EDIMA ya no está disponible.")
+        if self._is_linked(row.get("inventory_linked")):
+            raise ValueError("La publicación ya figura vinculada en EDIMA.")
+
+        raw_search = str(search or "").strip()
+        normalized_search = normalize_title(raw_search)
+        target_title = normalize_title(row.get("title"))
+        target_brand = normalize_title(row.get("brand"))
+        target_gtins = {
+            str(value).strip()
+            for value in row.get("gtins") or []
+            if str(value).strip()
+        }
+
+        scored = []
+        for product in products:
+            name = str(product.get("name") or "").strip()
+            brand = str(product.get("brand") or "").strip()
+            sku = str(product.get("sku_effective") or product.get("sku") or "").strip()
+            ecomm_id = str(product.get("ecomm_id") or "").strip()
+            eans = {
+                str(value).strip()
+                for value in [product.get("ean"), *(product.get("ean_aliases") or [])]
+                if str(value or "").strip()
+            }
+            name_norm = normalize_title(name)
+            brand_norm = normalize_title(brand)
+            haystack = normalize_title(
+                " ".join(
+                    [
+                        ecomm_id,
+                        sku,
+                        name,
+                        brand,
+                        " ".join(sorted(eans)),
+                    ]
+                )
+            )
+
+            reasons = []
+            score = 0.0
+            if raw_search:
+                raw_cf = raw_search.casefold()
+                exact_identifier = (
+                    raw_cf == ecomm_id.casefold()
+                    or raw_cf == sku.casefold()
+                    or raw_search in eans
+                )
+                if exact_identifier:
+                    score = 1.0
+                    reasons.append("Identificador exacto")
+                elif normalized_search and normalized_search in haystack:
+                    score = 0.86
+                    reasons.append("Coincide con tu búsqueda")
+                elif normalized_search and name_norm:
+                    similarity = SequenceMatcher(None, normalized_search, name_norm).ratio()
+                    if similarity < 0.55:
+                        continue
+                    score = similarity
+                    reasons.append(f"Nombre similar {similarity:.0%}")
+                else:
+                    continue
+            else:
+                similarity = (
+                    SequenceMatcher(None, target_title, name_norm).ratio()
+                    if target_title and name_norm
+                    else 0.0
+                )
+                score = similarity
+                if similarity:
+                    reasons.append(f"Nombre similar {similarity:.0%}")
+                if target_brand and brand_norm and target_brand == brand_norm:
+                    score += 0.12
+                    reasons.append("Misma marca")
+                if target_gtins and eans.intersection(target_gtins):
+                    score = max(score, 1.0)
+                    reasons.append("GTIN exacto")
+                if score < 0.40:
+                    continue
+
+            scored.append(
+                {
+                    **self._product_view(product),
+                    "score": min(score, 1.0),
+                    "reasons": reasons,
+                }
+            )
+
+        scored.sort(
+            key=lambda item: (
+                -float(item.get("score") or 0),
+                str(item.get("name") or "").casefold(),
+            )
+        )
+        return {
+            "external_id": external_id,
+            "title": row.get("title"),
+            "brand": row.get("brand"),
+            "gtin_raw": row.get("gtin_raw"),
+            "search": raw_search,
+            "candidates": scored[:limit],
+        }
+
+    def save_manual_assignment(
+        self,
+        external_id: str,
+        ecomm_id: str,
+        note: str | None = None,
+    ) -> dict:
+        external_id = str(external_id or "").strip()
+        ecomm_id = str(ecomm_id or "").strip()
+        if not external_id or not ecomm_id:
+            raise ValueError("La publicación ML y el producto Ecomm son obligatorios.")
+
+        edima = self.repo.snapshot("EDIMA_LINKAGE")
+        products = self.repo.snapshot("ECOMM_APP")
+        row = next(
+            (
+                candidate
+                for candidate in edima
+                if str(candidate.get("external_id") or "").strip() == external_id
+            ),
+            None,
+        )
+        if not row:
+            raise ValueError("La publicación EDIMA ya no está disponible.")
+        if self._is_linked(row.get("inventory_linked")):
+            raise ValueError("La publicación ya figura vinculada en EDIMA.")
+
+        current = self._decision_candidate(external_id)
+        if current.get("status") not in {
+            self.NO_ECOMM_MATCH,
+            self.REVIEW_TITLE_CANDIDATE,
+            self.REVIEW_OFFLINE_CANDIDATE,
+        }:
+            raise ValueError(
+                "Esta publicación tiene un conflicto de identificadores que debe resolverse antes de asignarla manualmente."
+            )
+
+        product = next(
+            (
+                candidate
+                for candidate in products
+                if str(candidate.get("ecomm_id") or "").strip() == ecomm_id
+            ),
+            None,
+        )
+        if not product:
+            raise ValueError("El producto Ecomm seleccionado ya no está disponible.")
+
+        now = datetime.now(timezone.utc)
+        product_view = self._product_view(product)
+        source_snapshot = {
+            "title": row.get("title"),
+            "gtin_raw": row.get("gtin_raw"),
+            "matched_ecomm_id": ecomm_id,
+            "match_method": "MANUAL_SEARCH",
+        }
+        history_entry = {
+            "at": now.isoformat(),
+            "decision": "CONFIRMED",
+            "ecomm_id": ecomm_id,
+            "note": note,
+            "source_snapshot": source_snapshot,
+        }
+        decision = (
+            self.db.query(InventoryLinkageDecision)
+            .filter(InventoryLinkageDecision.external_id == external_id)
+            .one_or_none()
+        )
+        if decision is None:
+            decision = InventoryLinkageDecision(
+                external_id=external_id,
+                decision="CONFIRMED",
+                ecomm_id=ecomm_id,
+                source_snapshot=source_snapshot,
+                product_snapshot=product_view,
+                note=note,
+                history=[history_entry],
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(decision)
+        else:
+            history = list(decision.history or [])
+            history.append(history_entry)
+            decision.decision = "CONFIRMED"
+            decision.ecomm_id = ecomm_id
+            decision.source_snapshot = source_snapshot
+            decision.product_snapshot = product_view
+            decision.note = note
+            decision.history = history[-100:]
+            decision.updated_at = now
+
+        self.db.commit()
+        return {
+            "external_id": row.get("external_id"),
+            "variation_id": row.get("variation_id"),
+            "title": row.get("title"),
+            "brand": row.get("brand"),
+            "gtin_raw": row.get("gtin_raw"),
+            "gtins": [
+                str(value).strip()
+                for value in row.get("gtins") or []
+                if str(value).strip()
+            ],
+            "inventory_linked": row.get("inventory_linked"),
+            "modified_at": row.get("modified_at"),
+            "status": self.READY_TO_LINK,
+            "reason": (
+                "Producto Ecomm elegido y confirmado manualmente dentro de KIKI Tech. "
+                "La publicación queda lista para el siguiente paso de vinculación asistida."
+            ),
+            "match_method": "HUMAN_CONFIRMED_MANUAL",
+            "offline_evidence": None,
+            "decision_status": "CONFIRMED",
+            "decision_note": note,
+            "decision_at": now.isoformat(),
+            "decision_source": "HUMAN_KIKI",
+            "matched_product": product_view,
         }
 
     def save_decision(
