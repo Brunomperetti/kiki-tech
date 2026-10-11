@@ -303,6 +303,8 @@ def test_inventory_linkage_uses_latest_reconciliation_mla_when_raw_ecomm_has_no_
 
         assert item["status"] == "READY_TO_LINK"
         assert item["match_method"] == "RECONCILIATION_MLA"
+        assert item["decision_source"] == "AUTOMATIC_IDENTIFIERS"
+        assert item["decision_at"] is None
         assert item["matched_product"]["sku"] == "1175"
 
 
@@ -489,6 +491,8 @@ def test_human_confirmation_promotes_title_candidate_to_ready():
         assert saved["status"] == "READY_TO_LINK"
         assert saved["match_method"] == "HUMAN_CONFIRMED_TITLE"
         assert saved["decision_status"] == "CONFIRMED"
+        assert saved["decision_source"] == "HUMAN_KIKI"
+        assert saved["decision_at"]
         report = service.report()
         assert report["summary"]["ready_to_link"] == 1
         assert report["summary"]["confirmed_by_human"] == 1
