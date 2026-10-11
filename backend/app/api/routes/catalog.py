@@ -19,6 +19,13 @@ router = APIRouter(prefix="/api", tags=["catalog"])
 logger = logging.getLogger(__name__)
 
 
+class InventoryLinkageDecisionRequest(BaseModel):
+    external_id: str
+    decision: str
+    ecomm_id: str
+    note: str | None = None
+
+
 class EnrichmentDecisionRequest(BaseModel):
     product_key: str
     status: str
@@ -103,6 +110,26 @@ def inventory_linkage(
     except Exception as exc:
         logger.exception("inventory_linkage_failed")
         raise HTTPException(500, "No se pudo analizar la vinculación de inventario.") from exc
+
+
+@router.post("/inventory-linkage/decision")
+def inventory_linkage_decision(
+    request: InventoryLinkageDecisionRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return InventoryLinkageService(db).save_decision(
+            external_id=request.external_id,
+            decision_value=request.decision,
+            ecomm_id=request.ecomm_id,
+            note=request.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("inventory_linkage_decision_failed")
+        raise HTTPException(500, "No se pudo guardar la decisión de vinculación.") from exc
 
 
 @router.get("/publication-readiness")
