@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {api} from '../services/api';
-import type {InventoryLinkageCandidate,InventoryLinkageItem,InventoryLinkageReport,InventoryLinkageStatus,ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
+import type {InventoryLinkageCandidate,InventoryLinkageEcommAction,InventoryLinkageItem,InventoryLinkageReport,InventoryLinkageStatus,ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
 import '../readiness.css';
 
 const linkageLabels:Record<InventoryLinkageStatus,string>={
@@ -35,6 +35,28 @@ function csvCell(value:unknown){
   return `"${text}"`;
 }
 
+const ecommActionLabels:Record<InventoryLinkageEcommAction,string>={
+  ECOMM_CREATE_NEW:'Alta nueva',
+  ECOMM_CORRECT_EXISTING:'Corregir existente',
+  ECOMM_SPECIAL_PRESENTATION:'Pack / presentación',
+  ECOMM_KEEP_RESEARCHING:'Seguir investigando',
+};
+
+const ecommActionDescriptions:Record<InventoryLinkageEcommAction,string>={
+  ECOMM_CREATE_NEW:'El producto correcto no está en Ecomm y habría que darlo de alta.',
+  ECOMM_CORRECT_EXISTING:'Creemos que existe en Ecomm, pero sus datos están mal o incompletos.',
+  ECOMM_SPECIAL_PRESENTATION:'Es un pack, combo, tamaño o variante que necesita su propio SKU/producto.',
+  ECOMM_KEEP_RESEARCHING:'Todavía no hay evidencia suficiente para decidir qué hacer.',
+};
+
+function pendingSummaryKey(action?:InventoryLinkageEcommAction|null){
+  if(action==='ECOMM_CREATE_NEW')return 'pending_ecomm_create_new' as const;
+  if(action==='ECOMM_CORRECT_EXISTING')return 'pending_ecomm_correct_existing' as const;
+  if(action==='ECOMM_SPECIAL_PRESENTATION')return 'pending_ecomm_special_presentation' as const;
+  if(action==='ECOMM_KEEP_RESEARCHING')return 'pending_ecomm_keep_researching' as const;
+  return null;
+}
+
 function linkageMethodLabel(method?:string|null){
   if(method==='RECONCILIATION_MLA')return 'MLA conciliado';
   if(method==='ECOMM_MLA')return 'MLA en Ecomm';
@@ -65,6 +87,7 @@ export function Readiness(){
   const [candidateSearching,setCandidateSearching]=useState(false);
   const [candidateSaving,setCandidateSaving]=useState('');
   const [candidateError,setCandidateError]=useState('');
+  const [ecommActionBusy,setEcommActionBusy]=useState('');
   useEffect(()=>{
     api.publicationReadiness().then(setReport).catch(error=>setMessage(error.message));
     api.inventoryLinkage().then(setLinkage).catch(()=>setLinkage(null));
@@ -241,6 +264,38 @@ export function Readiness(){
     }
   }
 
+  async function savePendingEcommAction(item:InventoryLinkageItem,action:InventoryLinkageEcommAction){
+    const externalId=String(item.external_id||'');
+    if(!externalId)return;
+    setEcommActionBusy(externalId);
+    setLinkageMessage('');
+    try{
+      const saved=await api.saveInventoryEcommAction(
+        externalId,
+        action,
+        ecommActionDescriptions[action],
+      );
+      setLinkage(current=>{
+        if(!current)return current;
+        const oldKey=pendingSummaryKey(item.ecomm_action);
+        const newKey=pendingSummaryKey(action);
+        const summary={...current.summary};
+        if(oldKey&&oldKey!==newKey)summary[oldKey]=Math.max(0,summary[oldKey]-1);
+        if(newKey&&oldKey!==newKey)summary[newKey]+=1;
+        return {
+          ...current,
+          items:current.items.map(candidate=>candidate.external_id===saved.external_id?saved:candidate),
+          summary,
+        };
+      });
+      setLinkageMessage(`Acción Ecomm guardada: ${ecommActionLabels[action]}.`);
+    }catch(error){
+      setLinkageMessage(error instanceof Error?error.message:'No se pudo guardar la acción Ecomm.');
+    }finally{
+      setEcommActionBusy('');
+    }
+  }
+
   function selectReason(code:string){
     setReasonCode(current=>current===code?'':code);
     setStatus('');
@@ -279,12 +334,13 @@ export function Readiness(){
   function exportPendingEcomm(){
     if(!pendingEcomm.length)return;
     const rows=[
-      ['MLA','GTIN','Producto EDIMA','Marca','Estado','Motivo','Fecha revisión'],
+      ['MLA','GTIN','Producto EDIMA','Marca','Acción Ecomm','Estado','Motivo','Fecha revisión'],
       ...pendingEcomm.map(item=>[
         item.external_id||'',
         item.gtin_raw||'',
         item.title||'',
         item.brand||'',
+        item.ecomm_action?ecommActionLabels[item.ecomm_action]:'Sin clasificar',
         'Pendiente de catálogo Ecomm',
         item.reason||'',
         item.decision_at?new Date(item.decision_at).toLocaleString('es-AR'):'',
@@ -355,7 +411,15 @@ export function Readiness(){
           <div><h3>Pendientes de catálogo Ecomm</h3><p>Ya revisaste estos casos y no encontraste un producto Ecomm que corresponda. El siguiente paso es darlo de alta/corregirlo en Ecomm o importar un inventario actualizado.</p></div>
           <button onClick={exportPendingEcomm} disabled={!pendingEcomm.length}>Exportar CSV ({pendingEcomm.length})</button>
         </div>
-        {pendingEcomm.length===0?<p className="evidence-note">Todavía no marcaste publicaciones como pendientes de catálogo Ecomm.</p>:<div className="pending-ecomm-list">{pendingEcomm.map((item,index)=><article key={item.external_id||index}><div><strong>{item.title||'Producto sin título'}</strong><small className="linkage-meta">{item.external_id||'—'} · GTIN <span className="mono">{item.gtin_raw||'—'}</span>{item.brand?` · ${item.brand}`:''}</small></div><span className="badge REVIEW_REQUIRED">Pendiente Ecomm</span></article>)}</div>}
+        {pendingEcomm.length===0?<p className="evidence-note">Todavía no marcaste publicaciones como pendientes de catálogo Ecomm.</p>:<>
+          <div className="ecomm-action-summary">
+            <span>Alta nueva <strong>{linkage.summary.pending_ecomm_create_new}</strong></span>
+            <span>Corregir existente <strong>{linkage.summary.pending_ecomm_correct_existing}</strong></span>
+            <span>Pack / presentación <strong>{linkage.summary.pending_ecomm_special_presentation}</strong></span>
+            <span>Seguir investigando <strong>{linkage.summary.pending_ecomm_keep_researching}</strong></span>
+          </div>
+          <div className="pending-ecomm-list">{pendingEcomm.map((item,index)=><article className="pending-ecomm-item" key={item.external_id||index}><div className="pending-ecomm-info"><strong>{item.title||'Producto sin título'}</strong><small className="linkage-meta">{item.external_id||'—'} · GTIN <span className="mono">{item.gtin_raw||'—'}</span>{item.brand?` · ${item.brand}`:''}</small>{item.ecomm_action&&<small className="linkage-meta"><strong>Acción definida:</strong> {ecommActionLabels[item.ecomm_action]}</small>}</div><div className="ecomm-action-buttons">{(Object.keys(ecommActionLabels) as InventoryLinkageEcommAction[]).map(action=><button key={action} className={item.ecomm_action===action?'active-action':'secondary'} onClick={()=>void savePendingEcommAction(item,action)} disabled={ecommActionBusy===item.external_id} title={ecommActionDescriptions[action]}>{ecommActionBusy===item.external_id?'Guardando…':ecommActionLabels[action]}</button>)}</div></article>)}</div>
+        </>}
       </section>
       <div className="linkage-groups">
         {linkageGroups.map(group=><section className="linkage-group" key={group.key}>
