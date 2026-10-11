@@ -24,7 +24,7 @@ class InventoryLinkageService:
         self.db = db
         self.repo = CatalogRepository(db)
 
-    def report(self) -> dict:
+    def report(self, apply_decisions: bool = True) -> dict:
         edima = self.repo.snapshot("EDIMA_LINKAGE")
         products = self.repo.snapshot("ECOMM_APP")
         if not edima:
@@ -76,6 +76,16 @@ class InventoryLinkageService:
                     for key in self._listing_keys(raw_id):
                         reconciliation_index[key].append(product)
 
+        decisions = (
+            {
+                decision.external_id: decision
+                for decision in self.db.query(InventoryLinkageDecision).all()
+            }
+            if apply_decisions
+            else {}
+        )
+        confirmed_by_human = 0
+
         linked = 0
         unlinked = 0
         invalid_gtin_total = 0
@@ -108,6 +118,35 @@ class InventoryLinkageService:
                 title_index,
                 normalized_products,
             )
+            decision_status = "NONE"
+            decision_note = None
+            decision = decisions.get(str(row.get("external_id") or ""))
+            if (
+                decision
+                and status == self.REVIEW_TITLE_CANDIDATE
+                and matched is not None
+            ):
+                decision_status = self._decision_state(decision, row, matched)
+                decision_note = decision.note
+                if decision_status == "CONFIRMED":
+                    status = self.READY_TO_LINK
+                    match_method = "HUMAN_CONFIRMED_TITLE"
+                    confirmed_by_human += 1
+                    reason = (
+                        "Coincidencia por título confirmada humanamente dentro de KIKI Tech. "
+                        "La publicación queda lista para el siguiente paso de vinculación asistida."
+                    )
+                elif decision_status == "REJECTED":
+                    reason = (
+                        "El candidato sugerido por título fue rechazado humanamente. "
+                        "La publicación sigue requiriendo identificación."
+                    )
+                elif decision_status == "STALE":
+                    reason = (
+                        "Existe una decisión anterior, pero cambió el EDIMA o el producto sugerido. "
+                        "Debe revisarse nuevamente antes de usarla."
+                    )
+
             status_counts[status] += 1
             items.append(
                 {
@@ -122,6 +161,8 @@ class InventoryLinkageService:
                     "status": status,
                     "reason": reason,
                     "match_method": match_method,
+                    "decision_status": decision_status,
+                    "decision_note": decision_note,
                     "matched_product": self._product_view(matched) if matched else None,
                 }
             )
@@ -151,6 +192,7 @@ class InventoryLinkageService:
                 "linked": linked,
                 "unlinked": unlinked,
                 "ready_to_link": status_counts[self.READY_TO_LINK],
+                "confirmed_by_human": confirmed_by_human,
                 "review_required": unlinked - status_counts[self.READY_TO_LINK],
                 "no_ecomm_match": status_counts[self.NO_ECOMM_MATCH],
                 "invalid_gtin": status_counts[self.INVALID_GTIN],
@@ -175,11 +217,118 @@ class InventoryLinkageService:
                     "Una publicación queda Lista para vincular cuando EDIMA indica No, contiene un "
                     "único GTIN válido y podemos identificar un único producto Ecomm por el MLA que "
                     "KIKI ya concilió, por un MLA directo en Ecomm o por GTIN exacto. Si MLA y GTIN se "
-                    "contradicen, KIKI la manda a revisión."
+                    "contradicen, KIKI la manda a revisión. Los candidatos encontrados solo por título "
+                    "pueden pasar a Lista para vincular únicamente después de una confirmación humana."
                 ),
             },
             "items": items,
         }
+
+    def save_decision(
+        self,
+        external_id: str,
+        decision_value: str,
+        ecomm_id: str,
+        note: str | None = None,
+    ) -> dict:
+        external_id = str(external_id or "").strip()
+        ecomm_id = str(ecomm_id or "").strip()
+        decision_value = str(decision_value or "").strip().upper()
+        if decision_value not in {"CONFIRMED", "REJECTED"}:
+            raise ValueError("La decisión debe ser CONFIRMED o REJECTED.")
+        if not external_id or not ecomm_id:
+            raise ValueError("La publicación ML y el producto Ecomm son obligatorios.")
+
+        base_report = self.report(apply_decisions=False)
+        item = next(
+            (
+                candidate
+                for candidate in base_report.get("items", [])
+                if str(candidate.get("external_id") or "") == external_id
+            ),
+            None,
+        )
+        if not item:
+            raise ValueError("La publicación EDIMA ya no está disponible.")
+        if item.get("status") != self.REVIEW_TITLE_CANDIDATE:
+            raise ValueError(
+                "Solo se pueden confirmar o rechazar candidatos sugeridos por título."
+            )
+        matched = item.get("matched_product") or {}
+        if str(matched.get("ecomm_id") or "") != ecomm_id:
+            raise ValueError("El producto Ecomm sugerido cambió; revisá nuevamente la fila.")
+
+        now = datetime.now(timezone.utc)
+        row = (
+            self.db.query(InventoryLinkageDecision)
+            .filter(InventoryLinkageDecision.external_id == external_id)
+            .one_or_none()
+        )
+        source_snapshot = {
+            "title": item.get("title"),
+            "gtin_raw": item.get("gtin_raw"),
+            "matched_ecomm_id": ecomm_id,
+            "match_method": item.get("match_method"),
+        }
+        history_entry = {
+            "at": now.isoformat(),
+            "decision": decision_value,
+            "ecomm_id": ecomm_id,
+            "note": note,
+            "source_snapshot": source_snapshot,
+        }
+        if row is None:
+            row = InventoryLinkageDecision(
+                external_id=external_id,
+                decision=decision_value,
+                ecomm_id=ecomm_id,
+                source_snapshot=source_snapshot,
+                product_snapshot=matched,
+                note=note,
+                history=[history_entry],
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(row)
+        else:
+            history = list(row.history or [])
+            history.append(history_entry)
+            row.decision = decision_value
+            row.ecomm_id = ecomm_id
+            row.source_snapshot = source_snapshot
+            row.product_snapshot = matched
+            row.note = note
+            row.history = history[-100:]
+            row.updated_at = now
+
+        self.db.commit()
+        refreshed = self.report()
+        return next(
+            item
+            for item in refreshed.get("items", [])
+            if str(item.get("external_id") or "") == external_id
+        )
+
+    @staticmethod
+    def _decision_state(
+        decision: InventoryLinkageDecision,
+        row: dict,
+        matched: dict,
+    ) -> str:
+        snapshot = decision.source_snapshot or {}
+        current = {
+            "title": row.get("title"),
+            "gtin_raw": row.get("gtin_raw"),
+            "matched_ecomm_id": str(matched.get("ecomm_id") or ""),
+        }
+        if (
+            str(snapshot.get("title") or "") != str(current["title"] or "")
+            or str(snapshot.get("gtin_raw") or "") != str(current["gtin_raw"] or "")
+            or str(snapshot.get("matched_ecomm_id") or "")
+            != current["matched_ecomm_id"]
+        ):
+            return "STALE"
+        return decision.decision if decision.decision in {"CONFIRMED", "REJECTED"} else "STALE"
 
     def _classify_unlinked(
         self,
@@ -413,6 +562,7 @@ class InventoryLinkageService:
                 "linked": 0,
                 "unlinked": 0,
                 "ready_to_link": 0,
+                "confirmed_by_human": 0,
                 "review_required": 0,
                 "no_ecomm_match": 0,
                 "invalid_gtin": 0,
