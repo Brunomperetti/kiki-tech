@@ -1209,3 +1209,119 @@ def test_pending_ecomm_catalog_does_not_hide_new_exact_match():
         assert item["status"] == "READY_TO_LINK"
         assert item["matched_product"]["ecomm_id"] == "20"
         assert item["match_method"] == "GTIN_EXACT"
+
+
+def test_pending_ecomm_action_classification_is_persisted_and_counted():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1000", None, "Producto totalmente distinto")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA300",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                    "Colágeno + Magnesio PGN X 60 Capsulas",
+                )
+            ],
+        )
+        service.mark_pending_ecomm_catalog("MLA300")
+
+        saved = service.save_pending_ecomm_action(
+            "MLA300",
+            "ECOMM_CREATE_NEW",
+            "No existe un producto equivalente en el catálogo actual.",
+        )
+
+        assert saved["status"] == "PENDING_ECOMM_CATALOG"
+        assert saved["ecomm_action"] == "ECOMM_CREATE_NEW"
+        assert "alta nueva" in saved["reason"].lower()
+
+        report = service.report()
+        item = report["items"][0]
+        assert item["ecomm_action"] == "ECOMM_CREATE_NEW"
+        assert report["summary"]["pending_ecomm_create_new"] == 1
+        assert report["summary"]["pending_ecomm_catalog"] == 1
+
+
+def test_pending_ecomm_action_can_be_reclassified():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1000", None, "Producto totalmente distinto")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA301",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                    "Potasio Natier Pack X2",
+                )
+            ],
+        )
+        service.mark_pending_ecomm_catalog("MLA301")
+        service.save_pending_ecomm_action("MLA301", "ECOMM_CREATE_NEW")
+        service.save_pending_ecomm_action("MLA301", "ECOMM_SPECIAL_PRESENTATION")
+
+        report = service.report()
+        item = report["items"][0]
+
+        assert item["ecomm_action"] == "ECOMM_SPECIAL_PRESENTATION"
+        assert report["summary"]["pending_ecomm_create_new"] == 0
+        assert report["summary"]["pending_ecomm_special_presentation"] == 1
+
+
+def test_classified_pending_ecomm_does_not_hide_future_exact_match():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = InventoryLinkageService(db)
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [product("10", "1000", None, "Producto totalmente distinto")],
+        )
+        service.repo.save_snapshot(
+            "EDIMA_LINKAGE",
+            [
+                edima(
+                    "MLA302",
+                    "No",
+                    "7798121272958",
+                    ["7798121272958"],
+                    "Colágeno + Magnesio PGN X 60 Capsulas",
+                )
+            ],
+        )
+        service.mark_pending_ecomm_catalog("MLA302")
+        service.save_pending_ecomm_action("MLA302", "ECOMM_KEEP_RESEARCHING")
+
+        service.repo.save_snapshot(
+            "ECOMM_APP",
+            [
+                product(
+                    "20",
+                    "2000",
+                    "7798121272958",
+                    "Colágeno + Magnesio PGN X 60 Capsulas",
+                )
+            ],
+        )
+
+        item = service.report()["items"][0]
+
+        assert item["status"] == "READY_TO_LINK"
+        assert item["matched_product"]["ecomm_id"] == "20"
+        assert item["ecomm_action"] is None
