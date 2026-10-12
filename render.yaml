@@ -42,10 +42,10 @@ services:
     runtime: static
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: ./frontend/dist
-    envVars:
-      - key: VITE_API_URL
-        sync: false
     routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://kiki-tech-api.onrender.com/api/*
       - type: rewrite
         source: /*
         destination: /index.html
