@@ -85,26 +85,37 @@ export function WorkQueue(){
 
   async function load(){
     setLoading(true);
-    const results=await Promise.allSettled([
-      api.inventoryLinkage(),
-      api.reconciliationReviewQueue(),
-      api.duplicateReviewQueue(),
-      api.finalPublicationQueue(),
+    setError('');
+
+    const readinessResult=await Promise.allSettled([
       api.publicationReadiness(),
       api.externalResearchQueue(),
     ]);
-    setData({
-      linkage:results[0].status==='fulfilled'?results[0].value:null,
-      reconciliation:results[1].status==='fulfilled'?results[1].value:null,
-      duplicates:results[2].status==='fulfilled'?results[2].value:null,
-      finalQueue:results[3].status==='fulfilled'?results[3].value:null,
-      readiness:results[4].status==='fulfilled'?results[4].value:null,
-      research:results[5].status==='fulfilled'?results[5].value:null,
-    });
-    if(results.some(result=>result.status==='rejected')){
+    const readiness=readinessResult[0].status==='fulfilled'?readinessResult[0].value:null;
+    const research=readinessResult[1].status==='fulfilled'?readinessResult[1].value:null;
+    setData(current=>({...current,readiness,research}));
+
+    const linkage=await api.inventoryLinkage().catch(()=>null);
+    setData(current=>({...current,linkage}));
+
+    const reconciliation=await api.reconciliationReviewQueue().catch(()=>null);
+    setData(current=>({...current,reconciliation}));
+
+    const duplicates=await api.duplicateReviewQueue().catch(()=>null);
+    setData(current=>({...current,duplicates}));
+
+    const finalQueue=await api.finalPublicationQueue().catch(()=>null);
+    setData(current=>({...current,finalQueue}));
+
+    if(
+      readiness===null
+      || research===null
+      || linkage===null
+      || reconciliation===null
+      || duplicates===null
+      || finalQueue===null
+    ){
       setError('No pudimos conectar con todos los servicios de KIKI. Los valores no cargados se muestran como no disponibles, no como cero.');
-    }else{
-      setError('');
     }
     setLoading(false);
   }
