@@ -13,18 +13,11 @@ from .enrichment_review_service import EnrichmentReviewService
 
 
 class CatalogContinuityService:
-    """Keep validated KIKI core data stable across newer Ecomm snapshots.
-
-    Ecomm remains the source feed. Accepted KIKI evidence remains persisted. When a
-    newer Ecomm value disagrees with a previously validated KIKI value, this service
-    creates an explicit human-review conflict instead of silently replacing either
-    side.
-    """
+    """Keep validated KIKI core data stable across newer Ecomm snapshots."""
 
     USE_KIKI = "USE_KIKI"
     USE_ECOMM = "USE_ECOMM"
     VALID_DECISIONS = {USE_KIKI, USE_ECOMM}
-
     ACCEPTED_STATUSES = {"EVIDENCE_ACCEPTED", "GTIN_NOT_APPLICABLE"}
 
     FIELD_LABELS = {
@@ -37,7 +30,9 @@ class CatalogContinuityService:
         self.repo = CatalogRepository(db)
 
     def report(self) -> dict:
-        products = list(self.repo.snapshot("ECOMM_APP"))
+        return self._report_for_products(list(self.repo.snapshot("ECOMM_APP")))
+
+    def _report_for_products(self, products: list[dict]) -> dict:
         product_index = {
             EnrichmentReviewService.product_key(product): product
             for product in products
@@ -85,16 +80,17 @@ class CatalogContinuityService:
                 continue
 
             for field, kiki_value, is_exception in self._validated_fields(evidence):
-                item = self._field_item(
-                    product_key=product_key,
-                    product=product,
-                    field=field,
-                    kiki_value=kiki_value,
-                    is_exception=is_exception,
-                    evidence=evidence,
-                    decision=decisions.get(f"{product_key}:{field}"),
+                items.append(
+                    self._field_item(
+                        product_key=product_key,
+                        product=product,
+                        field=field,
+                        kiki_value=kiki_value,
+                        is_exception=is_exception,
+                        evidence=evidence,
+                        decision=decisions.get(f"{product_key}:{field}"),
+                    )
                 )
-                items.append(item)
 
         summary = {
             "validated_products": len(validated_products),
@@ -129,8 +125,10 @@ class CatalogContinuityService:
         }
 
     def effective_index(self, products: list[dict] | None = None) -> dict[str, dict]:
-        products = list(products if products is not None else self.repo.snapshot("ECOMM_APP"))
-        report = self.report()
+        products = list(
+            products if products is not None else self.repo.snapshot("ECOMM_APP")
+        )
+        report = self._report_for_products(products)
         item_index: dict[str, list[dict]] = {}
         for item in report["items"]:
             if item["field"] == "product":
@@ -154,7 +152,10 @@ class CatalogContinuityService:
                 if item["field"] == "brand":
                     brand = item["effective_value"]
                 elif item["field"] == "ean":
-                    if item.get("kiki_exception") and item["state"] != "RESOLVED_USE_ECOMM":
+                    if (
+                        item.get("kiki_exception")
+                        and item["state"] != "RESOLVED_USE_ECOMM"
+                    ):
                         ean = None
                         gtin_exception = True
                     else:
@@ -200,7 +201,12 @@ class CatalogContinuityService:
         )
         if current is None or current["field"] == "product":
             raise ValueError("El conflicto ya no está disponible.")
-        if current["state"] not in {"CONFLICT", "STALE_DECISION", "RESOLVED_USE_KIKI", "RESOLVED_USE_ECOMM"}:
+        if current["state"] not in {
+            "CONFLICT",
+            "STALE_DECISION",
+            "RESOLVED_USE_KIKI",
+            "RESOLVED_USE_ECOMM",
+        }:
             raise ValueError("Ese dato ya no presenta un conflicto entre KIKI y Ecomm.")
 
         now = datetime.now(timezone.utc)
@@ -242,12 +248,11 @@ class CatalogContinuityService:
             row.updated_at = now
 
         self.db.commit()
-        refreshed = next(
+        return next(
             item
             for item in self.report()["items"]
             if item["conflict_key"] == conflict_key
         )
-        return refreshed
 
     def _field_item(
         self,
@@ -324,7 +329,13 @@ class CatalogContinuityService:
         return fields
 
     @classmethod
-    def _same_value(cls, field: str, ecomm_value, kiki_value, is_exception: bool) -> bool:
+    def _same_value(
+        cls,
+        field: str,
+        ecomm_value,
+        kiki_value,
+        is_exception: bool,
+    ) -> bool:
         if is_exception:
             return cls._empty(ecomm_value)
         if cls._empty(ecomm_value) or cls._empty(kiki_value):
@@ -344,7 +355,9 @@ class CatalogContinuityService:
     @staticmethod
     def _text(value) -> str:
         text = unicodedata.normalize("NFKD", str(value or ""))
-        text = "".join(char for char in text if not unicodedata.combining(char))
+        text = "".join(
+            char for char in text if not unicodedata.combining(char)
+        )
         return " ".join(text.casefold().split())
 
     @staticmethod
