@@ -108,3 +108,13 @@
   .core-resolution-actions{display:grid;grid-template-columns:1fr}
   .core-resolution-actions>*{width:100%}
 }
+
+.gtin-triage{display:flex;justify-content:space-between;gap:18px;align-items:center;margin:12px 0 4px;padding:12px 14px;border:1px solid #d9e5c9;border-radius:10px;background:#f5faef}
+.gtin-triage p{margin:3px 0 0;font-size:12px}
+.core-row-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.core-suggestion-badge{display:inline-flex;padding:4px 7px;border-radius:999px;background:#eaf5d9;color:#3c6428;font-size:11px;font-weight:700}
+.gtin-exception-action{background:#735f24}
+@media(max-width:700px){
+  .gtin-triage{flex-direction:column;align-items:stretch}
+  .gtin-triage button{width:100%}
+}
