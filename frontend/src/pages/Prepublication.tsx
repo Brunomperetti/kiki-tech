@@ -145,6 +145,7 @@ export function Prepublication(){
       <article><span>En pre-publicación</span><strong>{s.total.toLocaleString('es-AR')}</strong></article>
       <article><span>Desde Ecomm validado</span><strong>{s.from_ecomm_core.toLocaleString('es-AR')}</strong></article>
       <article><span>Desde evidencia aceptada</span><strong>{s.from_accepted_evidence.toLocaleString('es-AR')}</strong></article>
+      <article><span>Excepción GTIN</span><strong>{s.from_gtin_exception.toLocaleString('es-AR')}</strong></article>
       <article><span>Imágenes aprobadas</span><strong>{s.approved_images.toLocaleString('es-AR')}</strong></article>
       <article><span>Esperando imágenes</span><strong>{s.waiting_images.toLocaleString('es-AR')}</strong></article>
       <article><span>Listos para preview</span><strong>{s.ready_for_preview.toLocaleString('es-AR')}</strong></article>
@@ -173,7 +174,7 @@ export function Prepublication(){
       {finalMessage&&<div className="notice">{finalMessage}</div>}
       {finalItems.length===0?<div className="prepub-empty"><strong>No hay productos en este estado.</strong></div>:<div className="final-queue-list">{finalItems.map(item=><article className="final-queue-item" key={item.product_key}>
         <div className="final-queue-head">
-          <div><h3>{item.preview.title||'Producto sin nombre'}</h3><p>SKU {item.preview.sku||'—'} · GTIN {item.preview.gtin||'—'}</p></div>
+          <div><h3>{item.preview.title||'Producto sin nombre'}</h3><p>SKU {item.preview.sku||'—'} · GTIN {item.preview.gtin||(item.preview.gtin_exception?'No aplica (validado)':'—')}</p></div>
           <span className={`final-status ${item.queue_status}`}>{finalStatusLabel(item.queue_status)}</span>
         </div>
         <div className="final-preview-grid">
@@ -197,13 +198,13 @@ export function Prepublication(){
     <section className="panel">
       <div className="filters prepub-filters">
         <input placeholder="Buscar SKU, producto, marca o EAN" value={search} onChange={e=>setSearch(e.target.value)}/>
-        <select value={source} onChange={e=>setSource(e.target.value)}><option value="">Todos los orígenes</option><option value="ECOMM_CORE">Ecomm validado</option><option value="ACCEPTED_EVIDENCE">Evidencia aceptada</option></select>
+        <select value={source} onChange={e=>setSource(e.target.value)}><option value="">Todos los orígenes</option><option value="ECOMM_CORE">Ecomm validado</option><option value="ACCEPTED_EVIDENCE">Evidencia aceptada</option><option value="ACCEPTED_GTIN_EXCEPTION">Excepción GTIN documentada</option></select>
       </div>
       <p className="result-count">Mostrando <strong>{items.length.toLocaleString('es-AR')}</strong> de {s.total.toLocaleString('es-AR')} productos</p>
       {items.length===0&&<div className="prepub-empty"><strong>Todavía no hay productos para mostrar con este filtro.</strong></div>}
       <div className="prepub-list">{items.map(item=><article className="prepub-item" key={item.product_key}>
         <div className="prepub-head"><div><h2>{item.product.name||'Producto sin nombre'}</h2><p>SKU {item.product.sku||'—'} · Stock {item.product.stock??'—'}</p></div><span className={`prepub-source ${item.core_source}`}>{item.core_source_label}</span></div>
-        <div className="prepub-core"><div><small>Marca validada</small><strong>{item.verified_core_data.brand||'—'}</strong></div><div><small>EAN / GTIN</small><strong>{item.verified_core_data.ean||'—'}</strong></div><div><small>Fuente</small>{item.verified_core_data.source_url?<a href={item.verified_core_data.source_url} target="_blank" rel="noreferrer">{item.verified_core_data.source_name||'Ver evidencia'}</a>:<strong>{item.verified_core_data.source_name||'Ecomm-App'}</strong>}</div></div>
+        <div className="prepub-core"><div><small>Marca validada</small><strong>{item.verified_core_data.brand||'—'}</strong></div><div><small>EAN / GTIN</small><strong>{item.verified_core_data.ean||(item.verified_core_data.gtin_exception?'No aplica · documentado':'—')}</strong></div><div><small>Fuente</small>{item.verified_core_data.source_url?<a href={item.verified_core_data.source_url} target="_blank" rel="noreferrer">{item.verified_core_data.source_name||'Ver evidencia'}</a>:<strong>{item.verified_core_data.source_name||'Ecomm-App'}</strong>}</div></div>
         <div className="prepub-checks"><span className={item.checks.core_data}>{checkLabel(item.checks.core_data)}<small>Datos centrales</small></span><span className={item.checks.images}>{checkLabel(item.checks.images)}<small>Imágenes</small></span><span className={item.checks.category}>{checkLabel(item.checks.category)}<small>Categoría ML</small></span><span className={item.checks.attributes}>{checkLabel(item.checks.attributes)}<small>Atributos</small></span><span className={item.checks.preview}>{checkLabel(item.checks.preview)}<small>Preview</small></span></div>
       </article>)}</div>
       <p className="evidence-note">{report.policy.description}</p>
