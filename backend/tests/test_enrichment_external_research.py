@@ -140,3 +140,49 @@ def test_external_research_requires_explicit_review_state():
         service = service_with_report(db)
         with pytest.raises(ValueError, match="Investigar afuera"):
             service.save("ECOMM:10", "DRAFT", proposed_brand="Natufarma")
+
+
+def test_product_without_internal_signal_can_be_researched_and_accepted():
+    report = {
+        "reconciliation_run_id": 88,
+        "items": [
+            {
+                "product": {
+                    "ecomm_id": "30",
+                    "sku": "1002",
+                    "name": "Cardo Mariano Suelta X 50 Grs",
+                    "brand": None,
+                    "ean": None,
+                    "stock": 1,
+                    "price": 1400,
+                },
+                "readiness_status": "REVIEW_REQUIRED",
+                "reason_codes": ["EAN_MISSING", "BRAND_MISSING"],
+            }
+        ],
+    }
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = EnrichmentExternalResearchService(db)
+        service.review.readiness.report = lambda: report
+
+        service.review.save_decision(
+            "ECOMM:30",
+            "EXTERNAL_RESEARCH",
+            "Resolver datos centrales desde la cola guiada.",
+        )
+        saved = service.save(
+            "ECOMM:30",
+            "EVIDENCE_ACCEPTED",
+            proposed_brand="Marca Verificada",
+            proposed_ean="4006381333931",
+            source_name="Ficha oficial",
+            source_url="https://example.com/producto",
+            confidence="MEDIUM",
+        )
+
+        assert saved["research_status"] == "EVIDENCE_ACCEPTED"
+        assert saved["proposed_ean"] == "4006381333931"
+        assert saved["proposed_brand"] == "Marca Verificada"

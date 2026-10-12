@@ -135,7 +135,11 @@ class EnrichmentReviewService:
             not has_candidate
             and len(evidence.get("candidate_brands") or []) > 1
         )
-        if not has_candidate and not is_ambiguous:
+        if (
+            not has_candidate
+            and not is_ambiguous
+            and status != self.EXTERNAL_RESEARCH
+        ):
             raise ValueError(
                 "Este producto todavía no tiene evidencia interna suficiente para esta cola."
             )
