@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
+import {Link} from 'react-router-dom';
 import {api} from '../services/api';
-import type {InventoryLinkageCandidate,InventoryLinkageEcommAction,InventoryLinkageItem,InventoryLinkageReport,InventoryLinkageStatus,ReadinessItem,ReadinessReport,ReadinessStatus} from '../types/catalog';
+import type {InventoryLinkageCandidate,InventoryLinkageEcommAction,InventoryLinkageItem,InventoryLinkageReport,InventoryLinkageStatus} from '../types/catalog';
 import '../readiness.css';
 
 const linkageLabels:Record<InventoryLinkageStatus,string>={
@@ -15,20 +16,6 @@ const linkageLabels:Record<InventoryLinkageStatus,string>={
   INVALID_GTIN:'GTIN inválido',
   NO_ECOMM_MATCH:'Sin coincidencia Ecomm',
 };
-
-const labels:Record<ReadinessStatus,string>={
-  READY_CORE_DATA:'Datos centrales OK',
-  REVIEW_REQUIRED:'Revisar',
-  BLOCKED:'Bloqueado',
-  EXCLUDED_BULK:'Fuera del masivo actual',
-  NO_STOCK:'Sin stock',
-  ALREADY_PUBLISHED:'Ya publicado',
-};
-
-function matchesSearch(item:ReadinessItem,term:string){
-  if(!term)return true;
-  return [item.product.sku,item.product.ean,item.product.name].some(value=>String(value||'').toLowerCase().includes(term));
-}
 
 function csvCell(value:unknown){
   const text=String(value??'').replace(/"/g,'""');
@@ -73,12 +60,7 @@ function linkageMethodLabel(method?:string|null){
 }
 
 export function Readiness(){
-  const [report,setReport]=useState<ReadinessReport|null>(null);
-  const [linkage,setLinkage]=useState<InventoryLinkageReport|null>(null);
-  const [status,setStatus]=useState('');
-  const [reasonCode,setReasonCode]=useState('');
-  const [search,setSearch]=useState('');
-  const [message,setMessage]=useState('');
+  const [linkage,setLinkage]=useState<InventoryLinkageReport|undefined>(undefined);
   const [linkageMessage,setLinkageMessage]=useState('');
   const [linkageBusy,setLinkageBusy]=useState('');
   const [candidateItem,setCandidateItem]=useState<InventoryLinkageItem|null>(null);
@@ -89,17 +71,10 @@ export function Readiness(){
   const [candidateError,setCandidateError]=useState('');
   const [ecommActionBusy,setEcommActionBusy]=useState('');
   useEffect(()=>{
-    api.publicationReadiness().then(setReport).catch(error=>setMessage(error.message));
-    api.inventoryLinkage().then(setLinkage).catch(()=>setLinkage(null));
+    api.inventoryLinkage()
+      .then(setLinkage)
+      .catch(error=>setLinkageMessage(error instanceof Error?error.message:'No se pudo cargar la vinculación.'));
   },[]);
-  const items=useMemo(()=>{
-    const term=search.trim().toLowerCase();
-    return (report?.items||[]).filter(item=>{
-      if(status&&item.readiness_status!==status)return false;
-      if(reasonCode&&!item.reason_codes.includes(reasonCode))return false;
-      return matchesSearch(item,term);
-    });
-  },[report,status,reasonCode,search]);
   const readyLinkage=useMemo(
     ()=>(linkage?.items||[]).filter(item=>item.status==='READY_TO_LINK'),
     [linkage],
@@ -131,9 +106,8 @@ export function Readiness(){
       };
     });
   },[linkage]);
-  if(message)return <><header><div><p className="eyebrow">PREPARACIÓN MERCADO LIBRE</p><h1>Validador de publicación</h1></div></header><div className="notice warning">{message}</div></>;
-  if(!report)return <div className="auth-loading">Preparando validación…</div>;
-  const s=report.summary;
+  if(linkage===undefined&&!linkageMessage)return <div className="auth-loading">Preparando vinculación…</div>;
+  if(linkage===undefined&&linkageMessage)return <><header><div><p className="eyebrow">VINCULAR CON MERCADO LIBRE</p><h1>Relacionar publicaciones con el inventario</h1></div></header><div className="notice warning">{linkageMessage}</div></>;
 
   async function decideLinkage(item:InventoryLinkageItem,decision:'CONFIRMED'|'REJECTED'){
     const externalId=String(item.external_id||'');
@@ -296,11 +270,6 @@ export function Readiness(){
     }
   }
 
-  function selectReason(code:string){
-    setReasonCode(current=>current===code?'':code);
-    setStatus('');
-  }
-
   function exportReadyLinkage(){
     if(!readyLinkage.length)return;
     const rows=[
@@ -358,41 +327,8 @@ export function Readiness(){
     URL.revokeObjectURL(url);
   }
 
-  function exportReview(){
-    const term=search.trim().toLowerCase();
-    const exportItems=report!.items.filter(item=>{
-      if(!['REVIEW_REQUIRED','BLOCKED'].includes(item.readiness_status))return false;
-      if(reasonCode&&!item.reason_codes.includes(reasonCode))return false;
-      return matchesSearch(item,term);
-    });
-    const rows=[
-      ['SKU','Producto','EAN/GTIN','Stock','Precio','Estado','Códigos','Motivos'],
-      ...exportItems.map(item=>[
-        item.product.sku||'',
-        item.product.name||'',
-        item.product.ean||'',
-        item.product.stock??'',
-        item.product.price??'',
-        labels[item.readiness_status],
-        item.reason_codes.join(' | '),
-        item.reasons.join(' | '),
-      ]),
-    ];
-    const csv='\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
-    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const link=document.createElement('a');
-    link.href=url;
-    link.download=`kiki-revision-ml-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
   return <><header><div><p className="eyebrow">VINCULAR CON MERCADO LIBRE</p><h1>Relacionar publicaciones con el inventario</h1><p>Este circuito es para publicaciones que ya existen en Mercado Libre y necesitan quedar asociadas al producto correcto de Ecomm.</p></div></header>
   <div className="notice warning"><strong>No modifica sistemas externos.</strong> KIKI identifica, propone y guarda decisiones; la vinculación externa se ejecutará en una etapa posterior.</div>
-  <details className="panel guided-secondary"><summary><strong>Información adicional · preparación de productos nuevos</strong><span>Ver métricas técnicas del catálogo</span></summary><section className="cards readiness-cards"><article><span>Datos centrales OK</span><strong>{s.READY_CORE_DATA.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{s.REVIEW_REQUIRED.toLocaleString('es-AR')}</strong></article><article><span>Bloqueados</span><strong>{s.BLOCKED.toLocaleString('es-AR')}</strong></article><article><span>Fuera del masivo actual</span><strong>{s.EXCLUDED_BULK.toLocaleString('es-AR')}</strong></article><article><span>Sin stock</span><strong>{s.NO_STOCK.toLocaleString('es-AR')}</strong></article><article><span>Ya publicados</span><strong>{s.ALREADY_PUBLISHED.toLocaleString('es-AR')}</strong></article></section></details>
   <section className="panel"><div className="panel-title-row"><div><h2>Vinculación de inventario EDIMA</h2><p>Cruza las publicaciones de Mercado Libre con el catálogo de Ecomm-App usando el MLA exacto y el GTIN como evidencia.</p></div></div>
     {!linkage?<p>Consultando el último reporte EDIMA…</p>:!linkage.available?<div className="notice"><strong>EDIMA todavía no está cargado.</strong><p>{linkage.message}</p><p>Subilo desde <strong>Importaciones → EDIMA · Vinculación inventario ML</strong>.</p></div>:<>
       <section className="cards readiness-cards"><article><span>Publicaciones EDIMA</span><strong>{linkage.summary.total_publications.toLocaleString('es-AR')}</strong></article><article><span>Vinculadas</span><strong>{linkage.summary.linked.toLocaleString('es-AR')}</strong></article><article><span>Sin vincular</span><strong>{linkage.summary.unlinked.toLocaleString('es-AR')}</strong></article><article><span>Listas para vincular</span><strong>{linkage.summary.ready_to_link.toLocaleString('es-AR')}</strong></article><article><span>Confirmadas por vos</span><strong>{linkage.summary.confirmed_by_human.toLocaleString('es-AR')}</strong></article><article><span>Requieren revisión</span><strong>{linkage.summary.review_required.toLocaleString('es-AR')}</strong></article><article><span>Pendientes de Ecomm</span><strong>{linkage.summary.pending_ecomm_catalog.toLocaleString('es-AR')}</strong></article><article><span>GTIN únicos sin vincular</span><strong>{linkage.summary.distinct_unlinked_gtins.toLocaleString('es-AR')}</strong></article></section>
@@ -439,9 +375,10 @@ export function Readiness(){
     </>}
   </section>
   {candidateItem&&<div className="candidate-modal-overlay" role="presentation" onClick={()=>setCandidateItem(null)}><section className="candidate-modal" role="dialog" aria-modal="true" aria-label="Buscar producto Ecomm" onClick={event=>event.stopPropagation()}><div className="candidate-modal-header"><div><p className="eyebrow">ASIGNACIÓN MANUAL</p><h3>Buscar producto Ecomm</h3><p><strong>{candidateItem.title||'Publicación EDIMA'}</strong></p><small className="linkage-meta">{candidateItem.external_id||'—'} · GTIN {candidateItem.gtin_raw||'—'}</small></div><button className="danger-outline" onClick={()=>setCandidateItem(null)}>Cerrar</button></div><form className="candidate-search-form" onSubmit={event=>{event.preventDefault();void loadManualCandidates(candidateItem,candidateQuery)}}><input autoFocus placeholder="Buscar por producto, SKU, EAN o ID Ecomm" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}/><button type="submit" disabled={candidateSearching}>{candidateSearching?'Buscando…':'Buscar'}</button></form>{candidateError&&<div className="notice warning">{candidateError}</div>}<p className="evidence-note">KIKI muestra sugerencias del catálogo Ecomm. Marca, cantidad, presentación y variante/sabor deben coincidir. Si cambia algo como Clásico vs Avellana, no confirmes.</p><div className="candidate-results">{candidateSearching&&candidateResults.length===0?<p>Buscando candidatos…</p>:candidateResults.length===0?<p>No encontramos candidatos con suficiente similitud. Probá buscar por una palabra, SKU, EAN o ID interno.</p>:candidateResults.map(candidate=><article className="candidate-card" key={candidate.ecomm_id||candidate.sku||candidate.name}><div><strong>{candidate.name||'Producto Ecomm'}</strong><small className="linkage-meta">ID: <span className="mono">{candidate.ecomm_id||'—'}</span> · SKU: <span className="mono">{candidate.sku||'—'}</span></small><small className="linkage-meta">Marca: {candidate.brand||'—'} · EAN: <span className="mono">{candidate.ean||'—'}</span> · Stock: {candidate.stock??'—'}</small><small className="linkage-meta">{candidate.reasons.join(' · ')||'Coincidencia manual'}</small></div><button onClick={()=>confirmManualCandidate(candidate)} disabled={candidateSaving===candidate.ecomm_id}>{candidateSaving===candidate.ecomm_id?'Guardando…':'Elegir y confirmar'}</button></article>)}</div><div className="candidate-no-match"><div><strong>¿Ninguno corresponde?</strong><p>Marcá este caso como pendiente de catálogo Ecomm. No crea productos ni modifica Ecomm.</p></div><button className="secondary" onClick={()=>void markPendingEcomm()} disabled={candidateSaving==='__pending_ecomm__'}>{candidateSaving==='__pending_ecomm__'?'Guardando…':'Ninguno coincide · enviar a Ecomm'}</button></div></section></div>}
-  <details className="notice"><summary><strong>¿Cómo leer estos estados?</strong></summary><p>“Ya publicados” salen del flujo de alta. “Sin stock” se apartan temporalmente y no se priorizan mientras no tengan unidades disponibles. “Fuera del masivo actual” son productos que no están necesariamente mal: una regla comercial vigente indica que ciertos SKU asociados o combos no se incluyen todavía en el alta masiva. “Requieren revisión” y “Bloqueados” necesitan una corrección o una decisión. “Datos centrales OK” son candidatos con stock informado y positivo, marca y EAN/GTIN presentes y sin bloqueos conocidos de conciliación. No significa que deban tener a la vez SKU de variante y SKU de producto, ni que ya estén listos para Mercado Libre: después todavía deben validar imágenes, categoría, atributos, preview y confirmación humana.</p></details>
-  <details className="notice"><summary><strong>Regla SKU del masivo actual</strong></summary><p>{report.bulk_policy.description}</p><p>En simple: si un EAN tiene un único SKU base numérico de 4 dígitos, los SKU numéricos de 5 o más dígitos asociados a ese mismo EAN se consideran combos/asociados y quedan fuera del masivo por ahora. Si el EAN no tiene un único SKU base de 4 dígitos, KIKI Tech lo manda a revisión en vez de decidir solo.</p></details>
-  <section className="panel"><div className="panel-title-row"><div><h2>Motivos que requieren atención</h2><p>Hacé clic en un motivo para ver únicamente los productos afectados.</p></div><button onClick={exportReview}>Exportar revisión CSV</button></div><div className="reason-grid">{report.reason_summary.map(reason=><button key={reason.code} className={`reason-card ${reasonCode===reason.code?'active':''}`} onClick={()=>selectReason(reason.code)}><span>{reason.label}</span><strong>{reason.count.toLocaleString('es-AR')}</strong></button>)}</div>{reasonCode&&<button className="text-button" onClick={()=>setReasonCode('')}>Limpiar filtro por motivo</button>}</section>
-  <section className="panel"><h2>Controles que todavía faltan</h2><p>{report.pending_external_checks.join(' · ')}</p></section>
-  <section className="panel"><div className="filters"><input placeholder="Buscar por SKU, EAN o producto" value={search} onChange={event=>setSearch(event.target.value)}/><select value={status} onChange={event=>setStatus(event.target.value)}><option value="">Todos los estados</option>{Object.entries(labels).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></div><p className="result-count">Mostrando <strong>{items.length.toLocaleString('es-AR')}</strong> productos{reasonCode?' para el motivo seleccionado':''}</p><div className="table-wrap"><table><thead><tr><th>SKU</th><th>Producto</th><th>EAN</th><th>Stock</th><th>Precio</th><th>Preparación</th><th>Motivo</th></tr></thead><tbody>{items.map((item,index)=><tr key={`${item.product.sku||item.product.ean||'item'}-${index}`}><td className="mono">{item.product.sku||'—'}</td><td>{item.product.name||'—'}</td><td className="mono">{item.product.ean||'—'}</td><td>{item.product.stock??'—'}</td><td>{item.product.price!==undefined&&item.product.price!==null?Number(item.product.price).toLocaleString('es-AR',{style:'currency',currency:'ARS'}):'—'}</td><td><span className={`badge ${item.readiness_status}`}>{labels[item.readiness_status]}</span></td><td>{item.reasons.join(' ')||'—'}</td></tr>)}</tbody></table></div></section></>;
+  <section className="panel guided-help">
+    <h2>¿Te falta EAN, marca u otro dato para publicar?</h2>
+    <p>Esos problemas ya no se resuelven acá. KIKI los concentra en <strong>Resolver pendientes</strong>, donde cada producto tiene una acción concreta.</p>
+    <Link className="guided-link" to="/work">Ir a Resolver pendientes</Link>
+  </section>
+</>;
 }
