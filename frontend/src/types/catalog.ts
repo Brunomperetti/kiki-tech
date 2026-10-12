@@ -62,6 +62,6 @@ export interface PrepublicationMetadataPayload {product_key:string;status:Metada
 export interface MetadataBatchResult {requested:number;analyzed:number;errors:{product_key:string;message:string}[]}
 
 export type FinalPublicationQueueStatus='BLOCKED'|'READY_FOR_FINAL_REVIEW'|'APPROVED_FOR_PUBLICATION'|'STALE_APPROVAL';
-export interface FinalPublicationPreview {title?:string|null;sku?:string|null;brand?:string|null;gtin?:string|null;price?:number|null;stock?:number|null;category_id?:string|null;category_name?:string|null;image_urls:string[];attributes:{id?:string|null;name?:string|null;value?:string|null}[]}
+export interface FinalPublicationPreview {title?:string|null;sku?:string|null;brand?:string|null;gtin?:string|null;gtin_exception?:boolean;price?:number|null;stock?:number|null;category_id?:string|null;category_name?:string|null;image_urls:string[];attributes:{id?:string|null;name?:string|null;value?:string|null}[]}
 export interface FinalPublicationQueueItem {product_key:string;product:Product;verified_core_data:PrepublicationVerifiedCore;checks:PrepublicationItem['checks'];queue_status:FinalPublicationQueueStatus;preview:FinalPublicationPreview;blockers:string[];approved_at?:string|null;approval_note?:string|null;history_count:number}
 export interface FinalPublicationQueueReport {summary:{total:number;BLOCKED:number;READY_FOR_FINAL_REVIEW:number;APPROVED_FOR_PUBLICATION:number;STALE_APPROVAL:number};policy:{mode:string;description:string;required_checks:string[]};items:FinalPublicationQueueItem[]}
