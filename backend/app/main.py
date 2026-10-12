@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .api.routes.catalog import router
@@ -48,7 +50,23 @@ def create_app(settings=None) -> FastAPI:
 
     @application.get("/health")
     def health():
-        return {"status": "ok", "mode": "read-only-external-systems"}
+        try:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except SQLAlchemyError:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "degraded",
+                    "database": "unavailable",
+                    "mode": "read-only-external-systems",
+                },
+            )
+        return {
+            "status": "ok",
+            "database": "ok",
+            "mode": "read-only-external-systems",
+        }
 
     @application.exception_handler(Exception)
     async def unexpected_error(request: Request, exc: Exception):
