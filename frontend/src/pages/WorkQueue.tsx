@@ -52,6 +52,12 @@ function productKey(item:ReadinessItem){
   return '';
 }
 
+function likelyGtinException(item:ReadinessItem){
+  const name=String(item.product.name||'').toUpperCase();
+  return ['SUELTA','SUELTO','GRANEL','FRACCIONADO','FRACCIONADA','ARTESANAL','CASERO','CASERA']
+    .some(word=>name.includes(word));
+}
+
 function draftFromResearch(item?:ExternalResearchItem):EvidenceDraft{
   if(!item)return {...emptyDraft};
   return {
@@ -77,6 +83,7 @@ export function WorkQueue(){
   const [success,setSuccess]=useState('');
   const [coreIssue,setCoreIssue]=useState<CoreIssue>('EAN_MISSING');
   const [coreSearch,setCoreSearch]=useState('');
+  const [likelyExceptionsOnly,setLikelyExceptionsOnly]=useState(false);
   const [resolutionItem,setResolutionItem]=useState<ReadinessItem|null>(null);
   const [draft,setDraft]=useState<EvidenceDraft>({...emptyDraft});
   const [evidenceBusy,setEvidenceBusy]=useState(false);
@@ -130,8 +137,17 @@ export function WorkQueue(){
   function evidenceResolved(item:ReadinessItem,field:CoreIssue){
     const key=productKey(item);
     const research=key?researchByKey.get(key):undefined;
-    if(research?.research_status!=='EVIDENCE_ACCEPTED')return false;
-    return field==='EAN_MISSING'?Boolean(research.proposed_ean):Boolean(research.proposed_brand);
+    if(!research)return false;
+    if(field==='EAN_MISSING'){
+      return (
+        (research.research_status==='EVIDENCE_ACCEPTED'&&Boolean(research.proposed_ean))
+        || research.research_status==='GTIN_NOT_APPLICABLE'
+      );
+    }
+    return (
+      ['EVIDENCE_ACCEPTED','GTIN_NOT_APPLICABLE'].includes(research.research_status)
+      && Boolean(research.proposed_brand)
+    );
   }
 
   const rawEanItems=useMemo(
@@ -151,8 +167,16 @@ export function WorkQueue(){
     [rawBrandItems,researchByKey],
   );
 
+  const likelyExceptionCount=useMemo(
+    ()=>pendingEanItems.filter(likelyGtinException).length,
+    [pendingEanItems],
+  );
+
   const activeCoreItems=useMemo(()=>{
-    const source=coreIssue==='EAN_MISSING'?pendingEanItems:pendingBrandItems;
+    let source=coreIssue==='EAN_MISSING'?pendingEanItems:pendingBrandItems;
+    if(coreIssue==='EAN_MISSING'&&likelyExceptionsOnly){
+      source=source.filter(likelyGtinException);
+    }
     const term=coreSearch.trim().toLowerCase();
     if(!term)return source;
     return source.filter(item=>[
@@ -161,7 +185,7 @@ export function WorkQueue(){
       item.product.brand,
       item.product.ean,
     ].some(value=>String(value||'').toLowerCase().includes(term)));
-  },[coreIssue,coreSearch,pendingEanItems,pendingBrandItems]);
+  },[coreIssue,coreSearch,likelyExceptionsOnly,pendingEanItems,pendingBrandItems]);
 
   const corePendingKeys=useMemo(()=>{
     const keys=new Set<string>();
@@ -218,25 +242,38 @@ export function WorkQueue(){
     return key;
   }
 
-  async function saveEvidence(status:'DRAFT'|'EVIDENCE_ACCEPTED'){
+  async function saveEvidence(status:'DRAFT'|'EVIDENCE_ACCEPTED'|'GTIN_NOT_APPLICABLE'){
     if(!resolutionItem)return;
     setEvidenceBusy(true);
     setEvidenceError('');
     setSuccess('');
     try{
       const key=await ensureExternalResearch(resolutionItem);
-      if(status==='EVIDENCE_ACCEPTED'){
+      if(status==='EVIDENCE_ACCEPTED'||status==='GTIN_NOT_APPLICABLE'){
         if(!draft.source_name.trim()||!draft.source_url.trim()){
           throw new Error('Para aceptar el dato necesitás indicar una fuente y su URL.');
         }
         if(!draft.confidence||draft.confidence==='LOW'){
           throw new Error('Para aceptar evidencia elegí confianza Alta o Media.');
         }
+      }
+      if(status==='EVIDENCE_ACCEPTED'){
         if(coreIssue==='EAN_MISSING'&&!draft.proposed_ean.trim()){
           throw new Error('Ingresá el EAN/GTIN que verificaste.');
         }
         if(coreIssue==='BRAND_MISSING'&&!draft.proposed_brand.trim()){
           throw new Error('Ingresá la marca que verificaste.');
+        }
+      }
+      if(status==='GTIN_NOT_APPLICABLE'){
+        if(coreIssue!=='EAN_MISSING'){
+          throw new Error('La excepción de GTIN solo corresponde al control de EAN/GTIN.');
+        }
+        if(draft.proposed_ean.trim()){
+          throw new Error('Para marcar que GTIN no aplica, dejá vacío el campo EAN/GTIN.');
+        }
+        if(!draft.notes.trim()){
+          throw new Error('Explicá en Observaciones por qué el producto no tendría GTIN propio.');
         }
       }
       await api.saveExternalResearch({
@@ -253,6 +290,9 @@ export function WorkQueue(){
       setData(current=>({...current,research}));
       if(status==='EVIDENCE_ACCEPTED'){
         setSuccess('Dato validado dentro de KIKI. Ya no queda pendiente para este control y podrá alimentar Pre-publicación.');
+        setResolutionItem(null);
+      }else if(status==='GTIN_NOT_APPLICABLE'){
+        setSuccess('Excepción de GTIN documentada. KIKI la validará después contra los requisitos de la categoría de Mercado Libre.');
         setResolutionItem(null);
       }else{
         setSuccess('Borrador guardado. Podés retomarlo después desde Resolver pendientes o Investigación externa.');
@@ -293,12 +333,12 @@ export function WorkQueue(){
       <div className="panel-title-row"><div><p className="eyebrow">DATOS PARA PUBLICAR</p><h2>Completar datos centrales</h2><p>Estos productos de Ecomm todavía no pueden avanzar porque les falta información básica. Acá ya podés resolver el dato, no solo verlo.</p></div></div>
 
       <div className="core-pending-summary">
-        <button className={coreIssue==='EAN_MISSING'?'active':''} onClick={()=>{setCoreIssue('EAN_MISSING');setCoreSearch('')}}>
+        <button className={coreIssue==='EAN_MISSING'?'active':''} onClick={()=>{setCoreIssue('EAN_MISSING');setCoreSearch('');setLikelyExceptionsOnly(false)}}>
           <span>Falta EAN/GTIN</span>
           <strong>{metric(readinessAvailable,pendingEanItems.length)}</strong>
           <small>{readinessAvailable?`${(rawEanItems.length-pendingEanItems.length).toLocaleString('es-AR')} resueltos con evidencia`:'Datos no disponibles'}</small>
         </button>
-        <button className={coreIssue==='BRAND_MISSING'?'active':''} onClick={()=>{setCoreIssue('BRAND_MISSING');setCoreSearch('')}}>
+        <button className={coreIssue==='BRAND_MISSING'?'active':''} onClick={()=>{setCoreIssue('BRAND_MISSING');setCoreSearch('');setLikelyExceptionsOnly(false)}}>
           <span>Falta marca</span>
           <strong>{metric(readinessAvailable,pendingBrandItems.length)}</strong>
           <small>{readinessAvailable?`${(rawBrandItems.length-pendingBrandItems.length).toLocaleString('es-AR')} resueltos con evidencia`:'Datos no disponibles'}</small>
@@ -311,6 +351,10 @@ export function WorkQueue(){
         <div><h3>{coreIssue==='EAN_MISSING'?'Productos sin EAN/GTIN':'Productos sin marca'}</h3><p>{coreIssue==='EAN_MISSING'?'Validá el código de la presentación exacta con una fuente confiable.':'Validá la marca real del producto con una fuente confiable.'}</p></div>
         <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>setCoreSearch(event.target.value)}/>
       </div>
+      {coreIssue==='EAN_MISSING'&&readinessAvailable&&<div className="gtin-triage">
+        <div><strong>KIKI detectó {likelyExceptionCount.toLocaleString('es-AR')} posibles casos sin GTIN propio</strong><p>Señal conservadora basada en palabras como “suelta”, “granel”, “fraccionado” o “artesanal”. Es solo una sugerencia: cada excepción requiere evidencia humana.</p></div>
+        <button className={likelyExceptionsOnly?'active-action':'secondary'} onClick={()=>setLikelyExceptionsOnly(current=>!current)}>{likelyExceptionsOnly?'Ver todos':'Revisar sugeridos'}</button>
+      </div>}
 
       {!readinessAvailable?<div className="notice warning"><strong>Los productos no pudieron cargarse.</strong><p>Esto es un problema de conexión con el backend; no significa que los pendientes se hayan borrado.</p></div>:<>
       <p className="result-count">Mostrando <strong>{Math.min(activeCoreItems.length,50).toLocaleString('es-AR')}</strong> de {activeCoreItems.length.toLocaleString('es-AR')} pendientes{activeCoreItems.length>50?' · usá el buscador para encontrar uno específico':''}</p>
@@ -319,7 +363,7 @@ export function WorkQueue(){
           const key=productKey(item);
           const research=key?researchByKey.get(key):undefined;
           return <article key={key||item.product.sku||item.product.name}>
-            <div><strong>{item.product.name||'Producto sin nombre'}</strong><small>SKU {item.product.sku||item.product.sku_effective||'—'} · Stock {item.product.stock??'—'}{item.product.brand?` · Marca ${item.product.brand}`:''}</small>{research&&research.research_status!=='EVIDENCE_ACCEPTED'&&<span className="core-draft-badge">Investigación iniciada</span>}</div>
+            <div><strong>{item.product.name||'Producto sin nombre'}</strong><small>SKU {item.product.sku||item.product.sku_effective||'—'} · Stock {item.product.stock??'—'}{item.product.brand?` · Marca ${item.product.brand}`:''}</small><div className="core-row-badges">{coreIssue==='EAN_MISSING'&&likelyGtinException(item)&&<span className="core-suggestion-badge">Posible excepción GTIN</span>}{research&&!['EVIDENCE_ACCEPTED','GTIN_NOT_APPLICABLE'].includes(research.research_status)&&<span className="core-draft-badge">Investigación iniciada</span>}</div></div>
             <button onClick={()=>openResolution(item)}>{research?'Continuar':'Resolver'} {coreIssue==='EAN_MISSING'?'EAN':'marca'}</button>
           </article>;
         })}
@@ -384,6 +428,7 @@ export function WorkQueue(){
           <button className="secondary" onClick={()=>void copyResearchQuery()} disabled={evidenceBusy}>Copiar búsqueda sugerida</button>
           <Link className="secondary-link" to="/external-research">Investigación avanzada</Link>
           <button className="secondary" onClick={()=>void saveEvidence('DRAFT')} disabled={evidenceBusy}>{evidenceBusy?'Guardando…':'Guardar borrador'}</button>
+          {coreIssue==='EAN_MISSING'&&<button className="gtin-exception-action" onClick={()=>void saveEvidence('GTIN_NOT_APPLICABLE')} disabled={evidenceBusy}>{evidenceBusy?'Guardando…':'No tiene GTIN / no aplica'}</button>}
           <button onClick={()=>void saveEvidence('EVIDENCE_ACCEPTED')} disabled={evidenceBusy}>{evidenceBusy?'Validando…':'Aceptar evidencia'}</button>
         </div>
       </section>
