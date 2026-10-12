@@ -1,4 +1,4 @@
-.external-cards{grid-template-columns:repeat(5,1fr)}
+.external-cards{grid-template-columns:repeat(6,1fr)}
 .external-guide p{max-width:1000px;line-height:1.55}
 .external-filters{display:grid;grid-template-columns:minmax(280px,1fr) 260px;gap:12px}
 .external-list{display:grid;gap:18px;margin-top:18px}
@@ -10,6 +10,7 @@
 .external-status{display:inline-block;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;background:#eef0ef;color:#526159}
 .external-status.READY_FOR_REVIEW{background:#fff0cf;color:#805c12}
 .external-status.EVIDENCE_ACCEPTED{background:#e5f6de;color:#356a24}
+.external-status.GTIN_NOT_APPLICABLE{background:#eef4da;color:#52671f}
 .external-status.REJECTED{background:#fee7e4;color:#934033}
 .external-evidence{display:grid;gap:5px;padding:12px 14px;background:#f3f7f4;border-radius:10px;margin-bottom:16px}
 .external-evidence strong{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#526159}
