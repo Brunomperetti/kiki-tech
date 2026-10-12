@@ -70,11 +70,17 @@ export function Readiness(){
   const [candidateSaving,setCandidateSaving]=useState('');
   const [candidateError,setCandidateError]=useState('');
   const [ecommActionBusy,setEcommActionBusy]=useState('');
-  useEffect(()=>{
-    api.inventoryLinkage()
-      .then(setLinkage)
-      .catch(error=>setLinkageMessage(error instanceof Error?error.message:'No se pudo cargar la vinculación.'));
-  },[]);
+  async function loadLinkage(){
+    setLinkage(undefined);
+    setLinkageMessage('');
+    try{
+      setLinkage(await api.inventoryLinkage());
+    }catch(error){
+      setLinkageMessage(error instanceof Error?error.message:'No se pudo cargar la vinculación.');
+    }
+  }
+
+  useEffect(()=>{void loadLinkage()},[]);
   const readyLinkage=useMemo(
     ()=>(linkage?.items||[]).filter(item=>item.status==='READY_TO_LINK'),
     [linkage],
@@ -107,7 +113,7 @@ export function Readiness(){
     });
   },[linkage]);
   if(linkage===undefined&&!linkageMessage)return <div className="auth-loading">Preparando vinculación…</div>;
-  if(linkage===undefined&&linkageMessage)return <><header><div><p className="eyebrow">VINCULAR CON MERCADO LIBRE</p><h1>Relacionar publicaciones con el inventario</h1></div></header><div className="notice warning">{linkageMessage}</div></>;
+  if(linkage===undefined&&linkageMessage)return <><header><div><p className="eyebrow">VINCULAR CON MERCADO LIBRE</p><h1>Relacionar publicaciones con el inventario</h1></div></header><div className="notice warning"><strong>{linkageMessage}</strong><p>No significa que se hayan borrado datos. El navegador no pudo conectarse con el backend de KIKI.</p><button onClick={()=>void loadLinkage()}>Reintentar conexión</button></div></>;
 
   async function decideLinkage(item:InventoryLinkageItem,decision:'CONFIRMED'|'REJECTED'){
     const externalId=String(item.external_id||'');
