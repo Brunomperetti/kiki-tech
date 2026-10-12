@@ -139,3 +139,26 @@ def test_product_key_prefers_ecomm_identity():
         {"ecomm_id": "9450613", "sku": "6228", "ean": "7790000000001"}
     )
     assert key == "ECOMM:9450613"
+
+
+def test_no_internal_evidence_can_be_sent_directly_to_external_research():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = service_with_report(db, report_with_internal_evidence())
+
+        saved = service.save_decision(
+            "ECOMM:30",
+            "EXTERNAL_RESEARCH",
+            "Enviado desde Resolver pendientes para buscar EAN/GTIN.",
+        )
+
+        assert saved["review_status"] == "EXTERNAL_RESEARCH"
+        assert saved["priority_code"] == "P4_EXTERNAL"
+        row = db.query(EnrichmentReviewDecision).one()
+        assert row.product_key == "ECOMM:30"
+        assert row.status == "EXTERNAL_RESEARCH"
+
+        queue = service.queue()
+        reviewed = next(item for item in queue["items"] if item["product_key"] == "ECOMM:30")
+        assert reviewed["review_status"] == "EXTERNAL_RESEARCH"
