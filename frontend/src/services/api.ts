@@ -7,18 +7,44 @@ let csrfToken = '';
 
 type AuthResponse = {authenticated: boolean; username: string; csrf_token: string};
 
+function sleep(ms: number) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const headers = new Headers(options.headers);
   if (method !== 'GET' && method !== 'HEAD' && path !== '/api/auth/login') {
     headers.set('X-CSRF-Token', csrfToken);
   }
-  const response = await fetch(`${base}${path}`, {...options, headers, credentials: 'include'});
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || 'No pudimos completar la operación.');
+
+  const attempts = method === 'GET' || method === 'HEAD' ? 3 : 1;
+  let lastNetworkError: unknown = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${base}${path}`, {...options, headers, credentials: 'include'});
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.detail || 'No pudimos completar la operación.');
+      }
+      return response.json();
+    } catch (error) {
+      const isNetworkFailure = error instanceof TypeError;
+      if (!isNetworkFailure || attempt === attempts) {
+        if (isNetworkFailure) {
+          throw new Error('No pudimos conectar con el servidor de KIKI. Esperá unos segundos y reintentá.');
+        }
+        throw error;
+      }
+      lastNetworkError = error;
+      await sleep(attempt * 1200);
+    }
   }
-  return response.json();
+
+  throw lastNetworkError instanceof Error
+    ? lastNetworkError
+    : new Error('No pudimos conectar con el servidor de KIKI.');
 }
 
 function rememberAuth(auth: AuthResponse): AuthResponse {
