@@ -61,3 +61,9 @@
   .daily-steps{grid-template-columns:1fr}
   .advanced-dashboard>summary{flex-direction:column;align-items:flex-start}
 }
+
+.guided-secondary{padding:0;overflow:hidden}
+.guided-secondary>summary{cursor:pointer;padding:14px 18px;display:flex;justify-content:space-between;gap:16px;align-items:center}
+.guided-secondary>summary span{color:#68786f;font-size:12px;font-weight:400}
+.guided-secondary>.cards{padding:0 18px 18px}
+@media(max-width:700px){.guided-secondary>summary{flex-direction:column;align-items:flex-start}}
