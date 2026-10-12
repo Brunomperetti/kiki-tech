@@ -44,7 +44,7 @@ export function WorkQueue(){
   const duplicatePending=data.duplicates?.summary.PENDING??0;
   const finalReady=data.finalQueue?.summary.READY_FOR_FINAL_REVIEW??0;
   const finalChanged=data.finalQueue?.summary.STALE_APPROVAL??0;
-  const totalPending=linkagePending+pendingEcomm+reconciliationPending+duplicatePending+finalReady+finalChanged;
+  const totalPending=linkagePending+reconciliationPending+duplicatePending+finalReady+finalChanged;
 
   return <>
     <header><div><p className="eyebrow">TRABAJO PENDIENTE</p><h1>Resolver pendientes</h1><p>KIKI ordena lo que necesita una decisión humana. No hace falta recorrer todos los módulos.</p></div></header>
