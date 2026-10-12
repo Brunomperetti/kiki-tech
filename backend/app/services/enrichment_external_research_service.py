@@ -13,9 +13,16 @@ class EnrichmentExternalResearchService:
     DRAFT = "DRAFT"
     READY_FOR_REVIEW = "READY_FOR_REVIEW"
     EVIDENCE_ACCEPTED = "EVIDENCE_ACCEPTED"
+    GTIN_NOT_APPLICABLE = "GTIN_NOT_APPLICABLE"
     REJECTED = "REJECTED"
 
-    VALID_STATUSES = {DRAFT, READY_FOR_REVIEW, EVIDENCE_ACCEPTED, REJECTED}
+    VALID_STATUSES = {
+        DRAFT,
+        READY_FOR_REVIEW,
+        EVIDENCE_ACCEPTED,
+        GTIN_NOT_APPLICABLE,
+        REJECTED,
+    }
     VALID_CONFIDENCE = {"LOW", "MEDIUM", "HIGH"}
 
     def __init__(self, db: Session):
@@ -49,6 +56,7 @@ class EnrichmentExternalResearchService:
                 "DRAFT": status_counts[self.DRAFT],
                 "READY_FOR_REVIEW": status_counts[self.READY_FOR_REVIEW],
                 "EVIDENCE_ACCEPTED": status_counts[self.EVIDENCE_ACCEPTED],
+                "GTIN_NOT_APPLICABLE": status_counts[self.GTIN_NOT_APPLICABLE],
                 "REJECTED": status_counts[self.REJECTED],
             },
             "policy": {
@@ -114,8 +122,25 @@ class EnrichmentExternalResearchService:
             if not source_name or not source_url:
                 raise ValueError("Para revisar o aceptar evidencia necesitás fuente y URL.")
 
-        if status == self.EVIDENCE_ACCEPTED and confidence not in {"HIGH", "MEDIUM"}:
-            raise ValueError("Para aceptar evidencia la confianza debe ser Alta o Media.")
+        if status == self.GTIN_NOT_APPLICABLE:
+            if proposed_ean:
+                raise ValueError(
+                    "Si marcás 'GTIN no aplica', no ingreses un EAN/GTIN propuesto."
+                )
+            if not source_name or not source_url:
+                raise ValueError(
+                    "Para documentar que GTIN no aplica necesitás fuente y URL."
+                )
+            if not notes:
+                raise ValueError(
+                    "Explicá por qué este producto no tendría GTIN propio "
+                    "(por ejemplo: granel, fraccionado o presentación propia)."
+                )
+
+        if status in {self.EVIDENCE_ACCEPTED, self.GTIN_NOT_APPLICABLE} and confidence not in {"HIGH", "MEDIUM"}:
+            raise ValueError(
+                "Para aceptar evidencia o una excepción de GTIN la confianza debe ser Alta o Media."
+            )
 
         now = datetime.now(timezone.utc)
         row = (
@@ -189,7 +214,8 @@ class EnrichmentExternalResearchService:
             cls.READY_FOR_REVIEW: 0,
             cls.DRAFT: 1,
             cls.EVIDENCE_ACCEPTED: 2,
-            cls.REJECTED: 3,
+            cls.GTIN_NOT_APPLICABLE: 3,
+            cls.REJECTED: 4,
         }
         stock = item.get("product", {}).get("stock") or 0
         try:

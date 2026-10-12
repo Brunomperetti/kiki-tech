@@ -186,3 +186,81 @@ def test_product_without_internal_signal_can_be_researched_and_accepted():
         assert saved["research_status"] == "EVIDENCE_ACCEPTED"
         assert saved["proposed_ean"] == "4006381333931"
         assert saved["proposed_brand"] == "Marca Verificada"
+
+
+def test_gtin_not_applicable_requires_source_confidence_and_reason():
+    report = {
+        "reconciliation_run_id": 91,
+        "items": [
+            {
+                "product": {
+                    "ecomm_id": "30",
+                    "sku": "1002",
+                    "name": "Cardo Mariano Suelta X 50 Grs",
+                    "brand": "Herboristeria",
+                    "ean": None,
+                    "stock": 1,
+                    "price": 1400,
+                },
+                "readiness_status": "REVIEW_REQUIRED",
+                "reason_codes": ["EAN_MISSING"],
+            }
+        ],
+    }
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = EnrichmentExternalResearchService(db)
+        service.review.readiness.report = lambda: report
+        service.review.save_decision("ECOMM:30", "EXTERNAL_RESEARCH")
+
+        with pytest.raises(ValueError, match="fuente y URL"):
+            service.save(
+                "ECOMM:30",
+                "GTIN_NOT_APPLICABLE",
+                confidence="HIGH",
+                notes="Producto fraccionado.",
+            )
+
+        with pytest.raises(ValueError, match="Explicá por qué"):
+            service.save(
+                "ECOMM:30",
+                "GTIN_NOT_APPLICABLE",
+                source_name="Ficha del proveedor",
+                source_url="https://example.com/cardo",
+                confidence="HIGH",
+            )
+
+        saved = service.save(
+            "ECOMM:30",
+            "GTIN_NOT_APPLICABLE",
+            proposed_brand="Herboristeria",
+            source_name="Ficha del proveedor",
+            source_url="https://example.com/cardo",
+            confidence="MEDIUM",
+            notes="Producto vendido suelto y fraccionado por peso; no tiene GTIN propio.",
+        )
+
+        assert saved["research_status"] == "GTIN_NOT_APPLICABLE"
+        assert saved["proposed_ean"] is None
+        assert service.queue()["summary"]["GTIN_NOT_APPLICABLE"] == 1
+
+
+def test_gtin_not_applicable_rejects_a_proposed_gtin():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = service_with_report(db)
+        send_to_external(service)
+
+        with pytest.raises(ValueError, match="no ingreses un EAN"):
+            service.save(
+                "ECOMM:10",
+                "GTIN_NOT_APPLICABLE",
+                proposed_ean="4006381333931",
+                source_name="Proveedor",
+                source_url="https://example.com/producto",
+                confidence="HIGH",
+                notes="No aplica.",
+            )

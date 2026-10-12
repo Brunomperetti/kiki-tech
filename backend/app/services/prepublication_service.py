@@ -31,7 +31,11 @@ class PrepublicationService:
         accepted = {
             row.product_key: row
             for row in self.db.query(EnrichmentExternalResearch)
-            .filter(EnrichmentExternalResearch.status == "EVIDENCE_ACCEPTED")
+            .filter(
+                EnrichmentExternalResearch.status.in_(
+                    {"EVIDENCE_ACCEPTED", "GTIN_NOT_APPLICABLE"}
+                )
+            )
             .all()
         }
         approved_images = {
@@ -82,14 +86,19 @@ class PrepublicationService:
                     source = "ECOMM_CORE"
                     source_label = "Datos centrales validados desde Ecomm-App"
             elif evidence is not None:
+                gtin_exception = evidence.status == "GTIN_NOT_APPLICABLE"
                 verified = {
                     "brand": product.get("brand") or evidence.proposed_brand,
                     "ean": product.get("ean") or evidence.proposed_ean,
+                    "gtin_exception": gtin_exception,
                     "source_name": evidence.source_name,
                     "source_url": evidence.source_url,
                     "confidence": evidence.confidence,
                 }
-                if verified["brand"] and verified["ean"]:
+                if gtin_exception and verified["brand"]:
+                    source = "ACCEPTED_GTIN_EXCEPTION"
+                    source_label = "Excepción de GTIN documentada"
+                elif verified["brand"] and verified["ean"]:
                     source = "ACCEPTED_EVIDENCE"
                     source_label = "Evidencia externa aceptada"
 
@@ -104,6 +113,9 @@ class PrepublicationService:
             conditional_pending = []
             conditional_required = []
             conditional_validation_status = "NOT_APPLICABLE"
+            core_data_status = "PASSED"
+            if verified.get("gtin_exception"):
+                core_data_status = "READY_TO_VALIDATE"
             if metadata is not None:
                 (
                     conditional_validation_status,
@@ -112,6 +124,21 @@ class PrepublicationService:
                 ) = self._conditional_state(metadata.attributes or [])
                 category_status = "PASSED"
                 category_passed += 1
+                required_ids = {
+                    str(attribute.get("id") or "").upper()
+                    for attribute in (metadata.required_missing or [])
+                }
+                conditional_ids = {
+                    str(attribute.get("id") or "").upper()
+                    for attribute in conditional_pending
+                }
+                gtin_required = bool(
+                    {"GTIN", "EAN", "GTIN14"}.intersection(
+                        required_ids | conditional_ids
+                    )
+                )
+                if verified.get("gtin_exception"):
+                    core_data_status = "BLOCKED" if gtin_required else "PASSED"
                 if metadata.required_missing or conditional_pending:
                     attributes_status = "READY_TO_VALIDATE"
                 else:
@@ -139,7 +166,7 @@ class PrepublicationService:
                     "verified_core_data": verified,
                     "status": self.WAITING_EXTERNAL_CONTROLS,
                     "checks": {
-                        "core_data": "PASSED",
+                        "core_data": core_data_status,
                         "images": images_status,
                         "category": category_status,
                         "attributes": attributes_status,
@@ -175,6 +202,7 @@ class PrepublicationService:
                 "total": len(items),
                 "from_ecomm_core": source_counts["ECOMM_CORE"],
                 "from_accepted_evidence": source_counts["ACCEPTED_EVIDENCE"],
+                "from_gtin_exception": source_counts["ACCEPTED_GTIN_EXCEPTION"],
                 "approved_images": image_passed,
                 "waiting_images": len(items) - image_passed,
                 "waiting_ml_connection": 0 if ml_connected else len(items),
@@ -192,8 +220,9 @@ class PrepublicationService:
             "policy": {
                 "mode": "READ_ONLY_PREPUBLICATION",
                 "description": (
-                    "Esta etapa no publica nada. Solo ingresan productos con marca y EAN/GTIN "
-                    "resueltos que además no estén excluidos por las reglas vigentes del masivo. "
+                    "Esta etapa no publica nada. Ingresan productos con marca y EAN/GTIN "
+                    "resueltos, o con una excepción de GTIN documentada que luego debe ser "
+                    "compatible con los requisitos de la categoría de Mercado Libre. "
                     "Todavía exige imágenes, categoría, atributos, preview y confirmación humana "
                     "antes de cualquier futura escritura en Mercado Libre."
                 ),

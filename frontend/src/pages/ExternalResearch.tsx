@@ -32,6 +32,7 @@ function emptyDraft(item:ExternalResearchItem):Draft{
 function statusLabel(status:ExternalResearchStatus){
   if(status==='READY_FOR_REVIEW')return 'Lista para revisar';
   if(status==='EVIDENCE_ACCEPTED')return 'Evidencia aceptada';
+  if(status==='GTIN_NOT_APPLICABLE')return 'GTIN no aplica';
   if(status==='REJECTED')return 'Descartada';
   return 'Borrador';
 }
@@ -102,14 +103,18 @@ export function ExternalResearch(){
         product_key:item.product_key,
         status:nextStatus,
         proposed_brand:draft.proposed_brand||undefined,
-        proposed_ean:draft.proposed_ean||undefined,
+        proposed_ean:nextStatus==='GTIN_NOT_APPLICABLE'?undefined:(draft.proposed_ean||undefined),
         source_name:draft.source_name||undefined,
         source_url:draft.source_url||undefined,
         confidence:draft.confidence||undefined,
         notes:draft.notes||undefined,
       };
       await api.saveExternalResearch(payload);
-      setSuccess(nextStatus==='EVIDENCE_ACCEPTED'?'Evidencia aceptada dentro de KIKI Tech. No se modificó ningún sistema externo.':'Investigación guardada.');
+      setSuccess(nextStatus==='EVIDENCE_ACCEPTED'
+        ?'Evidencia aceptada dentro de KIKI Tech. No se modificó ningún sistema externo.'
+        :nextStatus==='GTIN_NOT_APPLICABLE'
+          ?'Excepción de GTIN documentada. Mercado Libre deberá validar luego si la categoría permite publicar sin GTIN.'
+          :'Investigación guardada.');
       await load();
     }catch(error){
       setMessage(error instanceof Error?error.message:'No se pudo guardar la investigación.');
@@ -139,6 +144,7 @@ export function ExternalResearch(){
       <article><span>Borradores</span><strong>{s.DRAFT.toLocaleString('es-AR')}</strong></article>
       <article><span>Listas para revisar</span><strong>{s.READY_FOR_REVIEW.toLocaleString('es-AR')}</strong></article>
       <article><span>Evidencia aceptada</span><strong>{s.EVIDENCE_ACCEPTED.toLocaleString('es-AR')}</strong></article>
+      <article><span>GTIN no aplica</span><strong>{s.GTIN_NOT_APPLICABLE.toLocaleString('es-AR')}</strong></article>
       <article><span>Descartadas</span><strong>{s.REJECTED.toLocaleString('es-AR')}</strong></article>
     </section>
 
@@ -155,6 +161,7 @@ export function ExternalResearch(){
           <option value="DRAFT">Borradores</option>
           <option value="READY_FOR_REVIEW">Listas para revisar</option>
           <option value="EVIDENCE_ACCEPTED">Evidencia aceptada</option>
+          <option value="GTIN_NOT_APPLICABLE">GTIN no aplica</option>
           <option value="REJECTED">Descartadas</option>
         </select>
       </div>
@@ -189,6 +196,7 @@ export function ExternalResearch(){
             <button className="secondary" disabled={isBusy} onClick={()=>void save(item,'DRAFT')}>Guardar borrador</button>
             <button disabled={isBusy} onClick={()=>void save(item,'READY_FOR_REVIEW')}>Lista para revisar</button>
             <button className="accept" disabled={isBusy} onClick={()=>void save(item,'EVIDENCE_ACCEPTED')}>Aceptar evidencia</button>
+            <button className="secondary" disabled={isBusy} onClick={()=>void save(item,'GTIN_NOT_APPLICABLE')}>GTIN no aplica</button>
             <button className="ghost danger" disabled={isBusy} onClick={()=>void save(item,'REJECTED')}>Descartar investigación</button>
           </div>
         </article>;
