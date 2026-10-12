@@ -261,6 +261,9 @@ class FinalPublicationQueueService:
                 "name": product.get("name"),
                 "brand": (base.get("verified_core_data") or {}).get("brand"),
                 "ean": (base.get("verified_core_data") or {}).get("ean"),
+                "gtin_exception": bool(
+                    (base.get("verified_core_data") or {}).get("gtin_exception")
+                ),
                 "price": product.get("price"),
                 "stock": product.get("stock"),
             },
@@ -293,6 +296,7 @@ class FinalPublicationQueueService:
             "sku": product.get("sku_effective") or product.get("sku"),
             "brand": verified.get("brand"),
             "gtin": verified.get("ean"),
+            "gtin_exception": bool(verified.get("gtin_exception")),
             "price": product.get("price"),
             "stock": product.get("stock"),
             "category_id": meta.category_id if meta else None,
