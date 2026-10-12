@@ -81,8 +81,10 @@ export function WorkQueue(){
   const [draft,setDraft]=useState<EvidenceDraft>({...emptyDraft});
   const [evidenceBusy,setEvidenceBusy]=useState(false);
   const [evidenceError,setEvidenceError]=useState('');
+  const [loading,setLoading]=useState(false);
 
   async function load(){
+    setLoading(true);
     const results=await Promise.allSettled([
       api.inventoryLinkage(),
       api.reconciliationReviewQueue(),
@@ -100,10 +102,11 @@ export function WorkQueue(){
       research:results[5].status==='fulfilled'?results[5].value:null,
     });
     if(results.some(result=>result.status==='rejected')){
-      setError('Algunos contadores no pudieron cargarse. Podés seguir trabajando con los disponibles.');
+      setError('No pudimos conectar con todos los servicios de KIKI. Los valores no cargados se muestran como no disponibles, no como cero.');
     }else{
       setError('');
     }
+    setLoading(false);
   }
 
   useEffect(()=>{void load()},[]);
@@ -157,6 +160,14 @@ export function WorkQueue(){
     }
     return keys;
   },[pendingEanItems,pendingBrandItems]);
+
+  const readinessAvailable=data.readiness!==null;
+  const linkageAvailable=data.linkage!==null;
+  const reconciliationAvailable=data.reconciliation!==null;
+  const duplicatesAvailable=data.duplicates!==null;
+  const finalQueueAvailable=data.finalQueue!==null;
+
+  const metric=(available:boolean,value:number)=>available?value.toLocaleString('es-AR'):'—';
 
   const linkagePending=data.linkage?.summary.review_required??0;
   const pendingEcomm=data.linkage?.summary.pending_ecomm_catalog??0;
@@ -260,11 +271,11 @@ export function WorkQueue(){
 
   return <>
     <header><div><p className="eyebrow">TRABAJO PENDIENTE</p><h1>Resolver pendientes</h1><p>KIKI ordena lo que necesita una decisión humana. No hace falta recorrer todos los módulos.</p></div></header>
-    {error&&<div className="notice warning">{error}</div>}
+    {error&&<div className="notice warning"><strong>{error}</strong><div style={{marginTop:10}}><button onClick={()=>void load()} disabled={loading}>{loading?'Reintentando…':'Reintentar conexión'}</button></div></div>}
     {success&&<div className="notice success">{success}</div>}
 
     <section className="guided-hero">
-      <div><span>Productos/casos que necesitan atención</span><strong>{totalPending.toLocaleString('es-AR')}</strong><p>Trabajá de arriba hacia abajo. KIKI te lleva al lugar correcto.</p></div>
+      <div><span>Productos/casos que necesitan atención</span><strong>{readinessAvailable||linkageAvailable||reconciliationAvailable||duplicatesAvailable||finalQueueAvailable?totalPending.toLocaleString('es-AR'):'—'}</strong><p>Trabajá de arriba hacia abajo. KIKI te lleva al lugar correcto.</p></div>
     </section>
 
     <section className="panel core-pendings">
@@ -273,16 +284,16 @@ export function WorkQueue(){
       <div className="core-pending-summary">
         <button className={coreIssue==='EAN_MISSING'?'active':''} onClick={()=>{setCoreIssue('EAN_MISSING');setCoreSearch('')}}>
           <span>Falta EAN/GTIN</span>
-          <strong>{pendingEanItems.length.toLocaleString('es-AR')}</strong>
-          <small>{(rawEanItems.length-pendingEanItems.length).toLocaleString('es-AR')} resueltos con evidencia</small>
+          <strong>{metric(readinessAvailable,pendingEanItems.length)}</strong>
+          <small>{readinessAvailable?`${(rawEanItems.length-pendingEanItems.length).toLocaleString('es-AR')} resueltos con evidencia`:'Datos no disponibles'}</small>
         </button>
         <button className={coreIssue==='BRAND_MISSING'?'active':''} onClick={()=>{setCoreIssue('BRAND_MISSING');setCoreSearch('')}}>
           <span>Falta marca</span>
-          <strong>{pendingBrandItems.length.toLocaleString('es-AR')}</strong>
-          <small>{(rawBrandItems.length-pendingBrandItems.length).toLocaleString('es-AR')} resueltos con evidencia</small>
+          <strong>{metric(readinessAvailable,pendingBrandItems.length)}</strong>
+          <small>{readinessAvailable?`${(rawBrandItems.length-pendingBrandItems.length).toLocaleString('es-AR')} resueltos con evidencia`:'Datos no disponibles'}</small>
         </button>
-        <div className="core-static-card"><span>Precio inválido</span><strong>{priceInvalid.toLocaleString('es-AR')}</strong><small>Se corrige en el catálogo Ecomm de origen</small></div>
-        <Link className="core-static-card core-link-card" to="/duplicate-review"><span>SKU duplicado</span><strong>{duplicatePending.toLocaleString('es-AR')}</strong><small>Ir a revisión de duplicados →</small></Link>
+        <div className="core-static-card"><span>Precio inválido</span><strong>{metric(readinessAvailable,priceInvalid)}</strong><small>Se corrige en el catálogo Ecomm de origen</small></div>
+        <Link className="core-static-card core-link-card" to="/duplicate-review"><span>SKU duplicado</span><strong>{metric(duplicatesAvailable,duplicatePending)}</strong><small>Ir a revisión de duplicados →</small></Link>
       </div>
 
       <div className="core-list-toolbar">
@@ -290,6 +301,7 @@ export function WorkQueue(){
         <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>setCoreSearch(event.target.value)}/>
       </div>
 
+      {!readinessAvailable?<div className="notice warning"><strong>Los productos no pudieron cargarse.</strong><p>Esto es un problema de conexión con el backend; no significa que los pendientes se hayan borrado.</p></div>:<>
       <p className="result-count">Mostrando <strong>{Math.min(activeCoreItems.length,50).toLocaleString('es-AR')}</strong> de {activeCoreItems.length.toLocaleString('es-AR')} pendientes{activeCoreItems.length>50?' · usá el buscador para encontrar uno específico':''}</p>
       <div className="core-action-list">
         {activeCoreItems.slice(0,50).map(item=>{
@@ -301,31 +313,31 @@ export function WorkQueue(){
           </article>;
         })}
         {activeCoreItems.length===0&&<div className="prepub-empty"><strong>No quedan productos pendientes para este control.</strong></div>}
-      </div>
+      </div></>}
     </section>
 
     <section className="guided-work-list">
       <article className="guided-work-card">
         <div className="guided-step-number">1</div>
-        <div className="guided-work-copy"><h2>Vincular publicaciones con Ecomm</h2><p>Publicaciones que ya existen en Mercado Libre pero todavía necesitan identificación, revisión o una acción en el catálogo Ecomm.</p><div className="guided-metrics"><span>Revisión <strong>{linkagePending}</strong></span><span>Pendientes Ecomm <strong>{pendingEcomm}</strong></span></div></div>
+        <div className="guided-work-copy"><h2>Vincular publicaciones con Ecomm</h2><p>Publicaciones que ya existen en Mercado Libre pero todavía necesitan identificación, revisión o una acción en el catálogo Ecomm.</p><div className="guided-metrics"><span>Revisión <strong>{metric(linkageAvailable,linkagePending)}</strong></span><span>Pendientes Ecomm <strong>{metric(linkageAvailable,pendingEcomm)}</strong></span></div></div>
         <Link className="guided-link" to="/readiness">Continuar</Link>
       </article>
 
       <article className="guided-work-card">
         <div className="guided-step-number">2</div>
-        <div className="guided-work-copy"><h2>Resolver coincidencias dudosas</h2><p>Casos donde KIKI encontró una posible relación entre producto y publicación, pero necesita confirmación humana.</p><div className="guided-metrics"><span>Por revisar <strong>{reconciliationPending}</strong></span></div></div>
+        <div className="guided-work-copy"><h2>Resolver coincidencias dudosas</h2><p>Casos donde KIKI encontró una posible relación entre producto y publicación, pero necesita confirmación humana.</p><div className="guided-metrics"><span>Por revisar <strong>{metric(reconciliationAvailable,reconciliationPending)}</strong></span></div></div>
         <Link className="guided-link" to="/review">Revisar</Link>
       </article>
 
       <article className="guided-work-card">
         <div className="guided-step-number">3</div>
-        <div className="guided-work-copy"><h2>Revisar posibles duplicados</h2><p>Productos de Ecomm que comparten identificadores y podrían ser duplicados, variantes o productos distintos.</p><div className="guided-metrics"><span>Grupos pendientes <strong>{duplicatePending}</strong></span></div></div>
+        <div className="guided-work-copy"><h2>Revisar posibles duplicados</h2><p>Productos de Ecomm que comparten identificadores y podrían ser duplicados, variantes o productos distintos.</p><div className="guided-metrics"><span>Grupos pendientes <strong>{metric(duplicatesAvailable,duplicatePending)}</strong></span></div></div>
         <Link className="guided-link" to="/duplicate-review">Revisar</Link>
       </article>
 
       <article className="guided-work-card">
         <div className="guided-step-number">4</div>
-        <div className="guided-work-copy"><h2>Aprobar productos para el lote ML</h2><p>Productos que ya pasaron controles y están esperando aprobación final, o cuya información cambió después de una aprobación.</p><div className="guided-metrics"><span>Para aprobar <strong>{finalReady}</strong></span><span>Cambiaron <strong>{finalChanged}</strong></span></div></div>
+        <div className="guided-work-copy"><h2>Aprobar productos para el lote ML</h2><p>Productos que ya pasaron controles y están esperando aprobación final, o cuya información cambió después de una aprobación.</p><div className="guided-metrics"><span>Para aprobar <strong>{metric(finalQueueAvailable,finalReady)}</strong></span><span>Cambiaron <strong>{metric(finalQueueAvailable,finalChanged)}</strong></span></div></div>
         <Link className="guided-link" to="/prepublication">Ir a publicar en ML</Link>
       </article>
     </section>
