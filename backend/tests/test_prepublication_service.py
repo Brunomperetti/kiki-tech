@@ -291,3 +291,178 @@ def test_prepublication_unlocks_attributes_after_conditional_validation_is_satis
         assert item["ml_metadata"]["conditional_validation_status"] == "VALIDATED"
         assert item["ml_metadata"]["conditional_pending"] == []
         assert report["summary"]["ready_for_preview"] == 1
+
+
+def test_documented_gtin_exception_enters_prepublication_but_waits_for_category():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(
+            EnrichmentExternalResearch(
+                product_key="ECOMM:50",
+                reconciliation_run_id=1,
+                status="GTIN_NOT_APPLICABLE",
+                proposed_brand="Herboristeria",
+                proposed_ean=None,
+                source_name="Proveedor",
+                source_url="https://example.com/cardo",
+                confidence="HIGH",
+                notes="Producto fraccionado; no tiene GTIN propio.",
+                product_snapshot={},
+                internal_evidence={},
+                history=[],
+            )
+        )
+        db.commit()
+
+        service = PrepublicationService(db)
+        service.readiness.report = lambda: {
+            "items": [
+                readiness_item(
+                    ecomm_id="50",
+                    sku="1002",
+                    name="Cardo Mariano Suelta X 50 Grs",
+                    brand=None,
+                    ean=None,
+                    status="REVIEW_REQUIRED",
+                )
+            ]
+        }
+
+        report = service.report()
+        item = report["items"][0]
+
+        assert report["summary"]["from_gtin_exception"] == 1
+        assert item["core_source"] == "ACCEPTED_GTIN_EXCEPTION"
+        assert item["verified_core_data"]["gtin_exception"] is True
+        assert item["verified_core_data"]["ean"] is None
+        assert item["checks"]["core_data"] == "READY_TO_VALIDATE"
+
+
+def test_gtin_exception_passes_only_when_approved_category_does_not_require_gtin():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(
+            EnrichmentExternalResearch(
+                product_key="ECOMM:50",
+                reconciliation_run_id=1,
+                status="GTIN_NOT_APPLICABLE",
+                proposed_brand="Herboristeria",
+                proposed_ean=None,
+                source_name="Proveedor",
+                source_url="https://example.com/cardo",
+                confidence="HIGH",
+                notes="Producto fraccionado; no tiene GTIN propio.",
+                product_snapshot={},
+                internal_evidence={},
+                history=[],
+            )
+        )
+        db.add(
+            PrepublicationMetadataReview(
+                product_key="ECOMM:50",
+                status="APPROVED",
+                category_id="MLA-BULK",
+                category_name="Hierbas",
+                domain_id="MLA-HERBS",
+                domain_name="Hierbas",
+                candidates=[],
+                attributes=[
+                    {
+                        "id": "BRAND",
+                        "name": "Marca",
+                        "required": True,
+                        "conditional_required": False,
+                        "verified_value": "Herboristeria",
+                    }
+                ],
+                required_missing=[],
+                product_snapshot={},
+                history=[],
+            )
+        )
+        db.commit()
+
+        service = PrepublicationService(db)
+        service.readiness.report = lambda: {
+            "items": [
+                readiness_item(
+                    ecomm_id="50",
+                    sku="1002",
+                    name="Cardo Mariano Suelta X 50 Grs",
+                    brand=None,
+                    ean=None,
+                    status="REVIEW_REQUIRED",
+                )
+            ]
+        }
+
+        item = service.report()["items"][0]
+        assert item["checks"]["core_data"] == "PASSED"
+        assert item["checks"]["attributes"] == "PASSED"
+
+
+def test_gtin_exception_is_blocked_when_category_requires_gtin():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(
+            EnrichmentExternalResearch(
+                product_key="ECOMM:50",
+                reconciliation_run_id=1,
+                status="GTIN_NOT_APPLICABLE",
+                proposed_brand="Herboristeria",
+                proposed_ean=None,
+                source_name="Proveedor",
+                source_url="https://example.com/cardo",
+                confidence="HIGH",
+                notes="Producto fraccionado; no tiene GTIN propio.",
+                product_snapshot={},
+                internal_evidence={},
+                history=[],
+            )
+        )
+        db.add(
+            PrepublicationMetadataReview(
+                product_key="ECOMM:50",
+                status="APPROVED",
+                category_id="MLA-REQUIRES-GTIN",
+                category_name="Producto envasado",
+                domain_id="MLA-PACKAGED",
+                domain_name="Producto envasado",
+                candidates=[],
+                attributes=[
+                    {
+                        "id": "GTIN",
+                        "name": "Código universal",
+                        "required": True,
+                        "conditional_required": False,
+                        "verified_value": None,
+                    }
+                ],
+                required_missing=[{"id": "GTIN", "name": "Código universal"}],
+                product_snapshot={},
+                history=[],
+            )
+        )
+        db.commit()
+
+        service = PrepublicationService(db)
+        service.readiness.report = lambda: {
+            "items": [
+                readiness_item(
+                    ecomm_id="50",
+                    sku="1002",
+                    name="Cardo Mariano Suelta X 50 Grs",
+                    brand=None,
+                    ean=None,
+                    status="REVIEW_REQUIRED",
+                )
+            ]
+        }
+
+        item = service.report()["items"][0]
+        assert item["checks"]["core_data"] == "BLOCKED"
+        assert item["checks"]["attributes"] == "READY_TO_VALIDATE"
+        assert item["checks"]["preview"] == "BLOCKED"
