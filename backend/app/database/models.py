@@ -144,6 +144,26 @@ class EnrichmentExternalResearch(Base):
     )
 
 
+class CatalogCoreConflictDecision(Base):
+    """Human resolution when current Ecomm data conflicts with validated KIKI data."""
+
+    __tablename__ = "catalog_core_conflict_decisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conflict_key: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    product_key: Mapped[str] = mapped_column(String(255), index=True)
+    field: Mapped[str] = mapped_column(String(40), index=True)
+    decision: Mapped[str] = mapped_column(String(30), index=True)
+    source_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class PrepublicationImageReview(Base):
     """Persistent image-source review. It never copies or publishes an image by itself."""
 

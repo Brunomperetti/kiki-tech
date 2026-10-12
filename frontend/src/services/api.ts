@@ -1,4 +1,4 @@
-import type {EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
+import type {CatalogContinuityDecision, CatalogContinuityItem, CatalogContinuityReport, EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
 
@@ -73,6 +73,12 @@ export const api = {
     body: JSON.stringify({group_key: groupKey, decision, note: note || null}),
   }),
   publicationReadiness: () => request<ReadinessReport>('/api/publication-readiness'),
+  catalogContinuity: () => request<CatalogContinuityReport>('/api/catalog-continuity'),
+  saveCatalogContinuityDecision: (conflictKey: string, decision: CatalogContinuityDecision, note?: string) => request<CatalogContinuityItem>('/api/catalog-continuity/decision', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({conflict_key: conflictKey, decision, note: note || null}),
+  }),
   inventoryLinkage: () => request<InventoryLinkageReport>('/api/inventory-linkage'),
   saveInventoryLinkageDecision: (externalId: string, decision: 'CONFIRMED'|'REJECTED', ecommId: string, note?: string) => request<InventoryLinkageItem>('/api/inventory-linkage/decision', {
     method: 'POST',

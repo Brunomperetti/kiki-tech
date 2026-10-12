@@ -94,7 +94,7 @@ def test_prepublication_includes_core_ready_and_accepted_evidence_only():
         assert accepted["checks"]["preview"] == "BLOCKED"
 
 
-def test_prepublication_never_overwrites_existing_catalog_values_with_evidence():
+def test_prepublication_blocks_when_new_ecomm_value_conflicts_with_validated_kiki_data():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -131,8 +131,10 @@ def test_prepublication_never_overwrites_existing_catalog_values_with_evidence()
 
         report = service.report()
         item = report["items"][0]
-        assert item["verified_core_data"]["brand"] == "Marca Ecomm"
         assert item["verified_core_data"]["ean"] == "7795379101108"
+        assert item["verified_core_data"]["core_conflicts"][0]["field"] == "brand"
+        assert item["checks"]["core_data"] == "BLOCKED"
+        assert item["checks"]["preview"] == "BLOCKED"
 
 
 

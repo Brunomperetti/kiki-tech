@@ -8,6 +8,7 @@ from ..database.models import (
     PrepublicationImageReview,
     PrepublicationMetadataReview,
 )
+from .catalog_continuity_service import CatalogContinuityService
 from .enrichment_review_service import EnrichmentReviewService
 from .publication_readiness_service import PublicationReadinessService
 
@@ -51,6 +52,10 @@ class PrepublicationService:
             .all()
         }
         ml_connected = self.db.query(MercadoLibreConnection).first() is not None
+        readiness_items = list(readiness.get("items") or [])
+        effective_core = CatalogContinuityService(self.db).effective_index(
+            [dict(item.get("product") or {}) for item in readiness_items]
+        )
 
         items = []
         source_counts = Counter()
@@ -58,7 +63,7 @@ class PrepublicationService:
         category_passed = 0
         attributes_passed = 0
         ready_for_preview = 0
-        for item in readiness.get("items") or []:
+        for item in readiness_items:
             product = dict(item.get("product") or {})
             key = EnrichmentReviewService.product_key(product)
             readiness_status = item.get("readiness_status")
@@ -74,33 +79,54 @@ class PrepublicationService:
             source = None
             source_label = None
             verified = None
-            if readiness_status == PublicationReadinessService.READY_CORE_DATA:
+            effective = effective_core.get(key) or {}
+            if evidence is not None:
+                conflicts = effective.get("conflicts") or []
+                gtin_exception = bool(effective.get("gtin_exception"))
+                verified = {
+                    "brand": effective.get("brand"),
+                    "ean": effective.get("ean"),
+                    "gtin_exception": gtin_exception,
+                    "source_name": evidence.source_name,
+                    "source_url": evidence.source_url,
+                    "confidence": evidence.confidence,
+                    "core_conflicts": [
+                        {
+                            "conflict_key": conflict.get("conflict_key"),
+                            "field": conflict.get("field"),
+                            "field_label": conflict.get("field_label"),
+                            "ecomm_value": conflict.get("ecomm_value"),
+                            "kiki_value": conflict.get("kiki_value"),
+                            "state": conflict.get("state"),
+                        }
+                        for conflict in conflicts
+                    ],
+                }
+                if conflicts:
+                    source = (
+                        "ACCEPTED_GTIN_EXCEPTION"
+                        if evidence.status == "GTIN_NOT_APPLICABLE"
+                        else "ACCEPTED_EVIDENCE"
+                    )
+                    source_label = "Requiere resolver conflicto KIKI / Ecomm"
+                elif gtin_exception and verified["brand"]:
+                    source = "ACCEPTED_GTIN_EXCEPTION"
+                    source_label = "Excepción de GTIN documentada"
+                elif verified["brand"] and verified["ean"]:
+                    source = "ACCEPTED_EVIDENCE"
+                    source_label = "Datos efectivos validados por KIKI"
+            elif readiness_status == PublicationReadinessService.READY_CORE_DATA:
                 verified = {
                     "brand": product.get("brand"),
                     "ean": product.get("ean"),
                     "source_name": "Ecomm-App",
                     "source_url": None,
                     "confidence": "CATALOG",
+                    "core_conflicts": [],
                 }
                 if verified["brand"] and verified["ean"]:
                     source = "ECOMM_CORE"
                     source_label = "Datos centrales validados desde Ecomm-App"
-            elif evidence is not None:
-                gtin_exception = evidence.status == "GTIN_NOT_APPLICABLE"
-                verified = {
-                    "brand": product.get("brand") or evidence.proposed_brand,
-                    "ean": product.get("ean") or evidence.proposed_ean,
-                    "gtin_exception": gtin_exception,
-                    "source_name": evidence.source_name,
-                    "source_url": evidence.source_url,
-                    "confidence": evidence.confidence,
-                }
-                if gtin_exception and verified["brand"]:
-                    source = "ACCEPTED_GTIN_EXCEPTION"
-                    source_label = "Excepción de GTIN documentada"
-                elif verified["brand"] and verified["ean"]:
-                    source = "ACCEPTED_EVIDENCE"
-                    source_label = "Evidencia externa aceptada"
 
             if not source or not verified:
                 continue
@@ -114,7 +140,9 @@ class PrepublicationService:
             conditional_required = []
             conditional_validation_status = "NOT_APPLICABLE"
             core_data_status = "PASSED"
-            if verified.get("gtin_exception"):
+            if verified.get("core_conflicts"):
+                core_data_status = "BLOCKED"
+            elif verified.get("gtin_exception"):
                 core_data_status = "READY_TO_VALIDATE"
             if metadata is not None:
                 (
@@ -137,7 +165,9 @@ class PrepublicationService:
                         required_ids | conditional_ids
                     )
                 )
-                if verified.get("gtin_exception"):
+                if verified.get("core_conflicts"):
+                    core_data_status = "BLOCKED"
+                elif verified.get("gtin_exception"):
                     core_data_status = "BLOCKED" if gtin_required else "PASSED"
                 if metadata.required_missing or conditional_pending:
                     attributes_status = "READY_TO_VALIDATE"
@@ -150,7 +180,8 @@ class PrepublicationService:
 
             preview_status = (
                 "READY_TO_VALIDATE"
-                if images_status == "PASSED"
+                if core_data_status == "PASSED"
+                and images_status == "PASSED"
                 and category_status == "PASSED"
                 and attributes_status == "PASSED"
                 else "BLOCKED"
@@ -223,7 +254,9 @@ class PrepublicationService:
                     "Esta etapa no publica nada. Ingresan productos con marca y EAN/GTIN "
                     "resueltos, o con una excepción de GTIN documentada que luego debe ser "
                     "compatible con los requisitos de la categoría de Mercado Libre. "
-                    "Todavía exige imágenes, categoría, atributos, preview y confirmación humana "
+                    "Si un nuevo Ecomm contradice un dato ya validado en KIKI, el producto se "
+                    "bloquea hasta resolver explícitamente el conflicto. Todavía exige imágenes, "
+                    "categoría, atributos, preview y confirmación humana "
                     "antes de cualquier futura escritura en Mercado Libre."
                 ),
             },

@@ -118,3 +118,30 @@
   .gtin-triage{flex-direction:column;align-items:stretch}
   .gtin-triage button{width:100%}
 }
+
+.catalog-continuity-panel{margin-bottom:18px}
+.continuity-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+.continuity-summary span{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border:1px solid #dce5df;border-radius:10px;background:#fff;color:#627168;font-size:12px}
+.continuity-summary span.warning{background:#fff6e5;border-color:#edd29b;color:#7a5a1a}
+.continuity-summary strong{font-size:22px;color:#17392b}
+.continuity-ok{display:flex;gap:8px;align-items:center;padding:12px 14px;border-radius:10px;background:#eef8e7;color:#31563b}
+.continuity-ok span{color:#5f7066}
+.continuity-conflicts{display:grid;gap:10px;margin-top:12px}
+.continuity-conflicts article{border:1px solid #ead7ad;border-radius:12px;background:#fffdf8;padding:14px}
+.continuity-conflict-title{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.continuity-conflict-title strong{display:block}
+.continuity-conflict-title small{display:block;color:#6b776f;margin-top:4px}
+.continuity-conflict-title>span{padding:5px 8px;border-radius:999px;background:#fff0cf;color:#7c5b17;font-size:11px;font-weight:700;white-space:nowrap}
+.continuity-values{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.continuity-values>div{padding:10px 12px;border-radius:9px;background:#f5f7f5}
+.continuity-values small{display:block;color:#6f7c74;margin-bottom:3px}
+.continuity-values strong{display:block;overflow-wrap:anywhere}
+.continuity-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.continuity-actions a{color:#1b513c;font-weight:700;font-size:12px}
+@media(max-width:900px){.continuity-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+  .continuity-summary,.continuity-values{grid-template-columns:1fr}
+  .continuity-conflict-title{flex-direction:column}
+  .continuity-actions{display:grid;grid-template-columns:1fr}
+  .continuity-actions>*{width:100%}
+}

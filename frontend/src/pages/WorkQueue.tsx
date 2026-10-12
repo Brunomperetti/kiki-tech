@@ -2,6 +2,9 @@ import {useEffect,useMemo,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {api} from '../services/api';
 import type {
+  CatalogContinuityDecision,
+  CatalogContinuityItem,
+  CatalogContinuityReport,
   ExternalResearchConfidence,
   ExternalResearchItem,
   ExternalResearchQueue,
@@ -20,6 +23,7 @@ type PendingState={
   finalQueue:FinalPublicationQueueReport|null;
   readiness:ReadinessReport|null;
   research:ExternalResearchQueue|null;
+  continuity:CatalogContinuityReport|null;
 };
 
 type CoreIssue='EAN_MISSING'|'BRAND_MISSING';
@@ -78,6 +82,7 @@ export function WorkQueue(){
     finalQueue:null,
     readiness:null,
     research:null,
+    continuity:null,
   });
   const [error,setError]=useState('');
   const [success,setSuccess]=useState('');
@@ -89,6 +94,7 @@ export function WorkQueue(){
   const [evidenceBusy,setEvidenceBusy]=useState(false);
   const [evidenceError,setEvidenceError]=useState('');
   const [loading,setLoading]=useState(false);
+  const [continuityBusy,setContinuityBusy]=useState('');
 
   async function load(){
     setLoading(true);
@@ -101,6 +107,9 @@ export function WorkQueue(){
     const readiness=readinessResult[0].status==='fulfilled'?readinessResult[0].value:null;
     const research=readinessResult[1].status==='fulfilled'?readinessResult[1].value:null;
     setData(current=>({...current,readiness,research}));
+
+    const continuity=await api.catalogContinuity().catch(()=>null);
+    setData(current=>({...current,continuity}));
 
     const linkage=await api.inventoryLinkage().catch(()=>null);
     setData(current=>({...current,linkage}));
@@ -117,6 +126,7 @@ export function WorkQueue(){
     if(
       readiness===null
       || research===null
+      || continuity===null
       || linkage===null
       || reconciliation===null
       || duplicates===null
@@ -196,6 +206,7 @@ export function WorkQueue(){
     return keys;
   },[pendingEanItems,pendingBrandItems]);
 
+  const continuityAvailable=data.continuity!==null;
   const readinessAvailable=data.readiness!==null;
   const linkageAvailable=data.linkage!==null;
   const reconciliationAvailable=data.reconciliation!==null;
@@ -204,6 +215,9 @@ export function WorkQueue(){
 
   const metric=(available:boolean,value:number)=>available?value.toLocaleString('es-AR'):'—';
 
+  const continuityConflicts=(data.continuity?.summary.conflicts??0)+(data.continuity?.summary.stale_decisions??0);
+  const continuityConflictItems=(data.continuity?.items||[]).filter(item=>['CONFLICT','STALE_DECISION'].includes(item.state));
+
   const linkagePending=data.linkage?.summary.review_required??0;
   const pendingEcomm=data.linkage?.summary.pending_ecomm_catalog??0;
   const reconciliationPending=data.reconciliation?.summary.PENDING??0;
@@ -211,7 +225,33 @@ export function WorkQueue(){
   const finalReady=data.finalQueue?.summary.READY_FOR_FINAL_REVIEW??0;
   const finalChanged=data.finalQueue?.summary.STALE_APPROVAL??0;
   const priceInvalid=data.readiness?.reason_summary.find(item=>item.code==='PRICE_INVALID')?.count??0;
-  const totalPending=corePendingKeys.size+linkagePending+reconciliationPending+duplicatePending+finalReady+finalChanged;
+  const totalPending=corePendingKeys.size+continuityConflicts+linkagePending+reconciliationPending+duplicatePending+finalReady+finalChanged;
+
+  async function saveContinuityDecision(item:CatalogContinuityItem,decision:CatalogContinuityDecision){
+    setContinuityBusy(item.conflict_key);
+    setSuccess('');
+    try{
+      await api.saveCatalogContinuityDecision(
+        item.conflict_key,
+        decision,
+        decision==='USE_KIKI'
+          ?'Se conserva el dato validado previamente en KIKI frente al valor actual de Ecomm.'
+          :'Se acepta el valor actual de Ecomm para este campo.',
+      );
+      const [continuity,finalQueue]=await Promise.all([
+        api.catalogContinuity(),
+        api.finalPublicationQueue().catch(()=>data.finalQueue),
+      ]);
+      setData(current=>({...current,continuity,finalQueue:finalQueue||current.finalQueue}));
+      setSuccess(decision==='USE_KIKI'
+        ?'Decisión guardada: KIKI conserva el dato validado.'
+        :'Decisión guardada: KIKI usará el dato actual de Ecomm.');
+    }catch(err){
+      setError(err instanceof Error?err.message:'No se pudo resolver el conflicto entre KIKI y Ecomm.');
+    }finally{
+      setContinuityBusy('');
+    }
+  }
 
   function openResolution(item:ReadinessItem){
     const key=productKey(item);
@@ -326,7 +366,33 @@ export function WorkQueue(){
     {success&&<div className="notice success">{success}</div>}
 
     <section className="guided-hero">
-      <div><span>Productos/casos que necesitan atención</span><strong>{readinessAvailable||linkageAvailable||reconciliationAvailable||duplicatesAvailable||finalQueueAvailable?totalPending.toLocaleString('es-AR'):'—'}</strong><p>Trabajá de arriba hacia abajo. KIKI te lleva al lugar correcto.</p></div>
+      <div><span>Productos/casos que necesitan atención</span><strong>{readinessAvailable||continuityAvailable||linkageAvailable||reconciliationAvailable||duplicatesAvailable||finalQueueAvailable?totalPending.toLocaleString('es-AR'):'—'}</strong><p>Trabajá de arriba hacia abajo. KIKI te lleva al lugar correcto.</p></div>
+    </section>
+
+    <section className="panel catalog-continuity-panel">
+      <div className="panel-title-row">
+        <div><p className="eyebrow">MEMORIA DE KIKI</p><h2>Datos validados que se conservan al actualizar Ecomm</h2><p>Cuando subís un Ecomm nuevo, KIKI mantiene las correcciones ya verificadas. Solo te consulta si el nuevo dato de origen contradice algo validado.</p></div>
+      </div>
+      {!continuityAvailable?<div className="notice warning">No pudimos comparar el catálogo nuevo con los datos validados de KIKI.</div>:<>
+        <div className="continuity-summary">
+          <span>Productos con datos validados <strong>{data.continuity!.summary.validated_products.toLocaleString('es-AR')}</strong></span>
+          <span>Ecomm vacío · KIKI conserva <strong>{data.continuity!.summary.kiki_only.toLocaleString('es-AR')}</strong></span>
+          <span>Ya coinciden con Ecomm <strong>{data.continuity!.summary.aligned.toLocaleString('es-AR')}</strong></span>
+          <span className={continuityConflicts?'warning':''}>Conflictos a decidir <strong>{continuityConflicts.toLocaleString('es-AR')}</strong></span>
+        </div>
+        {data.continuity!.summary.missing_from_current_ecomm>0&&<div className="notice warning"><strong>{data.continuity!.summary.missing_from_current_ecomm} productos validados ya no aparecen en el Ecomm actual.</strong> KIKI conserva su historial; conviene revisar si fueron eliminados, cambiaron de ID o dejaron de venderse.</div>}
+        {continuityConflictItems.length===0?<div className="continuity-ok"><strong>Sin conflictos de datos.</strong><span>Podés cargar reportes nuevos de Ecomm sin perder lo que ya validaron en KIKI.</span></div>:<div className="continuity-conflicts">
+          {continuityConflictItems.map(item=><article key={item.conflict_key}>
+            <div className="continuity-conflict-title"><div><strong>{item.product.name||'Producto sin nombre'}</strong><small>SKU {item.product.sku||'—'} · {item.field_label}</small></div><span>{item.state==='STALE_DECISION'?'Ecomm volvió a cambiar':'Revisar'}</span></div>
+            <div className="continuity-values">
+              <div><small>Ecomm actual</small><strong>{item.ecomm_value||'Vacío'}</strong></div>
+              <div><small>KIKI validado</small><strong>{item.kiki_value||'—'}</strong>{item.source_name&&<small>Fuente: {item.source_name}</small>}</div>
+            </div>
+            <div className="continuity-actions"><button onClick={()=>void saveContinuityDecision(item,'USE_KIKI')} disabled={continuityBusy===item.conflict_key}>{continuityBusy===item.conflict_key?'Guardando…':'Conservar KIKI'}</button><button className="secondary" onClick={()=>void saveContinuityDecision(item,'USE_ECOMM')} disabled={continuityBusy===item.conflict_key}>Usar Ecomm</button>{item.source_url&&<a href={item.source_url} target="_blank" rel="noreferrer">Ver evidencia</a>}</div>
+          </article>)}
+        </div>}
+        <p className="evidence-note">{data.continuity!.policy.description}</p>
+      </>}
     </section>
 
     <section className="panel core-pendings">
