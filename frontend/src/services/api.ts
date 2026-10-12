@@ -2,7 +2,9 @@ import type {CatalogContinuityDecision, CatalogContinuityItem, CatalogContinuity
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
 
-const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const base = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_URL || 'http://localhost:8000')
+  : '';
 let csrfToken = '';
 
 type AuthResponse = {authenticated: boolean; username: string; csrf_token: string};
