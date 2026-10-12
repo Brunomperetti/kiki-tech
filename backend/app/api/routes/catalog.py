@@ -8,6 +8,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...integrations.common.excel import ExcelImportError
 from ...repositories.catalog_repository import CatalogRepository
+from ...services.catalog_continuity_service import CatalogContinuityService
 from ...services.enrichment_external_research_service import EnrichmentExternalResearchService
 from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
@@ -40,6 +41,12 @@ class InventoryLinkagePendingEcommRequest(BaseModel):
 class InventoryLinkageEcommActionRequest(BaseModel):
     external_id: str
     action: str
+    note: str | None = None
+
+
+class CatalogContinuityDecisionRequest(BaseModel):
+    conflict_key: str
+    decision: str
     note: str | None = None
 
 
@@ -229,6 +236,39 @@ def inventory_linkage_decision(
     except Exception as exc:
         logger.exception("inventory_linkage_decision_failed")
         raise HTTPException(500, "No se pudo guardar la decisión de vinculación.") from exc
+
+
+@router.get("/catalog-continuity")
+def catalog_continuity(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return CatalogContinuityService(db).report()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("catalog_continuity_failed")
+        raise HTTPException(500, "No se pudo comparar Ecomm con los datos validados de KIKI.") from exc
+
+
+@router.post("/catalog-continuity/decision")
+def catalog_continuity_decision(
+    request: CatalogContinuityDecisionRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return CatalogContinuityService(db).save_decision(
+            conflict_key=request.conflict_key,
+            decision_value=request.decision,
+            note=request.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("catalog_continuity_decision_failed")
+        raise HTTPException(500, "No se pudo guardar la decisión entre KIKI y Ecomm.") from exc
 
 
 @router.get("/publication-readiness")
