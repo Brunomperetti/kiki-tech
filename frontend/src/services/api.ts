@@ -114,6 +114,7 @@ export const api = {
     body: JSON.stringify({product_key: productKey, status, note: note || null}),
   }),
   gtinCandidates: (key:string) => request<{candidates:{ean:string;matched_name:string;matched_sku?:string;matched_brand?:string;reason:string}[];message:string}>(`/api/gtin-candidates/${encodeURIComponent(key)}`),
+  externalGtinCandidates: (key:string) => request<{candidates:{ean:string;matched_name:string;matched_brand:string;quantity:string;source_name:string;source_url:string;reason:string}[];message:string;unavailable?:boolean}>(`/api/external-gtin-candidates/${encodeURIComponent(key)}`),
   externalResearchQueue: () => request<ExternalResearchQueue>('/api/enrichment-external-research'),
   saveExternalResearch: (payload: ExternalResearchPayload) => request<ExternalResearchItem>('/api/enrichment-external-research', {
     method: 'POST',

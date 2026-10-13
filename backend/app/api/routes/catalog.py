@@ -13,6 +13,7 @@ from ...services.enrichment_external_research_service import EnrichmentExternalR
 from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
+from ...services.external_gtin_candidate_service import ExternalGtinCandidateService
 from ...services.inventory_linkage_service import InventoryLinkageService
 from ...services.publication_readiness_service import PublicationReadinessService
 from ...services.reconciliation_service import ReconciliationService
@@ -370,6 +371,17 @@ def get_gtin_candidates(product_key: str, db: Session = Depends(get_db), _sessio
     except Exception as exc:
         logger.exception("gtin_candidate_lookup_failed")
         raise HTTPException(500, "No se pudieron obtener sugerencias GTIN.") from exc
+
+
+@router.get("/external-gtin-candidates/{product_key:path}")
+def get_external_gtin_candidates(product_key: str, db: Session = Depends(get_db), _session=Depends(require_session)):
+    try:
+        return ExternalGtinCandidateService(db).lookup(product_key)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("external_gtin_candidate_lookup_failed")
+        raise HTTPException(500, "No se pudo consultar la fuente externa.") from exc
 
 
 @router.get("/enrichment-external-research")

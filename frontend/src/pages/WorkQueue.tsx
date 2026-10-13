@@ -101,6 +101,8 @@ export function WorkQueue(){
   const [evidenceError,setEvidenceError]=useState('');
   const [gtinSuggestions,setGtinSuggestions]=useState<{candidates:{ean:string;matched_name:string;matched_sku?:string;matched_brand?:string;reason:string}[];message:string}|null>(null);
   const [gtinBusy,setGtinBusy]=useState(false);
+  const [externalGtinBusy,setExternalGtinBusy]=useState(false);
+  const [externalGtin,setExternalGtin]=useState<{candidates:{ean:string;matched_name:string;matched_brand:string;quantity:string;source_name:string;source_url:string;reason:string}[];message:string;unavailable?:boolean}|null>(null);
   const [loading,setLoading]=useState(false);
   const [continuityBusy,setContinuityBusy]=useState('');
   const [brandProposals,setBrandProposals]=useState<EnrichmentReviewQueue|null>(null);
@@ -401,6 +403,7 @@ export function WorkQueue(){
     const existing=key?researchByKey.get(key):undefined;
     setResolutionItem(item);
     setGtinSuggestions(null);
+    setExternalGtin(null);
     setDraft({
       ...draftFromResearch(existing),
       proposed_ean:existing?.proposed_ean||item.product.ean||'',
@@ -425,6 +428,15 @@ export function WorkQueue(){
       setGtinSuggestions(await api.gtinCandidates(productKey(resolutionItem)));
     }catch(err){setEvidenceError(err instanceof Error?err.message:'No se pudo consultar el catálogo interno.');}
     finally{setGtinBusy(false);}
+  }
+
+  async function findExternalGtin(){
+    if(!resolutionItem)return;
+    setExternalGtinBusy(true);setEvidenceError('');
+    try{
+      setExternalGtin(await api.externalGtinCandidates(productKey(resolutionItem)));
+    }catch(err){setEvidenceError(err instanceof Error?err.message:'No se pudo consultar la fuente externa.');}
+    finally{setExternalGtinBusy(false);}
   }
 
   function setField(field:keyof EvidenceDraft,value:string){
@@ -722,6 +734,19 @@ export function WorkQueue(){
               <p>{candidate.matched_name} · SKU {candidate.matched_sku||'—'} · {candidate.matched_brand||'Marca desconocida'}</p>
               <small>{candidate.reason}</small>
               <button className="secondary" type="button" onClick={()=>setDraft(current=>({...current,proposed_ean:candidate.ean,confidence:'',source_name:'',source_url:''}))}>Usar como borrador</button>
+            </article>)}
+          </div>}
+        </div>}
+        {coreIssue==='EAN_MISSING'&&<div className="gtin-candidates">
+          <button type="button" className="secondary" disabled={externalGtinBusy} onClick={()=>void findExternalGtin()}>{externalGtinBusy?'Buscando en fuente externa…':'Investigar EAN en Open Food Facts'}</button>
+          <small>Base colaborativa de alimentos: las coincidencias son candidatas, no certificación de fabricante. La consulta se realiza solo al tocar el botón.</small>
+          {externalGtin&&<div><p>{externalGtin.message}</p>
+            {externalGtin.candidates.map(candidate=><article key={candidate.ean}>
+              <strong>GTIN posible: {candidate.ean}</strong>
+              <p>{candidate.matched_name} · {candidate.matched_brand||'Sin marca'} · {candidate.quantity||'Presentación no declarada'}</p>
+              <small>{candidate.reason}</small>
+              <a href={candidate.source_url} target="_blank" rel="noopener noreferrer">Ver ficha de origen ↗</a>
+              <button className="secondary" type="button" onClick={()=>setDraft(current=>({...current,proposed_ean:candidate.ean,source_name:'',source_url:'',confidence:'',notes:'Candidato Open Food Facts: '+candidate.source_url+'. Verificar con fabricante antes de aceptar.'}))}>Copiar candidato a borrador (sin verificar)</button>
             </article>)}
           </div>}
         </div>}
