@@ -95,6 +95,16 @@ export function WorkQueue(){
   const [evidenceError,setEvidenceError]=useState('');
   const [loading,setLoading]=useState(false);
   const [continuityBusy,setContinuityBusy]=useState('');
+  const [selectedGtinKeys,setSelectedGtinKeys]=useState<Set<string>>(new Set());
+  const [bulkGtinOpen,setBulkGtinOpen]=useState(false);
+  const [bulkGtinBusy,setBulkGtinBusy]=useState(false);
+  const [bulkGtinError,setBulkGtinError]=useState('');
+  const [bulkGtinDraft,setBulkGtinDraft]=useState({
+    source_name:'',
+    source_url:'',
+    confidence:'' as ExternalResearchConfidence|'',
+    notes:'',
+  });
 
   async function load(){
     setLoading(true);
@@ -177,10 +187,11 @@ export function WorkQueue(){
     [rawBrandItems,researchByKey],
   );
 
-  const likelyExceptionCount=useMemo(
-    ()=>pendingEanItems.filter(likelyGtinException).length,
+  const suggestedExceptionItems=useMemo(
+    ()=>pendingEanItems.filter(likelyGtinException),
     [pendingEanItems],
   );
+  const likelyExceptionCount=suggestedExceptionItems.length;
 
   const activeCoreItems=useMemo(()=>{
     let source=coreIssue==='EAN_MISSING'?pendingEanItems:pendingBrandItems;
@@ -250,6 +261,69 @@ export function WorkQueue(){
       setError(err instanceof Error?err.message:'No se pudo resolver el conflicto entre KIKI y Ecomm.');
     }finally{
       setContinuityBusy('');
+    }
+  }
+
+  function toggleGtinSelection(key:string){
+    setSelectedGtinKeys(current=>{
+      const next=new Set(current);
+      if(next.has(key))next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function selectAllSuggestedGtin(){
+    setSelectedGtinKeys(new Set(suggestedExceptionItems.map(productKey).filter(Boolean)));
+    setLikelyExceptionsOnly(true);
+  }
+
+  function clearGtinSelection(){
+    setSelectedGtinKeys(new Set());
+  }
+
+  async function saveBulkGtinExceptions(){
+    const productKeys=Array.from(selectedGtinKeys);
+    if(!productKeys.length){
+      setBulkGtinError('Seleccioná al menos un producto.');
+      return;
+    }
+    if(!bulkGtinDraft.source_name.trim()||!bulkGtinDraft.source_url.trim()){
+      setBulkGtinError('Indicá la fuente común y su URL.');
+      return;
+    }
+    if(!bulkGtinDraft.confidence||bulkGtinDraft.confidence==='LOW'){
+      setBulkGtinError('Para resolver el lote elegí confianza Alta o Media.');
+      return;
+    }
+    if(!bulkGtinDraft.notes.trim()){
+      setBulkGtinError('Explicá por qué este lote no tendría GTIN propio.');
+      return;
+    }
+
+    setBulkGtinBusy(true);
+    setBulkGtinError('');
+    setSuccess('');
+    try{
+      const result=await api.bulkMarkGtinNotApplicable({
+        product_keys:productKeys,
+        source_name:bulkGtinDraft.source_name.trim(),
+        source_url:bulkGtinDraft.source_url.trim(),
+        confidence:bulkGtinDraft.confidence,
+        notes:bulkGtinDraft.notes.trim(),
+      });
+      const [research,continuity]=await Promise.all([
+        api.externalResearchQueue(),
+        api.catalogContinuity().catch(()=>data.continuity),
+      ]);
+      setData(current=>({...current,research,continuity:continuity||current.continuity}));
+      setSelectedGtinKeys(new Set());
+      setBulkGtinOpen(false);
+      setSuccess(`${result.processed} productos quedaron documentados como “GTIN no aplica”. Mercado Libre validará después si cada categoría admite la excepción.`);
+    }catch(err){
+      setBulkGtinError(err instanceof Error?err.message:'No se pudo resolver el lote.');
+    }finally{
+      setBulkGtinBusy(false);
     }
   }
 
@@ -418,8 +492,16 @@ export function WorkQueue(){
         <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>setCoreSearch(event.target.value)}/>
       </div>
       {coreIssue==='EAN_MISSING'&&readinessAvailable&&<div className="gtin-triage">
-        <div><strong>KIKI detectó {likelyExceptionCount.toLocaleString('es-AR')} posibles casos sin GTIN propio</strong><p>Señal conservadora basada en palabras como “suelta”, “granel”, “fraccionado” o “artesanal”. Es solo una sugerencia: cada excepción requiere evidencia humana.</p></div>
-        <button className={likelyExceptionsOnly?'active-action':'secondary'} onClick={()=>setLikelyExceptionsOnly(current=>!current)}>{likelyExceptionsOnly?'Ver todos':'Revisar sugeridos'}</button>
+        <div><strong>KIKI detectó {likelyExceptionCount.toLocaleString('es-AR')} posibles casos sin GTIN propio</strong><p>Señal conservadora basada en palabras como “suelta”, “granel”, “fraccionado” o “artesanal”. Podés revisarlos y resolverlos juntos cuando realmente comparten la misma justificación.</p></div>
+        <div className="gtin-triage-actions">
+          <button className={likelyExceptionsOnly?'active-action':'secondary'} onClick={()=>setLikelyExceptionsOnly(current=>!current)}>{likelyExceptionsOnly?'Ver todos':'Revisar sugeridos'}</button>
+          {likelyExceptionCount>0&&<button onClick={selectAllSuggestedGtin}>Seleccionar {likelyExceptionCount.toLocaleString('es-AR')}</button>}
+        </div>
+      </div>}
+      {coreIssue==='EAN_MISSING'&&selectedGtinKeys.size>0&&<div className="bulk-selection-bar">
+        <strong>{selectedGtinKeys.size.toLocaleString('es-AR')} seleccionados</strong>
+        <span>Solo usá la acción masiva si la misma evidencia y el mismo motivo aplican a todo el grupo.</span>
+        <div><button className="secondary" onClick={clearGtinSelection}>Limpiar</button><button onClick={()=>{setBulkGtinError('');setBulkGtinOpen(true)}}>GTIN no aplica en lote</button></div>
       </div>}
 
       {!readinessAvailable?<div className="notice warning"><strong>Los productos no pudieron cargarse.</strong><p>Esto es un problema de conexión con el backend; no significa que los pendientes se hayan borrado.</p></div>:<>
@@ -428,7 +510,9 @@ export function WorkQueue(){
         {activeCoreItems.slice(0,50).map(item=>{
           const key=productKey(item);
           const research=key?researchByKey.get(key):undefined;
-          return <article key={key||item.product.sku||item.product.name}>
+          const selectable=coreIssue==='EAN_MISSING'&&likelyGtinException(item)&&Boolean(key);
+          return <article key={key||item.product.sku||item.product.name} className={selectable&&selectedGtinKeys.has(key)?'selected-core-item':''}>
+            {selectable&&<label className="core-select"><input type="checkbox" checked={selectedGtinKeys.has(key)} onChange={()=>toggleGtinSelection(key)}/><span>Seleccionar</span></label>}
             <div><strong>{item.product.name||'Producto sin nombre'}</strong><small>SKU {item.product.sku||item.product.sku_effective||'—'} · Stock {item.product.stock??'—'}{item.product.brand?` · Marca ${item.product.brand}`:''}</small><div className="core-row-badges">{coreIssue==='EAN_MISSING'&&likelyGtinException(item)&&<span className="core-suggestion-badge">Posible excepción GTIN</span>}{research&&!['EVIDENCE_ACCEPTED','GTIN_NOT_APPLICABLE'].includes(research.research_status)&&<span className="core-draft-badge">Investigación iniciada</span>}</div></div>
             <button onClick={()=>openResolution(item)}>{research?'Continuar':'Resolver'} {coreIssue==='EAN_MISSING'?'EAN':'marca'}</button>
           </article>;
@@ -467,6 +551,31 @@ export function WorkQueue(){
       <h2>Regla simple</h2>
       <p><strong>Si ya existe en Mercado Libre:</strong> trabajalo en “Vincular con ML”. <strong>Si todavía no existe:</strong> completá sus datos y trabajalo en “Publicar en ML”.</p>
     </section>
+
+    {bulkGtinOpen&&<div className="candidate-modal-overlay" role="presentation" onClick={()=>!bulkGtinBusy&&setBulkGtinOpen(false)}>
+      <section className="candidate-modal core-resolution-modal" role="dialog" aria-modal="true" aria-label="Resolver GTIN en lote" onClick={event=>event.stopPropagation()}>
+        <div className="candidate-modal-header">
+          <div><p className="eyebrow">ACCIÓN MASIVA</p><h3>Marcar {selectedGtinKeys.size.toLocaleString('es-AR')} productos como GTIN no aplica</h3><p>La decisión se guarda producto por producto, con la misma fuente, motivo e historial.</p></div>
+          <button className="danger-outline" onClick={()=>setBulkGtinOpen(false)} disabled={bulkGtinBusy}>Cerrar</button>
+        </div>
+        {bulkGtinError&&<div className="notice warning">{bulkGtinError}</div>}
+        <div className="notice warning"><strong>Confirmación importante.</strong><p>La detección de KIKI es una sugerencia por el título. Confirmá el lote solo si revisaste que todos son productos sueltos, a granel, fraccionados o presentaciones sin GTIN propio. La excepción todavía deberá ser compatible con la categoría de Mercado Libre.</p></div>
+        <div className="bulk-preview-list">
+          {suggestedExceptionItems.filter(item=>selectedGtinKeys.has(productKey(item))).slice(0,8).map(item=><span key={productKey(item)}>{item.product.name} · SKU {item.product.sku||item.product.sku_effective||'—'}</span>)}
+          {selectedGtinKeys.size>8&&<small>+ {(selectedGtinKeys.size-8).toLocaleString('es-AR')} productos más</small>}
+        </div>
+        <div className="core-resolution-form">
+          <label>Fuente común<input value={bulkGtinDraft.source_name} placeholder="Ej. catálogo/proveedor que respalda el criterio" onChange={event=>setBulkGtinDraft(current=>({...current,source_name:event.target.value}))}/></label>
+          <label>URL de evidencia<input type="url" value={bulkGtinDraft.source_url} placeholder="https://…" onChange={event=>setBulkGtinDraft(current=>({...current,source_url:event.target.value}))}/></label>
+          <label>Confianza<select value={bulkGtinDraft.confidence} onChange={event=>setBulkGtinDraft(current=>({...current,confidence:event.target.value as ExternalResearchConfidence}))}><option value="">Sin definir</option><option value="HIGH">Alta</option><option value="MEDIUM">Media</option></select></label>
+          <label className="core-resolution-notes">Motivo común<textarea value={bulkGtinDraft.notes} placeholder="Ej. Productos comercializados sueltos/fraccionados por peso, sin GTIN propio para esta presentación." onChange={event=>setBulkGtinDraft(current=>({...current,notes:event.target.value}))}/></label>
+        </div>
+        <div className="core-resolution-actions">
+          <button className="secondary" onClick={()=>setBulkGtinOpen(false)} disabled={bulkGtinBusy}>Cancelar</button>
+          <button className="gtin-exception-action" onClick={()=>void saveBulkGtinExceptions()} disabled={bulkGtinBusy}>{bulkGtinBusy?'Aplicando…':`Confirmar ${selectedGtinKeys.size.toLocaleString('es-AR')} productos`}</button>
+        </div>
+      </section>
+    </div>}
 
     {resolutionItem&&<div className="candidate-modal-overlay" role="presentation" onClick={()=>setResolutionItem(null)}>
       <section className="candidate-modal core-resolution-modal" role="dialog" aria-modal="true" aria-label="Resolver dato del producto" onClick={event=>event.stopPropagation()}>
