@@ -402,7 +402,15 @@ export function WorkQueue(){
   }
 
   async function runGtinPilot(){
-    const keys=activeCoreItems.slice(0,20).map(productKey).filter(Boolean);
+    const ranked=[...activeCoreItems].sort((a,b)=>{
+      const score=(item:ReadinessItem)=>{
+        const name=String(item.product.name||'').toUpperCase();
+        const bulk=/\\b(SUELTO|SUELTA|GRANEL|FRACCIONAD[OA])\\b/.test(name);
+        return (bulk?0:100)+(item.product.brand?30:0)+Math.min(name.split(/\\s+/).length,15);
+      };
+      return score(b)-score(a);
+    });
+    const keys=ranked.slice(0,20).map(productKey).filter(Boolean);
     if(!keys.length){setPilotError('No hay productos para investigar.');return;}
     setPilotBusy(true);setPilotError('');setPilotResult(null);
     try{setPilotResult(await api.gtinBatchPilot(keys));}
@@ -640,14 +648,14 @@ export function WorkQueue(){
         </>}
       </section>}
       {coreIssue==='EAN_MISSING'&&readinessAvailable&&<section className="gtin-pilot-panel">
-        <div><h3>Piloto de investigación · 20 productos</h3><p>Evalúa los primeros 20 de la búsqueda actual. Examina el catálogo interno y consulta hasta 5 en Open Food Facts. No modifica códigos ni los aprueba.</p></div>
-        <button disabled={pilotBusy||activeCoreItems.length===0} onClick={()=>void runGtinPilot()}>{pilotBusy?'Investigando…':'Investigar primeros 20'}</button>
+        <div><h3>Piloto de investigación · 20 productos</h3><p>Prioriza hasta 20 productos con mejor identificación de la búsqueda actual, relegando sueltos/fraccionados. Examina el catálogo interno y consulta hasta 5 en Open Food Facts. No modifica códigos ni los aprueba.</p></div>
+        <button disabled={pilotBusy||activeCoreItems.length===0} onClick={()=>void runGtinPilot()}>{pilotBusy?'Investigando…':'Investigar 20 priorizados'}</button>
         {pilotError&&<div className="notice warning">{pilotError}</div>}
         {pilotResult&&<div className="gtin-pilot-results">
-          <p>Analizados: {pilotResult.requested} · Consulta externa: {pilotResult.external_checked} · Con candidatos: {pilotResult.summary.candidate||0} · Sin candidatos: {pilotResult.summary.no_candidate||0} · Fuente no disponible: {pilotResult.summary.source_unavailable||0} · Fuente externa no consultada: {pilotResult.summary.external_not_checked||0}</p>
+          <p>Analizados: {pilotResult.requested} · Consulta externa: {pilotResult.external_checked} · Con candidatos: {pilotResult.summary.candidate||0} · Sin candidatos tras consulta: {pilotResult.summary.no_candidate||0} · Fuente no disponible: {pilotResult.summary.source_unavailable||0} · Fuente externa no consultada: {pilotResult.summary.external_not_checked||0}</p>
           <div className="gtin-pilot-items">{pilotResult.items.map(item=><article key={item.product_key}>
             <strong>{item.product_name||item.product_key}</strong>
-            <small>SKU {item.sku||'—'} · {item.status==='candidate'?'Candidato para revisar':item.status==='source_unavailable'?'Fuente no disponible':item.status==='needs_product_data'?'Faltan datos':'Sin candidato confirmado'}</small>
+            <small>SKU {item.sku||'—'} · {item.status==='candidate'?'Candidato para revisar':item.status==='source_unavailable'?'Fuente no disponible':item.status==='needs_product_data'?'Faltan datos':'Pendiente de investigación externa'}</small>
             {item.candidates.map(candidate=><div key={candidate.ean}><code>{candidate.ean}</code> {candidate.matched_name||''} {candidate.source_url&&<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">Ver fuente ↗</a>}</div>)}
           </article>)}</div>
         </div>}
