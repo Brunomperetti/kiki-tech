@@ -101,6 +101,9 @@ export function WorkQueue(){
   const [evidenceError,setEvidenceError]=useState('');
   const [gtinSuggestions,setGtinSuggestions]=useState<{candidates:{ean:string;matched_name:string;matched_sku?:string;matched_brand?:string;reason:string}[];message:string}|null>(null);
   const [gtinBusy,setGtinBusy]=useState(false);
+  const [pilotBusy,setPilotBusy]=useState(false);
+  const [pilotError,setPilotError]=useState('');
+  const [pilotResult,setPilotResult]=useState<{requested:number;external_checked:number;summary:Record<string,number>;items:{product_key:string;product_name?:string;sku?:string;status:string;candidates:{ean:string;source_url?:string;matched_name?:string}[];external_message?:string}[]}|null>(null);
   const [externalGtinBusy,setExternalGtinBusy]=useState(false);
   const [externalGtin,setExternalGtin]=useState<{candidates:{ean:string;matched_name:string;matched_brand:string;quantity:string;source_name:string;source_url:string;reason:string}[];message:string;unavailable?:boolean}|null>(null);
   const [loading,setLoading]=useState(false);
@@ -398,6 +401,15 @@ export function WorkQueue(){
     }
   }
 
+  async function runGtinPilot(){
+    const keys=activeCoreItems.slice(0,20).map(productKey).filter(Boolean);
+    if(!keys.length){setPilotError('No hay productos para investigar.');return;}
+    setPilotBusy(true);setPilotError('');setPilotResult(null);
+    try{setPilotResult(await api.gtinBatchPilot(keys));}
+    catch(err){setPilotError(err instanceof Error?err.message:'Falló la investigación piloto.');}
+    finally{setPilotBusy(false);}
+  }
+
   function openResolution(item:ReadinessItem){
     const key=productKey(item);
     const existing=key?researchByKey.get(key):undefined;
@@ -626,6 +638,19 @@ export function WorkQueue(){
             <Pagination page={verifiedPage} total={filteredApprovedBrands.length} pageSize={PAGE_SIZE} onChange={setVerifiedPage}/>
           </section>}
         </>}
+      </section>}
+      {coreIssue==='EAN_MISSING'&&readinessAvailable&&<section className="gtin-pilot-panel">
+        <div><h3>Piloto de investigación · 20 productos</h3><p>Evalúa los primeros 20 de la búsqueda actual. Examina el catálogo interno y consulta hasta 5 en Open Food Facts. No modifica códigos ni los aprueba.</p></div>
+        <button disabled={pilotBusy||activeCoreItems.length===0} onClick={()=>void runGtinPilot()}>{pilotBusy?'Investigando…':'Investigar primeros 20'}</button>
+        {pilotError&&<div className="notice warning">{pilotError}</div>}
+        {pilotResult&&<div className="gtin-pilot-results">
+          <p>Analizados: {pilotResult.requested} · Consulta externa: {pilotResult.external_checked} · Con candidatos: {pilotResult.summary.candidate||0} · Sin candidatos: {pilotResult.summary.no_candidate||0} · Fuente no disponible: {pilotResult.summary.source_unavailable||0} · Fuente externa no consultada: {pilotResult.summary.external_not_checked||0}</p>
+          <div className="gtin-pilot-items">{pilotResult.items.map(item=><article key={item.product_key}>
+            <strong>{item.product_name||item.product_key}</strong>
+            <small>SKU {item.sku||'—'} · {item.status==='candidate'?'Candidato para revisar':item.status==='source_unavailable'?'Fuente no disponible':item.status==='needs_product_data'?'Faltan datos':'Sin candidato confirmado'}</small>
+            {item.candidates.map(candidate=><div key={candidate.ean}><code>{candidate.ean}</code> {candidate.matched_name||''} {candidate.source_url&&<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">Ver fuente ↗</a>}</div>)}
+          </article>)}</div>
+        </div>}
       </section>}
       {coreIssue==='EAN_MISSING'&&readinessAvailable&&<div className="gtin-triage">
         <div><strong>KIKI detectó {likelyExceptionCount.toLocaleString('es-AR')} posibles casos sin GTIN propio</strong><p>Señal conservadora basada en palabras como “suelta”, “granel”, “fraccionado” o “artesanal”. Podés revisarlos y resolverlos juntos cuando realmente comparten la misma justificación.</p></div>
