@@ -99,6 +99,8 @@ export function WorkQueue(){
   const [draft,setDraft]=useState<EvidenceDraft>({...emptyDraft});
   const [evidenceBusy,setEvidenceBusy]=useState(false);
   const [evidenceError,setEvidenceError]=useState('');
+  const [gtinSuggestions,setGtinSuggestions]=useState<{candidates:{ean:string;matched_name:string;matched_sku?:string;matched_brand?:string;reason:string}[];message:string}|null>(null);
+  const [gtinBusy,setGtinBusy]=useState(false);
   const [loading,setLoading]=useState(false);
   const [continuityBusy,setContinuityBusy]=useState('');
   const [brandProposals,setBrandProposals]=useState<EnrichmentReviewQueue|null>(null);
@@ -398,6 +400,7 @@ export function WorkQueue(){
     const key=productKey(item);
     const existing=key?researchByKey.get(key):undefined;
     setResolutionItem(item);
+    setGtinSuggestions(null);
     setDraft({
       ...draftFromResearch(existing),
       proposed_ean:existing?.proposed_ean||item.product.ean||'',
@@ -413,6 +416,15 @@ export function WorkQueue(){
     setCoreIssue('BRAND_MISSING');
     openResolution(source);
     setDraft(current=>({...current,proposed_brand:item.proposed_brand||item.internal_evidence.brand_candidate||'',confidence:'',source_name:'',source_url:'',notes:''}));
+  }
+
+  async function findGtinSuggestions(){
+    if(!resolutionItem)return;
+    setGtinBusy(true);setEvidenceError('');
+    try{
+      setGtinSuggestions(await api.gtinCandidates(productKey(resolutionItem)));
+    }catch(err){setEvidenceError(err instanceof Error?err.message:'No se pudo consultar el catálogo interno.');}
+    finally{setGtinBusy(false);}
   }
 
   function setField(field:keyof EvidenceDraft,value:string){
@@ -702,6 +714,17 @@ export function WorkQueue(){
           <p>Usá fabricante oficial, GS1, etiqueta/ficha verificable o un distribuidor confiable de la presentación exacta. KIKI valida el formato del GTIN antes de aceptarlo.</p>
         </div>
 
+        {coreIssue==='EAN_MISSING'&&<div className="gtin-candidates">
+          <button className="secondary" type="button" disabled={gtinBusy} onClick={()=>void findGtinSuggestions()}>{gtinBusy?'Buscando…':'Buscar EAN en KIKI'}</button>
+          {gtinSuggestions&&<div><p>{gtinSuggestions.message}</p>
+            {gtinSuggestions.candidates.map(candidate=><article key={candidate.ean}>
+              <strong>GTIN candidato: {candidate.ean}</strong>
+              <p>{candidate.matched_name} · SKU {candidate.matched_sku||'—'} · {candidate.matched_brand||'Marca desconocida'}</p>
+              <small>{candidate.reason}</small>
+              <button className="secondary" type="button" onClick={()=>setDraft(current=>({...current,proposed_ean:candidate.ean,confidence:'',source_name:'',source_url:''}))}>Usar como borrador</button>
+            </article>)}
+          </div>}
+        </div>}
         <div className="core-resolution-form">
           <label>EAN / GTIN<input inputMode="numeric" value={draft.proposed_ean} placeholder="Ej. 7791234567890" onChange={event=>setField('proposed_ean',event.target.value)}/></label>
           <label>Marca<input value={draft.proposed_brand} placeholder="Marca verificada" onChange={event=>setField('proposed_brand',event.target.value)}/></label>
