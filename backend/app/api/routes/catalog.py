@@ -56,6 +56,14 @@ class EnrichmentDecisionRequest(BaseModel):
     note: str | None = None
 
 
+class EnrichmentExternalResearchBulkGtinRequest(BaseModel):
+    product_keys: list[str]
+    source_name: str
+    source_url: str
+    confidence: str
+    notes: str
+
+
 class EnrichmentExternalResearchRequest(BaseModel):
     product_key: str
     status: str
@@ -368,6 +376,30 @@ def enrichment_external_research_save(
     except Exception as exc:
         logger.exception("enrichment_external_research_save_failed")
         raise HTTPException(500, "No se pudo guardar la investigación externa.") from exc
+
+
+@router.post("/enrichment-external-research/bulk-gtin-not-applicable")
+def enrichment_external_research_bulk_gtin_not_applicable(
+    request: EnrichmentExternalResearchBulkGtinRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return EnrichmentExternalResearchService(db).bulk_mark_gtin_not_applicable(
+            product_keys=request.product_keys,
+            source_name=request.source_name,
+            source_url=request.source_url,
+            confidence=request.confidence,
+            notes=request.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("enrichment_external_research_bulk_gtin_failed")
+        raise HTTPException(
+            500,
+            "No se pudo aplicar la excepción GTIN al lote seleccionado.",
+        ) from exc
 
 
 @router.get("/products")
