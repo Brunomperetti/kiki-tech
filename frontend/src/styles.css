@@ -161,3 +161,19 @@
   .bulk-selection-bar{align-items:stretch}
   .core-select{order:-1}
 }
+
+
+/* Evidence-backed brand proposal review */
+.core-brand-proposals{margin:20px 0 26px}
+.brand-proposal-list{display:grid;gap:12px;margin-top:14px}
+.brand-proposal-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:18px;border:1px solid #dce5df;background:#fff;border-radius:12px}
+.brand-proposal-card .core-select{display:flex;gap:8px;align-items:center;white-space:nowrap;font-size:12px;color:#52665b}
+.brand-proposal-details{min-width:0;display:grid;gap:7px}
+.brand-proposal-details>strong{font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+.brand-proposal-details p,.brand-proposal-details small{font-size:12px;line-height:1.5}
+.brand-proposal-meta{display:flex;flex-wrap:wrap;gap:7px}
+.brand-proposal-meta span{background:#f1f6f2;border-radius:6px;padding:5px 8px;font-size:12px}
+.brand-proposal-card>button{white-space:nowrap}
+.brand-verify-section{margin-top:22px;padding-top:18px;border-top:1px solid #dce5df}
+.brand-verify-section h3{margin:0 0 8px}
+@media(max-width:800px){.brand-proposal-card{grid-template-columns:1fr;align-items:stretch}.brand-proposal-card>button{width:100%}}
