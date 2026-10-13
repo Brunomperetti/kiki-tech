@@ -113,6 +113,7 @@ export const api = {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({product_key: productKey, status, note: note || null}),
   }),
+  gtinCandidates: (key:string) => request<{candidates:{ean:string;matched_name:string;matched_sku?:string;matched_brand?:string;reason:string}[];message:string}>(`/api/gtin-candidates/${encodeURIComponent(key)}`),
   externalResearchQueue: () => request<ExternalResearchQueue>('/api/enrichment-external-research'),
   saveExternalResearch: (payload: ExternalResearchPayload) => request<ExternalResearchItem>('/api/enrichment-external-research', {
     method: 'POST',

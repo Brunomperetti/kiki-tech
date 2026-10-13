@@ -183,3 +183,10 @@
 .work-pagination>div{display:flex;gap:8px}
 .work-pagination button{padding:9px 13px}
 @media(max-width:700px){.work-pagination{align-items:stretch;flex-direction:column}.work-pagination>div button{flex:1}}
+
+/* Conservative, read-only candidate suggestions for GTIN resolution */
+.gtin-candidates{margin:12px 0 18px;padding:14px;border:1px solid #dce5df;border-radius:10px;background:#f7faf7;display:grid;gap:10px}
+.gtin-candidates>div{display:grid;gap:10px}
+.gtin-candidates article{background:#fff;border:1px solid #dce5df;padding:13px;border-radius:9px;display:grid;justify-items:start;gap:7px}
+.gtin-candidates article strong{overflow-wrap:anywhere}
+.gtin-candidates article small{color:#67776d;line-height:1.5}
