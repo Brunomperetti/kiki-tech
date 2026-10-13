@@ -70,3 +70,6 @@ export type CatalogContinuityState='KIKI_ONLY'|'ALIGNED'|'CONFLICT'|'RESOLVED_US
 export type CatalogContinuityDecision='USE_KIKI'|'USE_ECOMM';
 export interface CatalogContinuityItem {conflict_key:string;product_key:string;product:Product;field:string;field_label:string;state:CatalogContinuityState;ecomm_value?:string|null;kiki_value?:string|null;kiki_exception?:boolean;effective_value?:string|null;source_name?:string|null;source_url?:string|null;confidence?:string|null;updated_at?:string|null;decision?:CatalogContinuityDecision|null}
 export interface CatalogContinuityReport {summary:{validated_products:number;validated_fields:number;kiki_only:number;aligned:number;conflicts:number;resolved_use_kiki:number;resolved_use_ecomm:number;stale_decisions:number;missing_from_current_ecomm:number};policy:{mode:string;description:string};items:CatalogContinuityItem[]}
+
+export interface BulkGtinNotApplicablePayload {product_keys:string[];source_name:string;source_url:string;confidence:ExternalResearchConfidence;notes:string}
+export interface BulkGtinNotApplicableResult {requested:number;processed:number;status:'GTIN_NOT_APPLICABLE';product_keys:string[]}
