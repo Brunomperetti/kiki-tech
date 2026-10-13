@@ -8,6 +8,8 @@ import type {
   ExternalResearchConfidence,
   ExternalResearchItem,
   ExternalResearchQueue,
+  EnrichmentReviewItem,
+  EnrichmentReviewQueue,
   FinalPublicationQueueReport,
   InventoryLinkageReport,
   ReadinessItem,
@@ -95,6 +97,10 @@ export function WorkQueue(){
   const [evidenceError,setEvidenceError]=useState('');
   const [loading,setLoading]=useState(false);
   const [continuityBusy,setContinuityBusy]=useState('');
+  const [brandProposals,setBrandProposals]=useState<EnrichmentReviewQueue|null>(null);
+  const [selectedBrandKeys,setSelectedBrandKeys]=useState<Set<string>>(new Set());
+  const [brandBusy,setBrandBusy]=useState(false);
+  const [brandError,setBrandError]=useState('');
   const [selectedGtinKeys,setSelectedGtinKeys]=useState<Set<string>>(new Set());
   const [bulkGtinOpen,setBulkGtinOpen]=useState(false);
   const [bulkGtinBusy,setBulkGtinBusy]=useState(false);
@@ -114,6 +120,8 @@ export function WorkQueue(){
       api.publicationReadiness(),
       api.externalResearchQueue(),
     ]);
+    const brands=await api.enrichmentReviewQueue().catch(()=>null);
+    setBrandProposals(brands);
     const readiness=readinessResult[0].status==='fulfilled'?readinessResult[0].value:null;
     const research=readinessResult[1].status==='fulfilled'?readinessResult[1].value:null;
     setData(current=>({...current,readiness,research}));
@@ -186,6 +194,43 @@ export function WorkQueue(){
     ()=>rawBrandItems.filter(item=>!evidenceResolved(item,'BRAND_MISSING')),
     [rawBrandItems,researchByKey],
   );
+
+  const proposedBrands=useMemo(
+    ()=> (brandProposals?.items||[]).filter(item=>
+      item.missing_fields.includes('Marca')
+      && Boolean(item.internal_evidence.brand_candidate)
+      && item.review_status==='PENDING'
+    ),[brandProposals],
+  );
+  const highConfidenceBrands=useMemo(
+    ()=>proposedBrands.filter(item=>item.internal_evidence.confidence==='HIGH'),
+    [proposedBrands],
+  );
+
+  async function approveBrand(item:EnrichmentReviewItem){
+    setBrandBusy(true);setBrandError('');setSuccess('');
+    try{
+      await api.saveEnrichmentDecision(item.product_key,'APPROVED_PROPOSAL','Propuesta interna aceptada; pendiente de validar fuente verificable.');
+      setBrandProposals(await api.enrichmentReviewQueue());
+      setSelectedBrandKeys(current=>new Set([...current].filter(key=>key!==item.product_key)));
+      setSuccess('Propuesta interna de marca guardada. Para usarla como dato verificado, confirmá su fuente en Resolver marca.');
+    }catch(err){setBrandError(err instanceof Error?err.message:'No se pudo aprobar la propuesta.')}
+    finally{setBrandBusy(false);}
+  }
+
+  async function approveSelectedBrands(){
+    const keys=[...selectedBrandKeys];
+    if(!keys.length)return;
+    if(!window.confirm(`¿Aprobar ${keys.length} propuestas internas de confianza alta? No quedan verificadas para publicación.`))return;
+    setBrandBusy(true);setBrandError('');setSuccess('');
+    try{
+      const result=await api.bulkApproveBrandProposals(keys);
+      setBrandProposals(await api.enrichmentReviewQueue());
+      setSelectedBrandKeys(new Set());
+      setSuccess(`${result.processed} propuestas internas guardadas con evidencia e historial individual. Falta verificar su fuente para completar las marcas.`);
+    }catch(err){setBrandError(err instanceof Error?err.message:'No se pudo aprobar el lote.')}
+    finally{setBrandBusy(false);}
+  }
 
   const suggestedExceptionItems=useMemo(
     ()=>pendingEanItems.filter(likelyGtinException),
@@ -491,6 +536,32 @@ export function WorkQueue(){
         <div><h3>{coreIssue==='EAN_MISSING'?'Productos sin EAN/GTIN':'Productos sin marca'}</h3><p>{coreIssue==='EAN_MISSING'?'Validá el código de la presentación exacta con una fuente confiable.':'Validá la marca real del producto con una fuente confiable.'}</p></div>
         <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>setCoreSearch(event.target.value)}/>
       </div>
+      {coreIssue==='BRAND_MISSING'&&<section className="core-brand-proposals">
+        <div className="core-list-toolbar">
+          <div><h3>Marcas sugeridas por KIKI</h3><p>Candidatas del catálogo interno, con evidencia y nivel de confianza. Aprobar una propuesta no equivale a verificarla ni habilita publicación.</p></div>
+        </div>
+        {brandError&&<div className="notice warning">{brandError}</div>}
+        {brandProposals===null?<p>Las sugerencias no están disponibles en este momento.</p>:<>
+          <p>{proposedBrands.length} propuestas pendientes · {highConfidenceBrands.length} de confianza alta</p>
+          {highConfidenceBrands.length>0&&<div className="bulk-selection-bar">
+            <strong>{selectedBrandKeys.size} seleccionadas</strong>
+            <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set(highConfidenceBrands.map(item=>item.product_key)))}>Seleccionar alta confianza</button>
+            <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set())}>Limpiar</button>
+            <button disabled={brandBusy||selectedBrandKeys.size===0} onClick={()=>void approveSelectedBrands()}>Aprobar propuestas seleccionadas</button>
+          </div>}
+          <div className="core-pending-list">
+            {proposedBrands.slice(0,50).map(item=><article key={item.product_key}>
+              {item.internal_evidence.confidence==='HIGH'&&<label className="core-select"><input type="checkbox" checked={selectedBrandKeys.has(item.product_key)} onChange={()=>setSelectedBrandKeys(current=>{const next=new Set(current);if(next.has(item.product_key))next.delete(item.product_key);else next.add(item.product_key);return next;})}/> Seleccionar</label>}
+              <div><strong>{item.product.name||'Producto sin nombre'}</strong>
+                <small>Marca propuesta: <b>{item.internal_evidence.brand_candidate}</b> · Confianza {item.internal_evidence.confidence==='HIGH'?'alta':'media'} · Método: {item.internal_evidence.method||'catálogo interno'}</small>
+                <small>{item.internal_evidence.reason} {item.internal_evidence.related_sku?`· SKU de referencia: ${item.internal_evidence.related_sku}`:''}</small>
+              </div>
+              <button className="secondary" disabled={brandBusy} onClick={()=>void approveBrand(item)}>Aceptar propuesta</button>
+            </article>)}
+          </div>
+          {proposedBrands.length>50&&<small>Mostrando las primeras 50 propuestas. Filtrá o revisá por lotes antes de escalar.</small>}
+        </>}
+      </section>}
       {coreIssue==='EAN_MISSING'&&readinessAvailable&&<div className="gtin-triage">
         <div><strong>KIKI detectó {likelyExceptionCount.toLocaleString('es-AR')} posibles casos sin GTIN propio</strong><p>Señal conservadora basada en palabras como “suelta”, “granel”, “fraccionado” o “artesanal”. Podés revisarlos y resolverlos juntos cuando realmente comparten la misma justificación.</p></div>
         <div className="gtin-triage-actions">

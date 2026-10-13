@@ -56,6 +56,10 @@ class EnrichmentDecisionRequest(BaseModel):
     note: str | None = None
 
 
+class EnrichmentBrandBulkRequest(BaseModel):
+    product_keys: list[str]
+
+
 class EnrichmentExternalResearchBulkGtinRequest(BaseModel):
     product_keys: list[str]
     source_name: str
@@ -338,6 +342,22 @@ def enrichment_review_decision(
     except Exception as exc:
         logger.exception("enrichment_review_decision_failed")
         raise HTTPException(500, "No se pudo guardar la decisión de revisión.") from exc
+
+
+
+@router.post("/enrichment-review-decisions/bulk-brand")
+def enrichment_bulk_brand_approval(
+    request: EnrichmentBrandBulkRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return EnrichmentReviewService(db).bulk_approve_brand_proposals(request.product_keys)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("enrichment_bulk_brand_approval_failed")
+        raise HTTPException(500, "No se pudieron aprobar las propuestas de marca.") from exc
 
 
 @router.get("/enrichment-external-research")

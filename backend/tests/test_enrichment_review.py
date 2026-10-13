@@ -162,3 +162,38 @@ def test_no_internal_evidence_can_be_sent_directly_to_external_research():
         queue = service.queue()
         reviewed = next(item for item in queue["items"] if item["product_key"] == "ECOMM:30")
         assert reviewed["review_status"] == "EXTERNAL_RESEARCH"
+
+
+def test_bulk_brand_approval_is_atomic_and_keeps_individual_histories():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = service_with_report(db, report_with_internal_evidence())
+        with pytest.raises(ValueError, match="confianza alta"):
+            service.bulk_approve_brand_proposals(["ECOMM:10", "ECOMM:20"])
+        assert db.query(EnrichmentReviewDecision).count() == 0
+
+        result = service.bulk_approve_brand_proposals(["ECOMM:10", "ECOMM:10"])
+        assert result["processed"] == 1
+        row = db.query(EnrichmentReviewDecision).one()
+        assert row.product_key == "ECOMM:10"
+        assert row.status == "APPROVED_PROPOSAL"
+        assert row.proposed_brand == "Natufarma"
+        assert row.history[-1]["bulk_action"] is True
+
+        service.bulk_approve_brand_proposals(["ECOMM:10"])
+        db.refresh(row)
+        assert len(row.history) == 2
+
+
+def test_bulk_brand_rejects_stale_and_incompatible_selection():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = service_with_report(db, report_with_internal_evidence())
+        with pytest.raises(ValueError, match="ya no necesita"):
+            service.bulk_approve_brand_proposals(["ECOMM:NOT-FOUND"])
+        assert db.query(EnrichmentReviewDecision).count() == 0
+        service.save_decision("ECOMM:10", "EXTERNAL_RESEARCH")
+        with pytest.raises(ValueError, match="incompatible"):
+            service.bulk_approve_brand_proposals(["ECOMM:10"])
