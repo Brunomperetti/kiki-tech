@@ -104,6 +104,9 @@ export const api = {
     body: JSON.stringify({external_id: externalId, action, note: note || null}),
   }),
   enrichmentPilot: (limit = 20) => request<EnrichmentReport>(`/api/enrichment-pilot?limit=${limit}`),
+  bulkApproveBrandProposals: (product_keys:string[]) => request<{requested:number;processed:number;status:string}>('/api/enrichment-review-decisions/bulk-brand', {
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_keys}),
+  }),
   enrichmentReviewQueue: () => request<EnrichmentReviewQueue>('/api/enrichment-review-queue'),
   saveEnrichmentDecision: (productKey: string, status: EnrichmentReviewStatus, note?: string) => request<EnrichmentReviewItem>('/api/enrichment-review-decisions', {
     method: 'POST',
