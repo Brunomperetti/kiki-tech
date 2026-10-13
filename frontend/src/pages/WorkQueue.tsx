@@ -202,6 +202,7 @@ export function WorkQueue(){
       && item.review_status==='PENDING'
     ),[brandProposals],
   );
+  const approvedBrandProposals=useMemo(()=> (brandProposals?.items||[]).filter(item=>item.review_status==='APPROVED_PROPOSAL' && Boolean(item.proposed_brand) && item.missing_fields.includes('Marca') && !researchByKey.get(item.product_key)?.proposed_brand),[brandProposals,researchByKey]);
   const highConfidenceBrands=useMemo(
     ()=>proposedBrands.filter(item=>item.internal_evidence.confidence==='HIGH'),
     [proposedBrands],
@@ -385,6 +386,14 @@ export function WorkQueue(){
     setSuccess('');
   }
 
+  function verifyBrandProposal(item:EnrichmentReviewItem){
+    const source=(data.readiness?.items||[]).find(row=>productKey(row)===item.product_key);
+    if(!source){setBrandError('El producto ya no está disponible en el catálogo actual.');return;}
+    setCoreIssue('BRAND_MISSING');
+    openResolution(source);
+    setDraft(current=>({...current,proposed_brand:item.proposed_brand||item.internal_evidence.brand_candidate||'',confidence:'',source_name:'',source_url:'',notes:''}));
+  }
+
   function setField(field:keyof EvidenceDraft,value:string){
     setDraft(current=>({...current,[field]:value}));
   }
@@ -549,17 +558,27 @@ export function WorkQueue(){
             <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set())}>Limpiar</button>
             <button disabled={brandBusy||selectedBrandKeys.size===0} onClick={()=>void approveSelectedBrands()}>Aprobar propuestas seleccionadas</button>
           </div>}
-          <div className="core-pending-list">
-            {proposedBrands.slice(0,50).map(item=><article key={item.product_key}>
+          <div className="brand-proposal-list">
+            {proposedBrands.slice(0,50).map(item=><article className="brand-proposal-card" key={item.product_key}>
               {item.internal_evidence.confidence==='HIGH'&&<label className="core-select"><input type="checkbox" checked={selectedBrandKeys.has(item.product_key)} onChange={()=>setSelectedBrandKeys(current=>{const next=new Set(current);if(next.has(item.product_key))next.delete(item.product_key);else next.add(item.product_key);return next;})}/> Seleccionar</label>}
-              <div><strong>{item.product.name||'Producto sin nombre'}</strong>
-                <small>Marca propuesta: <b>{item.internal_evidence.brand_candidate}</b> · Confianza {item.internal_evidence.confidence==='HIGH'?'alta':'media'} · Método: {item.internal_evidence.method||'catálogo interno'}</small>
-                <small>{item.internal_evidence.reason} {item.internal_evidence.related_sku?`· SKU de referencia: ${item.internal_evidence.related_sku}`:''}</small>
+              <div className="brand-proposal-details">
+                <strong>{item.product.name||'Producto sin nombre'}</strong>
+                <div className="brand-proposal-meta"><span>Marca sugerida: <b>{item.internal_evidence.brand_candidate}</b></span><span>Confianza {item.internal_evidence.confidence==='HIGH'?'alta':'media'}</span><span>Origen: catálogo interno</span></div>
+                <p>{item.internal_evidence.reason}</p>
+                {item.internal_evidence.related_sku&&<small>SKU de referencia: {item.internal_evidence.related_sku}</small>}
               </div>
               <button className="secondary" disabled={brandBusy} onClick={()=>void approveBrand(item)}>Aceptar propuesta</button>
             </article>)}
           </div>
           {proposedBrands.length>50&&<small>Mostrando las primeras 50 propuestas. Filtrá o revisá por lotes antes de escalar.</small>}
+          {approvedBrandProposals.length>0&&<section className="brand-verify-section">
+            <h3>Propuestas aceptadas · falta verificar la fuente ({approvedBrandProposals.length})</h3>
+            <p>Estas marcas fueron aprobadas como candidatas, pero aún no resuelven el pendiente. Revisá la ficha del fabricante o proveedor antes de confirmarlas.</p>
+            <div className="brand-proposal-list">{approvedBrandProposals.slice(0,50).map(item=><article className="brand-proposal-card" key={item.product_key}>
+              <div className="brand-proposal-details"><strong>{item.product.name||'Producto sin nombre'}</strong><div className="brand-proposal-meta"><span>Marca propuesta: <b>{item.proposed_brand}</b></span><span>Pendiente de fuente verificable</span></div></div>
+              <button className="secondary" onClick={()=>verifyBrandProposal(item)}>Verificar marca</button>
+            </article>)}</div>
+          </section>
         </>}
       </section>}
       {coreIssue==='EAN_MISSING'&&readinessAvailable&&<div className="gtin-triage">
