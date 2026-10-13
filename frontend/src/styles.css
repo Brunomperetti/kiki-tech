@@ -177,3 +177,9 @@
 .brand-verify-section{margin-top:22px;padding-top:18px;border-top:1px solid #dce5df}
 .brand-verify-section h3{margin:0 0 8px}
 @media(max-width:800px){.brand-proposal-card{grid-template-columns:1fr;align-items:stretch}.brand-proposal-card>button{width:100%}}
+
+/* Guided-work pagination. Selected IDs live above the current page. */
+.work-pagination{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:16px 0 24px;padding:12px 14px;border:1px solid #dce5df;border-radius:10px;background:#f8faf8;color:#52665b;font-size:13px}
+.work-pagination>div{display:flex;gap:8px}
+.work-pagination button{padding:9px 13px}
+@media(max-width:700px){.work-pagination{align-items:stretch;flex-direction:column}.work-pagination>div button{flex:1}}
