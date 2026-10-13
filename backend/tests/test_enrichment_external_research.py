@@ -264,3 +264,102 @@ def test_gtin_not_applicable_rejects_a_proposed_gtin():
                 confidence="HIGH",
                 notes="No aplica.",
             )
+
+
+def test_bulk_gtin_not_applicable_persists_selected_products_in_one_action():
+    report = {
+        "reconciliation_run_id": 99,
+        "items": [
+            {
+                "product": {
+                    "ecomm_id": "30",
+                    "sku": "1002",
+                    "name": "Cardo Mariano Suelta X 50 Grs",
+                    "brand": None,
+                    "ean": None,
+                    "stock": 1,
+                    "price": 1400,
+                },
+                "readiness_status": "REVIEW_REQUIRED",
+                "reason_codes": ["EAN_MISSING", "BRAND_MISSING"],
+            },
+            {
+                "product": {
+                    "ecomm_id": "31",
+                    "sku": "1003",
+                    "name": "Pulmonaria Suelta X 20 Grs",
+                    "brand": None,
+                    "ean": None,
+                    "stock": 1,
+                    "price": 531,
+                },
+                "readiness_status": "REVIEW_REQUIRED",
+                "reason_codes": ["EAN_MISSING", "BRAND_MISSING"],
+            },
+        ],
+    }
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = EnrichmentExternalResearchService(db)
+        service.review.readiness.report = lambda: report
+
+        result = service.bulk_mark_gtin_not_applicable(
+            product_keys=["ECOMM:30", "ECOMM:31"],
+            source_name="Catálogo del proveedor",
+            source_url="https://example.com/catalogo",
+            confidence="HIGH",
+            notes="Productos comercializados sueltos y fraccionados por peso, sin GTIN propio.",
+        )
+
+        assert result["requested"] == 2
+        assert result["processed"] == 2
+        rows = db.query(EnrichmentExternalResearch).order_by(
+            EnrichmentExternalResearch.product_key
+        ).all()
+        assert [row.product_key for row in rows] == ["ECOMM:30", "ECOMM:31"]
+        assert all(row.status == "GTIN_NOT_APPLICABLE" for row in rows)
+        assert all(row.source_name == "Catálogo del proveedor" for row in rows)
+        assert all(row.history[-1]["bulk_action"] is True for row in rows)
+
+        queue = service.queue()
+        assert queue["summary"]["GTIN_NOT_APPLICABLE"] == 2
+
+
+def test_bulk_gtin_not_applicable_requires_common_evidence():
+    report = {
+        "reconciliation_run_id": 100,
+        "items": [
+            {
+                "product": {
+                    "ecomm_id": "30",
+                    "sku": "1002",
+                    "name": "Cardo Mariano Suelta X 50 Grs",
+                    "brand": None,
+                    "ean": None,
+                    "stock": 1,
+                    "price": 1400,
+                },
+                "readiness_status": "REVIEW_REQUIRED",
+                "reason_codes": ["EAN_MISSING"],
+            }
+        ],
+    }
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        service = EnrichmentExternalResearchService(db)
+        service.review.readiness.report = lambda: report
+
+        with pytest.raises(ValueError, match="fuente y URL"):
+            service.bulk_mark_gtin_not_applicable(
+                product_keys=["ECOMM:30"],
+                source_name="",
+                source_url="",
+                confidence="HIGH",
+                notes="Producto suelto.",
+            )
+
+        assert db.query(EnrichmentExternalResearch).count() == 0
