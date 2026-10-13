@@ -191,6 +191,72 @@ class EnrichmentReviewService:
         self.db.refresh(row)
         return self._serialize_queue_item(item, row)
 
+
+    def bulk_approve_brand_proposals(self, product_keys: list[str]) -> dict:
+        """Approve only current, unique HIGH-confidence *internal proposals*.
+
+        These decisions are not verified external evidence and do not satisfy
+        publication-readiness requirements. The entire batch is atomic.
+        """
+        keys = list(dict.fromkeys(str(key).strip() for key in product_keys or []))
+        if not keys or any(not key for key in keys) or len(keys) > 200:
+            raise ValueError("Seleccioná entre 1 y 200 productos válidos.")
+
+        readiness_report = self.readiness.report()
+        eligible = {
+            item["product_key"]: item
+            for item in self._eligible_items(readiness_report)
+        }
+        records = {
+            row.product_key: row
+            for row in self.db.query(EnrichmentReviewDecision)
+            .filter(EnrichmentReviewDecision.product_key.in_(keys))
+            .all()
+        }
+        # Validate the *whole* request before mutating anything.
+        for key in keys:
+            item = eligible.get(key)
+            if not item or "brand" not in (item.get("missing_fields") or []):
+                raise ValueError(f"El producto {key} ya no necesita una propuesta de marca.")
+            evidence = item["internal_evidence"]
+            if not evidence.get("brand_candidate") or evidence.get("confidence") != "HIGH":
+                raise ValueError(f"El producto {key} no tiene una propuesta única de confianza alta.")
+            previous = records.get(key)
+            if previous and previous.status not in {self.PENDING, self.APPROVED_PROPOSAL}:
+                raise ValueError(f"El producto {key} ya tiene una decisión incompatible.")
+
+        now = datetime.now(timezone.utc)
+        for key in keys:
+            item = eligible[key]
+            evidence = item["internal_evidence"]
+            row = records.get(key)
+            if row is None:
+                row = EnrichmentReviewDecision(
+                    product_key=key,
+                    created_at=now,
+                    updated_at=now,
+                )
+                self.db.add(row)
+            row.reconciliation_run_id = readiness_report.get("reconciliation_run_id")
+            row.status = self.APPROVED_PROPOSAL
+            row.proposed_brand = evidence["brand_candidate"]
+            row.proposed_ean = None
+            row.evidence = dict(evidence)
+            row.product_snapshot = self._slim_product(item.get("product") or {})
+            row.note = "Propuesta interna aprobada en lote; requiere verificación de fuente externa."
+            row.updated_at = now
+            history = list(row.history or [])
+            history.append({
+                "status": self.APPROVED_PROPOSAL,
+                "at": now.isoformat(),
+                "brand_candidate": evidence["brand_candidate"],
+                "confidence": "HIGH",
+                "bulk_action": True,
+            })
+            row.history = history[-100:]
+        self.db.commit()
+        return {"requested": len(keys), "processed": len(keys), "status": self.APPROVED_PROPOSAL}
+
     def _eligible_items(self, readiness_report: dict) -> list[dict]:
         raw_items = readiness_report.get("items") or []
         evidence_index = EnrichmentService._build_internal_evidence_index(raw_items)
