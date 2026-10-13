@@ -189,6 +189,153 @@ class EnrichmentExternalResearchService:
         self.db.refresh(row)
         return self._serialize(item, row)
 
+    def bulk_mark_gtin_not_applicable(
+        self,
+        product_keys: list[str],
+        source_name: str,
+        source_url: str,
+        confidence: str,
+        notes: str,
+    ) -> dict:
+        keys = []
+        seen = set()
+        for raw in product_keys or []:
+            key = self._clean(raw)
+            if key and key not in seen:
+                seen.add(key)
+                keys.append(key)
+        if not keys:
+            raise ValueError("Seleccioná al menos un producto.")
+
+        source_name = self._nullable(source_name, 255)
+        source_url = self._nullable(source_url, 2000)
+        confidence = self._nullable(confidence, 20)
+        confidence = confidence.upper() if confidence else None
+        notes = self._nullable(notes, 4000)
+
+        if not source_name or not source_url:
+            raise ValueError("Para resolver en lote necesitás fuente y URL.")
+        if not self._valid_http_url(source_url):
+            raise ValueError("La URL de la fuente debe comenzar con http:// o https://.")
+        if confidence not in {"HIGH", "MEDIUM"}:
+            raise ValueError("La confianza del lote debe ser Alta o Media.")
+        if not notes:
+            raise ValueError(
+                "Explicá por qué estos productos no tendrían GTIN propio."
+            )
+
+        readiness_report = self.review.readiness.report()
+        eligible_items = {
+            item["product_key"]: item
+            for item in self.review._eligible_items(readiness_report)
+        }
+        missing = [key for key in keys if key not in eligible_items]
+        if missing:
+            raise ValueError(
+                "Algunos productos ya no están disponibles para enriquecimiento: "
+                + ", ".join(missing[:5])
+            )
+
+        existing_decisions = {
+            row.product_key: row
+            for row in self.db.query(EnrichmentReviewDecision)
+            .filter(EnrichmentReviewDecision.product_key.in_(keys))
+            .all()
+        }
+        existing_research = {
+            row.product_key: row
+            for row in self.db.query(EnrichmentExternalResearch)
+            .filter(EnrichmentExternalResearch.product_key.in_(keys))
+            .all()
+        }
+
+        now = datetime.now(timezone.utc)
+        run_id = readiness_report.get("reconciliation_run_id")
+
+        for key in keys:
+            item = eligible_items[key]
+            evidence = dict(item.get("internal_evidence") or {})
+
+            decision = existing_decisions.get(key)
+            if decision is None:
+                decision = EnrichmentReviewDecision(
+                    product_key=key,
+                    reconciliation_run_id=run_id,
+                    status=EnrichmentReviewService.EXTERNAL_RESEARCH,
+                    created_at=now,
+                    updated_at=now,
+                )
+                self.db.add(decision)
+                existing_decisions[key] = decision
+
+            decision.reconciliation_run_id = run_id
+            decision.status = EnrichmentReviewService.EXTERNAL_RESEARCH
+            decision.proposed_brand = None
+            decision.proposed_ean = None
+            decision.evidence = evidence
+            decision.product_snapshot = self.review._slim_product(
+                item.get("product") or {}
+            )
+            decision.note = (
+                "Clasificación masiva: posible producto sin GTIN propio."
+            )
+            decision.updated_at = now
+            decision_history = list(decision.history or [])
+            decision_history.append(
+                {
+                    "status": EnrichmentReviewService.EXTERNAL_RESEARCH,
+                    "at": now.isoformat(),
+                    "note": decision.note,
+                    "bulk_action": "GTIN_NOT_APPLICABLE",
+                }
+            )
+            decision.history = decision_history[-100:]
+
+            row = existing_research.get(key)
+            if row is None:
+                row = EnrichmentExternalResearch(
+                    product_key=key,
+                    reconciliation_run_id=run_id,
+                    status=self.GTIN_NOT_APPLICABLE,
+                    created_at=now,
+                    updated_at=now,
+                )
+                self.db.add(row)
+                existing_research[key] = row
+
+            row.reconciliation_run_id = run_id
+            row.status = self.GTIN_NOT_APPLICABLE
+            row.proposed_ean = None
+            row.source_name = source_name
+            row.source_url = source_url
+            row.confidence = confidence
+            row.notes = notes
+            row.product_snapshot = dict(item.get("product") or {})
+            row.internal_evidence = evidence
+            row.updated_at = now
+            history = list(row.history or [])
+            history.append(
+                {
+                    "status": self.GTIN_NOT_APPLICABLE,
+                    "at": now.isoformat(),
+                    "source_name": source_name,
+                    "source_url": source_url,
+                    "confidence": confidence,
+                    "notes": notes,
+                    "bulk_action": True,
+                    "bulk_count": len(keys),
+                }
+            )
+            row.history = history[-100:]
+
+        self.db.commit()
+        return {
+            "requested": len(keys),
+            "processed": len(keys),
+            "status": self.GTIN_NOT_APPLICABLE,
+            "product_keys": keys,
+        }
+
     @classmethod
     def _serialize(cls, item: dict, row: EnrichmentExternalResearch | None) -> dict:
         return {
