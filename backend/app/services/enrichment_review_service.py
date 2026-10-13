@@ -216,7 +216,7 @@ class EnrichmentReviewService:
         # Validate the *whole* request before mutating anything.
         for key in keys:
             item = eligible.get(key)
-            if not item or "brand" not in (item.get("missing_fields") or []):
+            if not item or "Marca" not in (item.get("missing_fields") or []):
                 raise ValueError(f"El producto {key} ya no necesita una propuesta de marca.")
             evidence = item["internal_evidence"]
             if not evidence.get("brand_candidate") or evidence.get("confidence") != "HIGH":
