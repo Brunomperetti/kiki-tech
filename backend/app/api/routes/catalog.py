@@ -13,6 +13,7 @@ from ...services.enrichment_external_research_service import EnrichmentExternalR
 from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
+from ...services.gtin_batch_pilot_service import GtinBatchPilotService
 from ...services.external_gtin_candidate_service import ExternalGtinCandidateService
 from ...services.inventory_linkage_service import InventoryLinkageService
 from ...services.publication_readiness_service import PublicationReadinessService
@@ -56,6 +57,10 @@ class EnrichmentDecisionRequest(BaseModel):
     product_key: str
     status: str
     note: str | None = None
+
+
+class GtinBatchPilotRequest(BaseModel):
+    product_keys: list[str]
 
 
 class EnrichmentBrandBulkRequest(BaseModel):
@@ -382,6 +387,17 @@ def get_external_gtin_candidates(product_key: str, db: Session = Depends(get_db)
     except Exception as exc:
         logger.exception("external_gtin_candidate_lookup_failed")
         raise HTTPException(500, "No se pudo consultar la fuente externa.") from exc
+
+
+@router.post("/gtin-batch-pilot")
+def gtin_batch_pilot(request: GtinBatchPilotRequest, db: Session = Depends(get_db), _session=Depends(require_csrf)):
+    try:
+        return GtinBatchPilotService(db).run(request.product_keys)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("gtin_batch_pilot_failed")
+        raise HTTPException(500, "No se pudo ejecutar el piloto de EAN.") from exc
 
 
 @router.get("/enrichment-external-research")

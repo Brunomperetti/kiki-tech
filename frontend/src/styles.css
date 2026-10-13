@@ -190,3 +190,9 @@
 .gtin-candidates article{background:#fff;border:1px solid #dce5df;padding:13px;border-radius:9px;display:grid;justify-items:start;gap:7px}
 .gtin-candidates article strong{overflow-wrap:anywhere}
 .gtin-candidates article small{color:#67776d;line-height:1.5}
+
+.gtin-pilot-panel{margin:16px 0;padding:18px;border:1px solid #dce5df;border-radius:12px;background:#f7faf8;display:grid;gap:12px}
+.gtin-pilot-panel h3{margin:0 0 6px}.gtin-pilot-panel>button{justify-self:start}
+.gtin-pilot-results{display:grid;gap:12px}.gtin-pilot-items{max-height:380px;overflow-y:auto;display:grid;gap:8px}
+.gtin-pilot-items article{border:1px solid #dce5df;border-radius:8px;padding:11px;background:white;display:grid;gap:5px}
+.gtin-pilot-items small{color:#64786a}
