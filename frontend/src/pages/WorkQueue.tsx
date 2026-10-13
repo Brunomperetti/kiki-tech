@@ -578,7 +578,7 @@ export function WorkQueue(){
               <div className="brand-proposal-details"><strong>{item.product.name||'Producto sin nombre'}</strong><div className="brand-proposal-meta"><span>Marca propuesta: <b>{item.proposed_brand}</b></span><span>Pendiente de fuente verificable</span></div></div>
               <button className="secondary" onClick={()=>verifyBrandProposal(item)}>Verificar marca</button>
             </article>)}</div>
-          </section>
+          </section>}
         </>}
       </section>}
       {coreIssue==='EAN_MISSING'&&readinessAvailable&&<div className="gtin-triage">
