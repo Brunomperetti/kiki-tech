@@ -90,6 +90,10 @@ export function WorkQueue(){
   const [success,setSuccess]=useState('');
   const [coreIssue,setCoreIssue]=useState<CoreIssue>('EAN_MISSING');
   const [coreSearch,setCoreSearch]=useState('');
+  const [corePage,setCorePage]=useState(1);
+  const [brandPage,setBrandPage]=useState(1);
+  const [verifiedPage,setVerifiedPage]=useState(1);
+  const PAGE_SIZE=50;
   const [likelyExceptionsOnly,setLikelyExceptionsOnly]=useState(false);
   const [resolutionItem,setResolutionItem]=useState<ReadinessItem|null>(null);
   const [draft,setDraft]=useState<EvidenceDraft>({...emptyDraft});
@@ -203,6 +207,13 @@ export function WorkQueue(){
     ),[brandProposals],
   );
   const approvedBrandProposals=useMemo(()=> (brandProposals?.items||[]).filter(item=>item.review_status==='APPROVED_PROPOSAL' && Boolean(item.proposed_brand) && item.missing_fields.includes('Marca') && !researchByKey.get(item.product_key)?.proposed_brand),[brandProposals,researchByKey]);
+  const brandSearch=coreSearch.trim().toLocaleLowerCase();
+  const filteredProposedBrands=useMemo(()=>proposedBrands.filter(item=>[
+    item.product.name,item.product.sku,item.product.sku_effective,item.internal_evidence.brand_candidate,
+  ].some(value=>String(value||'').toLocaleLowerCase().includes(brandSearch))),[proposedBrands,brandSearch]);
+  const filteredApprovedBrands=useMemo(()=>approvedBrandProposals.filter(item=>[
+    item.product.name,item.product.sku,item.proposed_brand,
+  ].some(value=>String(value||'').toLocaleLowerCase().includes(brandSearch))),[approvedBrandProposals,brandSearch]);
   const highConfidenceBrands=useMemo(
     ()=>proposedBrands.filter(item=>item.internal_evidence.confidence==='HIGH'),
     [proposedBrands],
@@ -253,6 +264,16 @@ export function WorkQueue(){
       item.product.ean,
     ].some(value=>String(value||'').toLowerCase().includes(term)));
   },[coreIssue,coreSearch,likelyExceptionsOnly,pendingEanItems,pendingBrandItems]);
+
+  const visibleBrandProposals=filteredProposedBrands.slice((brandPage-1)*PAGE_SIZE,brandPage*PAGE_SIZE);
+  const visibleApprovedBrands=filteredApprovedBrands.slice((verifiedPage-1)*PAGE_SIZE,verifiedPage*PAGE_SIZE);
+  const visibleCoreItems=activeCoreItems.slice((corePage-1)*PAGE_SIZE,corePage*PAGE_SIZE);
+  const brandTotalPages=Math.max(1,Math.ceil(filteredProposedBrands.length/PAGE_SIZE));
+  const verifiedTotalPages=Math.max(1,Math.ceil(filteredApprovedBrands.length/PAGE_SIZE));
+  const coreTotalPages=Math.max(1,Math.ceil(activeCoreItems.length/PAGE_SIZE));
+  useEffect(()=>setBrandPage(p=>Math.min(p,brandTotalPages)),[brandTotalPages]);
+  useEffect(()=>setVerifiedPage(p=>Math.min(p,verifiedTotalPages)),[verifiedTotalPages]);
+  useEffect(()=>setCorePage(p=>Math.min(p,coreTotalPages)),[coreTotalPages]);
 
   const corePendingKeys=useMemo(()=>{
     const keys=new Set<string>();
@@ -527,12 +548,12 @@ export function WorkQueue(){
       <div className="panel-title-row"><div><p className="eyebrow">DATOS PARA PUBLICAR</p><h2>Completar datos centrales</h2><p>Estos productos de Ecomm todavía no pueden avanzar porque les falta información básica. Acá ya podés resolver el dato, no solo verlo.</p></div></div>
 
       <div className="core-pending-summary">
-        <button className={coreIssue==='EAN_MISSING'?'active':''} onClick={()=>{setCoreIssue('EAN_MISSING');setCoreSearch('');setLikelyExceptionsOnly(false)}}>
+        <button className={coreIssue==='EAN_MISSING'?'active':''} onClick={()=>{setCoreIssue('EAN_MISSING');setCoreSearch('');setCorePage(1);setLikelyExceptionsOnly(false)}}>
           <span>Falta EAN/GTIN</span>
           <strong>{metric(readinessAvailable,pendingEanItems.length)}</strong>
           <small>{readinessAvailable?`${(rawEanItems.length-pendingEanItems.length).toLocaleString('es-AR')} resueltos con evidencia`:'Datos no disponibles'}</small>
         </button>
-        <button className={coreIssue==='BRAND_MISSING'?'active':''} onClick={()=>{setCoreIssue('BRAND_MISSING');setCoreSearch('');setLikelyExceptionsOnly(false)}}>
+        <button className={coreIssue==='BRAND_MISSING'?'active':''} onClick={()=>{setCoreIssue('BRAND_MISSING');setCoreSearch('');setCorePage(1);setLikelyExceptionsOnly(false)}}>
           <span>Falta marca</span>
           <strong>{metric(readinessAvailable,pendingBrandItems.length)}</strong>
           <small>{readinessAvailable?`${(rawBrandItems.length-pendingBrandItems.length).toLocaleString('es-AR')} resueltos con evidencia`:'Datos no disponibles'}</small>
@@ -543,7 +564,7 @@ export function WorkQueue(){
 
       <div className="core-list-toolbar">
         <div><h3>{coreIssue==='EAN_MISSING'?'Productos sin EAN/GTIN':'Productos sin marca'}</h3><p>{coreIssue==='EAN_MISSING'?'Validá el código de la presentación exacta con una fuente confiable.':'Validá la marca real del producto con una fuente confiable.'}</p></div>
-        <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>setCoreSearch(event.target.value)}/>
+        <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>{setCoreSearch(event.target.value);setCorePage(1);setBrandPage(1);setVerifiedPage(1)}}/>
       </div>
       {coreIssue==='BRAND_MISSING'&&<section className="core-brand-proposals">
         <div className="core-list-toolbar">
@@ -551,7 +572,7 @@ export function WorkQueue(){
         </div>
         {brandError&&<div className="notice warning">{brandError}</div>}
         {brandProposals===null?<p>Las sugerencias no están disponibles en este momento.</p>:<>
-          <p>{proposedBrands.length} propuestas pendientes · {highConfidenceBrands.length} de confianza alta</p>
+          <p>{filteredProposedBrands.length} propuestas pendientes · {highConfidenceBrands.length} de confianza alta en el catálogo</p>
           {highConfidenceBrands.length>0&&<div className="bulk-selection-bar">
             <strong>{selectedBrandKeys.size} seleccionadas</strong>
             <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set(highConfidenceBrands.map(item=>item.product_key)))}>Seleccionar alta confianza</button>
@@ -559,7 +580,7 @@ export function WorkQueue(){
             <button disabled={brandBusy||selectedBrandKeys.size===0} onClick={()=>void approveSelectedBrands()}>Aprobar propuestas seleccionadas</button>
           </div>}
           <div className="brand-proposal-list">
-            {proposedBrands.slice(0,50).map(item=><article className="brand-proposal-card" key={item.product_key}>
+            {visibleBrandProposals.map(item=><article className="brand-proposal-card" key={item.product_key}>
               {item.internal_evidence.confidence==='HIGH'&&<label className="core-select"><input type="checkbox" checked={selectedBrandKeys.has(item.product_key)} onChange={()=>setSelectedBrandKeys(current=>{const next=new Set(current);if(next.has(item.product_key))next.delete(item.product_key);else next.add(item.product_key);return next;})}/> Seleccionar</label>}
               <div className="brand-proposal-details">
                 <strong>{item.product.name||'Producto sin nombre'}</strong>
@@ -570,14 +591,15 @@ export function WorkQueue(){
               <button className="secondary" disabled={brandBusy} onClick={()=>void approveBrand(item)}>Aceptar propuesta</button>
             </article>)}
           </div>
-          {proposedBrands.length>50&&<small>Mostrando las primeras 50 propuestas. Filtrá o revisá por lotes antes de escalar.</small>}
+          <Pagination page={brandPage} total={filteredProposedBrands.length} pageSize={PAGE_SIZE} onChange={setBrandPage} />
           {approvedBrandProposals.length>0&&<section className="brand-verify-section">
             <h3>Propuestas aceptadas · falta verificar la fuente ({approvedBrandProposals.length})</h3>
             <p>Estas marcas fueron aprobadas como candidatas, pero aún no resuelven el pendiente. Revisá la ficha del fabricante o proveedor antes de confirmarlas.</p>
-            <div className="brand-proposal-list">{approvedBrandProposals.slice(0,50).map(item=><article className="brand-proposal-card" key={item.product_key}>
+            <div className="brand-proposal-list">{visibleApprovedBrands.map(item=><article className="brand-proposal-card" key={item.product_key}>
               <div className="brand-proposal-details"><strong>{item.product.name||'Producto sin nombre'}</strong><div className="brand-proposal-meta"><span>Marca propuesta: <b>{item.proposed_brand}</b></span><span>Pendiente de fuente verificable</span></div></div>
               <button className="secondary" onClick={()=>verifyBrandProposal(item)}>Verificar marca</button>
             </article>)}</div>
+            <Pagination page={verifiedPage} total={filteredApprovedBrands.length} pageSize={PAGE_SIZE} onChange={setVerifiedPage}/>
           </section>}
         </>}
       </section>}
@@ -595,9 +617,9 @@ export function WorkQueue(){
       </div>}
 
       {!readinessAvailable?<div className="notice warning"><strong>Los productos no pudieron cargarse.</strong><p>Esto es un problema de conexión con el backend; no significa que los pendientes se hayan borrado.</p></div>:<>
-      <p className="result-count">Mostrando <strong>{Math.min(activeCoreItems.length,50).toLocaleString('es-AR')}</strong> de {activeCoreItems.length.toLocaleString('es-AR')} pendientes{activeCoreItems.length>50?' · usá el buscador para encontrar uno específico':''}</p>
+      <p className="result-count">Mostrando <strong>{activeCoreItems.length?((corePage-1)*PAGE_SIZE+1).toLocaleString('es-AR'):0}–{Math.min(corePage*PAGE_SIZE,activeCoreItems.length).toLocaleString('es-AR')}</strong> de {activeCoreItems.length.toLocaleString('es-AR')} pendientes</p>
       <div className="core-action-list">
-        {activeCoreItems.slice(0,50).map(item=>{
+        {visibleCoreItems.map(item=>{
           const key=productKey(item);
           const research=key?researchByKey.get(key):undefined;
           const selectable=coreIssue==='EAN_MISSING'&&likelyGtinException(item)&&Boolean(key);
@@ -608,7 +630,7 @@ export function WorkQueue(){
           </article>;
         })}
         {activeCoreItems.length===0&&<div className="prepub-empty"><strong>No quedan productos pendientes para este control.</strong></div>}
-      </div></>}
+      </div><Pagination page={corePage} total={activeCoreItems.length} pageSize={PAGE_SIZE} onChange={setCorePage}/></>}
     </section>
 
     <section className="guided-work-list">
@@ -700,3 +722,15 @@ export function WorkQueue(){
     </div>}
   </>;
 }
+function Pagination({page,total,pageSize,onChange}:{page:number;total:number;pageSize:number;onChange:(page:number)=>void}){
+  const pages=Math.max(1,Math.ceil(total/pageSize));
+  if(total<=pageSize)return null;
+  const current=Math.min(page,pages);
+  return <nav className="work-pagination" aria-label="Paginación de productos">
+    <span>Mostrando {((current-1)*pageSize+1).toLocaleString('es-AR')}–{Math.min(current*pageSize,total).toLocaleString('es-AR')} de {total.toLocaleString('es-AR')} · Página {current} de {pages}</span>
+    <div><button type="button" className="secondary" disabled={current===1} onClick={()=>onChange(current-1)}>← Anterior</button>
+    <button type="button" className="secondary" disabled={current===pages} onClick={()=>onChange(current+1)}>Siguiente →</button></div>
+  </nav>;
+}
+
+
