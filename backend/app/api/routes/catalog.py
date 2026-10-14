@@ -14,6 +14,7 @@ from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
+from ...services.tiendanube_price_stock_service import TiendanubePriceStockService
 from ...services.tiendanube_assisted_match_service import TiendanubeAssistedMatchService
 from ...services.gtin_batch_pilot_service import GtinBatchPilotService
 from ...services.external_gtin_candidate_service import ExternalGtinCandidateService
@@ -118,6 +119,11 @@ async def import_tiendanube_csv(
 @router.get("/tiendanube/assisted-matches")
 def tiendanube_assisted_matches(db: Session = Depends(get_db), _session=Depends(require_session)):
     return TiendanubeAssistedMatchService(db).report()
+
+
+@router.get("/tiendanube/price-stock-audit")
+def tiendanube_price_stock_audit(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return TiendanubePriceStockService(db).report()
 
 
 @router.get("/tiendanube/reconciliation")
