@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     kiki_ai_api_key: str = ""
     kiki_ai_model: str = "gpt-4.1-mini"
     kiki_ai_enabled: bool = False
+    kiki_ai_min_regenerate_hours: int = 24
+    kiki_ai_daily_request_limit: int = 10
 
     @field_validator("database_url")
     @classmethod
