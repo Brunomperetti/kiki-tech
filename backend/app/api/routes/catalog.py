@@ -229,8 +229,9 @@ def tiendanube_ai_draft(
     db: Session = Depends(get_db),
     _session=Depends(require_csrf),
 ):
+    # Backward-compatible route: all calls now pass through persistence and usage guards.
     try:
-        return TiendanubeAiPilotService(db).draft(request.product_key)
+        return TiendanubeAiDraftReviewService(db).generate_and_save(request.product_key)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:
