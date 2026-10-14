@@ -107,6 +107,9 @@ export const api = {
   bulkApproveBrandProposals: (product_keys:string[]) => request<{requested:number;processed:number;status:string}>('/api/enrichment-review-decisions/bulk-brand', {
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_keys}),
   }),
+  brandNotApplicable: (product_keys:string[],reason:string) => request<{requested:number;processed:number;status:string}>('/api/enrichment-review-decisions/brand-not-applicable',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_keys,reason}),
+  }),
   enrichmentReviewQueue: () => request<EnrichmentReviewQueue>('/api/enrichment-review-queue'),
   saveEnrichmentDecision: (productKey: string, status: EnrichmentReviewStatus, note?: string) => request<EnrichmentReviewItem>('/api/enrichment-review-decisions', {
     method: 'POST',

@@ -218,3 +218,29 @@ def test_bulk_accepts_medium_unique_proposals_with_actual_confidence():
         row = db.query(EnrichmentReviewDecision).one()
         assert row.history[-1]["confidence"] == "MEDIUM"
         assert row.proposed_brand == "Natufarma"
+
+
+def test_unbranded_exception_keeps_gtin_independent_and_audit_history():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        report = {"reconciliation_run_id": 42, "items": [
+            readiness_item(ecomm_id="1", sku="1", name="CARQUEJA SUELTA X 50 GRS"),
+            readiness_item(ecomm_id="2", sku="2", name="CARDO MARIANO SUELTO X 50 GRS"),
+            readiness_item(ecomm_id="3", sku="3", name="YERBA ENVASADA 500 GRS"),
+        ]}
+        service = service_with_report(db, report)
+        with pytest.raises(ValueError, match="señal"):
+            service.bulk_mark_brand_not_applicable(
+                ["ECOMM:1", "ECOMM:3"], "Confirmado sin marca por el vendedor."
+            )
+        assert db.query(EnrichmentReviewDecision).count() == 0
+        result = service.bulk_mark_brand_not_applicable(
+            ["ECOMM:1", "ECOMM:2"], "Productos fraccionados sin marca comercial."
+        )
+        assert result["processed"] == 2
+        rows = db.query(EnrichmentReviewDecision).all()
+        assert all(row.status == "BRAND_NOT_APPLICABLE" for row in rows)
+        assert all(row.proposed_ean is None for row in rows)
+        assert all(row.history[-1]["reason"] for row in rows)
+        assert service.queue()["summary"]["BRAND_NOT_APPLICABLE"] == 2

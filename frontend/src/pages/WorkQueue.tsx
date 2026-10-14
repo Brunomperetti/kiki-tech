@@ -103,6 +103,10 @@ export function WorkQueue(){
   const [continuityBusy,setContinuityBusy]=useState('');
   const [brandProposals,setBrandProposals]=useState<EnrichmentReviewQueue|null>(null);
   const [selectedBrandKeys,setSelectedBrandKeys]=useState<Set<string>>(new Set());
+  const [unbrandedKeys,setUnbrandedKeys]=useState<Set<string>>(new Set());
+  const [unbrandedReason,setUnbrandedReason]=useState('Productos comercializados genéricos, sueltos o fraccionados sin marca comercial.');
+  const [unbrandedBusy,setUnbrandedBusy]=useState(false);
+  const [unbrandedError,setUnbrandedError]=useState('');
   const [brandBusy,setBrandBusy]=useState(false);
   const [brandError,setBrandError]=useState('');
   const [selectedGtinKeys,setSelectedGtinKeys]=useState<Set<string>>(new Set());
@@ -169,6 +173,7 @@ export function WorkQueue(){
   function evidenceResolved(item:ReadinessItem,field:CoreIssue){
     const key=productKey(item);
     const research=key?researchByKey.get(key):undefined;
+    if(field==='BRAND_MISSING'&&(brandProposals?.items||[]).some(proposal=>proposal.product_key===key&&proposal.review_status==='BRAND_NOT_APPLICABLE'))return true;
     if(!research)return false;
     if(field==='EAN_MISSING'){
       return (
@@ -196,8 +201,27 @@ export function WorkQueue(){
   );
   const pendingBrandItems=useMemo(
     ()=>rawBrandItems.filter(item=>!evidenceResolved(item,'BRAND_MISSING')),
-    [rawBrandItems,researchByKey],
+    [rawBrandItems,researchByKey,brandProposals],
   );
+
+  const likelyUnbranded=useMemo(()=>pendingBrandItems.filter(item=>
+    /\b(SUELTO|SUELTA|GRANEL|FRACCIONAD[OA])\b/i.test(item.product.name||'')
+  ),[pendingBrandItems]);
+
+  async function confirmUnbranded(){
+    const keys=[...unbrandedKeys];
+    if(!keys.length)return;
+    if(unbrandedReason.trim().length<15){setUnbrandedError('Explicá el motivo con al menos 15 caracteres.');return;}
+    if(!window.confirm(`¿Confirmar que estos ${keys.length} productos no tienen marca comercial? Esta decisión no resuelve sus EAN ni autoriza publicarlos.`))return;
+    setUnbrandedBusy(true);setUnbrandedError('');
+    try{
+      const result=await api.brandNotApplicable(keys,unbrandedReason.trim());
+      setBrandProposals(await api.enrichmentReviewQueue());
+      setUnbrandedKeys(new Set());
+      setSuccess(`${result.processed} productos documentados como Marca no aplica. El EAN sigue pendiente cuando corresponda.`);
+    }catch(err){setUnbrandedError(err instanceof Error?err.message:'No se guardó la excepción de marca.');}
+    finally{setUnbrandedBusy(false);}
+  }
 
   const proposedBrands=useMemo(
     ()=> (brandProposals?.items||[]).filter(item=>
@@ -571,6 +595,20 @@ export function WorkQueue(){
         <div><h3>{coreIssue==='EAN_MISSING'?'Productos sin EAN/GTIN':'Productos sin marca'}</h3><p>{coreIssue==='EAN_MISSING'?'Validá el código de la presentación exacta con una fuente confiable.':'Validá la marca real del producto con una fuente confiable.'}</p></div>
         <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>{setCoreSearch(event.target.value);setCorePage(1);setBrandPage(1);setVerifiedPage(1)}}/>
       </div>
+      {coreIssue==='BRAND_MISSING'&&likelyUnbranded.length>0&&<section className="gtin-pilot-panel">
+        <h3>Posibles productos sin marca comercial</h3>
+        <p>KIKI detectó {likelyUnbranded.length} títulos con «suelto», «granel» o «fraccionado». Es solo una sugerencia: confirmá que se venden sin marca propia ni del proveedor.</p>
+        <div className="bulk-selection-bar">
+          <strong>{unbrandedKeys.size} seleccionados</strong>
+          <button className="secondary" disabled={unbrandedBusy} onClick={()=>setUnbrandedKeys(new Set(likelyUnbranded.slice(0,200).map(productKey).filter(Boolean)))}>Seleccionar hasta 200 sugeridos</button>
+          <button className="secondary" disabled={unbrandedBusy} onClick={()=>setUnbrandedKeys(new Set())}>Limpiar</button>
+        </div>
+        {unbrandedKeys.size>0&&<div className="core-resolution-form">
+          <label className="core-resolution-notes">Motivo que se guardará por producto<textarea value={unbrandedReason} onChange={event=>setUnbrandedReason(event.target.value)}/></label>
+          <button disabled={unbrandedBusy} onClick={()=>void confirmUnbranded()}>Confirmar «Marca no aplica» ({unbrandedKeys.size})</button>
+        </div>}
+        {unbrandedError&&<div className="notice warning">{unbrandedError}</div>}
+      </section>}
       {coreIssue==='BRAND_MISSING'&&<section className="core-brand-proposals">
         <div className="core-list-toolbar">
           <div><h3>Marcas sugeridas por KIKI</h3><p>Candidatas del catálogo interno, con evidencia y nivel de confianza. Aprobar una propuesta no equivale a verificarla ni habilita publicación.</p></div>
@@ -629,6 +667,7 @@ export function WorkQueue(){
           const research=key?researchByKey.get(key):undefined;
           const selectable=coreIssue==='EAN_MISSING'&&likelyGtinException(item)&&Boolean(key);
           return <article key={key||item.product.sku||item.product.name} className={selectable&&selectedGtinKeys.has(key)?'selected-core-item':''}>
+            {coreIssue==='BRAND_MISSING'&&likelyUnbranded.some(candidate=>productKey(candidate)===key)&&<label className="core-select"><input type="checkbox" checked={unbrandedKeys.has(key)} onChange={()=>setUnbrandedKeys(previous=>{const next=new Set(previous);if(next.has(key))next.delete(key);else next.add(key);return next;})}/><span>Sin marca</span></label>}
             {selectable&&<label className="core-select"><input type="checkbox" checked={selectedGtinKeys.has(key)} onChange={()=>toggleGtinSelection(key)}/><span>Seleccionar</span></label>}
             <div><strong>{item.product.name||'Producto sin nombre'}</strong><small>SKU {item.product.sku||item.product.sku_effective||'—'} · Stock {item.product.stock??'—'}{item.product.brand?` · Marca ${item.product.brand}`:''}</small><div className="core-row-badges">{coreIssue==='EAN_MISSING'&&likelyGtinException(item)&&<span className="core-suggestion-badge">Posible excepción GTIN</span>}{research&&!['EVIDENCE_ACCEPTED','GTIN_NOT_APPLICABLE'].includes(research.research_status)&&<span className="core-draft-badge">Investigación iniciada</span>}</div></div>
             <button onClick={()=>openResolution(item)}>{research?'Continuar':'Resolver'} {coreIssue==='EAN_MISSING'?'EAN':'marca'}</button>
