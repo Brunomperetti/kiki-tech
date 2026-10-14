@@ -230,3 +230,29 @@
 .executive-bottom p{margin:0;font-size:13px;line-height:1.6}
 @media(max-width:850px){.executive-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.executive-channel-grid{grid-template-columns:1fr}}
 @media(max-width:520px){.executive-kpis{grid-template-columns:1fr}}
+
+
+/* Tiendanube import usability */
+.imports-subtitle{font-size:18px;margin:20px 0 12px}
+.tn-import-section{display:grid;gap:14px;min-width:0}
+.tn-import-section>p{margin:0}
+.tn-import-section .tn-upload{display:flex;flex-direction:column;align-items:flex-start;max-width:100%;width:100%;gap:8px;padding:18px;overflow:hidden}
+.tn-upload input{max-width:100%;font-size:13px}
+.tn-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.tn-summary>div{display:grid;gap:8px;padding:14px;border:1px solid #dce5df;border-radius:10px;background:#f5f9f6;min-width:0}
+.tn-summary small{color:#617168;font-size:11px}
+.tn-summary strong{font-size:24px;color:#193f2e;font-variant-numeric:tabular-nums}
+.tn-explanation{font-size:13px;line-height:1.55}
+.tn-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.tn-filters label{display:grid;gap:6px;font-size:12px;font-weight:600;min-width:180px;flex:1}
+.tn-filters select,.tn-filters input{width:100%;padding:10px;border:1px solid #ccd9d1;border-radius:8px;background:white;font:inherit;font-size:13px;min-width:0}
+.tn-table-wrap{max-height:420px;overflow:auto;max-width:100%;min-width:0}
+.tn-table-wrap table{min-width:800px;table-layout:auto}
+.tn-table-wrap th{position:sticky;top:0;z-index:1;background:#f7f9f8}
+.tn-table-wrap td{overflow-wrap:anywhere}
+.tn-table-wrap td:first-child{min-width:220px;max-width:340px}
+.tn-status{display:inline-block;font-size:11px;white-space:normal;background:#edf3ef;border-radius:6px;padding:5px 8px}
+.tn-pages{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap}
+.tn-pages button{padding:10px 14px}
+@media(max-width:900px){.tn-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.tn-summary{grid-template-columns:1fr}.tn-filters{display:grid}}
