@@ -14,6 +14,7 @@ from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
+from ...services.tiendanube_ai_pilot_service import TiendanubeAiPilotService
 from ...services.tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
 from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
@@ -215,6 +216,24 @@ async def import_tiendanube_image_csv(
 @router.get("/tiendanube/images/audit")
 def tiendanube_image_audit(db: Session = Depends(get_db), _session=Depends(require_session)):
     return TiendanubeImageAuditService(db).report()
+
+
+class TiendanubeAiDraftRequest(BaseModel):
+    product_key: str
+
+
+@router.post("/tiendanube/ai/draft")
+def tiendanube_ai_draft(
+    request: TiendanubeAiDraftRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAiPilotService(db).draft(request.product_key)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @router.get("/tiendanube/enrichment-proposals")
