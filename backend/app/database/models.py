@@ -282,3 +282,18 @@ class TiendanubeMatchDecision(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class TiendanubeAiDraftRecord(Base):
+    """Local editorial draft; never a publication authorization."""
+    __tablename__ = "tiendanube_ai_draft_records"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_key: Mapped[str] = mapped_column(String(500), unique=True, index=True)
+    evidence_hash: Mapped[str] = mapped_column(String(64), index=True)
+    draft: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
