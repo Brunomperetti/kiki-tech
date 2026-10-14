@@ -115,6 +115,27 @@ async def import_tiendanube_csv(
         raise HTTPException(422, str(exc)) from exc
 
 
+class TiendanubeMatchDecisionRequest(BaseModel):
+    source_key: str
+    target_ecomm_id: str | None = None
+    status: str
+    note: str
+
+
+@router.post("/tiendanube/match-decision")
+def tiendanube_match_decision(
+    request: TiendanubeMatchDecisionRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAssistedMatchService(db).decide(
+            request.source_key, request.target_ecomm_id, request.status, request.note
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.get("/tiendanube/assisted-matches")
 def tiendanube_assisted_matches(db: Session = Depends(get_db), _session=Depends(require_session)):
     return TiendanubeAssistedMatchService(db).report()
