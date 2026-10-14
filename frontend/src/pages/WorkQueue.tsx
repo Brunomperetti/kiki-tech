@@ -88,7 +88,7 @@ export function WorkQueue(){
   });
   const [error,setError]=useState('');
   const [success,setSuccess]=useState('');
-  const [coreIssue,setCoreIssue]=useState<CoreIssue>('EAN_MISSING');
+  const [coreIssue,setCoreIssue]=useState<CoreIssue>('BRAND_MISSING');
   const [coreSearch,setCoreSearch]=useState('');
   const [corePage,setCorePage]=useState(1);
   const [brandPage,setBrandPage]=useState(1);
@@ -99,13 +99,6 @@ export function WorkQueue(){
   const [draft,setDraft]=useState<EvidenceDraft>({...emptyDraft});
   const [evidenceBusy,setEvidenceBusy]=useState(false);
   const [evidenceError,setEvidenceError]=useState('');
-  const [gtinSuggestions,setGtinSuggestions]=useState<{candidates:{ean:string;matched_name:string;matched_sku?:string;matched_brand?:string;reason:string}[];message:string}|null>(null);
-  const [gtinBusy,setGtinBusy]=useState(false);
-  const [pilotBusy,setPilotBusy]=useState(false);
-  const [pilotError,setPilotError]=useState('');
-  const [pilotResult,setPilotResult]=useState<{requested:number;external_checked:number;summary:Record<string,number>;items:{product_key:string;product_name?:string;sku?:string;status:string;candidates:{ean:string;source_url?:string;matched_name?:string}[];external_message?:string}[]}|null>(null);
-  const [externalGtinBusy,setExternalGtinBusy]=useState(false);
-  const [externalGtin,setExternalGtin]=useState<{candidates:{ean:string;matched_name:string;matched_brand:string;quantity:string;source_name:string;source_url:string;reason:string}[];message:string;unavailable?:boolean}|null>(null);
   const [loading,setLoading]=useState(false);
   const [continuityBusy,setContinuityBusy]=useState('');
   const [brandProposals,setBrandProposals]=useState<EnrichmentReviewQueue|null>(null);
@@ -401,29 +394,10 @@ export function WorkQueue(){
     }
   }
 
-  async function runGtinPilot(){
-    const ranked=[...activeCoreItems].sort((a,b)=>{
-      const score=(item:ReadinessItem)=>{
-        const name=String(item.product.name||'').toUpperCase();
-        const bulk=/\\b(SUELTO|SUELTA|GRANEL|FRACCIONAD[OA])\\b/.test(name);
-        return (bulk?0:100)+(item.product.brand?30:0)+Math.min(name.split(/\\s+/).length,15);
-      };
-      return score(b)-score(a);
-    });
-    const keys=ranked.slice(0,20).map(productKey).filter(Boolean);
-    if(!keys.length){setPilotError('No hay productos para investigar.');return;}
-    setPilotBusy(true);setPilotError('');setPilotResult(null);
-    try{setPilotResult(await api.gtinBatchPilot(keys));}
-    catch(err){setPilotError(err instanceof Error?err.message:'Falló la investigación piloto.');}
-    finally{setPilotBusy(false);}
-  }
-
   function openResolution(item:ReadinessItem){
     const key=productKey(item);
     const existing=key?researchByKey.get(key):undefined;
     setResolutionItem(item);
-    setGtinSuggestions(null);
-    setExternalGtin(null);
     setDraft({
       ...draftFromResearch(existing),
       proposed_ean:existing?.proposed_ean||item.product.ean||'',
@@ -439,24 +413,6 @@ export function WorkQueue(){
     setCoreIssue('BRAND_MISSING');
     openResolution(source);
     setDraft(current=>({...current,proposed_brand:item.proposed_brand||item.internal_evidence.brand_candidate||'',confidence:'',source_name:'',source_url:'',notes:''}));
-  }
-
-  async function findGtinSuggestions(){
-    if(!resolutionItem)return;
-    setGtinBusy(true);setEvidenceError('');
-    try{
-      setGtinSuggestions(await api.gtinCandidates(productKey(resolutionItem)));
-    }catch(err){setEvidenceError(err instanceof Error?err.message:'No se pudo consultar el catálogo interno.');}
-    finally{setGtinBusy(false);}
-  }
-
-  async function findExternalGtin(){
-    if(!resolutionItem)return;
-    setExternalGtinBusy(true);setEvidenceError('');
-    try{
-      setExternalGtin(await api.externalGtinCandidates(productKey(resolutionItem)));
-    }catch(err){setEvidenceError(err instanceof Error?err.message:'No se pudo consultar la fuente externa.');}
-    finally{setExternalGtinBusy(false);}
   }
 
   function setField(field:keyof EvidenceDraft,value:string){
@@ -647,19 +603,6 @@ export function WorkQueue(){
           </section>}
         </>}
       </section>}
-      {coreIssue==='EAN_MISSING'&&readinessAvailable&&<section className="gtin-pilot-panel">
-        <div><h3>Piloto de investigación · 20 productos</h3><p>Prioriza hasta 20 productos con mejor identificación de la búsqueda actual, relegando sueltos/fraccionados. Examina el catálogo interno y consulta hasta 5 en Open Food Facts. No modifica códigos ni los aprueba.</p></div>
-        <button disabled={pilotBusy||activeCoreItems.length===0} onClick={()=>void runGtinPilot()}>{pilotBusy?'Investigando…':'Investigar 20 priorizados'}</button>
-        {pilotError&&<div className="notice warning">{pilotError}</div>}
-        {pilotResult&&<div className="gtin-pilot-results">
-          <p>Analizados: {pilotResult.requested} · Consulta externa: {pilotResult.external_checked} · Con candidatos: {pilotResult.summary.candidate||0} · Sin candidatos tras consulta: {pilotResult.summary.no_candidate||0} · Fuente no disponible: {pilotResult.summary.source_unavailable||0} · Fuente externa no consultada: {pilotResult.summary.external_not_checked||0}</p>
-          <div className="gtin-pilot-items">{pilotResult.items.map(item=><article key={item.product_key}>
-            <strong>{item.product_name||item.product_key}</strong>
-            <small>SKU {item.sku||'—'} · {item.status==='candidate'?'Candidato para revisar':item.status==='source_unavailable'?'Fuente no disponible':item.status==='needs_product_data'?'Faltan datos':'Pendiente de investigación externa'}</small>
-            {item.candidates.map(candidate=><div key={candidate.ean}><code>{candidate.ean}</code> {candidate.matched_name||''} {candidate.source_url&&<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">Ver fuente ↗</a>}</div>)}
-          </article>)}</div>
-        </div>}
-      </section>}
       {coreIssue==='EAN_MISSING'&&readinessAvailable&&<div className="gtin-triage">
         <div><strong>KIKI detectó {likelyExceptionCount.toLocaleString('es-AR')} posibles casos sin GTIN propio</strong><p>Señal conservadora basada en palabras como “suelta”, “granel”, “fraccionado” o “artesanal”. Podés revisarlos y resolverlos juntos cuando realmente comparten la misma justificación.</p></div>
         <div className="gtin-triage-actions">
@@ -756,33 +699,9 @@ export function WorkQueue(){
         {evidenceError&&<div className="notice warning">{evidenceError}</div>}
         <div className="core-resolution-guide">
           <strong>No adivinamos datos.</strong>
-          <p>Usá fabricante oficial, GS1, etiqueta/ficha verificable o un distribuidor confiable de la presentación exacta. KIKI valida el formato del GTIN antes de aceptarlo.</p>
+          <p>Confirmá marca, presentación y fuente verificable antes de aceptar. KIKI conserva la evidencia y no modifica Ecomm-App ni Mercado Libre.</p>
         </div>
 
-        {coreIssue==='EAN_MISSING'&&<div className="gtin-candidates">
-          <button className="secondary" type="button" disabled={gtinBusy} onClick={()=>void findGtinSuggestions()}>{gtinBusy?'Buscando…':'Buscar EAN en KIKI'}</button>
-          {gtinSuggestions&&<div><p>{gtinSuggestions.message}</p>
-            {gtinSuggestions.candidates.map(candidate=><article key={candidate.ean}>
-              <strong>GTIN candidato: {candidate.ean}</strong>
-              <p>{candidate.matched_name} · SKU {candidate.matched_sku||'—'} · {candidate.matched_brand||'Marca desconocida'}</p>
-              <small>{candidate.reason}</small>
-              <button className="secondary" type="button" onClick={()=>setDraft(current=>({...current,proposed_ean:candidate.ean,confidence:'',source_name:'',source_url:''}))}>Usar como borrador</button>
-            </article>)}
-          </div>}
-        </div>}
-        {coreIssue==='EAN_MISSING'&&<div className="gtin-candidates">
-          <button type="button" className="secondary" disabled={externalGtinBusy} onClick={()=>void findExternalGtin()}>{externalGtinBusy?'Buscando en fuente externa…':'Investigar EAN en Open Food Facts'}</button>
-          <small>Base colaborativa de alimentos: las coincidencias son candidatas, no certificación de fabricante. La consulta se realiza solo al tocar el botón.</small>
-          {externalGtin&&<div><p>{externalGtin.message}</p>
-            {externalGtin.candidates.map(candidate=><article key={candidate.ean}>
-              <strong>GTIN posible: {candidate.ean}</strong>
-              <p>{candidate.matched_name} · {candidate.matched_brand||'Sin marca'} · {candidate.quantity||'Presentación no declarada'}</p>
-              <small>{candidate.reason}</small>
-              <a href={candidate.source_url} target="_blank" rel="noopener noreferrer">Ver ficha de origen ↗</a>
-              <button className="secondary" type="button" onClick={()=>setDraft(current=>({...current,proposed_ean:candidate.ean,source_name:'',source_url:'',confidence:'',notes:'Candidato Open Food Facts: '+candidate.source_url+'. Verificar con fabricante antes de aceptar.'}))}>Copiar candidato a borrador (sin verificar)</button>
-            </article>)}
-          </div>}
-        </div>}
         <div className="core-resolution-form">
           <label>EAN / GTIN<input inputMode="numeric" value={draft.proposed_ean} placeholder="Ej. 7791234567890" onChange={event=>setField('proposed_ean',event.target.value)}/></label>
           <label>Marca<input value={draft.proposed_brand} placeholder="Marca verificada" onChange={event=>setField('proposed_brand',event.target.value)}/></label>
@@ -794,7 +713,7 @@ export function WorkQueue(){
 
         <div className="core-resolution-actions">
           <button className="secondary" onClick={()=>void copyResearchQuery()} disabled={evidenceBusy}>Copiar búsqueda sugerida</button>
-          <Link className="secondary-link" to="/external-research">Investigación avanzada</Link>
+          
           <button className="secondary" onClick={()=>void saveEvidence('DRAFT')} disabled={evidenceBusy}>{evidenceBusy?'Guardando…':'Guardar borrador'}</button>
           {coreIssue==='EAN_MISSING'&&<button className="gtin-exception-action" onClick={()=>void saveEvidence('GTIN_NOT_APPLICABLE')} disabled={evidenceBusy}>{evidenceBusy?'Guardando…':'No tiene GTIN / no aplica'}</button>}
           <button onClick={()=>void saveEvidence('EVIDENCE_ACCEPTED')} disabled={evidenceBusy}>{evidenceBusy?'Validando…':'Aceptar evidencia'}</button>
