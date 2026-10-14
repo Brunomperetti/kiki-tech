@@ -169,7 +169,7 @@ def test_bulk_brand_approval_is_atomic_and_keeps_individual_histories():
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         service = service_with_report(db, report_with_internal_evidence())
-        with pytest.raises(ValueError, match="confianza alta"):
+        with pytest.raises(ValueError, match="confianza alta o media"):
             service.bulk_approve_brand_proposals(["ECOMM:10", "ECOMM:20"])
         assert db.query(EnrichmentReviewDecision).count() == 0
 
@@ -197,3 +197,24 @@ def test_bulk_brand_rejects_stale_and_incompatible_selection():
         service.save_decision("ECOMM:10", "EXTERNAL_RESEARCH")
         with pytest.raises(ValueError, match="incompatible"):
             service.bulk_approve_brand_proposals(["ECOMM:10"])
+
+
+def test_bulk_accepts_medium_unique_proposals_with_actual_confidence():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        report = report_with_internal_evidence()
+        service = service_with_report(db, report)
+        original = service._eligible_items
+        def medium_items(readiness):
+            items = original(readiness)
+            for item in items:
+                if item["product_key"] == "ECOMM:10":
+                    item["internal_evidence"]["confidence"] = "MEDIUM"
+            return items
+        service._eligible_items = medium_items
+        result = service.bulk_approve_brand_proposals(["ECOMM:10"])
+        assert result["processed"] == 1
+        row = db.query(EnrichmentReviewDecision).one()
+        assert row.history[-1]["confidence"] == "MEDIUM"
+        assert row.proposed_brand == "Natufarma"
