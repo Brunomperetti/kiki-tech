@@ -171,6 +171,8 @@ export const api = {
     body: JSON.stringify(payload),
   }),
   tiendanubeAssistedMatches: () => request<{available:boolean;summary:{sku_unmatched:number;with_proposals:number;without_proposals:number};items:{tiendanube_sku:string;tiendanube_name:string;tiendanube_brand:string;tiendanube_slug:string;status:string;candidates:{ecomm_id:string;sku:string;name:string;brand:string;similarity:number;confidence:string;evidence:string}[]}[];policy?:string}>('/api/tiendanube/assisted-matches'),
+  tiendanubeImageAudit: () => request<{available:boolean;summary:Record<string,number>;items:{product_id:string;name:string;sku:string;status:string;image_count:number;image_urls:string[];tiendanube_slug:string|null}[];policy?:string}>('/api/tiendanube/images/audit'),
+  uploadTiendanubeImages: (file:File) => {const form=new FormData();form.append('file',file);return request<{images:number;product_ids:number;policy:string}>('/api/tiendanube/images/import-csv',{method:'POST',body:form})},
   tiendanubeReport: () => request<{available:boolean;summary:Record<string,number>;items:{slug:string;name:string;sku:string;ean_raw:string;brand:string;price:string|null;stock:string|null;status:string;matched_ecomm_id:string|null}[];policy?:string}>('/api/tiendanube/reconciliation'),
   uploadTiendanube: (file:File) => {const form=new FormData();form.append('file',file);return request<{records:number;products:number;status:string}>('/api/tiendanube/import-csv',{method:'POST',body:form});},
   imports: () => request<ImportJob[]>('/api/imports'),
