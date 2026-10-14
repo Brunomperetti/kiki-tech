@@ -171,6 +171,7 @@ export const api = {
     body: JSON.stringify(payload),
   }),
   tiendanubeAssistedMatches: () => request<{available:boolean;summary:{sku_unmatched:number;with_proposals:number;without_proposals:number};items:{tiendanube_sku:string;tiendanube_name:string;tiendanube_brand:string;tiendanube_slug:string;status:string;candidates:{ecomm_id:string;sku:string;name:string;brand:string;similarity:number;confidence:string;evidence:string}[]}[];policy?:string}>('/api/tiendanube/assisted-matches'),
+  tiendanubePriceStockAudit: () => request<{available:boolean;summary:Record<string,number>;items:{sku:string;name:string;ecomm_id:string;tiendanube_price:string|null;ecomm_list_price:string|null;price_difference:string|null;tiendanube_stock:string|null;ecomm_stock:string|null;stock_difference:string|null;price_state:string;stock_state:string}[];policy?:string}>('/api/tiendanube/price-stock-audit'),
   tiendanubeReport: () => request<{available:boolean;summary:Record<string,number>;items:{slug:string;name:string;sku:string;ean_raw:string;brand:string;price:string|null;stock:string|null;status:string;matched_ecomm_id:string|null}[];policy?:string}>('/api/tiendanube/reconciliation'),
   uploadTiendanube: (file:File) => {const form=new FormData();form.append('file',file);return request<{records:number;products:number;status:string}>('/api/tiendanube/import-csv',{method:'POST',body:form});},
   imports: () => request<ImportJob[]>('/api/imports'),
