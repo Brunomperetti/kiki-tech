@@ -128,3 +128,47 @@ class TiendanubeAssistedMatchService:
         record.updated_at = now
         db.commit()
         return {"status": status, "source_key": source_key, "history_count": len(record.history)}
+
+    def bulk_preview(self, source_keys: list[str]):
+        if not source_keys or len(source_keys) > 50 or len(set(source_keys)) != len(source_keys):
+            raise ValueError("Seleccioná entre 1 y 50 productos diferentes.")
+        by_key = {x["source_key"]: x for x in self.report()["items"]}
+        selection = []
+        for key in source_keys:
+            item = by_key.get(key)
+            if not item:
+                raise ValueError("Hay productos que ya no están pendientes. Actualizá la revisión.")
+            if item["decision"] is not None:
+                raise ValueError("Hay decisiones previas. Revisalas individualmente antes de cambiarlas.")
+            selection.append(item)
+        return {"count": len(selection), "items": [
+            {"source_key": x["source_key"], "name": x["tiendanube_name"],
+             "sku": x["tiendanube_sku"], "candidate_count": len(x["candidates"])}
+            for x in selection
+        ], "action": "REJECTED", "policy": "No se crea vínculo ni se modifica ningún catálogo externo."}
+
+    def bulk_reject(self, source_keys: list[str], note: str):
+        if len((note or "").strip()) < 10:
+            raise ValueError("Ingresá un motivo de al menos 10 caracteres.")
+        preview = self.bulk_preview(source_keys)
+        db = self.catalog.repo.db
+        current = {x["source_key"]: x for x in self.report()["items"]}
+        existing = set(db.scalars(select(TiendanubeMatchDecision.source_key).where(
+            TiendanubeMatchDecision.source_key.in_(source_keys))).all())
+        if existing:
+            raise ValueError("Hay decisiones anteriores para estos productos. Actualizá la revisión.")
+        now = datetime.now(timezone.utc)
+        for key in source_keys:
+            item = current[key]
+            source = {"sku": item["tiendanube_sku"], "slug": item["tiendanube_slug"],
+                      "name": item["tiendanube_name"], "brand": item["tiendanube_brand"]}
+            event = {"at": now.isoformat(), "status": "REJECTED", "target_ecomm_id": None,
+                     "note": note.strip(), "source": source, "target": {}}
+            db.add(TiendanubeMatchDecision(
+                source_key=key, status="REJECTED", target_ecomm_id=None,
+                source_snapshot=source, target_snapshot={}, note=note.strip(),
+                history=[event], updated_at=now,
+            ))
+        db.commit()
+        return {"updated": preview["count"], "status": "REJECTED",
+                "policy": "Solo decisiones internas; sin cambios en Tiendanube, Ecomm o ML."}
