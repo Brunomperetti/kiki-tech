@@ -87,6 +87,47 @@ class TiendanubeCsvService:
                 "products": len({r["slug"] for r in records if r["slug"]}),
                 "status": "COMPLETED"}
 
+
+    def duplicate_sku_review(self):
+        """Audit repeated SKU groups without changing source data."""
+        rows = self.repo.snapshot("TIENDANUBE")
+        if not rows:
+            return {"available": False, "groups": [], "summary": {}}
+        by_sku = {}
+        for row in rows:
+            sku = str(row.get("sku") or "").strip()
+            if sku:
+                by_sku.setdefault(sku.casefold(), []).append(row)
+        groups = []
+        for sku, members in sorted(by_sku.items()):
+            if len(members) < 2:
+                continue
+            slugs = {str(x.get("slug") or "").strip() for x in members}
+            variants = [tuple(sorted(
+                (str(v.get("property") or "").strip().casefold(), str(v.get("value") or "").strip().casefold())
+                for v in (x.get("variant") or []) if str(v.get("property") or "").strip()
+            )) for x in members]
+            different_variants = len(set(variants)) == len(variants) and all(variants)
+            same_product = len(slugs) == 1 and "" not in slugs
+            if same_product and different_variants:
+                status = "POSSIBLE_SHARED_SKU_VARIANTS"
+                reason = "Mismo producto con atributos de variante diferentes. Revisar si el SKU compartido es correcto."
+            elif not same_product:
+                status = "CROSS_PRODUCT_SKU_CONFLICT"
+                reason = "El SKU se repite en productos diferentes; requiere revisión."
+            else:
+                status = "DUPLICATE_VARIANT_OR_ROW"
+                reason = "Mismo producto sin atributos de variante que distingan todas las filas."
+            groups.append({"sku": members[0]["sku"], "count": len(members),
+                           "status": status, "reason": reason, "items": members})
+        counts = Counter(group["status"] for group in groups)
+        return {"available": True,
+                "summary": {"groups": len(groups),
+                            "affected_rows": sum(group["count"] for group in groups),
+                            **dict(counts)},
+                "groups": groups,
+                "policy": "Clasificación orientativa: no altera SKU, stock, precios ni variantes."}
+
     def report(self):
         tn = self.repo.snapshot("TIENDANUBE")
         ecomm = self.repo.snapshot("ECOMM_APP")
