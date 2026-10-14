@@ -266,3 +266,19 @@ class MercadoLibreSync(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class TiendanubeMatchDecision(Base):
+    """Auditable human decision; never performs external writes."""
+    __tablename__ = "tiendanube_match_decisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_key: Mapped[str] = mapped_column(String(500), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(24), index=True)
+    target_ecomm_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    target_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    note: Mapped[str] = mapped_column(Text)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
