@@ -1,7 +1,5 @@
 """Conservative catalog completeness audit for imported Tiendanube snapshots."""
 from collections import Counter
-from html import unescape
-import re
 
 from .tiendanube_csv_service import TiendanubeCsvService
 
