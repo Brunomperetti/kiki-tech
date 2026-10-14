@@ -1,7 +1,6 @@
 """Read-only Tiendanube catalog import and conservative SKU reconciliation."""
 import csv
 import io
-import re
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
