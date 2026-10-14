@@ -11,6 +11,7 @@ export function Layout(){
       <NavLink to="/work">Resolver pendientes</NavLink>
       <NavLink to="/readiness">Vincular con ML</NavLink>
       <NavLink to="/prepublication">Publicar en ML</NavLink>
+      <NavLink to="/tiendanube">Tiendanube</NavLink>
     </nav>
 
     <details className="advanced-nav">
