@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {api} from '../services/api';
-import type {FinalPublicationQueueReport,InventoryLinkageReport,MercadoLibreStatus,Summary} from '../types/catalog';
+import type {FinalPublicationQueueReport,InventoryLinkageReport,MercadoLibreStatus,Summary,ReadinessReport} from '../types/catalog';
 
 const emptyMl:MercadoLibreStatus={connected:false,token_expired:false,listing_count:0};
 const date=(value?:string)=>value?new Date(value).toLocaleString('es-AR'):'Nunca';
@@ -11,6 +11,9 @@ export function Dashboard(){
   const [ml,setMl]=useState<MercadoLibreStatus>(emptyMl);
   const [linkage,setLinkage]=useState<InventoryLinkageReport|null>(null);
   const [finalQueue,setFinalQueue]=useState<FinalPublicationQueueReport|null>(null);
+  const [readiness,setReadiness]=useState<ReadinessReport|null>(null);
+  const [audit,setAudit]=useState<{total:number;items:{status:string}[]}|null>(null);
+  const [summaryLoaded,setSummaryLoaded]=useState(false);
   const [busy,setBusy]=useState(false);
   const [syncing,setSyncing]=useState(false);
   const [message,setMessage]=useState('');
@@ -21,11 +24,16 @@ export function Dashboard(){
       api.mlStatus(),
       api.inventoryLinkage(),
       api.finalPublicationQueue(),
+      api.publicationReadiness(),
+      api.internalDecisionHistory(),
     ]);
+    setSummaryLoaded(results[0].status==='fulfilled');
     if(results[0].status==='fulfilled')setData(results[0].value);
     if(results[1].status==='fulfilled')setMl(results[1].value);
     if(results[2].status==='fulfilled')setLinkage(results[2].value);
     if(results[3].status==='fulfilled')setFinalQueue(results[3].value);
+    if(results[4].status==='fulfilled')setReadiness(results[4].value);
+    if(results[5].status==='fulfilled')setAudit(results[5].value);
   }
 
   useEffect(()=>{void load().catch(e=>setMessage(e instanceof Error?e.message:'No se pudo cargar el inicio.'))},[]);
@@ -49,6 +57,9 @@ export function Dashboard(){
     finally{setSyncing(false)}
   }
 
+  const formatCount=(value?:number|null)=>value===undefined||value===null?'—':value.toLocaleString('es-AR');
+  const brandNotApplicable=audit?.items.filter(item=>item.status==='BRAND_NOT_APPLICABLE').length;
+  const brandApproved=audit?.items.filter(item=>item.status==='APPROVED_PROPOSAL').length;
   const ecomm=data.import_diagnostics?.find(item=>item.source==='ECOMM_APP');
   const linkPending=linkage?.summary.review_required??0;
   const linkReady=linkage?.summary.ready_to_link??0;
@@ -59,6 +70,27 @@ export function Dashboard(){
   return <>
     <header className="guided-header"><div><p className="eyebrow">KIKI TECH</p><h1>¿Qué necesita atención?</h1><p>Entrá, actualizá la información y seguí el próximo paso. No necesitás recorrer todas las herramientas.</p></div><Link className="guided-primary-link" to="/imports">Actualizar información</Link></header>
     {message&&<div className="notice">{message}</div>}
+
+    <section className="panel executive-overview">
+      <div className="panel-title-row"><div><p className="eyebrow">PANORAMA OPERATIVO</p><h2>El catálogo, en una sola mirada</h2><p>Información de los últimos datos cargados en KIKI. Los valores no disponibles se muestran como «—», nunca como cero.</p></div><button className="secondary" onClick={()=>void load()}>Actualizar indicadores</button></div>
+      <div className="executive-kpis">
+        <article><small>Productos en Ecomm</small><strong>{summaryLoaded?formatCount(data.total_products):'—'}</strong><span>Catálogo importado</span></article>
+        <article><small>Publicaciones en ML</small><strong>{summaryLoaded?formatCount(data.total_listings):'—'}</strong><span>Registros del último snapshot</span></article>
+        <article><small>Ya publicados</small><strong>{formatCount(readiness?.summary.ALREADY_PUBLISHED)}</strong><span>Productos identificados por KIKI</span></article>
+        <article><small>Requieren revisión</small><strong>{formatCount(readiness?.summary.REVIEW_REQUIRED)}</strong><span>Preparación del catálogo</span></article>
+        <article><small>Sin stock</small><strong>{formatCount(readiness?.summary.NO_STOCK)}</strong><span>Pueden superponerse con otros controles</span></article>
+        <article><small>Decisiones registradas</small><strong>{formatCount(audit?.total)}</strong><span>Memoria interna de enriquecimiento</span></article>
+      </div>
+      <div className="executive-channel-grid">
+        <article><strong>ECOMM-APP</strong><p>{ecomm?'Catálogo importado':'Esperando importación'}</p><small>{ecomm?.filename||'Fuente principal del catálogo'}</small></article>
+        <article><strong>Mercado Libre</strong><p>{ml.connected&&!ml.token_expired?'API conectada':ml.token_expired?'Requiere renovar conexión':'API sin conexión activa'}</p><small>{summaryLoaded?formatCount(data.total_listings):'—'} publicaciones en el snapshot</small></article>
+        <article><strong>Tiendanube</strong><p>Esperando catálogo CSV</p><small>No conectado a KIKI; todavía no hay conciliación con Tiendanube</small></article>
+      </div>
+      <div className="executive-bottom">
+        <p>Marcas «no aplica»: <strong>{formatCount(brandNotApplicable)}</strong> · Propuestas internas aprobadas: <strong>{formatCount(brandApproved)}</strong>. Son decisiones internas, no marcas verificadas para publicar.</p>
+        <Link className="guided-primary-link" to="/work">Revisar decisiones y pendientes →</Link>
+      </div>
+    </section>
 
     <section className="guided-dashboard-grid">
       <article className="guided-dashboard-card">
