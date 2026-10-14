@@ -214,6 +214,7 @@ export function WorkQueue(){
   const filteredApprovedBrands=useMemo(()=>approvedBrandProposals.filter(item=>[
     item.product.name,item.product.sku,item.proposed_brand,
   ].some(value=>String(value||'').toLocaleLowerCase().includes(brandSearch))),[approvedBrandProposals,brandSearch]);
+  const selectableBrands=useMemo(()=>filteredProposedBrands.filter(item=>["HIGH","MEDIUM"].includes(item.internal_evidence.confidence)),[filteredProposedBrands]);
   const highConfidenceBrands=useMemo(
     ()=>proposedBrands.filter(item=>item.internal_evidence.confidence==='HIGH'),
     [proposedBrands],
@@ -233,7 +234,11 @@ export function WorkQueue(){
   async function approveSelectedBrands(){
     const keys=[...selectedBrandKeys];
     if(!keys.length)return;
-    if(!window.confirm(`¿Aprobar ${keys.length} propuestas internas de confianza alta? No quedan verificadas para publicación.`))return;
+    const selected=proposedBrands.filter(item=>selectedBrandKeys.has(item.product_key));
+    const high=selected.filter(item=>item.internal_evidence.confidence==='HIGH').length;
+    const medium=selected.filter(item=>item.internal_evidence.confidence==='MEDIUM').length;
+    if(selected.length!==keys.length){setBrandError('La selección contiene propuestas que ya no están pendientes. Actualizá la página.');return;}
+    if(!window.confirm(`¿Aprobar ${keys.length} propuestas? Alta: ${high} · Media: ${medium}. Revisá especialmente las de confianza media. NO quedan verificadas para publicación.`))return;
     setBrandBusy(true);setBrandError('');setSuccess('');
     try{
       const result=await api.bulkApproveBrandProposals(keys);
@@ -573,15 +578,15 @@ export function WorkQueue(){
         {brandError&&<div className="notice warning">{brandError}</div>}
         {brandProposals===null?<p>Las sugerencias no están disponibles en este momento.</p>:<>
           <p>{filteredProposedBrands.length} propuestas pendientes · {highConfidenceBrands.length} de confianza alta en el catálogo</p>
-          {highConfidenceBrands.length>0&&<div className="bulk-selection-bar">
+          {selectableBrands.length>0&&<div className="bulk-selection-bar">
             <strong>{selectedBrandKeys.size} seleccionadas</strong>
-            <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set(highConfidenceBrands.map(item=>item.product_key)))}>Seleccionar alta confianza</button>
+            <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set(selectableBrands.map(item=>item.product_key)))}>Seleccionar alta y media (filtradas)</button>
             <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set())}>Limpiar</button>
             <button disabled={brandBusy||selectedBrandKeys.size===0} onClick={()=>void approveSelectedBrands()}>Aprobar propuestas seleccionadas</button>
           </div>}
           <div className="brand-proposal-list">
             {visibleBrandProposals.map(item=><article className="brand-proposal-card" key={item.product_key}>
-              {item.internal_evidence.confidence==='HIGH'&&<label className="core-select"><input type="checkbox" checked={selectedBrandKeys.has(item.product_key)} onChange={()=>setSelectedBrandKeys(current=>{const next=new Set(current);if(next.has(item.product_key))next.delete(item.product_key);else next.add(item.product_key);return next;})}/> Seleccionar</label>}
+              {['HIGH','MEDIUM'].includes(item.internal_evidence.confidence)&&<label className="core-select"><input type="checkbox" checked={selectedBrandKeys.has(item.product_key)} onChange={()=>setSelectedBrandKeys(current=>{const next=new Set(current);if(next.has(item.product_key))next.delete(item.product_key);else next.add(item.product_key);return next;})}/> Seleccionar</label>}
               <div className="brand-proposal-details">
                 <strong>{item.product.name||'Producto sin nombre'}</strong>
                 <div className="brand-proposal-meta"><span>Marca sugerida: <b>{item.internal_evidence.brand_candidate}</b></span><span>Confianza {item.internal_evidence.confidence==='HIGH'?'alta':'media'}</span><span>Origen: catálogo interno</span></div>
