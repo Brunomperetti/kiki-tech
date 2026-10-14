@@ -219,8 +219,8 @@ class EnrichmentReviewService:
             if not item or "Marca" not in (item.get("missing_fields") or []):
                 raise ValueError(f"El producto {key} ya no necesita una propuesta de marca.")
             evidence = item["internal_evidence"]
-            if not evidence.get("brand_candidate") or evidence.get("confidence") != "HIGH":
-                raise ValueError(f"El producto {key} no tiene una propuesta única de confianza alta.")
+            if not evidence.get("brand_candidate") or evidence.get("confidence") not in {"HIGH", "MEDIUM"}:
+                raise ValueError(f"El producto {key} no tiene una propuesta única de confianza alta o media.")
             previous = records.get(key)
             if previous and previous.status not in {self.PENDING, self.APPROVED_PROPOSAL}:
                 raise ValueError(f"El producto {key} ya tiene una decisión incompatible.")
@@ -250,7 +250,7 @@ class EnrichmentReviewService:
                 "status": self.APPROVED_PROPOSAL,
                 "at": now.isoformat(),
                 "brand_candidate": evidence["brand_candidate"],
-                "confidence": "HIGH",
+                "confidence": evidence.get("confidence"),
                 "bulk_action": True,
             })
             row.history = history[-100:]
