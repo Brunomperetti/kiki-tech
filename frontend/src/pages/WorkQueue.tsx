@@ -173,6 +173,7 @@ export function WorkQueue(){
   function evidenceResolved(item:ReadinessItem,field:CoreIssue){
     const key=productKey(item);
     const research=key?researchByKey.get(key):undefined;
+    if(field==='BRAND_MISSING'&&(brandProposals?.items||[]).some(proposal=>proposal.product_key===key&&proposal.review_status==='BRAND_NOT_APPLICABLE'))return true;
     if(!research)return false;
     if(field==='EAN_MISSING'){
       return (
@@ -180,7 +181,6 @@ export function WorkQueue(){
         || research.research_status==='GTIN_NOT_APPLICABLE'
       );
     }
-    if((brandProposals?.items||[]).some(proposal=>proposal.product_key===key&&proposal.review_status==='BRAND_NOT_APPLICABLE'))return true;
     return (
       ['EVIDENCE_ACCEPTED','GTIN_NOT_APPLICABLE'].includes(research.research_status)
       && Boolean(research.proposed_brand)
@@ -205,7 +205,7 @@ export function WorkQueue(){
   );
 
   const likelyUnbranded=useMemo(()=>pendingBrandItems.filter(item=>
-    /\\b(SUELTO|SUELTA|GRANEL|FRACCIONAD[OA])\\b/i.test(item.product.name||'')
+    /\b(SUELTO|SUELTA|GRANEL|FRACCIONAD[OA])\b/i.test(item.product.name||'')
   ),[pendingBrandItems]);
 
   async function confirmUnbranded(){
