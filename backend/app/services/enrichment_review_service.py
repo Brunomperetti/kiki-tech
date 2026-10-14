@@ -210,7 +210,7 @@ class EnrichmentReviewService:
             "note": row.note,
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
             "history": list(row.history or []),
-        } for row in records if row.status != self.PENDING]
+        } for row in records if row.status != self.PENDING or len(row.history or []) > 0]
         return {"total": len(items), "items": items}
 
     def revoke_internal_decision(self, product_key: str, reason: str) -> dict:
