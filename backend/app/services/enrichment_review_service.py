@@ -196,6 +196,46 @@ class EnrichmentReviewService:
 
 
 
+
+    def decision_history(self) -> dict:
+        """Audit every persisted internal decision, including older snapshots."""
+        records = self.db.query(EnrichmentReviewDecision).order_by(
+            EnrichmentReviewDecision.updated_at.desc()
+        ).all()
+        items = [{
+            "product_key": row.product_key,
+            "product": row.product_snapshot or {},
+            "status": row.status,
+            "proposed_brand": row.proposed_brand,
+            "note": row.note,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "history": list(row.history or []),
+        } for row in records if row.status != self.PENDING]
+        return {"total": len(items), "items": items}
+
+    def revoke_internal_decision(self, product_key: str, reason: str) -> dict:
+        """Undo an internal brand-only decision, keeping the historical trail."""
+        reason = str(reason or "").strip()
+        if len(reason) < 10:
+            raise ValueError("Explicá por qué querés corregir la decisión (mínimo 10 caracteres).")
+        row = self.db.query(EnrichmentReviewDecision).filter(
+            EnrichmentReviewDecision.product_key == product_key
+        ).one_or_none()
+        if row is None or row.status not in {self.BRAND_NOT_APPLICABLE, self.APPROVED_PROPOSAL}:
+            raise ValueError("Esta decisión no puede revertirse desde aquí.")
+        previous = row.status
+        now = datetime.now(timezone.utc)
+        history = list(row.history or [])
+        history.append({"status": self.PENDING, "previous_status": previous,
+                        "at": now.isoformat(), "note": reason, "action": "REVOKE"})
+        row.history = history[-100:]
+        row.status = self.PENDING
+        row.proposed_brand = None
+        row.note = reason
+        row.updated_at = now
+        self.db.commit()
+        return {"product_key": product_key, "status": self.PENDING, "previous_status": previous}
+
     def bulk_mark_brand_not_applicable(self, product_keys: list[str], reason: str) -> dict:
         """Record explicit no-brand assessments. Does not touch GTIN or external research."""
         import re
