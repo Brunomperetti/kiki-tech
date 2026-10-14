@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -14,7 +15,13 @@ def test_saved_draft_human_review_and_stale_block():
         service.ai.proposals.catalog.repo.save_snapshot("TIENDANUBE", [row])
         service.ai.draft = lambda _key: {"title": "Marca Avena 500g", "description": "",
                                            "questions": [], "status": "AI_DRAFT_UNVERIFIED"}
-        result = service.generate_and_save("a")
+        class Settings:
+            kiki_ai_enabled = True
+            kiki_ai_api_key = "test-only"
+            kiki_ai_daily_request_limit = 10
+            kiki_ai_min_regenerate_hours = 24
+        with patch("app.services.tiendanube_ai_draft_review_service.get_settings", return_value=Settings()):
+            result = service.generate_and_save("a")
         assert result["status"] == "PENDING_REVIEW"
         assert result["stale"] is False
         reviewed = service.review("a", "APPROVED_INTERNAL", "Verificado por el equipo")
