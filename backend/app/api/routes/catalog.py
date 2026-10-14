@@ -14,6 +14,7 @@ from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
+from ...services.tiendanube_assisted_match_service import TiendanubeAssistedMatchService
 from ...services.gtin_batch_pilot_service import GtinBatchPilotService
 from ...services.external_gtin_candidate_service import ExternalGtinCandidateService
 from ...services.inventory_linkage_service import InventoryLinkageService
@@ -112,6 +113,11 @@ async def import_tiendanube_csv(
         return TiendanubeCsvService(db).import_csv(file.filename, content)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/tiendanube/assisted-matches")
+def tiendanube_assisted_matches(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return TiendanubeAssistedMatchService(db).report()
 
 
 @router.get("/tiendanube/reconciliation")
