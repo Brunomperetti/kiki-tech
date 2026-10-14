@@ -1,10 +1,11 @@
 """Persistent human review of AI drafts with source-change detection."""
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from ..database.models import TiendanubeAiDraftRecord
+from ..core.config import get_settings
 from .tiendanube_ai_pilot_service import TiendanubeAiPilotService
 
 
@@ -39,6 +40,31 @@ class TiendanubeAiDraftReviewService:
 
     def generate_and_save(self, product_key):
         evidence_hash = self.fingerprint(product_key)
+        settings = get_settings()
+        if not settings.kiki_ai_enabled or not settings.kiki_ai_api_key:
+            raise RuntimeError("El piloto de IA está deshabilitado.")
+        if not 1 <= settings.kiki_ai_daily_request_limit <= 100:
+            raise RuntimeError("Configuración del límite diario de IA inválida.")
+        if not 1 <= settings.kiki_ai_min_regenerate_hours <= 720:
+            raise RuntimeError("Configuración del intervalo de IA inválida.")
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=1)
+        records = self.db.scalars(select(TiendanubeAiDraftRecord)).all()
+        # This is an additional conservative application-level guard, not a
+        # concurrency-safe monetary quota. A hard cost ceiling belongs at the API provider.
+        usage = 0
+        for existing in records:
+            generated = [
+                datetime.fromisoformat(event["at"])
+                for event in (existing.history or [])
+                if event.get("event") == "AI_GENERATED" and event.get("at")
+            ]
+            usage += sum(timestamp >= cutoff for timestamp in generated)
+            if existing.product_key == product_key and generated:
+                if now - max(generated) < timedelta(hours=settings.kiki_ai_min_regenerate_hours):
+                    raise ValueError("Ya existe un borrador reciente. Consultalo antes de volver a generar.")
+        if usage >= settings.kiki_ai_daily_request_limit:
+            raise ValueError("Se alcanzó el límite diario de solicitudes de IA. Probá mañana.")
         draft = self.ai.draft(product_key)
         # Do not persist a result if another request/import changed its source during generation.
         if self.fingerprint(product_key) != evidence_hash:

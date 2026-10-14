@@ -14,7 +14,6 @@ from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
-from ...services.tiendanube_ai_pilot_service import TiendanubeAiPilotService
 from ...services.tiendanube_ai_draft_review_service import TiendanubeAiDraftReviewService
 from ...services.tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
@@ -229,8 +228,9 @@ def tiendanube_ai_draft(
     db: Session = Depends(get_db),
     _session=Depends(require_csrf),
 ):
+    # Backward-compatible route: all calls now pass through persistence and usage guards.
     try:
-        return TiendanubeAiPilotService(db).draft(request.product_key)
+        return TiendanubeAiDraftReviewService(db).generate_and_save(request.product_key)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:
