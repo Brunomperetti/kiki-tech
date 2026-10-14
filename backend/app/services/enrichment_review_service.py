@@ -19,12 +19,14 @@ class EnrichmentReviewService:
     APPROVED_PROPOSAL = "APPROVED_PROPOSAL"
     REJECTED = "REJECTED"
     EXTERNAL_RESEARCH = "EXTERNAL_RESEARCH"
+    BRAND_NOT_APPLICABLE = "BRAND_NOT_APPLICABLE"
 
     VALID_STATUSES = {
         PENDING,
         APPROVED_PROPOSAL,
         REJECTED,
         EXTERNAL_RESEARCH,
+        BRAND_NOT_APPLICABLE,
     }
 
     PRIORITY_LABELS = {
@@ -94,6 +96,7 @@ class EnrichmentReviewService:
                 "APPROVED_PROPOSAL": status_counts[self.APPROVED_PROPOSAL],
                 "REJECTED": status_counts[self.REJECTED],
                 "EXTERNAL_RESEARCH": status_counts[self.EXTERNAL_RESEARCH],
+                "BRAND_NOT_APPLICABLE": status_counts[self.BRAND_NOT_APPLICABLE],
             },
             "priority_summary": [
                 {
@@ -191,6 +194,57 @@ class EnrichmentReviewService:
         self.db.refresh(row)
         return self._serialize_queue_item(item, row)
 
+
+
+    def bulk_mark_brand_not_applicable(self, product_keys: list[str], reason: str) -> dict:
+        """Record explicit no-brand assessments. Does not touch GTIN or external research."""
+        import re
+        keys = [str(key).strip() for key in product_keys or []]
+        reason = str(reason or "").strip()
+        if not keys or len(keys) > 200 or len(set(keys)) != len(keys) or any(not key for key in keys):
+            raise ValueError("Seleccioná entre 1 y 200 productos diferentes.")
+        if len(reason) < 15 or len(reason) > 1500:
+            raise ValueError("Explicá en al menos 15 caracteres por qué no corresponde marca.")
+
+        report = self.readiness.report()
+        eligible = {item["product_key"]: item for item in self._eligible_items(report)}
+        previous = {
+            row.product_key: row for row in self.db.query(EnrichmentReviewDecision)
+            .filter(EnrichmentReviewDecision.product_key.in_(keys)).all()
+        }
+        for key in keys:
+            item = eligible.get(key)
+            if item is None or "Marca" not in (item.get("missing_fields") or []):
+                raise ValueError(f"{key} ya no requiere revisión de marca.")
+            title = EnrichmentService._normalize((item.get("product") or {}).get("name"))
+            if not re.search(r"\\b(SUELTO|SUELTA|GRANEL|FRACCIONADO|FRACCIONADA)\\b", title):
+                raise ValueError(f"{key} no tiene señal de producto suelto o fraccionado.")
+            row = previous.get(key)
+            if row and row.status not in {self.PENDING, self.BRAND_NOT_APPLICABLE}:
+                raise ValueError(f"{key} ya tiene una decisión incompatible.")
+
+        now = datetime.now(timezone.utc)
+        for key in keys:
+            item = eligible[key]
+            row = previous.get(key)
+            if row is None:
+                row = EnrichmentReviewDecision(product_key=key, created_at=now, updated_at=now)
+                self.db.add(row)
+            row.status = self.BRAND_NOT_APPLICABLE
+            row.reconciliation_run_id = report.get("reconciliation_run_id")
+            row.proposed_brand = None
+            row.proposed_ean = None
+            row.note = reason
+            row.evidence = {"classification": "seller_confirmed_unbranded", "reason": reason}
+            row.product_snapshot = self._slim_product(item.get("product") or {})
+            row.updated_at = now
+            history = list(row.history or [])
+            history.append({"status": self.BRAND_NOT_APPLICABLE, "at": now.isoformat(),
+                            "reason": reason, "bulk_action": len(keys) > 1})
+            row.history = history[-100:]
+        self.db.commit()
+        return {"requested": len(keys), "processed": len(keys),
+                "status": self.BRAND_NOT_APPLICABLE}
 
     def bulk_approve_brand_proposals(self, product_keys: list[str]) -> dict:
         """Approve only current, unique HIGH-confidence *internal proposals*.
@@ -332,6 +386,7 @@ class EnrichmentReviewService:
             cls.EXTERNAL_RESEARCH: 1,
             cls.APPROVED_PROPOSAL: 2,
             cls.REJECTED: 3,
+            cls.BRAND_NOT_APPLICABLE: 4,
         }
         priority_rank = {
             "P1_HIGH": 0,
