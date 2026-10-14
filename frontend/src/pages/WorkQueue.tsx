@@ -104,6 +104,7 @@ export function WorkQueue(){
   const [brandProposals,setBrandProposals]=useState<EnrichmentReviewQueue|null>(null);
   const [selectedBrandKeys,setSelectedBrandKeys]=useState<Set<string>>(new Set());
   const [unbrandedKeys,setUnbrandedKeys]=useState<Set<string>>(new Set());
+  const [showUnbrandedList,setShowUnbrandedList]=useState(true);
   const [unbrandedReason,setUnbrandedReason]=useState('Productos comercializados genéricos, sueltos o fraccionados sin marca comercial.');
   const [unbrandedBusy,setUnbrandedBusy]=useState(false);
   const [unbrandedError,setUnbrandedError]=useState('');
@@ -209,7 +210,8 @@ export function WorkQueue(){
   ),[pendingBrandItems]);
 
   async function confirmUnbranded(){
-    const keys=[...unbrandedKeys];
+    const eligibleKeys=new Set(likelyUnbranded.map(productKey));
+    const keys=[...unbrandedKeys].filter(key=>eligibleKeys.has(key));
     if(!keys.length)return;
     if(unbrandedReason.trim().length<15){setUnbrandedError('Explicá el motivo con al menos 15 caracteres.');return;}
     if(!window.confirm(`¿Confirmar que estos ${keys.length} productos no tienen marca comercial? Esta decisión no resuelve sus EAN ni autoriza publicarlos.`))return;
@@ -599,10 +601,25 @@ export function WorkQueue(){
         <h3>Posibles productos sin marca comercial</h3>
         <p>KIKI detectó {likelyUnbranded.length} títulos con «suelto», «granel» o «fraccionado». Es solo una sugerencia: confirmá que se venden sin marca propia ni del proveedor.</p>
         <div className="bulk-selection-bar">
-          <strong>{unbrandedKeys.size} seleccionados</strong>
-          <button className="secondary" disabled={unbrandedBusy} onClick={()=>setUnbrandedKeys(new Set(likelyUnbranded.slice(0,200).map(productKey).filter(Boolean)))}>Seleccionar hasta 200 sugeridos</button>
+          <strong>{unbrandedKeys.size} seleccionados de {likelyUnbranded.length}</strong>
+          <button className="secondary" disabled={unbrandedBusy} onClick={()=>setUnbrandedKeys(new Set(likelyUnbranded.slice(0,200).map(productKey).filter(Boolean)))}>Seleccionar {Math.min(200,likelyUnbranded.length)} sugeridos</button>
           <button className="secondary" disabled={unbrandedBusy} onClick={()=>setUnbrandedKeys(new Set())}>Limpiar</button>
         </div>
+        <button type="button" className="secondary" onClick={()=>setShowUnbrandedList(value=>!value)}>{showUnbrandedList?'Ocultar lista':'Ver y revisar productos'} ({likelyUnbranded.length})</button>
+        {showUnbrandedList&&<div className="unbranded-review-list">
+          {likelyUnbranded.map(item=>{
+            const key=productKey(item);
+            return <label className="unbranded-review-row" key={key}>
+              <input type="checkbox" disabled={unbrandedBusy} checked={unbrandedKeys.has(key)} onChange={event=>setUnbrandedKeys(current=>{
+                const next=new Set(current);
+                if(event.target.checked&&next.size<200)next.add(key);
+                else if(!event.target.checked)next.delete(key);
+                return next;
+              })}/>
+              <span><strong>{item.product.name||'Producto sin nombre'}</strong><small>SKU {item.product.sku||item.product.sku_effective||'—'} · Stock {item.product.stock??'—'}</small></span>
+            </label>;
+          })}
+        </div>}
         {unbrandedKeys.size>0&&<div className="core-resolution-form">
           <label className="core-resolution-notes">Motivo que se guardará por producto<textarea value={unbrandedReason} onChange={event=>setUnbrandedReason(event.target.value)}/></label>
           <button disabled={unbrandedBusy} onClick={()=>void confirmUnbranded()}>Confirmar «Marca no aplica» ({unbrandedKeys.size})</button>

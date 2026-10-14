@@ -196,3 +196,12 @@
 .gtin-pilot-results{display:grid;gap:12px}.gtin-pilot-items{max-height:380px;overflow-y:auto;display:grid;gap:8px}
 .gtin-pilot-items article{border:1px solid #dce5df;border-radius:8px;padding:11px;background:white;display:grid;gap:5px}
 .gtin-pilot-items small{color:#64786a}
+
+/* Review every unbranded suggestion before any bulk decision */
+.unbranded-review-list{display:grid;gap:7px;max-height:390px;overflow-y:auto;padding:5px}
+.unbranded-review-row{display:flex;align-items:center;gap:12px;border:1px solid #dce5df;background:#fff;border-radius:9px;padding:12px;cursor:pointer}
+.unbranded-review-row input{flex:none;width:17px;height:17px}
+.unbranded-review-row span{display:grid;gap:4px;min-width:0}
+.unbranded-review-row strong{font-size:13px;overflow-wrap:anywhere}
+.unbranded-review-row small{font-size:12px;color:#66766b}
+.unbranded-review-row:has(input:checked){background:#edf6ed;border-color:#93bd97}
