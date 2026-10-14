@@ -59,6 +59,11 @@ class EnrichmentDecisionRequest(BaseModel):
     note: str | None = None
 
 
+class InternalDecisionRevokeRequest(BaseModel):
+    product_key: str
+    reason: str
+
+
 class BrandNotApplicableRequest(BaseModel):
     product_keys: list[str]
     reason: str
@@ -387,6 +392,23 @@ def brand_not_applicable(
     except Exception as exc:
         logger.exception("brand_not_applicable_failed")
         raise HTTPException(500, "No se pudo guardar la excepción de marca.") from exc
+
+
+@router.get("/enrichment-decisions/history")
+def internal_decision_history(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return EnrichmentReviewService(db).decision_history()
+
+
+@router.post("/enrichment-decisions/revoke")
+def revoke_internal_decision(
+    request: InternalDecisionRevokeRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return EnrichmentReviewService(db).revoke_internal_decision(request.product_key, request.reason)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/gtin-candidates/{product_key:path}")

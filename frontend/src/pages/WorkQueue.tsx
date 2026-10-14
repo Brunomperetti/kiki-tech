@@ -101,6 +101,11 @@ export function WorkQueue(){
   const [evidenceError,setEvidenceError]=useState('');
   const [loading,setLoading]=useState(false);
   const [continuityBusy,setContinuityBusy]=useState('');
+  const [decisionAudit,setDecisionAudit]=useState<{total:number;items:{product_key:string;product:{name?:string;sku?:string};status:string;proposed_brand?:string|null;note?:string|null;updated_at?:string|null;history:{status:string;at?:string;note?:string;reason?:string;action?:string}[]}[]}|null>(null);
+  const [auditOpen,setAuditOpen]=useState(false);
+  const [auditQuery,setAuditQuery]=useState('');
+  const [auditBusy,setAuditBusy]=useState('');
+  const [auditError,setAuditError]=useState('');
   const [brandProposals,setBrandProposals]=useState<EnrichmentReviewQueue|null>(null);
   const [selectedBrandKeys,setSelectedBrandKeys]=useState<Set<string>>(new Set());
   const [unbrandedKeys,setUnbrandedKeys]=useState<Set<string>>(new Set());
@@ -129,6 +134,8 @@ export function WorkQueue(){
       api.publicationReadiness(),
       api.externalResearchQueue(),
     ]);
+    const audit=await api.internalDecisionHistory().catch(()=>null);
+    setDecisionAudit(audit);
     const brands=await api.enrichmentReviewQueue().catch(()=>null);
     setBrandProposals(brands);
     const readiness=readinessResult[0].status==='fulfilled'?readinessResult[0].value:null;
@@ -245,6 +252,21 @@ export function WorkQueue(){
     ()=>proposedBrands.filter(item=>item.internal_evidence.confidence==='HIGH'),
     [proposedBrands],
   );
+
+  async function revokeAuditDecision(key:string){
+    const reason=window.prompt('Motivo de la corrección (mínimo 10 caracteres):');
+    if(reason===null)return;
+    if(reason.trim().length<10){setAuditError('Escribí un motivo de al menos 10 caracteres.');return;}
+    if(!window.confirm('¿Reabrir esta decisión de marca? La historia quedará conservada.'))return;
+    setAuditBusy(key);setAuditError('');
+    try{
+      await api.revokeInternalDecision(key,reason.trim());
+      const [audit,brands]=await Promise.all([api.internalDecisionHistory(),api.enrichmentReviewQueue()]);
+      setDecisionAudit(audit);setBrandProposals(brands);
+      setSuccess('La decisión volvió a revisión y conservó el historial.');
+    }catch(err){setAuditError(err instanceof Error?err.message:'No se pudo corregir la decisión.');}
+    finally{setAuditBusy('');}
+  }
 
   async function approveBrand(item:EnrichmentReviewItem){
     setBrandBusy(true);setBrandError('');setSuccess('');
@@ -575,6 +597,26 @@ export function WorkQueue(){
       </>}
     </section>
 
+    <section className="panel decision-audit-panel">
+      <div className="panel-title-row"><div><p className="eyebrow">MEMORIA DE KIKI</p><h2>Decisiones tomadas</h2><p>Consultá las marcas aprobadas como propuestas y los casos «Marca no aplica». Las decisiones internas no modifican Ecomm ni Mercado Libre.</p></div>
+        <button className="secondary" onClick={()=>setAuditOpen(value=>!value)}>{auditOpen?'Ocultar decisiones':'Ver decisiones'} ({decisionAudit?.total??'—'})</button>
+      </div>
+      {auditOpen&&<>
+        <input placeholder="Buscar producto, SKU o motivo" value={auditQuery} onChange={event=>setAuditQuery(event.target.value)}/>
+        {auditError&&<div className="notice warning">{auditError}</div>}
+        {decisionAudit===null?<p>No se pudo cargar el historial. Reintentá actualizar la página.</p>:
+          <div className="decision-audit-list">{decisionAudit.items.filter(item=>[
+            item.product?.name,item.product?.sku,item.note,item.proposed_brand,item.product_key,
+          ].some(value=>String(value||'').toLocaleLowerCase().includes(auditQuery.toLocaleLowerCase()))).map(item=><article key={item.product_key}>
+            <strong>{item.product?.name||item.product_key}</strong>
+            <small>SKU {item.product?.sku||'—'} · {item.status==='BRAND_NOT_APPLICABLE'?'Marca no aplica':item.status==='APPROVED_PROPOSAL'?'Propuesta interna aprobada':item.status} · {item.updated_at?new Date(item.updated_at).toLocaleString('es-AR'):''}</small>
+            {item.proposed_brand&&<p>Marca propuesta: {item.proposed_brand}</p>}
+            {item.note&&<p>Motivo: {item.note}</p>}
+            <details><summary>Ver historial ({item.history.length})</summary>{item.history.map((event,index)=><p key={index}>{event.at||''} · {event.status} · {event.reason||event.note||''}</p>)}</details>
+            {['BRAND_NOT_APPLICABLE','APPROVED_PROPOSAL'].includes(item.status)&&<button className="secondary" disabled={Boolean(auditBusy)} onClick={()=>void revokeAuditDecision(item.product_key)}>Corregir decisión</button>}
+          </article>)}</div>}
+      </>}
+    </section>
     <section className="panel core-pendings">
       <div className="panel-title-row"><div><p className="eyebrow">DATOS PARA PUBLICAR</p><h2>Completar datos centrales</h2><p>Estos productos de Ecomm todavía no pueden avanzar porque les falta información básica. Acá ya podés resolver el dato, no solo verlo.</p></div></div>
 

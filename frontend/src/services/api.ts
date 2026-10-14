@@ -110,6 +110,10 @@ export const api = {
   brandNotApplicable: (product_keys:string[],reason:string) => request<{requested:number;processed:number;status:string}>('/api/enrichment-review-decisions/brand-not-applicable',{
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_keys,reason}),
   }),
+  internalDecisionHistory: () => request<{total:number;items:{product_key:string;product:{name?:string;sku?:string};status:string;proposed_brand?:string|null;note?:string|null;updated_at?:string|null;history:{status:string;at?:string;note?:string;reason?:string;action?:string}[]}[]}>('/api/enrichment-decisions/history'),
+  revokeInternalDecision: (product_key:string,reason:string) => request<{product_key:string;status:string;previous_status:string}>('/api/enrichment-decisions/revoke',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_key,reason}),
+  }),
   enrichmentReviewQueue: () => request<EnrichmentReviewQueue>('/api/enrichment-review-queue'),
   saveEnrichmentDecision: (productKey: string, status: EnrichmentReviewStatus, note?: string) => request<EnrichmentReviewItem>('/api/enrichment-review-decisions', {
     method: 'POST',

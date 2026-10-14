@@ -205,3 +205,11 @@
 .unbranded-review-row strong{font-size:13px;overflow-wrap:anywhere}
 .unbranded-review-row small{font-size:12px;color:#66766b}
 .unbranded-review-row:has(input:checked){background:#edf6ed;border-color:#93bd97}
+
+
+.decision-audit-panel{margin:20px 0}.decision-audit-panel .panel-title-row{align-items:center}
+.decision-audit-panel>input{width:100%;max-width:520px;padding:12px;margin:12px 0;border:1px solid #dce5df;border-radius:8px}
+.decision-audit-list{display:grid;gap:10px;max-height:460px;overflow:auto;padding:5px}
+.decision-audit-list article{border:1px solid #dce5df;background:#fff;border-radius:10px;padding:13px;display:grid;gap:6px;justify-items:start}
+.decision-audit-list small{color:#65756b}.decision-audit-list details{width:100%;font-size:12px;overflow-wrap:anywhere}
+.decision-audit-list details p{padding:6px 8px;background:#f5f8f6;border-radius:5px}
