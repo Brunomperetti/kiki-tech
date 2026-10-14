@@ -15,6 +15,7 @@ from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
 from ...services.tiendanube_ai_pilot_service import TiendanubeAiPilotService
+from ...services.tiendanube_ai_draft_review_service import TiendanubeAiDraftReviewService
 from ...services.tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
 from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
@@ -234,6 +235,49 @@ def tiendanube_ai_draft(
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
+
+
+class TiendanubeAiReviewRequest(BaseModel):
+    product_key: str
+    decision: str
+    note: str
+
+
+@router.post("/tiendanube/ai/generate-and-save")
+def tn_ai_generate_and_save(
+    request: TiendanubeAiDraftRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAiDraftReviewService(db).generate_and_save(request.product_key)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@router.get("/tiendanube/ai/saved-draft")
+def tn_ai_saved_draft(
+    product_key: str,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    return TiendanubeAiDraftReviewService(db).view(product_key)
+
+
+@router.post("/tiendanube/ai/review")
+def tn_ai_review(
+    request: TiendanubeAiReviewRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAiDraftReviewService(db).review(
+            request.product_key, request.decision, request.note
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @router.get("/tiendanube/enrichment-proposals")
