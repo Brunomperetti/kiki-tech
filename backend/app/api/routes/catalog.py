@@ -120,6 +120,11 @@ def tiendanube_assisted_matches(db: Session = Depends(get_db), _session=Depends(
     return TiendanubeAssistedMatchService(db).report()
 
 
+@router.get("/tiendanube/duplicate-skus")
+def tiendanube_duplicate_skus(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return TiendanubeCsvService(db).duplicate_sku_review()
+
+
 @router.get("/tiendanube/reconciliation")
 def tiendanube_reconciliation(
     db: Session = Depends(get_db),
