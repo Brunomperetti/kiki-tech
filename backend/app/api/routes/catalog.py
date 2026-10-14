@@ -59,6 +59,11 @@ class EnrichmentDecisionRequest(BaseModel):
     note: str | None = None
 
 
+class BrandNotApplicableRequest(BaseModel):
+    product_keys: list[str]
+    reason: str
+
+
 class GtinBatchPilotRequest(BaseModel):
     product_keys: list[str]
 
@@ -365,6 +370,23 @@ def enrichment_bulk_brand_approval(
     except Exception as exc:
         logger.exception("enrichment_bulk_brand_approval_failed")
         raise HTTPException(500, "No se pudieron aprobar las propuestas de marca.") from exc
+
+
+@router.post("/enrichment-review-decisions/brand-not-applicable")
+def brand_not_applicable(
+    request: BrandNotApplicableRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return EnrichmentReviewService(db).bulk_mark_brand_not_applicable(
+            request.product_keys, request.reason
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("brand_not_applicable_failed")
+        raise HTTPException(500, "No se pudo guardar la excepción de marca.") from exc
 
 
 @router.get("/gtin-candidates/{product_key:path}")
