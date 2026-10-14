@@ -217,7 +217,7 @@ class EnrichmentReviewService:
             if item is None or "Marca" not in (item.get("missing_fields") or []):
                 raise ValueError(f"{key} ya no requiere revisión de marca.")
             title = EnrichmentService._normalize((item.get("product") or {}).get("name"))
-            if not re.search(r"\\b(SUELTO|SUELTA|GRANEL|FRACCIONADO|FRACCIONADA)\\b", title):
+            if not re.search(r"\b(SUELTO|SUELTA|GRANEL|FRACCIONADO|FRACCIONADA)\b", title):
                 raise ValueError(f"{key} no tiene señal de producto suelto o fraccionado.")
             row = previous.get(key)
             if row and row.status not in {self.PENDING, self.BRAND_NOT_APPLICABLE}:
