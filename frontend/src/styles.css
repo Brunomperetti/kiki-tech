@@ -213,3 +213,20 @@
 .decision-audit-list article{border:1px solid #dce5df;background:#fff;border-radius:10px;padding:13px;display:grid;gap:6px;justify-items:start}
 .decision-audit-list small{color:#65756b}.decision-audit-list details{width:100%;font-size:12px;overflow-wrap:anywhere}
 .decision-audit-list details p{padding:6px 8px;background:#f5f8f6;border-radius:5px}
+
+
+/* Executive snapshot uses existing KIKI sources; unavailable is never shown as zero. */
+.executive-overview{display:grid;gap:18px;margin-bottom:20px}
+.executive-overview .panel-title-row{align-items:center}
+.executive-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.executive-kpis article{border:1px solid #dce6df;border-radius:12px;background:#f7faf8;padding:16px;display:grid;gap:7px}
+.executive-kpis small,.executive-kpis span{font-size:12px;color:#68786e}
+.executive-kpis strong{font-size:29px;line-height:1.1;color:#193d2d;font-variant-numeric:tabular-nums}
+.executive-channel-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.executive-channel-grid article{border:1px solid #dce6df;border-radius:10px;padding:16px;display:grid;gap:5px;min-width:0}
+.executive-channel-grid article strong{font-size:14px}.executive-channel-grid article p{font-weight:600;margin:0}
+.executive-channel-grid article small{font-size:12px;color:#6b7970;overflow-wrap:anywhere}
+.executive-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.executive-bottom p{margin:0;font-size:13px;line-height:1.6}
+@media(max-width:850px){.executive-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.executive-channel-grid{grid-template-columns:1fr}}
+@media(max-width:520px){.executive-kpis{grid-template-columns:1fr}}
