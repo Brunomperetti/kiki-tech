@@ -170,6 +170,8 @@ export const api = {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(payload),
   }),
+  tiendanubeReport: () => request<{available:boolean;summary:Record<string,number>;items:{slug:string;name:string;sku:string;ean_raw:string;brand:string;price:string|null;stock:string|null;status:string;matched_ecomm_id:string|null}[];policy?:string}>('/api/tiendanube/reconciliation'),
+  uploadTiendanube: (file:File) => {const form=new FormData();form.append('file',file);return request<{records:number;products:number;status:string}>('/api/tiendanube/import-csv',{method:'POST',body:form});},
   imports: () => request<ImportJob[]>('/api/imports'),
   analyze: (source = 'AUTO') => request<unknown>(`/api/reconciliations?ml_source=${source}`, {method: 'POST'}),
   mlStatus: () => request<MercadoLibreStatus>('/api/mercadolibre/status'),
