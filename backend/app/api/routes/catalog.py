@@ -14,6 +14,9 @@ from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
+from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
+from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
+from ...services.tiendanube_price_stock_service import TiendanubePriceStockService
 from ...services.tiendanube_assisted_match_service import TiendanubeAssistedMatchService
 from ...services.gtin_batch_pilot_service import GtinBatchPilotService
 from ...services.external_gtin_candidate_service import ExternalGtinCandidateService
@@ -139,6 +142,43 @@ def tiendanube_match_decision(
 @router.get("/tiendanube/assisted-matches")
 def tiendanube_assisted_matches(db: Session = Depends(get_db), _session=Depends(require_session)):
     return TiendanubeAssistedMatchService(db).report()
+
+
+@router.get("/tiendanube/duplicate-skus")
+def tiendanube_duplicate_skus(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return TiendanubeCsvService(db).duplicate_sku_review()
+
+
+@router.get("/tiendanube/price-stock-audit")
+def tiendanube_price_stock_audit(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return TiendanubePriceStockService(db).report()
+
+
+@router.get("/tiendanube/quality-audit")
+def tiendanube_quality_audit(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return TiendanubeQualityAuditService(db).report()
+
+
+@router.post("/tiendanube/images/import-csv", status_code=201)
+async def import_tiendanube_image_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(400, "Seleccioná un CSV de imágenes.")
+    content = await file.read(get_settings().max_upload_mb * 1024 * 1024 + 1)
+    if len(content) > get_settings().max_upload_mb * 1024 * 1024:
+        raise HTTPException(413, "El archivo supera el límite permitido.")
+    try:
+        return TiendanubeImageAuditService(db).import_csv(content)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/tiendanube/images/audit")
+def tiendanube_image_audit(db: Session = Depends(get_db), _session=Depends(require_session)):
+    return TiendanubeImageAuditService(db).report()
 
 
 @router.get("/tiendanube/reconciliation")
