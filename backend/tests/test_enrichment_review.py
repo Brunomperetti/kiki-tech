@@ -270,4 +270,5 @@ def test_internal_decisions_are_auditable_and_reversible():
         row = db.query(EnrichmentReviewDecision).one()
         assert len(row.history) == 2
         assert row.history[-1]["action"] == "REVOKE"
-        assert service.decision_history()["total"] == 0
+        assert service.decision_history()["total"] == 1
+        assert service.decision_history()["items"][0]["status"] == "PENDING"
