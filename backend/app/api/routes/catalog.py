@@ -14,6 +14,7 @@ from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
+from ...services.tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
 from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
 from ...services.tiendanube_price_stock_service import TiendanubePriceStockService
@@ -214,6 +215,14 @@ async def import_tiendanube_image_csv(
 @router.get("/tiendanube/images/audit")
 def tiendanube_image_audit(db: Session = Depends(get_db), _session=Depends(require_session)):
     return TiendanubeImageAuditService(db).report()
+
+
+@router.get("/tiendanube/enrichment-proposals")
+def tiendanube_enrichment_proposals(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    return TiendanubeEnrichmentProposalService(db).report()
 
 
 @router.get("/tiendanube/reconciliation")
