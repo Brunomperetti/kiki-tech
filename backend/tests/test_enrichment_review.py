@@ -244,3 +244,30 @@ def test_unbranded_exception_keeps_gtin_independent_and_audit_history():
         assert all(row.proposed_ean is None for row in rows)
         assert all(row.history[-1]["reason"] for row in rows)
         assert service.queue()["summary"]["BRAND_NOT_APPLICABLE"] == 2
+
+
+def test_internal_decisions_are_auditable_and_reversible():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        report = {"reconciliation_run_id": 42, "items": [
+            readiness_item(ecomm_id="1", sku="1", name="CARQUEJA SUELTA X 50 GRS"),
+        ]}
+        service = service_with_report(db, report)
+        service.bulk_mark_brand_not_applicable(
+            ["ECOMM:1"], "Venta a granel sin marca comercial."
+        )
+        audit = service.decision_history()
+        assert audit["total"] == 1
+        assert audit["items"][0]["status"] == "BRAND_NOT_APPLICABLE"
+        assert len(audit["items"][0]["history"]) == 1
+        with pytest.raises(ValueError, match="mínimo 10"):
+            service.revoke_internal_decision("ECOMM:1", "mal")
+        result = service.revoke_internal_decision(
+            "ECOMM:1", "Corrección: el producto tiene marca del vendedor."
+        )
+        assert result["status"] == "PENDING"
+        row = db.query(EnrichmentReviewDecision).one()
+        assert len(row.history) == 2
+        assert row.history[-1]["action"] == "REVOKE"
+        assert service.decision_history()["total"] == 0
