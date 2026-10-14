@@ -13,6 +13,7 @@ from ...services.enrichment_external_research_service import EnrichmentExternalR
 from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
+from ...services.tiendanube_csv_service import TiendanubeCsvService
 from ...services.gtin_batch_pilot_service import GtinBatchPilotService
 from ...services.external_gtin_candidate_service import ExternalGtinCandidateService
 from ...services.inventory_linkage_service import InventoryLinkageService
@@ -94,6 +95,31 @@ class EnrichmentExternalResearchRequest(BaseModel):
     source_url: str | None = None
     confidence: str | None = None
     notes: str | None = None
+
+
+@router.post("/tiendanube/import-csv", status_code=201)
+async def import_tiendanube_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(400, "Seleccioná un archivo CSV de Tiendanube.")
+    content = await file.read(get_settings().max_upload_mb * 1024 * 1024 + 1)
+    if len(content) > get_settings().max_upload_mb * 1024 * 1024:
+        raise HTTPException(413, "El archivo supera el tamaño permitido.")
+    try:
+        return TiendanubeCsvService(db).import_csv(file.filename, content)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/tiendanube/reconciliation")
+def tiendanube_reconciliation(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    return TiendanubeCsvService(db).report()
 
 
 @router.post("/imports/{source}", status_code=201)
