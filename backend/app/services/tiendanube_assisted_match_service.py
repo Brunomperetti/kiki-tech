@@ -19,6 +19,49 @@ def numbers(value):
     return set(re.findall(r"\d+(?:[.,]\d+)?", normalize(value)))
 
 
+# Only explicit, recognizable product attributes can rule out a candidate.
+# Unknown attributes are not assumed to match.
+FLAVOR_TERMS = {
+    "vainilla": ("vainilla", "vanilla"),
+    "chocolate": ("chocolate", "choco"),
+    "frutilla": ("frutilla", "fresa", "strawberry"),
+    "limon": ("limon", "lemon"),
+    "naranja": ("naranja", "orange"),
+    "menta": ("menta", "mint"),
+    "coco": ("coco", "coconut"),
+    "manzana": ("manzana", "apple"),
+    "durazno": ("durazno", "peach"),
+}
+UNITS = {"g", "gr", "grs", "gramos", "kg", "ml", "cc", "l", "litros"}
+
+def product_flavors(*values):
+    words = set(normalize(" ".join(str(v or "") for v in values)).split())
+    # For SKU strings without separators, only detect well-known flavor
+    # words when they occur as a suffix; do not match arbitrary substrings.
+    sku_compact = normalize(str(values[-1] or "")).replace(" ", "") if values else ""
+    return {flavor for flavor, aliases in FLAVOR_TERMS.items()
+            if any(alias in words or sku_compact.endswith(alias) for alias in aliases)}
+
+def pack_units(value):
+    tokens = re.sub(r"\bx(?=\d)", "x ", normalize(value)).split()
+    units = []
+    for i, token in enumerate(tokens[1:], start=1):
+        if token in UNITS and re.fullmatch(r"\d+", tokens[i-1]):
+            units.append((int(tokens[i-1]), "g" if token in {"gr", "grs", "gramos"} else
+                          "ml" if token == "cc" else "l" if token == "litros" else token))
+    return set(units)
+
+def variant_conflict(source_name, source_sku, target_name, target_sku):
+    source_flavors = product_flavors(source_name, source_sku)
+    target_flavors = product_flavors(target_name, target_sku)
+    if source_flavors and target_flavors and source_flavors.isdisjoint(target_flavors):
+        return True
+    source_units, target_units = pack_units(source_name), pack_units(target_name)
+    if source_units and target_units and source_units != target_units:
+        return True
+    return False
+
+
 class TiendanubeAssistedMatchService:
     def __init__(self, db):
         self.catalog = TiendanubeCsvService(db)
@@ -44,6 +87,9 @@ class TiendanubeAssistedMatchService:
                     continue
                 target_brand = normalize(target.get("brand"))
                 if source_brand and target_brand and source_brand != target_brand:
+                    continue
+                if variant_conflict(item["name"], item["sku"], target.get("name"),
+                                    target.get("sku_effective") or target.get("sku")):
                     continue
                 # Different quantities/packs never become a high-confidence match.
                 if numbers(item["name"]) != numbers(target.get("name")):
