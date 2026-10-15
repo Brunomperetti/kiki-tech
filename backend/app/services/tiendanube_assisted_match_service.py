@@ -43,7 +43,7 @@ def product_flavors(*values):
             if any(alias in words or sku_compact.endswith(alias) for alias in aliases)}
 
 def pack_units(value):
-    tokens = normalize(value).split()
+    tokens = re.sub(r"\\bx(?=\\d)", "x ", normalize(value)).split()
     units = []
     for i, token in enumerate(tokens[1:], start=1):
         if token in UNITS and re.fullmatch(r"\d+", tokens[i-1]):
