@@ -15,6 +15,7 @@ from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
 from ...services.tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
+from ...services.tiendanube_seo_guideline_audit import audit_seo_fields
 from ...services.tiendanube_ai_offline_preview_service import TiendanubeAiOfflinePreviewService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
 from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
@@ -186,6 +187,24 @@ def tiendanube_ai_offline_preview(
         return TiendanubeAiOfflinePreviewService(db).preview(product_key)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/tiendanube/seo-guideline-audit")
+def tiendanube_seo_guideline_audit(
+    product_key: str,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    report = TiendanubeEnrichmentProposalService(db).report()
+    item = next((value for value in report["items"] if value["product_key"] == product_key), None)
+    if item is None:
+        raise HTTPException(404, "Producto sin propuesta disponible.")
+    return {
+        "product_key": product_key,
+        "audit": audit_seo_fields(product_name=item["original_name"]),
+        "source": "Guía SEO para e-commerce de Tiendanube (recomendaciones orientativas)",
+        "policy": "Solo diagnóstico de campos disponibles: el CSV de este flujo no contiene metadata SEO verificada. No se infiere ni publica.",
+    }
 
 
 @router.get("/tiendanube/commercial-proposals")
