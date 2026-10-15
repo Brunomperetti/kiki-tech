@@ -21,9 +21,18 @@ def brand_already_present(name, brand):
     )
 
 
+def brand_partially_present(name, brand):
+    name_words, brand_words = words(name), words(brand)
+    if len(brand_words) < 2:
+        return False
+    return any(name_words[i:i + count] == brand_words[:count]
+               for count in range(1, len(brand_words))
+               for i in range(len(name_words) - count + 1))
+
+
 def suggested_product_title(original_name, brand):
     """Do not invent SEO phrases or change source order without product evidence."""
-    if not brand or brand_already_present(original_name, brand):
+    if not brand or brand_already_present(original_name, brand) or brand_partially_present(original_name, brand):
         return original_name
     return f"{original_name} · {brand}"
 
@@ -60,8 +69,11 @@ class TiendanubeEnrichmentProposalService:
             reasons = []
             proposed_title = original_name
             if brand and not brand_already_present(original_name, brand):
-                proposed_title = suggested_product_title(original_name, brand)
-                reasons.append("Se incorpora la marca del CSV sin repetirla ni modificar la descripción original.")
+                if brand_partially_present(original_name, brand):
+                    reasons.append("El título contiene parte de la marca; requiere revisión para evitar duplicaciones.")
+                else:
+                    proposed_title = suggested_product_title(original_name, brand)
+                    reasons.append("Se incorpora la marca del CSV sin repetirla ni modificar la descripción original.")
             if not any(x.get("description_present") for x in variants):
                 reasons.append("No se detectó una descripción en el CSV.")
             if not reasons:
