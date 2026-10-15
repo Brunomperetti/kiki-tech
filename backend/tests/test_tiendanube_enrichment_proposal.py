@@ -44,6 +44,7 @@ def test_brand_redundancy_and_boundary_rules():
     assert not brand_already_present("Chocolate 250g", "Choco")
     assert suggested_product_title("Jabón Sri Sri Tattva 100g", "Sri Sri Tattva") == "Jabón Sri Sri Tattva 100g"
     assert suggested_product_title("Avena 500 g", "Granix") == "Avena 500 g · Granix"
+    assert suggested_product_title("Jabón Sri Sri Vegetal 100g", "Sri Sri Tattva") == "Jabón Sri Sri Vegetal 100g"
 
 
 def test_seo_fields_not_claimed_verified():
