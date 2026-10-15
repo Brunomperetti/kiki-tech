@@ -95,3 +95,27 @@ def test_unrecognized_brand_is_not_automatically_called_a_conflict():
         report = svc.report()
         item = report["items"][0]
         assert item["brand_review_required"] is False
+
+
+def test_possessive_brand_spelling_is_not_added_twice():
+    from app.services.tiendanube_enrichment_proposal_service import suggested_product_title
+    original = "Probióticos Prebiótico Natures Truth 50 Gomitas Ananá"
+    assert suggested_product_title(original, "Nature's Truth") == original
+    assert suggested_product_title(original, "Nature’s Truth") == original
+
+
+def test_brand_conflict_is_data_review_not_seo_suggestion():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = TiendanubeEnrichmentProposalService(db)
+        rows = [
+            {"slug": "a", "sku": "A", "name": "Chialesterol Geonat 60 Cápsulas",
+             "brand": "Provefarma", "description_present": True},
+            {"slug": "b", "sku": "B", "name": "Producto Geonat 30 Cápsulas",
+             "brand": "Geonat", "description_present": True},
+        ]
+        svc.catalog.repo.save_snapshot("TIENDANUBE", rows)
+        item = next(x for x in svc.report()["items"] if x["product_key"] == "a")
+        assert item["review_type"] == "VERIFY_BRAND"
+        assert item["title_changed"] is False
