@@ -51,6 +51,10 @@ class TiendanubeEnrichmentProposalService:
             if not key:
                 continue
             grouped.setdefault(key, []).append(row)
+        known_brands = {
+            str(row.get("brand") or "").strip() for row in rows
+            if len(words(row.get("brand") or "")) > 0
+        }
         proposals = []
         for key, variants in grouped.items():
             first = variants[0]
@@ -68,7 +72,20 @@ class TiendanubeEnrichmentProposalService:
                 facts.append({"field": "category", "value": category, "source": "Tiendanube CSV"})
             reasons = []
             proposed_title = original_name
-            if brand and not brand_already_present(original_name, brand):
+            conflicting_brands = sorted(
+                (other for other in known_brands
+                 if other and brand and folded(other) != folded(brand)
+                 and len("".join(words(other))) >= 5
+                 and brand_already_present(original_name, other)),
+                key=lambda value: (-len(value), value),
+            )
+            brand_conflict = bool(conflicting_brands) and not brand_already_present(original_name, brand)
+            if brand_conflict:
+                reasons.append(
+                    "Posible diferencia entre la marca registrada y otra marca "
+                    "presente en el título. Verificar si es marca, fabricante o distribuidor."
+                )
+            if brand and not brand_conflict and not brand_already_present(original_name, brand):
                 if brand_partially_present(original_name, brand):
                     reasons.append("El título contiene parte de la marca; requiere revisión para evitar duplicaciones.")
                 else:
@@ -82,6 +99,8 @@ class TiendanubeEnrichmentProposalService:
                 "product_key": key, "original_name": original_name,
                 "proposed_title": proposed_title,
                 "title_changed": proposed_title != original_name,
+                "brand_review_required": brand_conflict,
+                "other_brands_in_title": conflicting_brands[:5],
                 "seo_title": None,
                 "seo_status": "PENDING_RESEARCH",
                 "description_action": "RESEARCH_REQUIRED" if not any(
@@ -95,6 +114,7 @@ class TiendanubeEnrichmentProposalService:
         return {
             "available": True,
             "summary": {"proposals": len(proposals), "title_suggestions": counts["title"],
+                        "brand_review_required": sum(x["brand_review_required"] for x in proposals),
                         "description_research_needed": sum(
                             x["description_action"] == "RESEARCH_REQUIRED" for x in proposals)},
             "items": proposals,

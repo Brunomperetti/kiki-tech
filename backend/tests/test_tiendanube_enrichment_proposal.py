@@ -59,3 +59,39 @@ def test_seo_fields_not_claimed_verified():
         item = service.report()["items"][0]
         assert item["seo_title"] is None
         assert item["seo_status"] == "PENDING_RESEARCH"
+
+
+def test_conflicting_known_brand_is_reviewed_without_rewriting_title():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = TiendanubeEnrichmentProposalService(db)
+        rows = [
+            {"slug": "chialesterol", "sku": "A1",
+             "name": "Chialesterol Geonat Colesterol Y Salud 60 Cápsulas",
+             "brand": "Provefarma", "description_present": True},
+            {"slug": "otra", "sku": "B1", "name": "Producto Geonat 30 caps",
+             "brand": "Geonat", "description_present": True},
+        ]
+        svc.catalog.repo.save_snapshot("TIENDANUBE", rows)
+        report = svc.report()
+        item = next(i for i in report["items"] if i["product_key"] == "chialesterol")
+        assert item["brand_review_required"] is True
+        assert item["other_brands_in_title"] == ["Geonat"]
+        assert item["title_changed"] is False
+        assert item["proposed_title"] == rows[0]["name"]
+        assert report["summary"]["brand_review_required"] >= 1
+        assert svc.catalog.repo.snapshot("TIENDANUBE") == rows
+
+
+def test_unrecognized_brand_is_not_automatically_called_a_conflict():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = TiendanubeEnrichmentProposalService(db)
+        rows = [{"slug": "a", "sku": "A", "name": "Jabon OtraMarca 100g",
+                 "brand": "Distribuidora", "description_present": True}]
+        svc.catalog.repo.save_snapshot("TIENDANUBE", rows)
+        report = svc.report()
+        item = report["items"][0]
+        assert item["brand_review_required"] is False
