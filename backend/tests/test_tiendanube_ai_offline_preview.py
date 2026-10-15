@@ -17,7 +17,7 @@ def test_offline_simulation_uses_source_facts_and_does_not_write():
         svc.proposals.catalog.repo.save_snapshot("TIENDANUBE", original)
         result = svc.preview("avena")
         assert result["status"] == "OFFLINE_SIMULATION"
-        assert result["title"] == "Granix · Avena 500 g"
+        assert result["title"] == "Avena 500 g · Granix"
         assert result["description"] == ""
         assert result["questions"]
         assert result["evidence"]
