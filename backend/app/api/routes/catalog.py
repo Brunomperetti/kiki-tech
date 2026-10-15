@@ -150,6 +150,37 @@ class TiendanubeBatchPreviewRequest(BaseModel):
     source_keys: list[str]
 
 
+class TiendanubeBulkApproveRequest(BaseModel):
+    source_keys: list[str]
+    note: str
+
+
+@router.post("/tiendanube/matches/bulk-approve-preview")
+def tiendanube_bulk_approve_preview(
+    request: TiendanubeBatchPreviewRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return TiendanubeAssistedMatchService(db).bulk_approve_preview(request.source_keys)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.post("/tiendanube/matches/bulk-approve")
+def tiendanube_bulk_approve(
+    request: TiendanubeBulkApproveRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAssistedMatchService(db).bulk_approve(
+            request.source_keys, request.note
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.post("/tiendanube/matches/bulk-preview")
 def tiendanube_matches_bulk_preview(
     request: TiendanubeBatchPreviewRequest,
