@@ -9,7 +9,7 @@ def folded(value):
 
 
 def words(value):
-    return re.findall(r"[a-z0-9]+", re.sub(r"(?<=\\w)[\u0027’]s\\b", "s", folded(value)))
+    return re.findall(r"[a-z0-9]+", folded(value).replace("\u0027", "").replace("’", ""))
 
 
 def brand_already_present(name, brand):
