@@ -217,3 +217,77 @@ class TiendanubeAssistedMatchService:
         db.commit()
         return {"updated": preview["count"], "status": "REJECTED",
                 "policy": "Solo decisiones internas; sin cambios en Tiendanube, Ecomm o ML."}
+
+    def bulk_approve_preview(self, source_keys: list[str]):
+        """Return eligible one-to-one matches; never guess among candidates."""
+        if not source_keys or len(source_keys) > 50 or len(source_keys) != len(set(source_keys)):
+            raise ValueError("Seleccioná entre 1 y 50 productos distintos.")
+        report = self.report()
+        by_key = {item["source_key"]: item for item in report["items"]}
+        db = self.catalog.repo.db
+        approved_targets = {
+            str(row.target_ecomm_id) for row in db.scalars(select(TiendanubeMatchDecision)).all()
+            if row.status == "APPROVED" and row.target_ecomm_id
+        }
+        used_targets = set()
+        eligible = []
+        excluded = []
+        for key in source_keys:
+            item = by_key.get(key)
+            reason = None
+            if item is None:
+                reason = "Ya no figura entre los pendientes"
+            elif item["decision"] is not None:
+                reason = "Tiene una decisión anterior"
+            elif len(item["candidates"]) != 1:
+                reason = "No tiene un único candidato"
+            else:
+                candidate = item["candidates"][0]
+                target_id = candidate["ecomm_id"]
+                if not target_id or candidate["confidence"] != "HIGH" or candidate["similarity"] < 0.96:
+                    reason = "Evidencia insuficiente"
+                elif not normalize(item["tiendanube_brand"]) or normalize(item["tiendanube_brand"]) != normalize(candidate["brand"]):
+                    reason = "Marca no comprobada"
+                elif target_id in approved_targets or target_id in used_targets:
+                    reason = "El candidato ya está vinculado o se repite en el lote"
+                else:
+                    used_targets.add(target_id)
+                    eligible.append({"source_key": key, "name": item["tiendanube_name"],
+                                     "sku": item["tiendanube_sku"], "target_id": target_id,
+                                     "target_name": candidate["name"], "target_sku": candidate["sku"],
+                                     "similarity": candidate["similarity"]})
+            if reason:
+                excluded.append({"source_key": key, "name": item["tiendanube_name"] if item else key,
+                                 "reason": reason})
+        return {"eligible": eligible, "excluded": excluded, "selected": len(source_keys),
+                "policy": "Revisión humana obligatoria. Solo vínculos internos; nunca se actualizan canales."}
+
+    def bulk_approve(self, source_keys: list[str], note: str):
+        """All-or-nothing batch operation; refuse changes since preview."""
+        if len((note or "").strip()) < 10:
+            raise ValueError("Ingresá un motivo de al menos 10 caracteres.")
+        preview = self.bulk_approve_preview(source_keys)
+        if preview["excluded"] or len(preview["eligible"]) != len(source_keys):
+            raise ValueError("El lote contiene casos no aptos; volvé a revisar la selección.")
+        db = self.catalog.repo.db
+        # Fail closed if any of these sources was acted upon since preview.
+        current = set(db.scalars(select(TiendanubeMatchDecision.source_key).where(
+            TiendanubeMatchDecision.source_key.in_(source_keys))).all())
+        if current:
+            raise ValueError("Hay decisiones posteriores. Actualizá la selección.")
+        now = datetime.now(timezone.utc)
+        for item in preview["eligible"]:
+            event = {"at": now.isoformat(), "status": "APPROVED",
+                     "target_ecomm_id": item["target_id"], "note": note.strip(),
+                     "source": {"sku": item["sku"], "name": item["name"]},
+                     "target": {"ecomm_id": item["target_id"], "name": item["target_name"],
+                                "sku": item["target_sku"]}}
+            db.add(TiendanubeMatchDecision(
+                source_key=item["source_key"], status="APPROVED",
+                target_ecomm_id=item["target_id"],
+                source_snapshot=event["source"], target_snapshot=event["target"],
+                note=note.strip(), history=[event], updated_at=now,
+            ))
+        db.commit()
+        return {"updated": len(preview["eligible"]), "status": "APPROVED",
+                "policy": "Solo decisiones internas. No se modifican canales externos."}
