@@ -14,6 +14,7 @@ from ...services.enrichment_review_service import EnrichmentReviewService
 from ...services.enrichment_service import EnrichmentService
 from ...services.gtin_candidate_service import GtinCandidateService
 from ...services.tiendanube_csv_service import TiendanubeCsvService
+from ...services.tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
 from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
 from ...services.tiendanube_price_stock_service import TiendanubePriceStockService
@@ -172,6 +173,14 @@ def tiendanube_matches_bulk_reject(
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/tiendanube/commercial-proposals")
+def tiendanube_commercial_proposals(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    return TiendanubeEnrichmentProposalService(db).report()
 
 
 @router.get("/tiendanube/assisted-matches")
