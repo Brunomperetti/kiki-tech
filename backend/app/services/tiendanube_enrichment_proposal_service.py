@@ -9,7 +9,7 @@ def folded(value):
 
 
 def words(value):
-    return re.findall(r"[a-z0-9]+", folded(value))
+    return re.findall(r"[a-z0-9]+", re.sub(r"(?<=\\w)[\u0027’]s\\b", "s", folded(value)))
 
 
 def brand_already_present(name, brand):
@@ -100,6 +100,7 @@ class TiendanubeEnrichmentProposalService:
                 "proposed_title": proposed_title,
                 "title_changed": proposed_title != original_name,
                 "brand_review_required": brand_conflict,
+                "review_type": "VERIFY_BRAND" if brand_conflict else ("TITLE_SUGGESTION" if proposed_title != original_name else "VERIFY_DATA"),
                 "other_brands_in_title": conflicting_brands[:5],
                 "seo_title": None,
                 "seo_status": "PENDING_RESEARCH",
