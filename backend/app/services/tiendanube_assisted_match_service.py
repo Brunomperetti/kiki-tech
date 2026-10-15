@@ -3,7 +3,7 @@ import re
 import unicodedata
 from difflib import SequenceMatcher
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from ..database.models import TiendanubeMatchDecision
 
@@ -266,6 +266,11 @@ class TiendanubeAssistedMatchService:
         """All-or-nothing batch operation; refuse changes since preview."""
         if len((note or "").strip()) < 10:
             raise ValueError("Ingresá un motivo de al menos 10 caracteres.")
+        db = self.catalog.repo.db
+        # Serialize batch-approval checks and writes across workers on PostgreSQL.
+        # This does not replace a final functional validation of every source.
+        if db.bind is not None and db.bind.dialect.name == "postgresql":
+            db.execute(text("SELECT pg_advisory_xact_lock(92715087)"))
         preview = self.bulk_approve_preview(source_keys)
         if preview["excluded"] or len(preview["eligible"]) != len(source_keys):
             raise ValueError("El lote contiene casos no aptos; volvé a revisar la selección.")
