@@ -3,7 +3,7 @@ export function Imports({mode='imports'}:{mode?:'imports'|'tiendanube'}){const [
 const reason=window.prompt(status==='APPROVED'?'Motivo de aprobación (mínimo 10 caracteres):':'Motivo del rechazo (mínimo 10 caracteres):');
 if(reason===null)return;
 if(reason.trim().length<10){setDecisionMessage('Escribí un motivo de al menos 10 caracteres.');return;}
-if(!window.confirm(status==='APPROVED'?'¿Aprobar esta relación interna? No se modificará ningún canal.':'¿Rechazar las propuestas de este producto?'))return;
+if(!window.confirm(status==='APPROVED'?'¿Guardar esta relación interna? Si existe una decisión anterior, se registrará la corrección en el historial. No se modificará ningún canal.':'¿Guardar rechazo interno? Si existe una decisión anterior, se registrará la corrección en el historial.'))return;
 setDecisionBusy(sourceKey);setDecisionMessage('');
 try{await api.tiendanubeMatchDecision(sourceKey,status,target,reason.trim());setAssisted(await api.tiendanubeAssistedMatches());setDecisionMessage('Decisión guardada en KIKI con su historial. No se modificaron canales externos.')}
 catch(e){setDecisionMessage(e instanceof Error?e.message:'No se pudo guardar la decisión.')}
