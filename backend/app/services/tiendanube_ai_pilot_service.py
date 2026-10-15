@@ -40,7 +40,6 @@ class TiendanubeAiPilotService:
             "https://api.openai.com/v1/chat/completions",
             data=json.dumps({
                 "model": settings.kiki_ai_model,
-            "evidence_audit": audit_generated_copy(title.strip(), description.strip(), facts),
                 "temperature": 0.1,
                 "max_tokens": 300,
                 "response_format": {"type": "json_object"},
