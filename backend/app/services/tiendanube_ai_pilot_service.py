@@ -5,6 +5,7 @@ from urllib.request import Request, urlopen
 
 from ..core.config import get_settings
 from .tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
+from .tiendanube_ai_evidence_check import audit_generated_copy
 
 
 INSTRUCTIONS = (
@@ -69,5 +70,6 @@ class TiendanubeAiPilotService:
             "product_key": product_key, "title": title.strip(), "description": description.strip(),
             "questions": questions, "evidence": facts, "status": "AI_DRAFT_UNVERIFIED",
             "model": settings.kiki_ai_model,
+            "evidence_audit": audit_generated_copy(title.strip(), description.strip(), facts),
             "policy": "Borrador de IA no verificado; sin guardado, actualización de productos ni publicación.",
         }
