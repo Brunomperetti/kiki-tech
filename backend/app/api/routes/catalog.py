@@ -139,6 +139,41 @@ def tiendanube_match_decision(
         raise HTTPException(422, str(exc)) from exc
 
 
+class TiendanubeBatchRejectRequest(BaseModel):
+    source_keys: list[str]
+    note: str
+
+
+class TiendanubeBatchPreviewRequest(BaseModel):
+    source_keys: list[str]
+
+
+@router.post("/tiendanube/matches/bulk-preview")
+def tiendanube_matches_bulk_preview(
+    request: TiendanubeBatchPreviewRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return TiendanubeAssistedMatchService(db).bulk_preview(request.source_keys)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.post("/tiendanube/matches/bulk-reject")
+def tiendanube_matches_bulk_reject(
+    request: TiendanubeBatchRejectRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAssistedMatchService(db).bulk_reject(
+            request.source_keys, request.note
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.get("/tiendanube/assisted-matches")
 def tiendanube_assisted_matches(db: Session = Depends(get_db), _session=Depends(require_session)):
     return TiendanubeAssistedMatchService(db).report()
