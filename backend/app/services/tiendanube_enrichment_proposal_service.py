@@ -1,6 +1,31 @@
 """Evidence-only commercial copy proposals; no LLM or external updates."""
 from collections import Counter
+import re
+import unicodedata
 from .tiendanube_csv_service import TiendanubeCsvService
+
+def folded(value):
+    return unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode().casefold()
+
+
+def words(value):
+    return re.findall(r"[a-z0-9]+", folded(value))
+
+
+def brand_already_present(name, brand):
+    """Match complete word sequences; avoid partial substrings and accent/case pitfalls."""
+    name_words, brand_words = words(name), words(brand)
+    return bool(brand_words) and any(
+        name_words[i:i + len(brand_words)] == brand_words
+        for i in range(len(name_words) - len(brand_words) + 1)
+    )
+
+
+def suggested_product_title(original_name, brand):
+    """Do not invent SEO phrases or change source order without product evidence."""
+    if not brand or brand_already_present(original_name, brand):
+        return original_name
+    return f"{original_name} · {brand}"
 
 
 class TiendanubeEnrichmentProposalService:
@@ -34,9 +59,9 @@ class TiendanubeEnrichmentProposalService:
                 facts.append({"field": "category", "value": category, "source": "Tiendanube CSV"})
             reasons = []
             proposed_title = original_name
-            if brand and brand.casefold() not in original_name.casefold():
-                proposed_title = f"{brand} · {original_name}"
-                reasons.append("Marca explícita compatible, tomada del mismo producto.")
+            if brand and not brand_already_present(original_name, brand):
+                proposed_title = suggested_product_title(original_name, brand)
+                reasons.append("Se incorpora la marca del CSV sin repetirla ni modificar la descripción original.")
             if not any(x.get("description_present") for x in variants):
                 reasons.append("No se detectó una descripción en el CSV.")
             if not reasons:
@@ -45,12 +70,14 @@ class TiendanubeEnrichmentProposalService:
                 "product_key": key, "original_name": original_name,
                 "proposed_title": proposed_title,
                 "title_changed": proposed_title != original_name,
+                "seo_title": None,
+                "seo_status": "PENDING_RESEARCH",
                 "description_action": "RESEARCH_REQUIRED" if not any(
                     x.get("description_present") for x in variants) else "NO_CHANGE",
                 "verified_product_facts": facts,
                 "reasons": reasons,
                 "status": "DRAFT_REVIEW",
-                "policy": "Borrador interno, armado solo con campos del CSV. No es validación de fabricante ni contenido publicado.",
+                "policy": "Nombre comercial sugerido; título SEO y meta descripción requieren investigación. No valida datos de fabricante ni publica.",
             })
         counts = Counter("title" if x["title_changed"] else "description" for x in proposals)
         return {
