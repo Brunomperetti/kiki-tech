@@ -170,6 +170,8 @@ export const api = {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(payload),
   }),
+  tiendanubeBulkApprovePreview: (source_keys:string[]) => request<{selected:number;eligible:{source_key:string;name:string;sku:string;target_id:string;target_name:string;target_sku:string;similarity:number}[];excluded:{source_key:string;name:string;reason:string}[];policy:string}>('/api/tiendanube/matches/bulk-approve-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_keys})}),
+  tiendanubeBulkApprove: (source_keys:string[],note:string) => request<{updated:number;status:string;policy:string}>('/api/tiendanube/matches/bulk-approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_keys,note})}),
   tiendanubeBulkPreview: (source_keys:string[]) => request<{count:number;items:{source_key:string;name:string;sku:string;candidate_count:number}[];action:string;policy:string}>('/api/tiendanube/matches/bulk-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_keys})}),
   tiendanubeBulkReject: (source_keys:string[],note:string) => request<{updated:number;status:string;policy:string}>('/api/tiendanube/matches/bulk-reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_keys,note})}),
   tiendanubeMatchDecision: (source_key:string,status:'APPROVED'|'REJECTED',target_ecomm_id:string|null,note:string) => request<{status:string;source_key:string;history_count:number}>('/api/tiendanube/match-decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_key,status,target_ecomm_id,note})}),
