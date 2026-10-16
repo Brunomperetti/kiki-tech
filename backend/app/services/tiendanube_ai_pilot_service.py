@@ -95,8 +95,8 @@ class TiendanubeAiPilotService:
             raise RuntimeError("Respuesta de IA fuera de los límites establecidos.")
         # Fail closed when the model introduces new quantities, percentages or counts.
         # This cannot prove other claims: all output remains pending human review.
-        input_numbers = set(re.findall(r"(?<![\\w])\\d+(?:[.,]\\d+)?", payload))
-        output_numbers = set(re.findall(r"(?<![\\w])\\d+(?:[.,]\\d+)?", title + " " + description))
+        input_numbers = set(re.findall(r"(?<![\w])\d+(?:[.,]\d+)?", payload))
+        output_numbers = set(re.findall(r"(?<![\w])\d+(?:[.,]\d+)?", title + " " + description))
         if output_numbers - input_numbers:
             attempt.status = "INVALID_RESPONSE"
             self.db.commit()
