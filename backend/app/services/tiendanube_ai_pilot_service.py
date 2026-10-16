@@ -82,6 +82,10 @@ class TiendanubeAiPilotService:
             attempt.status = "FAILED_PROVIDER"
             self.db.commit()
             raise RuntimeError("No se pudo generar el borrador de IA. Revisá la configuración del servicio.") from exc
+        if not isinstance(parsed, dict):
+            attempt.status = "INVALID_RESPONSE"
+            self.db.commit()
+            raise RuntimeError("Respuesta de IA inválida; se esperaba un objeto JSON.")
         title = parsed.get("title")
         description = parsed.get("description")
         questions = parsed.get("questions")
@@ -89,7 +93,8 @@ class TiendanubeAiPilotService:
             attempt.status = "INVALID_RESPONSE"
             self.db.commit()
             raise RuntimeError("Respuesta de IA inválida; no se guardó ninguna propuesta.")
-        if len(title) > 150 or len(description) > 700 or len(questions) > 3 or any(not isinstance(q, str) for q in questions):
+        if (not title.strip() or len(title) > 150 or len(description) > 700
+                or len(questions) > 3 or any(not isinstance(q, str) or len(q) > 300 for q in questions)):
             attempt.status = "INVALID_RESPONSE"
             self.db.commit()
             raise RuntimeError("Respuesta de IA fuera de los límites establecidos.")
