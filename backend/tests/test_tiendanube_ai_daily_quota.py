@@ -27,7 +27,7 @@ class FakeResponse:
 def seed(db):
     svc = TiendanubeAiPilotService(db)
     svc.proposals.catalog.repo.save_snapshot("TIENDANUBE", [
-        {"slug": "avena", "sku": "A", "name": "Avena", "brand": "",
+        {"slug": "avena", "sku": "A", "name": "Avena", "brand": "Marca A",
          "category": "", "description_present": False}
     ])
     return svc
@@ -123,3 +123,19 @@ def test_malformed_generated_copy_is_logged_as_invalid(tmp_path):
                     svc.draft("avena")
         attempt = db.scalars(select(KikiAiDailyPilotAttempt)).one()
         assert attempt.status == "INVALID_RESPONSE"
+
+def test_ambiguous_brand_rejected_before_reserving_quota(tmp_path):
+    engine = create_engine("sqlite:///" + str(tmp_path / "brand.db"))
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = TiendanubeAiPilotService(db)
+        svc.proposals.catalog.repo.save_snapshot("TIENDANUBE", [
+            {"slug": "avena", "sku": "A", "name": "Avena", "brand": "",
+             "category": "", "description_present": False}
+        ])
+        with patch("app.services.tiendanube_ai_pilot_service.get_settings", return_value=Settings()):
+            with patch("app.services.tiendanube_ai_pilot_service.urlopen") as mocked:
+                with pytest.raises(ValueError, match="marca clara"):
+                    svc.draft("avena")
+                mocked.assert_not_called()
+        assert db.scalars(select(KikiAiDailyPilotAttempt)).all() == []
