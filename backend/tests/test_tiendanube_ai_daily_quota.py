@@ -139,3 +139,21 @@ def test_ambiguous_brand_rejected_before_reserving_quota(tmp_path):
                     svc.draft("avena")
                 mocked.assert_not_called()
         assert db.scalars(select(KikiAiDailyPilotAttempt)).all() == []
+
+
+def test_ai_invented_quantity_is_rejected_and_audited(tmp_path):
+    engine = create_engine("sqlite:///" + str(tmp_path / "numbers.db"))
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = seed(db)
+        class InventedResponse(FakeResponse):
+            def read(self, _):
+                return json.dumps({"choices": [{"message": {"content": json.dumps({
+                    "title": "Avena 900 g", "description": "Contiene 25 vitaminas", "questions": []
+                })}}]}).encode()
+        with patch("app.services.tiendanube_ai_pilot_service.get_settings", return_value=Settings()):
+            with patch("app.services.tiendanube_ai_pilot_service.urlopen", return_value=InventedResponse()):
+                with pytest.raises(RuntimeError, match="cantidades no respaldadas"):
+                    svc.draft("avena")
+        record = db.scalars(select(KikiAiDailyPilotAttempt)).one()
+        assert record.status == "INVALID_RESPONSE"
