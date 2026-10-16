@@ -282,3 +282,13 @@ class TiendanubeMatchDecision(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class KikiAiDailyPilotAttempt(Base):
+    """One durable reservation per UTC day. Failed attempts still consume the pilot slot."""
+    __tablename__ = "kiki_ai_daily_pilot_attempts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day_utc: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    product_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="RESERVED")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
