@@ -24,7 +24,7 @@ def test_ai_draft_uses_existing_evidence_and_no_external_catalog_writes():
     with Session(engine) as db:
         svc = TiendanubeAiPilotService(db)
         original = [{"slug": "avena", "sku": "A", "name": "Avena 500 g",
-                     "brand": "", "category": "", "description_present": False}]
+                     "brand": "Marca A", "category": "", "description_present": False}]
         svc.proposals.catalog.repo.save_snapshot("TIENDANUBE", original)
         class Settings:
             kiki_ai_enabled = True
