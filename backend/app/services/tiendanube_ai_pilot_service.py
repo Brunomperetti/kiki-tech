@@ -37,7 +37,13 @@ class TiendanubeAiPilotService:
         proposal = next((x for x in report["items"] if x["product_key"] == product_key), None)
         if not proposal:
             raise ValueError("Producto sin propuesta vigente; actualizá el catálogo.")
+        # First pilot: only an unambiguous product with one declared brand.
         facts = proposal["verified_product_facts"]
+        brands = [fact for fact in facts if fact.get("field") == "brand" and str(fact.get("value") or "").strip()]
+        if proposal.get("brand_review_required") or len(brands) != 1:
+            raise ValueError("Elegí un producto con marca clara y sin conflictos para la primera prueba.")
+        if not str(proposal.get("original_name") or "").strip():
+            raise ValueError("El producto debe tener un nombre original válido.")
         # Reserve BEFORE the paid request. A database UNIQUE constraint on the UTC day
         # makes this concurrency-safe across app instances. Failed requests also count.
         attempt = KikiAiDailyPilotAttempt(
