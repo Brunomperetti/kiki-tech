@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     auth_window_minutes: int = 15
     auth_block_minutes: int = 15
     enable_api_docs: bool = False
+    kiki_ai_api_key: str = ""
+    kiki_ai_model: str = "gpt-4.1-mini"
+    kiki_ai_enabled: bool = False
 
     @field_validator("database_url")
     @classmethod

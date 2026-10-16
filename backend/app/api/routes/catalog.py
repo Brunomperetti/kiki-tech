@@ -17,6 +17,7 @@ from ...services.tiendanube_csv_service import TiendanubeCsvService
 from ...services.tiendanube_enrichment_proposal_service import TiendanubeEnrichmentProposalService
 from ...services.tiendanube_seo_guideline_audit import audit_seo_fields
 from ...services.tiendanube_ai_offline_preview_service import TiendanubeAiOfflinePreviewService
+from ...services.tiendanube_ai_pilot_service import TiendanubeAiPilotService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
 from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
 from ...services.tiendanube_price_stock_service import TiendanubePriceStockService
@@ -175,6 +176,24 @@ def tiendanube_matches_bulk_reject(
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+class TiendanubeAiDraftRequest(BaseModel):
+    product_key: str
+
+
+@router.post("/tiendanube/ai/draft")
+def tiendanube_ai_draft(
+    request: TiendanubeAiDraftRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAiPilotService(db).draft(request.product_key)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @router.get("/tiendanube/ai/offline-preview")
