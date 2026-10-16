@@ -157,3 +157,41 @@ def test_ai_invented_quantity_is_rejected_and_audited(tmp_path):
                     svc.draft("avena")
         record = db.scalars(select(KikiAiDailyPilotAttempt)).one()
         assert record.status == "INVALID_RESPONSE"
+
+
+def test_non_object_json_is_rejected_and_recorded(tmp_path):
+    engine = create_engine("sqlite:///" + str(tmp_path / "non_object.db"))
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = seed(db)
+
+        class NonObjectResponse(FakeResponse):
+            def read(self, _):
+                return json.dumps({"choices": [{"message": {"content": "[]"}}]}).encode()
+
+        with patch("app.services.tiendanube_ai_pilot_service.get_settings", return_value=Settings()):
+            with patch("app.services.tiendanube_ai_pilot_service.urlopen", return_value=NonObjectResponse()):
+                with pytest.raises(RuntimeError, match="objeto JSON"):
+                    svc.draft("avena")
+        record = db.scalars(select(KikiAiDailyPilotAttempt)).one()
+        assert record.status == "INVALID_RESPONSE"
+
+
+def test_blank_title_is_rejected_and_recorded(tmp_path):
+    engine = create_engine("sqlite:///" + str(tmp_path / "blank_title.db"))
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = seed(db)
+
+        class BlankTitleResponse(FakeResponse):
+            def read(self, _):
+                return json.dumps({"choices": [{"message": {"content": json.dumps({
+                    "title": "   ", "description": "", "questions": []
+                })}}]}).encode()
+
+        with patch("app.services.tiendanube_ai_pilot_service.get_settings", return_value=Settings()):
+            with patch("app.services.tiendanube_ai_pilot_service.urlopen", return_value=BlankTitleResponse()):
+                with pytest.raises(RuntimeError, match="fuera de los límites"):
+                    svc.draft("avena")
+        record = db.scalars(select(KikiAiDailyPilotAttempt)).one()
+        assert record.status == "INVALID_RESPONSE"
