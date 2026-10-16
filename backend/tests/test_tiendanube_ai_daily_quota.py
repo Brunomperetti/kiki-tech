@@ -58,6 +58,8 @@ def test_failed_request_also_consumes_slot(tmp_path):
             with patch("app.services.tiendanube_ai_pilot_service.urlopen", side_effect=TimeoutError):
                 with pytest.raises(RuntimeError):
                     svc.draft("avena")
+            attempt = db.scalars(select(KikiAiDailyPilotAttempt)).one()
+            assert attempt.status == "FAILED_PROVIDER"
             with patch("app.services.tiendanube_ai_pilot_service.urlopen") as mocked:
                 with pytest.raises(ValueError, match="único intento diario"):
                     svc.draft("avena")
@@ -103,3 +105,21 @@ def test_simultaneous_requests_reserve_only_one_slot(tmp_path):
     assert sum("único intento diario" in r for r in results) == 1
     with Session(engine) as db:
         assert len(db.scalars(select(KikiAiDailyPilotAttempt)).all()) == 1
+
+
+def test_malformed_generated_copy_is_logged_as_invalid(tmp_path):
+    engine = create_engine("sqlite:///" + str(tmp_path / "invalid.db"))
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = seed(db)
+        class InvalidResponse(FakeResponse):
+            def read(self, _):
+                return json.dumps({"choices": [{"message": {"content": json.dumps({
+                    "title": "Avena", "description": "", "questions": "not-an-array"
+                })}}]}).encode()
+        with patch("app.services.tiendanube_ai_pilot_service.get_settings", return_value=Settings()):
+            with patch("app.services.tiendanube_ai_pilot_service.urlopen", return_value=InvalidResponse()):
+                with pytest.raises(RuntimeError, match="Respuesta de IA inválida"):
+                    svc.draft("avena")
+        attempt = db.scalars(select(KikiAiDailyPilotAttempt)).one()
+        assert attempt.status == "INVALID_RESPONSE"
