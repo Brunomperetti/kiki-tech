@@ -1,5 +1,6 @@
 """Optional one-product AI pilot. Persists quota audit only; never writes to external catalogs."""
 import json
+import re
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from ..database.models import KikiAiDailyPilotAttempt
@@ -92,6 +93,14 @@ class TiendanubeAiPilotService:
             attempt.status = "INVALID_RESPONSE"
             self.db.commit()
             raise RuntimeError("Respuesta de IA fuera de los límites establecidos.")
+        # Fail closed when the model introduces new quantities, percentages or counts.
+        # This cannot prove other claims: all output remains pending human review.
+        input_numbers = set(re.findall(r"(?<![\\w])\\d+(?:[.,]\\d+)?", payload))
+        output_numbers = set(re.findall(r"(?<![\\w])\\d+(?:[.,]\\d+)?", title + " " + description))
+        if output_numbers - input_numbers:
+            attempt.status = "INVALID_RESPONSE"
+            self.db.commit()
+            raise RuntimeError("La IA agregó cantidades no respaldadas por el CSV; descartamos el borrador.")
         attempt.status = "COMPLETED"
         self.db.commit()
         # Keep drafts explicitly unverified: editorial suggestions require human fact checking.
