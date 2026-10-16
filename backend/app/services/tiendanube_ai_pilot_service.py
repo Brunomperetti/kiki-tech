@@ -1,4 +1,4 @@
-"""Optional one-product AI pilot. No persistence or external catalog writes."""
+"""Optional one-product AI pilot. Persists quota audit only; never writes to external catalogs."""
 import json
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
@@ -72,13 +72,19 @@ class TiendanubeAiPilotService:
                 raw = json.loads(response.read(40_000))
             parsed = json.loads(raw["choices"][0]["message"]["content"])
         except (HTTPError, URLError, TimeoutError, ValueError, KeyError, IndexError, TypeError) as exc:
+            attempt.status = "FAILED_PROVIDER"
+            self.db.commit()
             raise RuntimeError("No se pudo generar el borrador de IA. Revisá la configuración del servicio.") from exc
         title = parsed.get("title")
         description = parsed.get("description")
         questions = parsed.get("questions")
         if not isinstance(title, str) or not isinstance(description, str) or not isinstance(questions, list):
+            attempt.status = "INVALID_RESPONSE"
+            self.db.commit()
             raise RuntimeError("Respuesta de IA inválida; no se guardó ninguna propuesta.")
         if len(title) > 150 or len(description) > 700 or len(questions) > 3 or any(not isinstance(q, str) for q in questions):
+            attempt.status = "INVALID_RESPONSE"
+            self.db.commit()
             raise RuntimeError("Respuesta de IA fuera de los límites establecidos.")
         attempt.status = "COMPLETED"
         self.db.commit()
