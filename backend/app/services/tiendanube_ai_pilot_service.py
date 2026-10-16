@@ -1,5 +1,8 @@
 """Optional one-product AI pilot. No persistence or external catalog writes."""
 import json
+from datetime import datetime, timezone
+from sqlalchemy.exc import IntegrityError
+from ..database.models import KikiAiDailyPilotAttempt
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -23,6 +26,7 @@ INSTRUCTIONS = (
 
 class TiendanubeAiPilotService:
     def __init__(self, db):
+        self.db = db
         self.proposals = TiendanubeEnrichmentProposalService(db)
 
     def draft(self, product_key: str):
@@ -34,6 +38,18 @@ class TiendanubeAiPilotService:
         if not proposal:
             raise ValueError("Producto sin propuesta vigente; actualizá el catálogo.")
         facts = proposal["verified_product_facts"]
+        # Reserve BEFORE the paid request. A database UNIQUE constraint on the UTC day
+        # makes this concurrency-safe across app instances. Failed requests also count.
+        attempt = KikiAiDailyPilotAttempt(
+            day_utc=datetime.now(timezone.utc).date().isoformat(),
+            product_key=product_key, status="RESERVED",
+        )
+        try:
+            self.db.add(attempt)
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise ValueError("El piloto ya consumió su único intento diario (UTC).") from exc
         payload = json.dumps({"verified_product_facts": facts, "original_name": proposal["original_name"]}, ensure_ascii=False)
         request = Request(
             "https://api.openai.com/v1/chat/completions",
@@ -64,6 +80,8 @@ class TiendanubeAiPilotService:
             raise RuntimeError("Respuesta de IA inválida; no se guardó ninguna propuesta.")
         if len(title) > 150 or len(description) > 700 or len(questions) > 3 or any(not isinstance(q, str) for q in questions):
             raise RuntimeError("Respuesta de IA fuera de los límites establecidos.")
+        attempt.status = "COMPLETED"
+        self.db.commit()
         # Keep drafts explicitly unverified: editorial suggestions require human fact checking.
         return {
             "product_key": product_key, "title": title.strip(), "description": description.strip(),
