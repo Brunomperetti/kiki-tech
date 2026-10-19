@@ -3,143 +3,144 @@ import {Link} from 'react-router-dom';
 import {api} from '../services/api';
 import type {FinalPublicationQueueReport,InventoryLinkageReport,MercadoLibreStatus,Summary,ReadinessReport} from '../types/catalog';
 
-const emptyMl:MercadoLibreStatus={connected:false,token_expired:false,listing_count:0};
-const date=(value?:string)=>value?new Date(value).toLocaleString('es-AR'):'Nunca';
+const count=(value?:number|null)=>value==null?'—':value.toLocaleString('es-AR');
+const date=(value?:string)=>value?new Date(value).toLocaleString('es-AR'):'Sin registro';
 
 export function Dashboard(){
-  const [data,setData]=useState<Summary>({total_products:0,total_listings:0});
-  const [ml,setMl]=useState<MercadoLibreStatus>(emptyMl);
+  const [data,setData]=useState<Summary|null>(null);
+  const [ml,setMl]=useState<MercadoLibreStatus|null>(null);
   const [linkage,setLinkage]=useState<InventoryLinkageReport|null>(null);
   const [finalQueue,setFinalQueue]=useState<FinalPublicationQueueReport|null>(null);
   const [readiness,setReadiness]=useState<ReadinessReport|null>(null);
-  const [audit,setAudit]=useState<{total:number;items:{status:string}[]}|null>(null);
-  const [summaryLoaded,setSummaryLoaded]=useState(false);
+  const [tn,setTn]=useState<Awaited<ReturnType<typeof api.tiendanubeReport>>|null>(null);
+  const [tnStatus,setTnStatus]=useState<'loading'|'available'|'unavailable'>('loading');
+  const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [syncing,setSyncing]=useState(false);
   const [message,setMessage]=useState('');
 
   async function load(){
+    setLoading(true);
     const results=await Promise.allSettled([
       api.dashboard(),
       api.mlStatus(),
       api.inventoryLinkage(),
       api.finalPublicationQueue(),
       api.publicationReadiness(),
-      api.internalDecisionHistory(),
+      api.tiendanubeReport(),
     ]);
-    setSummaryLoaded(results[0].status==='fulfilled');
-    if(results[0].status==='fulfilled')setData(results[0].value);
-    if(results[1].status==='fulfilled')setMl(results[1].value);
-    if(results[2].status==='fulfilled')setLinkage(results[2].value);
-    if(results[3].status==='fulfilled')setFinalQueue(results[3].value);
-    if(results[4].status==='fulfilled')setReadiness(results[4].value);
-    if(results[5].status==='fulfilled')setAudit(results[5].value);
+    setData(results[0].status==='fulfilled'?results[0].value:null);
+    setMl(results[1].status==='fulfilled'?results[1].value:null);
+    setLinkage(results[2].status==='fulfilled'?results[2].value:null);
+    setFinalQueue(results[3].status==='fulfilled'?results[3].value:null);
+    setReadiness(results[4].status==='fulfilled'?results[4].value:null);
+    setTn(results[5].status==='fulfilled'?results[5].value:null);
+    setTnStatus(results[5].status==='fulfilled'?'available':'unavailable');
+    setLoading(false);
   }
-
-  useEffect(()=>{void load().catch(e=>setMessage(e instanceof Error?e.message:'No se pudo cargar el inicio.'))},[]);
+  useEffect(()=>{void load().catch(e=>{setLoading(false);setMessage(e instanceof Error?e.message:'No se pudo actualizar el inicio.')})},[]);
 
   async function analyze(){
     setBusy(true);setMessage('');
-    try{await api.analyze('AUTO');await load();setMessage('Catálogo actualizado y analizado correctamente.')}
-    catch(e){setMessage(e instanceof Error?e.message:'Error inesperado')}
+    try{await api.analyze('AUTO');await load();setMessage('Catálogo analizado. Los indicadores se actualizaron.')}
+    catch(e){setMessage(e instanceof Error?e.message:'No se pudo analizar el catálogo.')}
     finally{setBusy(false)}
   }
-
   async function connect(){
     try{const {url}=await api.mlAuthUrl();window.location.assign(url)}
-    catch(e){setMessage(e instanceof Error?e.message:'Error inesperado')}
+    catch(e){setMessage(e instanceof Error?e.message:'No se pudo conectar Mercado Libre.')}
   }
-
   async function sync(){
     setSyncing(true);setMessage('');
-    try{const result=await api.mlSync();await load();setMessage(`Sincronización completada: ${result.listing_count} publicaciones.`)}
-    catch(e){setMessage(e instanceof Error?e.message:'Error inesperado')}
+    try{const result=await api.mlSync();await load();setMessage(`Sincronización finalizada: ${result.listing_count} publicaciones.`)}
+    catch(e){setMessage(e instanceof Error?e.message:'No se pudo sincronizar Mercado Libre.')}
     finally{setSyncing(false)}
   }
 
-  const formatCount=(value?:number|null)=>value===undefined||value===null?'—':value.toLocaleString('es-AR');
-  const brandNotApplicable=audit?.items.filter(item=>item.status==='BRAND_NOT_APPLICABLE').length;
-  const brandApproved=audit?.items.filter(item=>item.status==='APPROVED_PROPOSAL').length;
-  const ecomm=data.import_diagnostics?.find(item=>item.source==='ECOMM_APP');
-  const linkPending=linkage?.summary.review_required??0;
-  const linkReady=linkage?.summary.ready_to_link??0;
-  const pendingEcomm=linkage?.summary.pending_ecomm_catalog??0;
-  const finalReady=finalQueue?.summary.READY_FOR_FINAL_REVIEW??0;
-  const finalApproved=finalQueue?.summary.APPROVED_FOR_PUBLICATION??0;
+  const ecomm=data?.import_diagnostics?.find(item=>item.source==='ECOMM_APP');
+  const mlImport=data?.import_diagnostics?.find(item=>item.source==='MERCADOLIBRE');
+  const mlSnapshot=Boolean(mlImport||ml?.last_sync||(data?.total_listings||0)>0);
+  const tnImported=tnStatus==='available'&&tn?.available===true;
+  const readyCount=finalQueue?.summary.READY_FOR_FINAL_REVIEW;
+  const reviewCount=readiness?.summary.REVIEW_REQUIRED;
+  const linkageCount=linkage?.available?linkage.summary.review_required:null;
+  const next=!ecomm
+    ? {eyebrow:'PRIMER PASO',title:'Cargar el catálogo de Ecomm-App',description:'Importá la fuente principal para que KIKI pueda comparar productos y preparar las revisiones.',to:'/imports',cta:'Actualizar información'}
+    : reviewCount!=null&&reviewCount>0
+    ? {eyebrow:'SIGUIENTE ACCIÓN',title:'Resolver los productos que necesitan revisión',description:'Hay fichas que todavía requieren completar o verificar información antes de avanzar con Mercado Libre.',to:'/work',cta:'Ver tareas pendientes'}
+    : readyCount!=null&&readyCount>0
+    ? {eyebrow:'SIGUIENTE ACCIÓN',title:'Revisar los productos preparados para ML',description:'Tenés productos listos para una revisión final interna. Todavía no se publican en Mercado Libre.',to:'/prepublication',cta:'Ver productos preparados'}
+    : {eyebrow:'SIGUIENTE PASO',title:'Elegí dónde querés trabajar',description:'Consultá las tareas o revisá el estado de Mercado Libre y Tiendanube desde Canales de venta.',to:'/channels',cta:'Ver canales de venta'};
+  const kpis=[
+    {label:'Productos en Ecomm',value:ecomm?count(data?.total_products):'—',detail:ecomm?'Catálogo importado':'Falta cargar o verificar fuente'},
+    {label:'Publicaciones ML',value:mlSnapshot?count(data?.total_listings):'—',detail:'Último catálogo registrado, no en vivo'},
+    {label:'Productos Tiendanube',value:tnImported?count(tn?.summary.products):'—',detail:tnStatus==='unavailable'?'No se pudieron consultar':tnImported?'CSV importado':'Sin catálogo disponible'},
+    {label:'Para revisar antes de ML',value:count(reviewCount),detail:'Revisión previa a publicación; no todas las tareas'},
+  ];
 
-  return <>
-    <header className="guided-header"><div><p className="eyebrow">KIKI TECH</p><h1>¿Qué necesita atención?</h1><p>Entrá, actualizá la información y seguí el próximo paso. No necesitás recorrer todas las herramientas.</p></div><Link className="guided-primary-link" to="/imports">Actualizar información</Link></header>
-    {message&&<div className="notice">{message}</div>}
+  return <div className="kiki-home">
+    <header className="kiki-home-header">
+      <div>
+        <p className="eyebrow">KIKI TECH · VISTA GENERAL</p>
+        <h1>Tu catálogo, en una sola mirada.</h1>
+        <p>Lo importante primero: qué tenés, qué necesita atención y dónde continuar.</p>
+      </div>
+      <button type="button" className="kiki-refresh" disabled={loading} onClick={()=>void load()}>{loading?'Actualizando…':'↻ Actualizar datos'}</button>
+    </header>
+    {message&&<div className="notice" role="status">{message}</div>}
+    {!loading&&!data&&<div className="notice warning" role="alert">No se pudo consultar el resumen del catálogo. Podés volver a intentar con «Actualizar datos». Los valores no disponibles se muestran con —.</div>}
 
-    <section className="panel executive-overview">
-      <div className="panel-title-row"><div><p className="eyebrow">PANORAMA OPERATIVO</p><h2>El catálogo, en una sola mirada</h2><p>Información de los últimos datos cargados en KIKI. Los valores no disponibles se muestran como «—», nunca como cero.</p></div><button className="secondary" onClick={()=>void load()}>Actualizar indicadores</button></div>
-      <div className="executive-kpis">
-        <article><small>Productos en Ecomm</small><strong>{summaryLoaded?formatCount(data.total_products):'—'}</strong><span>Catálogo importado</span></article>
-        <article><small>Publicaciones en ML</small><strong>{summaryLoaded?formatCount(data.total_listings):'—'}</strong><span>Registros del último snapshot</span></article>
-        <article><small>Ya publicados</small><strong>{formatCount(readiness?.summary.ALREADY_PUBLISHED)}</strong><span>Productos identificados por KIKI</span></article>
-        <article><small>Requieren revisión</small><strong>{formatCount(readiness?.summary.REVIEW_REQUIRED)}</strong><span>Preparación del catálogo</span></article>
-        <article><small>Sin stock</small><strong>{formatCount(readiness?.summary.NO_STOCK)}</strong><span>Pueden superponerse con otros controles</span></article>
-        <article><small>Decisiones registradas</small><strong>{formatCount(audit?.total)}</strong><span>Memoria interna de enriquecimiento</span></article>
+    <section className="kiki-metrics" aria-label="Indicadores del catálogo">
+      {kpis.map(item=><article className="kiki-metric" key={item.label}>
+        <small>{item.label}</small>
+        <strong>{loading?'…':item.value}</strong>
+        <span>{item.detail}</span>
+      </article>)}
+    </section>
+
+    <div className="kiki-home-columns">
+      <section className="kiki-feature-panel">
+        <p className="eyebrow">{next.eyebrow}</p>
+        <h2>{next.title}</h2>
+        <p>{next.description}</p>
+        <Link className="kiki-main-action" to={next.to}>{next.cta} <span aria-hidden="true">→</span></Link>
+      </section>
+      <section className="kiki-task-panel">
+        <div className="kiki-panel-heading">
+          <div><p className="eyebrow">TRABAJO DIARIO</p><h2>Accesos rápidos</h2></div>
+          <Link to="/work">Todas las tareas →</Link>
+        </div>
+        <Link className="kiki-quick-row" to="/work"><span className="kiki-row-symbol" aria-hidden="true">✓</span><span><strong>Resolver pendientes</strong><small>Marcas, códigos y datos que faltan comprobar</small></span><b>→</b></Link>
+        <Link className="kiki-quick-row" to="/readiness"><span className="kiki-row-symbol" aria-hidden="true">⇄</span><span><strong>Revisar vinculaciones ML</strong><small>{linkageCount==null?'Consultar estado':`${count(linkageCount)} casos necesitan revisión`}</small></span><b>→</b></Link>
+        <Link className="kiki-quick-row" to="/tiendanube"><span className="kiki-row-symbol" aria-hidden="true">✧</span><span><strong>Mejorar fichas Tiendanube</strong><small>Revisar propuestas comerciales de KIKI AI</small></span><b>→</b></Link>
+      </section>
+    </div>
+
+    <section className="kiki-sources-panel">
+      <div className="kiki-panel-heading">
+        <div><p className="eyebrow">FUENTES DE INFORMACIÓN</p><h2>Estado de tus catálogos</h2></div>
+        <Link to="/channels">Ver canales →</Link>
       </div>
-      <div className="executive-channel-grid">
-        <article><strong>ECOMM-APP</strong><p>{ecomm?'Catálogo importado':'Esperando importación'}</p><small>{ecomm?.filename||'Fuente principal del catálogo'}</small></article>
-        <article><strong>Mercado Libre</strong><p>{ml.connected&&!ml.token_expired?'API conectada':ml.token_expired?'Requiere renovar conexión':'API sin conexión activa'}</p><small>{summaryLoaded?formatCount(data.total_listings):'—'} publicaciones en el snapshot</small></article>
-        <article><strong>Tiendanube</strong><p>Esperando catálogo CSV</p><small>No conectado a KIKI; todavía no hay conciliación con Tiendanube</small></article>
-      </div>
-      <div className="executive-bottom">
-        <p>Marcas «no aplica»: <strong>{formatCount(brandNotApplicable)}</strong> · Propuestas internas aprobadas: <strong>{formatCount(brandApproved)}</strong>. Son decisiones internas, no marcas verificadas para publicar.</p>
-        <Link className="guided-primary-link" to="/work">Revisar decisiones y pendientes →</Link>
+      <div className="kiki-sources-grid">
+        <article><div className="kiki-source-head"><strong>Ecomm-App</strong><span className={ecomm?'kiki-source-pill is-ok':'kiki-source-pill'}>{ecomm?'Importado':'Sin confirmar'}</span></div><p>Base de productos para comparar.</p><small>{ecomm?.filename||'No hay una importación registrada en el resumen.'}</small></article>
+        <article><div className="kiki-source-head"><strong>Mercado Libre</strong><span className={ml?.connected&&!ml.token_expired?'kiki-source-pill is-ok':'kiki-source-pill'}>{ml===null?'No disponible':ml.connected&&!ml.token_expired?'API conectada':ml.token_expired?'Requiere reconectar':'API sin conectar'}</span></div><p>Publicaciones y vinculación con inventario.</p><small>{mlSnapshot?`Último registro: ${count(data?.total_listings)} publicaciones`:'Sin publicaciones verificables en el resumen.'}</small></article>
+        <article><div className="kiki-source-head"><strong>Tiendanube</strong><span className={tnImported?'kiki-source-pill is-ok':'kiki-source-pill'}>{tnStatus==='unavailable'?'No disponible':tnImported?'CSV importado':'Sin CSV'}</span></div><p>Catálogo para conciliar y mejorar fichas.</p><small>{tnImported?`${count(tn?.summary.products)} productos en el CSV · no es conexión en vivo`:'No se confirmó un catálogo importado.'}</small></article>
       </div>
     </section>
 
-    <section className="guided-dashboard-grid">
-      <article className="guided-dashboard-card">
-        <span className="guided-card-kicker">1 · EMPEZAR</span>
-        <h2>Actualizar información</h2>
-        <p>Importá Ecomm/EDIMA o sincronizá Mercado Libre cuando haya acceso.</p>
-        <div className="guided-card-stats"><span>Ecomm <strong>{Number(data.total_products||0).toLocaleString('es-AR')}</strong></span><span>ML <strong>{Number(data.total_listings||0).toLocaleString('es-AR')}</strong></span></div>
-        <Link to="/imports">Actualizar datos</Link>
-      </article>
-
-      <article className="guided-dashboard-card">
-        <span className="guided-card-kicker">2 · TRABAJAR</span>
-        <h2>Resolver pendientes</h2>
-        <p>KIKI reúne las decisiones humanas que todavía faltan y las ordena por tipo.</p>
-        <div className="guided-card-stats"><span>Vinculación <strong>{linkPending}</strong></span><span>Pendientes Ecomm <strong>{pendingEcomm}</strong></span></div>
-        <Link to="/work">Ver pendientes</Link>
-      </article>
-
-      <article className="guided-dashboard-card">
-        <span className="guided-card-kicker">3 · VINCULAR</span>
-        <h2>Vincular con Mercado Libre</h2>
-        <p>Para publicaciones que ya existen en ML y necesitan relacionarse correctamente con Ecomm.</p>
-        <div className="guided-card-stats"><span>Listas <strong>{linkReady}</strong></span><span>Revisión <strong>{linkPending}</strong></span></div>
-        <Link to="/readiness">Ir a vinculación</Link>
-      </article>
-
-      <article className="guided-dashboard-card">
-        <span className="guided-card-kicker">4 · PUBLICAR</span>
-        <h2>Publicar productos nuevos</h2>
-        <p>Para productos de Ecomm que todavía no están en ML. Se preparan, validan y aprueban antes del lote.</p>
-        <div className="guided-card-stats"><span>Para aprobar <strong>{finalReady}</strong></span><span>Aprobados <strong>{finalApproved}</strong></span></div>
-        <Link to="/prepublication">Ir a publicación</Link>
-      </article>
-    </section>
-
-    <section className="panel daily-routine">
-      <div><p className="eyebrow">RUTINA SIMPLE</p><h2>El uso diario de KIKI en cuatro pasos</h2></div>
-      <div className="daily-steps"><span><b>1</b> Actualizar datos</span><span><b>2</b> Resolver lo que KIKI marque</span><span><b>3</b> Aprobar lo que esté listo</span><span><b>4</b> Salir</span></div>
-    </section>
-
-    <details className="panel advanced-dashboard">
-      <summary><strong>Estado técnico y conexiones</strong><span>Solo cuando necesitás revisar fuentes, sincronización o diagnóstico.</span></summary>
-      <div className="advanced-dashboard-content">
-        <section className="connection compact-connection"><div><p className="eyebrow">ECOMM-APP</p><h2>{ecomm?'Inventario cargado':'Sin importación'}</h2><div className="connection-details"><span>Archivo <strong>{ecomm?.filename||'—'}</strong></span><span>Filas <strong>{ecomm?.rows_accepted??0}</strong></span><span>Productos <strong>{ecomm?.canonical_products??0}</strong></span></div></div></section>
-        <section className="connection compact-connection"><div><p className="eyebrow">MERCADO LIBRE</p><h2>{syncing?'Sincronizando…':!ml.connected?'No conectado':ml.token_expired?'Token vencido':'Conectado'}</h2><div className="connection-details"><span>Publicaciones <strong>{ml.listing_count}</strong></span><span>Última sync <strong>{date(ml.last_sync)}</strong></span><span>Token <strong>{date(ml.token_expiration)}</strong></span></div></div><div>{(!ml.connected||ml.token_expired)&&<button onClick={connect}>Conectar / reconectar</button>} {ml.connected&&!ml.token_expired&&<button onClick={sync} disabled={syncing}>{syncing?'Sincronizando…':'Sincronizar ML'}</button>}</div></section>
-        <div className="analysis-actions"><button onClick={analyze} disabled={busy}>{busy?'Analizando…':'Analizar catálogo ahora'}</button></div>
-        <h3>Diagnóstico de importación</h3>
-        {data.import_diagnostics?.length?data.import_diagnostics.map(item=><div className="diagnostic" key={item.source}><h3>{item.source} <small>{item.filename}</small></h3><div className="diagnostic-counts"><span>Leídas <strong>{item.rows_read}</strong></span><span>Aceptadas <strong>{item.rows_accepted}</strong></span><span>Descartadas <strong>{item.rows_discarded}</strong></span>{item.canonical_products!==undefined&&<span>Canónicos <strong>{item.canonical_products}</strong></span>}</div></div>):<p>Todavía no hay importaciones para diagnosticar.</p>}
+    <details className="kiki-diagnostics-panel">
+      <summary><span><strong>Diagnóstico y conexiones</strong><small>Opciones técnicas para cuando las necesites</small></span><span aria-hidden="true">⌄</span></summary>
+      <div className="kiki-diagnostics-content">
+        <p><strong>Ecomm:</strong> {ecomm?.filename||'Sin archivo registrado'} · <strong>Última sincronización ML:</strong> {date(ml?.last_sync)}</p>
+        <p><strong>Preparación ML:</strong> {count(readyCount)} para revisión final · {count(finalQueue?.summary.APPROVED_FOR_PUBLICATION)} aprobados internamente. Los indicadores pueden referirse a conjuntos distintos y no deben sumarse.</p>
+        <div className="kiki-diagnostic-actions">
+          <Link className="secondary-link" to="/imports">Importar datos</Link>
+          <button type="button" disabled={busy} onClick={()=>void analyze()}>{busy?'Analizando…':'Reanalizar catálogo'}</button>
+          {ml&&(!ml.connected||ml.token_expired)&&<button type="button" className="secondary" onClick={()=>void connect()}>Reconectar Mercado Libre</button>}
+          {ml?.connected&&!ml.token_expired&&<button type="button" disabled={syncing} onClick={()=>void sync()}>{syncing?'Sincronizando…':'Sincronizar Mercado Libre'}</button>}
+        </div>
       </div>
     </details>
-  </>;
+    <p className="kiki-home-footnote">KIKI trabaja con la información importada y las conexiones habilitadas. Aprobar una ficha o preparación no publica automáticamente productos en los canales externos.</p>
+  </div>;
 }
