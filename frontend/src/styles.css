@@ -264,3 +264,125 @@
 .tn-assisted-list article{display:grid;gap:8px;background:#fff;border:1px solid #dce5df;border-radius:9px;padding:13px}
 .tn-assisted-list article>div{display:grid;gap:5px;border-top:1px solid #e4eae6;padding-top:8px}
 .tn-assisted-list small{color:#617168}
+
+
+/* KIKI 3.0 — clear daily navigation and executive home.
+   Scoped to kiki- classes to avoid changing the legacy working tools. */
+.kiki-shell{grid-template-columns:248px minmax(0,1fr);background:#f4f7f5}
+.kiki-shell>main{max-width:1540px;padding:38px 44px 60px;min-width:0}
+.kiki-sidebar{padding:28px 18px 20px;background:linear-gradient(165deg,#112f24 0%,#0d241c 100%);gap:0}
+.kiki-brand{text-decoration:none;color:#fff;letter-spacing:-.025em}
+.kiki-brand>span{background:#c6ed88;border-radius:12px}
+.kiki-brand>div{font-size:17px;line-height:1.1}
+.kiki-brand small{letter-spacing:0;font-size:11px;margin-top:5px}
+.kiki-nav-kicker{color:#85a79a;font-size:10px;letter-spacing:.17em;font-weight:700;margin:37px 14px 11px;line-height:1.4}
+.kiki-primary-nav{display:grid;grid-template-columns:1fr;gap:5px;margin:0!important}
+.kiki-primary-nav a{display:flex;gap:13px;align-items:center;min-height:46px;padding:11px 14px;border-radius:10px;font-size:13px;font-weight:600;color:#cadbd2;transition:background .15s,color .15s}
+.kiki-primary-nav a.active{background:#29503d;color:#fff;box-shadow:inset 3px 0 0 #c5ec83}
+.kiki-primary-nav a:hover{background:#234635}
+.kiki-nav-icon{display:grid;place-items:center;width:23px;font-size:20px;line-height:1;color:#c2e498}
+.kiki-advanced-nav{margin-top:25px;border-top:1px solid #345447;padding-top:17px}
+.kiki-advanced-nav>summary{color:#c0d5c9;font-size:12px;font-weight:600;cursor:pointer;padding:10px 12px;border-radius:8px;line-height:1.45}
+.kiki-advanced-nav>summary:hover{background:#204536;color:#fff}
+.kiki-advanced-nav>nav{display:grid;grid-template-columns:1fr;margin:5px 0 0;gap:1px}
+.kiki-advanced-nav nav a{font-size:12px;padding:8px 12px 8px 18px;color:#bed2c5;border-radius:7px}
+.kiki-advanced-nav nav a.active{color:#fff;background:#244a37}
+.kiki-sidebar-footer{margin-top:auto;padding-top:24px}
+.kiki-sidebar-footer .readonly{margin:0;padding:12px;border-color:#3d604b;font-size:12px;color:#c6ec87;line-height:1.5;background:#19392b;border-radius:11px}
+.kiki-sidebar-footer .readonly small{display:block;margin:4px 0 0;color:#b1cbbb;font-size:11px;line-height:1.5}
+.kiki-status-dot{display:inline-block;vertical-align:middle;background:#b8e980;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.kiki-sidebar-footer .logout{margin-top:13px;border-color:#739082;color:#e2f0e9;font-size:12px;padding:11px;border-radius:9px}
+.kiki-shell a:focus-visible,.kiki-shell button:focus-visible,.kiki-shell summary:focus-visible{outline:3px solid #8bb85c;outline-offset:3px}
+.kiki-home{display:grid;gap:24px;max-width:1370px}
+.kiki-home-header{display:flex;justify-content:space-between;gap:22px;align-items:center;margin-bottom:0;padding:0 0 4px}
+.kiki-home-header h1{font-size:clamp(26px,2.7vw,38px);line-height:1.16;letter-spacing:-.045em;margin:9px 0 12px;color:#17352a;font-weight:700}
+.kiki-home-header p:not(.eyebrow){font-size:14px;max-width:710px;color:#61766b}
+.kiki-home .eyebrow{color:#618c59;letter-spacing:.12em;font-weight:700;font-size:10px}
+.kiki-refresh{white-space:nowrap;border:1px solid #cbdcd1;color:#295542;background:#fff;font-size:12px;padding:11px 14px;border-radius:9px;box-shadow:0 1px 3px #112a1b06}
+.kiki-refresh:hover{background:#eaf4eb}
+.kiki-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kiki-metric{display:grid;gap:9px;background:#fff;border:1px solid #e1e9e2;border-radius:14px;padding:20px 21px;box-shadow:0 2px 10px #0d261106;min-width:0}
+.kiki-metric small{font-size:12px;color:#62766a;font-weight:600}
+.kiki-metric strong{font-size:clamp(26px,3vw,35px);font-variant-numeric:tabular-nums;line-height:1.1;color:#133c2b;letter-spacing:-.035em}
+.kiki-metric span{font-size:11px;color:#7b8c80;line-height:1.5}
+.kiki-home-columns{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px}
+.kiki-feature-panel{display:flex;flex-direction:column;align-items:flex-start;padding:27px 29px;border:1px solid #b6d1b8;border-radius:16px;background:linear-gradient(133deg,#e7f4e0 0%,#f5faf1 68%,#fff 100%);min-height:275px}
+.kiki-feature-panel h2{font-size:25px;letter-spacing:-.035em;color:#173e2d;line-height:1.25;margin:14px 0 11px;max-width:440px}
+.kiki-feature-panel>p:not(.eyebrow){font-size:13px;max-width:465px;line-height:1.7}
+.kiki-main-action{display:inline-flex;gap:16px;align-items:center;justify-content:space-between;background:#1b5139;color:#fff;text-decoration:none;font-size:12px;font-weight:700;padding:12px 17px;border-radius:9px;margin-top:auto;min-height:42px;transition:background .15s}
+.kiki-main-action:hover{background:#123e2a;color:#fff}
+.kiki-task-panel,.kiki-sources-panel{background:#fff;border:1px solid #e0e9e1;border-radius:16px;padding:24px;box-shadow:0 2px 10px #0d261106}
+.kiki-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:15px}
+.kiki-panel-heading h2{font-size:19px;letter-spacing:-.02em;margin:5px 0 0;color:#1b3e2d}
+.kiki-panel-heading>a{font-size:12px;text-decoration:none;color:#2e6245;font-weight:700;white-space:nowrap}
+.kiki-panel-heading>a:hover{text-decoration:underline}
+.kiki-quick-row{display:flex;gap:13px;align-items:center;padding:15px 2px;border-top:1px solid #ebefeb;color:#183e2c;text-decoration:none}
+.kiki-quick-row:hover{background:#f8fbf8}
+.kiki-quick-row>span:nth-child(2){display:grid;gap:5px;flex:1;min-width:0}
+.kiki-quick-row strong{font-size:13px}
+.kiki-quick-row small{font-size:11px;color:#728276;line-height:1.45}
+.kiki-quick-row>b{font-size:16px;color:#799181}
+.kiki-row-symbol{width:35px;height:35px;display:grid;place-items:center;background:#eaf3e9;color:#285c3f;border-radius:10px;font-size:20px;flex:none}
+.kiki-sources-panel{display:grid;gap:4px}
+.kiki-sources-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.kiki-sources-grid article{padding:17px;border:1px solid #e6eee6;background:#fafcfb;border-radius:11px;display:grid;align-content:start;gap:9px;min-width:0}
+.kiki-source-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.kiki-source-head strong{font-size:13px;color:#254631}
+.kiki-source-pill{display:inline-flex;align-items:center;padding:5px 8px;border-radius:99px;background:#edf0ed;color:#657469;font-size:10px;font-weight:700}
+.kiki-source-pill.is-ok{background:#e1f3e0;color:#25643a}
+.kiki-sources-grid p{font-size:12px;line-height:1.45;color:#62746a}
+.kiki-sources-grid small{font-size:11px;color:#88958a;line-height:1.45;overflow-wrap:anywhere}
+.kiki-diagnostics-panel{border:1px solid #e0e9e2;border-radius:13px;background:#fff;overflow:hidden}
+.kiki-diagnostics-panel>summary{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:17px 22px;color:#375c45;list-style:none;gap:12px}
+.kiki-diagnostics-panel>summary::-webkit-details-marker{display:none}
+.kiki-diagnostics-panel>summary>span:first-child{display:grid;gap:4px}
+.kiki-diagnostics-panel summary strong{font-size:13px}
+.kiki-diagnostics-panel summary small{font-size:11px;color:#7b8b7d}
+.kiki-diagnostics-content{border-top:1px solid #e8eee8;padding:22px;display:grid;gap:14px}
+.kiki-diagnostics-content p{font-size:12px}
+.kiki-diagnostic-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kiki-diagnostic-actions button,.kiki-diagnostic-actions .secondary-link{font-size:12px;padding:10px 12px}
+.kiki-home-footnote{font-size:11px;color:#7a8d81;line-height:1.6;margin:0}
+.kiki-channel-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.kiki-channel-card{background:#fff;border:1px solid #e1e9e2;border-radius:16px;box-shadow:0 2px 12px #0d261106;padding:27px;display:flex;flex-direction:column;min-height:310px;gap:15px}
+.kiki-channel-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.kiki-channel-icon{width:50px;height:50px;border-radius:13px;background:#e6f2e8;color:#24533a;font-weight:800;font-size:17px;display:grid;place-items:center}
+.kiki-channel-card h2{margin:0;font-size:24px;letter-spacing:-.03em;color:#19402c}
+.kiki-channel-card p{font-size:13px;max-width:500px;line-height:1.7}
+.kiki-channel-card>small{margin-top:auto;color:#778a7d;font-size:11px;line-height:1.55}
+.kiki-channel-metric{font-size:25px;color:#214c36;font-weight:700;display:flex;align-items:baseline;gap:10px}
+.kiki-channel-metric small{font-size:12px;font-weight:400;color:#778a7d}
+.kiki-channel-actions{display:flex;flex-wrap:wrap;gap:11px;align-items:center}
+.kiki-channel-actions .kiki-main-action{margin:0}
+.kiki-channel-help{display:flex;align-items:center;justify-content:space-between;gap:24px;background:#e9f4e6;border:1px solid #d3e6d1;border-radius:14px;padding:23px 25px}
+.kiki-channel-help h2{margin:6px 0 6px;font-size:18px}
+.kiki-channel-help p:not(.eyebrow){font-size:12px;max-width:650px}
+.kiki-channel-help>a{white-space:nowrap}
+@media(max-width:1150px){
+  .kiki-shell>main{padding:28px 24px 45px}
+  .kiki-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kiki-home-columns{grid-template-columns:1fr}
+  .kiki-feature-panel{min-height:210px;gap:15px}
+}
+@media(max-width:900px){
+  .kiki-shell{grid-template-columns:1fr}
+  .kiki-sidebar{height:auto;position:static;overflow:visible;padding:17px 22px}
+  .kiki-nav-kicker{display:none}
+  .kiki-primary-nav{margin-top:20px!important;grid-template-columns:repeat(4,minmax(0,1fr))}
+  .kiki-primary-nav a{justify-content:center;text-align:center;flex-direction:column;gap:5px;padding:11px 7px;font-size:11px}
+  .kiki-advanced-nav{margin-top:10px;padding-top:5px}
+  .kiki-sidebar-footer{display:none}
+  .kiki-shell>main{padding:28px 20px 45px}
+}
+@media(max-width:680px){
+  .kiki-home-header{align-items:stretch;flex-direction:column}
+  .kiki-refresh{align-self:flex-start}
+  .kiki-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .kiki-metric{padding:15px 12px}
+  .kiki-sources-grid,.kiki-channel-cards{grid-template-columns:1fr}
+  .kiki-task-panel,.kiki-sources-panel{padding:17px}
+  .kiki-feature-panel{padding:22px}
+  .kiki-feature-panel h2{font-size:22px}
+  .kiki-channel-help{flex-direction:column;align-items:flex-start}
+  .kiki-channel-card{padding:20px;min-height:0}
+}
