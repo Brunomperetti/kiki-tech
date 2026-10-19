@@ -292,3 +292,24 @@ class KikiAiDailyPilotAttempt(Base):
     product_key: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="RESERVED")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class KikiAiEditorialDraft(Base):
+    """Immutable generated copy with one auditable internal human decision."""
+    __tablename__ = "kiki_ai_editorial_drafts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_key: Mapped[str] = mapped_column(String(500), index=True, nullable=False)
+    source_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    original_name: Mapped[str] = mapped_column(Text, nullable=False)
+    source_facts: Mapped[list] = mapped_column(JSON, nullable=False)
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    questions: Mapped[list] = mapped_column(JSON, nullable=False)
+    review_status: Mapped[str] = mapped_column(String(32), default="PENDING_REVIEW", nullable=False)
+    review_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    history: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
