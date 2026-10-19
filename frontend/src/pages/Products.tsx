@@ -52,18 +52,15 @@ export function Products(){
   },[search,status]);
 
   useEffect(()=>{
+    // One read-only CSV request per visit to Productos, only when a ficha opens.
+    // Do not cancel it when the selected product changes during loading.
     if(!selected||tnState!=='idle')return;
-    let active=true;
     setTnState('loading');
     void api.tiendanubeReport().then(response=>{
-      if(!active)return;
       setTnRows(response.items||[]);
       setTnAvailable(response.available===true);
       setTnState('ready');
-    }).catch(()=>{
-      if(active)setTnState('error');
-    });
-    return ()=>{active=false};
+    }).catch(()=>setTnState('error'));
   },[selected,tnState]);
 
   const pages=Math.ceil(items.length/PAGE_SIZE);
