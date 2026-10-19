@@ -3,7 +3,6 @@ import {Link} from 'react-router-dom';
 import {api} from '../services/api';
 import type {FinalPublicationQueueReport,InventoryLinkageReport,MercadoLibreStatus,Summary,ReadinessReport} from '../types/catalog';
 
-const emptyMl:MercadoLibreStatus={connected:false,token_expired:false,listing_count:0};
 const count=(value?:number|null)=>value==null?'—':value.toLocaleString('es-AR');
 const date=(value?:string)=>value?new Date(value).toLocaleString('es-AR'):'Sin registro';
 
