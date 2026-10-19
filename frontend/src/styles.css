@@ -386,3 +386,66 @@
   .kiki-channel-help{flex-direction:column;align-items:flex-start}
   .kiki-channel-card{padding:20px;min-height:0}
 }
+
+
+/* KIKI 3.0 — focused, read-only product workspace. */
+.kiki-catalog{display:grid;gap:20px;max-width:1410px;min-width:0}
+.kiki-catalog>.kiki-home-header{margin:0}
+.kiki-catalog-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:14px;background:#fff;border:1px solid #e2eae4;padding:20px;border-radius:14px}
+.kiki-catalog-filters label{display:grid;gap:8px;font-size:12px;font-weight:700;color:#315441;min-width:0}
+.kiki-catalog-filters input,.kiki-catalog-filters select{width:100%;min-width:0;border:1px solid #cbdacb;border-radius:9px;padding:12px 13px;background:#fafdfb;font:inherit;font-weight:400;font-size:13px;color:#203c2b}
+.kiki-catalog-summary{display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:#68796d;font-size:12px}
+.kiki-catalog-summary strong{color:#224730;font-size:13px}
+.kiki-catalog-workspace{min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
+.kiki-catalog-workspace.is-open{grid-template-columns:minmax(270px,.88fr) minmax(0,1.2fr)}
+.kiki-catalog-results{min-width:0;background:#fff;border:1px solid #e0e9e2;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px #0d261106}
+.kiki-catalog-list{display:grid}
+.kiki-catalog-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border-top:1px solid #eef2ed;background:#fff}
+.kiki-catalog-row:first-child{border-top:0}
+.kiki-catalog-row:hover,.kiki-catalog-row.is-selected{background:#f5faf4}
+.kiki-catalog-row.is-selected{box-shadow:inset 3px 0 0 #95c96f}
+.kiki-catalog-item{min-width:0;display:grid;gap:6px;align-items:start}
+.kiki-catalog-item strong{color:#1a3c2b;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.kiki-catalog-item span{color:#687b6d;font-size:11px;overflow-wrap:anywhere}
+.kiki-catalog-item small{font-size:11px;color:#476b50;font-weight:600}
+.kiki-detail-open{background:#ecf6ec;color:#25533a;border:1px solid #ccdfc9;font-size:11px;padding:9px 12px;white-space:nowrap;border-radius:8px;flex:none}
+.kiki-detail-open:hover,.kiki-catalog-row.is-selected .kiki-detail-open{background:#1b5139;color:#fff}
+.kiki-catalog-empty{padding:30px;color:#738377;font-size:13px}
+.kiki-catalog-pages{padding:15px 18px;border-top:1px solid #e8efe9;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#637b69}
+.kiki-catalog-pages>div{display:flex;gap:8px}
+.kiki-catalog-pages button{padding:9px 11px;font-size:11px}
+.kiki-product-detail{background:#fff;border:1px solid #d6e6d8;border-radius:14px;padding:24px;min-width:0;box-shadow:0 7px 20px #0d26110e;display:grid;gap:18px}
+.kiki-detail-heading{margin:0;align-items:start;display:flex;justify-content:space-between;gap:12px}
+.kiki-detail-heading h2{font-size:19px;line-height:1.35;color:#173c2b;margin:6px 0 10px;overflow-wrap:anywhere}
+.kiki-close-detail{background:#f1f5f1;color:#41614a;padding:8px 10px;font-size:11px;white-space:nowrap}
+.kiki-product-status{display:inline-flex;background:#eef6e7;color:#386b34;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700}
+.kiki-detail-intro{font-size:12px;line-height:1.6;color:#6b7c70}
+.kiki-detail-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kiki-detail-source{display:grid;align-content:start;gap:12px;min-width:0;padding:17px 15px;background:#fafcfb;border:1px solid #e5ede7;border-radius:11px}
+.kiki-detail-source-heading{display:flex;align-items:center;gap:9px}
+.kiki-detail-source-heading h3{color:#255037;font-size:14px;margin:0}
+.kiki-detail-source-icon{display:grid;place-items:center;width:31px;height:31px;flex:none;background:#e5f2e5;color:#265b3e;border-radius:9px;font-size:11px;font-weight:800}
+.kiki-details-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0}
+.kiki-details-grid>div{min-width:0}
+.kiki-details-grid dt{color:#7e8c7f;font-size:10px;line-height:1.4}
+.kiki-details-grid dd{margin:4px 0 0;color:#243d2f;font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.kiki-detail-source p{font-size:12px;line-height:1.6}
+.kiki-detail-muted{color:#718075;overflow-wrap:anywhere}
+.kiki-detail-positive{color:#2c6d41;font-weight:700}
+.kiki-detail-warning{color:#9a5a22;font-weight:600}
+.kiki-detail-link{font-size:12px;color:#276143;text-decoration:none;font-weight:700;align-self:end;margin-top:auto}
+.kiki-detail-link:hover{text-decoration:underline}
+.kiki-detail-note{display:grid;gap:9px;background:#f4f9f1;border:1px solid #dcebd4;padding:17px;border-radius:11px}
+.kiki-detail-note strong{font-size:13px;color:#294d34}
+.kiki-detail-note p{font-size:12px;color:#647965;line-height:1.6}
+.kiki-detail-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.kiki-detail-actions .kiki-main-action{margin:0}
+.kiki-detail-actions .secondary-link{font-size:11px}
+@media(max-width:1280px){.kiki-catalog-workspace.is-open{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:750px){
+  .kiki-catalog-filters,.kiki-detail-sources{grid-template-columns:1fr}
+  .kiki-catalog-row{align-items:flex-start;flex-direction:column}
+  .kiki-catalog-pages{align-items:stretch;flex-direction:column}
+  .kiki-detail-heading{flex-direction:column}
+  .kiki-product-detail{padding:17px}
+}
