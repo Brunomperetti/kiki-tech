@@ -1,9 +1,11 @@
 """Optional one-product AI pilot. Persists quota audit only; never writes to external catalogs."""
 import json
 import re
+import hashlib
+from sqlalchemy import select
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
-from ..database.models import KikiAiDailyPilotAttempt
+from ..database.models import KikiAiDailyPilotAttempt, KikiAiEditorialDraft
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -106,12 +108,108 @@ class TiendanubeAiPilotService:
             attempt.status = "INVALID_RESPONSE"
             self.db.commit()
             raise RuntimeError("La IA agregó cantidades no respaldadas por el CSV; descartamos el borrador.")
+        # Create the editorial draft atomically with the completed paid-attempt audit.
+        # Preserve each generated version and never update the external catalogs.
+        now = datetime.now(timezone.utc)
+        record = KikiAiEditorialDraft(
+            product_key=product_key,
+            original_name=proposal["original_name"],
+            source_facts=facts,
+            source_hash=self._fingerprint(proposal),
+            title=title.strip(),
+            description=description.strip(),
+            questions=questions,
+            model=settings.kiki_ai_model,
+            review_status="PENDING_REVIEW",
+            history=[{"event": "GENERATED", "at": now.isoformat(),
+                      "note": "Borrador no verificado; requiere revisión humana."}],
+        )
+        self.db.add(record)
         attempt.status = "COMPLETED"
         self.db.commit()
-        # Keep drafts explicitly unverified: editorial suggestions require human fact checking.
-        return {
-            "product_key": product_key, "title": title.strip(), "description": description.strip(),
-            "questions": questions, "evidence": facts, "status": "AI_DRAFT_UNVERIFIED",
-            "model": settings.kiki_ai_model,
-            "policy": "Borrador de IA no verificado; sin guardado, actualización de productos ni publicación.",
+        self.db.refresh(record)
+        return self._serialize(record, source_current=True)
+
+    @staticmethod
+    def _fingerprint(proposal: dict) -> str:
+        payload = {
+            "product_key": proposal["product_key"],
+            "original_name": proposal["original_name"],
+            "source_facts": proposal["verified_product_facts"],
         }
+        return hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+    def _is_current(self, record: KikiAiEditorialDraft) -> bool:
+        report = self.proposals.report()
+        current = next(
+            (p for p in report["items"] if p["product_key"] == record.product_key), None
+        )
+        return current is not None and self._fingerprint(current) == record.source_hash
+
+    @staticmethod
+    def _serialize(record: KikiAiEditorialDraft, *, source_current: bool) -> dict:
+        return {
+            "draft_id": record.id, "product_key": record.product_key,
+            "original_name": record.original_name,
+            "title": record.title, "description": record.description,
+            "questions": record.questions, "evidence": record.source_facts,
+            "status": "AI_DRAFT_UNVERIFIED", "review_status": record.review_status,
+            "review_note": record.review_note, "history": record.history,
+            "source_current": source_current, "model": record.model,
+            "created_at": record.created_at.isoformat() if record.created_at else None,
+            "policy": "Propuesta editorial guardada; aprobación solamente interna. "
+                      "No modifica ni publica productos en canales externos.",
+        }
+
+    def saved(self, product_key: str) -> dict:
+        record = self.db.scalars(
+            select(KikiAiEditorialDraft)
+            .where(KikiAiEditorialDraft.product_key == product_key)
+            .order_by(KikiAiEditorialDraft.id.desc())
+        ).first()
+        if record is None:
+            return {"available": False, "draft": None}
+        return {"available": True, "draft": self._serialize(
+            record, source_current=self._is_current(record)
+        )}
+
+    def review(self, draft_id: int, action: str, note: str, confirmed: bool) -> dict:
+        if action not in {"APPROVE", "REJECT"}:
+            raise ValueError("Acción de revisión inválida.")
+        if confirmed is not True:
+            raise ValueError("Confirmá expresamente la revisión antes de guardar.")
+        note = note.strip() if isinstance(note, str) else ""
+        if not 10 <= len(note) <= 500:
+            raise ValueError("El motivo de revisión debe tener entre 10 y 500 caracteres.")
+        # Lock the row when possible; never overwrite a prior editorial decision.
+        record = self.db.scalar(
+            select(KikiAiEditorialDraft)
+            .where(KikiAiEditorialDraft.id == draft_id).with_for_update()
+        )
+        if record is None:
+            raise ValueError("El borrador solicitado no existe.")
+        latest = self.db.scalars(
+            select(KikiAiEditorialDraft.id)
+            .where(KikiAiEditorialDraft.product_key == record.product_key)
+            .order_by(KikiAiEditorialDraft.id.desc())
+        ).first()
+        if latest != record.id:
+            raise ValueError("Existe una propuesta más reciente; revisá la última versión.")
+        if record.review_status != "PENDING_REVIEW":
+            raise ValueError("Esta propuesta ya tiene una decisión editorial registrada.")
+        if not self._is_current(record):
+            raise ValueError("El CSV cambió desde la generación; no se puede aprobar ni rechazar como vigente.")
+        record.review_status = "APPROVED_INTERNAL" if action == "APPROVE" else "REJECTED_INTERNAL"
+        record.review_note = note
+        record.reviewed_at = datetime.now(timezone.utc)
+        record.history = [*record.history, {
+            "event": record.review_status,
+            "at": record.reviewed_at.isoformat(),
+            "note": note,
+        }]
+        self.db.commit()
+        self.db.refresh(record)
+        return self._serialize(record, source_current=True)
+

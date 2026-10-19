@@ -196,6 +196,36 @@ def tiendanube_ai_draft(
         raise HTTPException(503, str(exc)) from exc
 
 
+class TiendanubeAiReviewRequest(BaseModel):
+    draft_id: int
+    action: str
+    note: str
+    confirmed: bool = False
+
+
+@router.get("/tiendanube/ai/saved")
+def tiendanube_ai_saved(
+    product_key: str,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    return TiendanubeAiPilotService(db).saved(product_key)
+
+
+@router.post("/tiendanube/ai/review")
+def tiendanube_ai_review(
+    request: TiendanubeAiReviewRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return TiendanubeAiPilotService(db).review(
+            request.draft_id, request.action, request.note, request.confirmed
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.get("/tiendanube/ai/offline-preview")
 def tiendanube_ai_offline_preview(
     product_key: str,

@@ -54,6 +54,24 @@ function rememberAuth(auth: AuthResponse): AuthResponse {
   return auth;
 }
 
+export type TiendanubeAiEditorialDraft = {
+  draft_id: number;
+  product_key: string;
+  original_name: string;
+  title: string;
+  description: string;
+  questions: string[];
+  evidence: {field:string;value:string;source:string}[];
+  status: string;
+  review_status: 'PENDING_REVIEW'|'APPROVED_INTERNAL'|'REJECTED_INTERNAL';
+  review_note: string;
+  history: {event:string;at:string;note:string}[];
+  source_current: boolean;
+  model: string;
+  created_at: string|null;
+  policy: string;
+};
+
 export const api = {
   me: () => request<AuthResponse>('/api/auth/me').then(rememberAuth),
   login: (username: string, password: string) => request<AuthResponse>('/api/auth/login', {
@@ -173,7 +191,9 @@ export const api = {
   tiendanubeBulkPreview: (source_keys:string[]) => request<{count:number;items:{source_key:string;name:string;sku:string;candidate_count:number}[];action:string;policy:string}>('/api/tiendanube/matches/bulk-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_keys})}),
   tiendanubeBulkReject: (source_keys:string[],note:string) => request<{updated:number;status:string;policy:string}>('/api/tiendanube/matches/bulk-reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_keys,note})}),
   tiendanubeMatchDecision: (source_key:string,status:'APPROVED'|'REJECTED',target_ecomm_id:string|null,note:string) => request<{status:string;source_key:string;history_count:number}>('/api/tiendanube/match-decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_key,status,target_ecomm_id,note})}),
-  tiendanubeAiDraft: (product_key:string) => request<{product_key:string;title:string;description:string;questions:string[];evidence:{field:string;value:string;source:string}[];status:string;model:string;policy:string}>('/api/tiendanube/ai/draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_key})}),
+  tiendanubeAiDraft: (product_key:string) => request<TiendanubeAiEditorialDraft>('/api/tiendanube/ai/draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_key})}),
+  tiendanubeAiSaved: (product_key:string) => request<{available:boolean;draft:TiendanubeAiEditorialDraft|null}>('/api/tiendanube/ai/saved?product_key='+encodeURIComponent(product_key)),
+  tiendanubeAiReview: (draft_id:number,action:'APPROVE'|'REJECT',note:string) => request<TiendanubeAiEditorialDraft>('/api/tiendanube/ai/review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draft_id,action,note,confirmed:true})}),
   tiendanubeAiOfflinePreview: (product_key:string) => request<{product_key:string;original_title:string;title:string;description:string;questions:string[];evidence:{field:string;value:string;source:string}[];status:string;policy:string}>('/api/tiendanube/ai/offline-preview?product_key='+encodeURIComponent(product_key)),
   tiendanubeSeoGuidelineAudit: (product_key:string) => request<{product_key:string;audit:{alerts:{field:string;reason:string}[];missing:string[];description_words:number;status:string;policy:string};source:string;policy:string}>('/api/tiendanube/seo-guideline-audit?product_key='+encodeURIComponent(product_key)),
   tiendanubeCommercialProposals: () => request<{available:boolean;summary:{proposals:number;title_suggestions:number;description_research_needed:number};items:{product_key:string;original_name:string;proposed_title:string;title_changed:boolean;brand_review_required:boolean;review_type:string;other_brands_in_title:string[];description_action:string;verified_product_facts:{field:string;value:string;source:string}[];reasons:string[];status:string}[];policy:string}>('/api/tiendanube/commercial-proposals'),
