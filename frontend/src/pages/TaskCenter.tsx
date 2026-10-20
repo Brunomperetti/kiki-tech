@@ -83,7 +83,7 @@ export function buildTaskCenter(data:State):Task[]{
       description:'KIKI propone marcas basadas en evidencia disponible. Confirmalas solamente cuando corresponda.',
       count:b&&b.reconciliation_run_id>0?b.summary.PENDING:null,unit:'propuestas pendientes',
       href:'/work/details#revisar-marcas',cta:'Revisar marcas',
-      examples:twoNames((b?.items||[]).filter(x=>x.status==='PENDING').map(x=>x.product.name||x.product.sku||'')),
+      examples:twoNames((b?.items||[]).filter(x=>x.review_status==='PENDING').map(x=>x.product.name||x.product.sku||'')),
       caution:'Pueden ser productos que ya figuran en la revisión de datos centrales.',
     },
     {
