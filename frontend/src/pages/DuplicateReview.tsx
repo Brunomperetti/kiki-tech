@@ -148,7 +148,7 @@ export function DuplicateReview(){
     <section className="panel">
       <div className="kiki-duplicate-instructions"><strong>KIKI reconoce familias comerciales de SKU</strong>
       <p>Según la regla del negocio, pueden pertenecer a la misma familia si tienen el mismo SKU, comparten los primeros 4 o 3 dígitos, o comparten los primeros 2 y alguno presenta una terminación especial de tres números repetidos (111, 222, 999) o número seguido de 00 (100, 200, 300…).</p>
-      <p><strong>Familia compatible no significa variante confirmada.</strong> Puede tratarse de un combo, precio especial o varias ofertas. Para guardar «Son variantes» revisá la presentación real; GTIN y publicaciones ML se verifican por separado. Las coincidencias de dos o tres dígitos son solo pistas y nunca desbloquean productos automáticamente.</p></div>
+      <p><strong>Familia compatible no significa variante confirmada.</strong> Puede tratarse de un combo, precio especial o varias ofertas. La regla numérica no cubre SKU alfanuméricos como sabores VAINILLA/CHOCOLATE: pueden ser variantes válidas. Para guardar «Son variantes» revisá la presentación real; GTIN y publicaciones ML se verifican por separado.</p></div>
       <div className="review-filters">
         <input placeholder="Buscar SKU, EAN, producto o publicación ML" value={search} onChange={event=>setSearch(event.target.value)}/>
         <select value={decisionFilter} onChange={event=>setDecisionFilter(event.target.value as DuplicateReviewDecision|'')}>
@@ -161,7 +161,7 @@ export function DuplicateReview(){
         <select aria-label="Filtrar por familia SKU" value={familyFilter} onChange={e=>setFamilyFilter(e.target.value as ''|'FAMILY_CANDIDATE'|'REVIEW_REQUIRED')}>
           <option value="">Todas las coincidencias de familia</option>
           <option value="FAMILY_CANDIDATE">Familia comercial posible</option>
-          <option value="REVIEW_REQUIRED">No cumple la regla / incompleto</option>
+          <option value="REVIEW_REQUIRED">Sin coincidencia numérica (revisar)</option>
         </select>
       </div>
       <p className="result-count">Mostrando <strong>{items.length.toLocaleString('es-AR')}</strong> de {s.groups_total.toLocaleString('es-AR')} grupos</p>
@@ -177,6 +177,10 @@ export function DuplicateReview(){
       {!items.length&&<div className="review-empty">No hay grupos para el filtro seleccionado.</div>}
       <div className="reconciliation-review-list">{items.map(group=>{
         const isBusy=busy===group.group_key;
+        const outsideNumericPattern=Boolean(group.family_diagnosis?.pairs.some(pair=>pair.rule==='NOT_NUMERIC'));
+        const overlappingMlIds=group.products.length>1
+          ? group.products[0].matched_listing_ids.filter(id=>id&&group.products.slice(1).every(p=>p.matched_listing_ids.includes(id)))
+          : [];
         return <article className="reconciliation-review-item" key={group.group_key}>
           <div className="reconciliation-review-head">
             <div>
@@ -188,8 +192,8 @@ export function DuplicateReview(){
             <div className="reconciliation-review-meta">{group.history_count>0?`${group.history_count} movimiento${group.history_count===1?'':'s'}`:'Sin decisiones previas'}</div>
           </div>
 
-          {group.family_diagnosis&&<section className={`kiki-sku-family ${group.family_diagnosis.status==='FAMILY_CANDIDATE'?'is-family':'needs-review'}`} aria-label="Diagnóstico de familia SKU">
-            <strong>{group.family_diagnosis.status==='FAMILY_CANDIDATE'?'Familia comercial posible':'Revisar relación entre estos SKU'}</strong>
+          {group.family_diagnosis&&<section className={`kiki-sku-family ${group.family_diagnosis.status==='FAMILY_CANDIDATE'?'is-family':outsideNumericPattern?'is-outside-rule':'needs-review'}`} aria-label="Diagnóstico de familia SKU">
+            <strong>{group.family_diagnosis.status==='FAMILY_CANDIDATE'?'Familia comercial posible':outsideNumericPattern?'Fuera de la regla numérica; no significa error':'Sin coincidencia numérica de familia'}</strong>
             <p>{group.family_diagnosis.headline}</p>
             <details>
               <summary>Ver por qué KIKI relaciona estos SKU ({group.family_diagnosis.matches}/{group.family_diagnosis.comparisons} coincidencias)</summary>
@@ -200,6 +204,11 @@ export function DuplicateReview(){
             </details>
             <small>{group.family_diagnosis.policy}</small>
           </section>}
+          {overlappingMlIds.length>0&&<div className="kiki-shared-ml-warning" role="note">
+            <strong>Las mismas publicaciones ML aparecen asociadas a todas estas fichas</strong>
+            <p>Identificadores compartidos en el snapshot: <code>{overlappingMlIds.join(' · ')}</code></p>
+            <p>Podrían ser variaciones bajo una publicación compartida, o asociaciones ambiguas por alias de SKU. Confirmá en Mercado Libre el SKU y la variante de cada publicación antes de vincular inventario. KIKI no cambiará ninguna asociación automáticamente.</p>
+          </div>}
           <div className="duplicate-group-products">{group.products.map(item=><div className="review-side" key={item.product_key}>
             <h3>Ecomm-App</h3>
             <strong className="duplicate-product-title">{item.product.name||'Producto sin nombre'}</strong>
@@ -215,7 +224,7 @@ export function DuplicateReview(){
             </div>
           </div>)}</div>
 
-          <div className="duplicate-explanation"><strong>Qué hay que decidir:</strong> si estas fichas son duplicados reales, productos distintos o variantes físicas verificadas. Una familia comercial de combos/ofertas especiales es solo una pista, no determina por sí misma cuál de estas tres decisiones corresponde.</div>
+          <div className="duplicate-explanation"><strong>Qué hay que decidir:</strong> si estas fichas son duplicados reales, productos distintos o variantes físicas verificadas. Si solo confirmaste que pertenecen a una familia comercial de combos u ofertas, <strong>dejá este grupo pendiente</strong>: eso no autoriza a marcarlo como variante ni a liberar controles.</div>
           <textarea className="review-note" placeholder="Nota opcional: por ejemplo, mismo EAN y presentación / sabores diferentes / SKU mal asignado" value={notes[group.group_key]||''} onChange={event=>setNotes(current=>({...current,[group.group_key]:event.target.value}))}/>
 
           <div className="review-actions duplicate-actions">
