@@ -27,6 +27,20 @@ class TiendanubeQualityAuditService:
             return {"available": False, "summary": {}, "items": []}
         raw_counts = Counter(str(row.get("ean_raw") or "").strip() for row in rows
                              if str(row.get("ean_raw") or "").strip())
+        # Keep the exact imported GTIN; never strip Excel-like suffixes or infer one.
+        # The same GTIN may occur within variants or across different products.
+        gtin_index = {}
+        for row in rows:
+            gtin = str(row.get("ean_raw") or "").strip()
+            if not gtin:
+                continue
+            row_key = str(row.get("slug") or "").strip() or "SKU:" + str(row.get("sku") or "")
+            gtin_index.setdefault(gtin, []).append({
+                "key": row_key, "name": str(row.get("name") or ""),
+                "sku": str(row.get("sku") or ""),
+                "brand": str(row.get("brand") or ""),
+                "variant": row.get("variant") or [],
+            })
         grouped = {}
         for row in rows:
             identity = str(row.get("slug") or "").strip() or "SKU:" + str(row.get("sku") or "")
@@ -51,9 +65,31 @@ class TiendanubeQualityAuditService:
             if any(raw_counts[str(x.get("ean_raw") or "").strip()] > 1
                    for x in members if str(x.get("ean_raw") or "").strip()):
                 issues.append("GTIN_REPEATED")
+            repeated_gtins = []
+            for gtin in dict.fromkeys(str(x.get("ean_raw") or "").strip() for x in members):
+                if not gtin or raw_counts[gtin] < 2:
+                    continue
+                others = []
+                seen = set()
+                for other in gtin_index[gtin]:
+                    # Different SKUs / variants inside the same slug remain a separate
+                    # presentation-verification question. Do not call them another product.
+                    identifier = (other["key"], other["sku"])
+                    if other["key"] != identity and identifier not in seen:
+                        others.append(other)
+                        seen.add(identifier)
+                repeated_gtins.append({
+                    "gtin": gtin,
+                    "occurrences": raw_counts[gtin],
+                    "other_products": others,
+                    "repeated_within_product": sum(
+                        1 for other in gtin_index[gtin] if other["key"] == identity
+                    ) > 1,
+                })
             # Image file is exported separately; do not call images missing.
             items.append({"key": identity, "name": first.get("name") or "",
                           "sku": first.get("sku") or "", "variant_rows": len(members),
+                          "gtin_conflicts": repeated_gtins,
                           "issues": issues, "priority": "HIGH" if any(
                               x in issues for x in ("SKU_MISSING", "GTIN_NEEDS_REVIEW", "GTIN_REPEATED")
                           ) else "REVIEW" if issues else "NO_ISSUES_DETECTED",

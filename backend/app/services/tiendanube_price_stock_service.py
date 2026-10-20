@@ -67,6 +67,18 @@ class TiendanubePriceStockService:
             else:
                 ml_status = "ONE_SKU_CANDIDATE"
             ml_price = decimal_or_none(ml_matches[0].get("price")) if len(ml_matches) == 1 else None
+            # Keep every row of matching offer evidence, including prices and
+            # missing prices. NEVER choose a single price from multiple offers.
+            ml_offers = []
+            for offer in ml_matches:
+                offer_price = decimal_or_none(offer.get("price"))
+                ml_offers.append({
+                    "external_id": str(offer.get("external_id") or ""),
+                    "title": str(offer.get("title") or ""),
+                    "price": str(offer_price) if offer_price is not None else None,
+                    "listing_status": str(offer.get("status") or ""),
+                })
+            ml_offers.sort(key=lambda item: (item["external_id"], item["title"], item["price"] or ""))
             ml_status_label = ("Múltiples ofertas ML" if len(ml_matches) > 1
                                else "Sin coincidencia SKU" if ml_available and not ml_matches
                                else "Sin snapshot ML" if not ml_available else "SKU único en snapshot")
@@ -74,6 +86,7 @@ class TiendanubePriceStockService:
                 "ml_status": ml_status,
                 "ml_status_label": ml_status_label,
                 "ml_listing_count": len(ml_matches),
+                "ml_offers": ml_offers,
                 "ml_listing_ids": [str(item.get("external_id") or "") for item in ml_matches if item.get("external_id")],
                 "ml_price": str(ml_price) if ml_price is not None else None,
                 "ml_stock": None,
@@ -107,5 +120,5 @@ class TiendanubePriceStockService:
             "ml_source": ml_source if ml_available else None,
             "ml_snapshot_at": ml_snapshot_at,
             "items": results,
-            "policy": "TN frente a precio de lista Ecomm: diferencias no son errores automáticos. ML: precio indicativo solo si el SKU coincide exactamente con una única publicación del último snapshot elegido; no verifica la presentación. Con varias ofertas se requiere revisión manual. No se compara stock ML porque esta fuente no lo suministra de modo fiable. Sin escrituras externas.",
+            "policy": "TN frente a precio de lista Ecomm: diferencias no son errores automáticos. ML: se muestran por separado todos los precios de las filas del último snapshot con SKU exactamente coincidente. No prueban identidad de presentación ni vigencia actual; con múltiples ofertas no se calcula un precio único. Stock ML no comparable. Sin escrituras externas.",
         }
