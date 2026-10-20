@@ -20,8 +20,26 @@ export interface DuplicateReviewHistoryEntry {
   product_keys?:string[];
 }
 
+export interface SkuFamilyPair {
+  sku_a:string;
+  sku_b:string;
+  rule:'SAME_SKU'|'PREFIX_4'|'PREFIX_3'|'PREFIX_2_SPECIAL'|'NO_RULE'|'NOT_NUMERIC';
+  related:boolean;
+  explanation:string;
+}
+
+export interface SkuFamilyDiagnosis {
+  status:'FAMILY_CANDIDATE'|'REVIEW_REQUIRED';
+  headline:string;
+  matches:number;
+  comparisons:number;
+  pairs:SkuFamilyPair[];
+  policy:string;
+}
+
 export interface DuplicateReviewGroup {
   group_key:string;
+  family_diagnosis?:SkuFamilyDiagnosis;
   shared_identifiers:string[];
   product_keys:string[];
   products:DuplicateReviewProduct[];

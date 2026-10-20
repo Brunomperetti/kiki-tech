@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..database.duplicate_review import DuplicateReviewDecision
 from ..repositories.catalog_repository import CatalogRepository
 from .reconciliation_review_service import ReconciliationReviewService
+from .sku_family_service import diagnose_duplicate_group
 
 
 class DuplicateReviewService:
@@ -345,6 +346,9 @@ class DuplicateReviewService:
             "shared_identifiers": list(group["shared_identifiers"]),
             "product_keys": list(group["product_keys"]),
             "products": [self._serialize_result(item) for item in group["results"]],
+            "family_diagnosis": diagnose_duplicate_group([
+                item.get("product") or {} for item in group["results"]
+            ]),
             "review_decision": decision.decision if decision else self.PENDING,
             "note": decision.note if decision else None,
             "updated_at": decision.updated_at.isoformat() if decision else None,

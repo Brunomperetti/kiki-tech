@@ -20,3 +20,21 @@
 .kiki-duplicate-select{display:flex;gap:10px;align-items:center;margin-bottom:12px;padding:10px;background:#edf6e9;border-radius:9px;border:1px solid #d5e9d1;color:#29593d;font-size:12px;font-weight:700;cursor:pointer}
 .kiki-duplicate-select input{width:17px;height:17px;accent-color:#1a6038}
 @media(max-width:700px){.kiki-duplicate-batch-head{align-items:flex-start;flex-direction:column}.kiki-duplicate-batch{padding:14px}.kiki-duplicate-batch-actions{display:grid}}
+
+
+/* KIKI Market family SKU rules: review hints, never confirmation badges. */
+.kiki-sku-family{display:grid;gap:9px;padding:15px 17px;margin:12px 0 15px;border-radius:12px;border:1px solid #e2e3d2;background:#fffcf4}
+.kiki-sku-family.is-family{background:#f1f8ed;border-color:#c9e1c7}
+.kiki-sku-family.needs-review{background:#fff8ed;border-color:#ecd6ab}
+.kiki-sku-family>strong{font-size:14px;color:#2d563d}
+.kiki-sku-family.needs-review>strong{color:#7e562d}
+.kiki-sku-family>p{font-size:12px;line-height:1.6;color:#4d6c57}
+.kiki-sku-family>small{font-size:11px;line-height:1.55;color:#6c786c}
+.kiki-sku-family details{border-radius:9px;border:1px solid #d4e5d1;background:#fff;overflow:hidden}
+.kiki-sku-family details>summary{padding:10px 12px;cursor:pointer;color:#305f40;font-size:12px;font-weight:700}
+.kiki-sku-family-pairs{display:grid;gap:7px;padding:12px;border-top:1px solid #e3eee1}
+.kiki-sku-family-pairs>div{display:grid;gap:4px;padding:9px 11px;border-radius:8px;background:#f3f8f0}
+.kiki-sku-family-pairs>div.is-unconfirmed{background:#fff4e6}
+.kiki-sku-family-pairs span{font-size:12px;font-weight:700;color:#315840}
+.kiki-sku-family-pairs small{font-size:11px;color:#5c735f;line-height:1.55}
+@media(max-width:700px){.kiki-sku-family{padding:12px}}
