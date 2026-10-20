@@ -27,6 +27,20 @@ class TiendanubePriceStockService:
             str(row.get("ecomm_id")): row
             for row in ecomm if row.get("ecomm_id")
         }
+        # Compare only Mercado Libre listings with the SAME literal variant SKU as TN.
+        # Listing prices are offer prices; multiple offers are not a single price.
+        # Do not infer ML stock: neither listing snapshot guarantees it is comparable.
+        from .reconciliation_service import ReconciliationService
+        ml_source = ReconciliationService(self.catalog.repo.db)._choose_ml_source("AUTO")
+        ml_record = self.catalog.repo.snapshot_record(ml_source)
+        ml_listings = (ml_record.payload or []) if ml_record else []
+        by_ml_sku = {}
+        for listing in ml_listings:
+            sku = str(listing.get("variant_sku") or listing.get("sku_effective") or listing.get("sku") or "").strip()
+            if sku:
+                by_ml_sku.setdefault(sku.casefold(), []).append(listing)
+        ml_available = ml_record is not None
+        ml_snapshot_at = ml_record.updated_at.isoformat() if ml_record else None
         results = []
         for row in reconciled["items"]:
             if row["status"] != "MATCHED_SKU" or not row["matched_ecomm_id"]:
@@ -43,7 +57,26 @@ class TiendanubePriceStockService:
                            else "EQUAL" if tn_price == ec_price else "DIFFERENT")
             stock_state = ("UNAVAILABLE" if tn_stock is None or ec_stock is None
                            else "EQUAL" if tn_stock == ec_stock else "DIFFERENT")
+            ml_matches = by_ml_sku.get(str(row["sku"]).strip().casefold(), []) if ml_available else []
+            if not ml_available:
+                ml_status = "NO_SNAPSHOT"
+            elif len(ml_matches) == 0:
+                ml_status = "NO_EXACT_SKU"
+            elif len(ml_matches) > 1:
+                ml_status = "MULTIPLE_LISTINGS"
+            else:
+                ml_status = "ONE_SKU_CANDIDATE"
+            ml_price = decimal_or_none(ml_matches[0].get("price")) if len(ml_matches) == 1 else None
+            ml_status_label = ("Múltiples ofertas ML" if len(ml_matches) > 1
+                               else "Sin coincidencia SKU" if ml_available and not ml_matches
+                               else "Sin snapshot ML" if not ml_available else "SKU único en snapshot")
             results.append({
+                "ml_status": ml_status,
+                "ml_status_label": ml_status_label,
+                "ml_listing_count": len(ml_matches),
+                "ml_listing_ids": [str(item.get("external_id") or "") for item in ml_matches if item.get("external_id")],
+                "ml_price": str(ml_price) if ml_price is not None else None,
+                "ml_stock": None,
                 "sku": row["sku"], "name": row["name"],
                 "ecomm_id": row["matched_ecomm_id"],
                 "tiendanube_price": str(tn_price) if tn_price is not None else None,
@@ -66,7 +99,13 @@ class TiendanubePriceStockService:
                 "stock_different": stocks["DIFFERENT"],
                 "stock_equal": stocks["EQUAL"],
                 "stock_unavailable": stocks["UNAVAILABLE"],
+                "ml_sku_single_candidate": sum(item["ml_status"] == "ONE_SKU_CANDIDATE" for item in results),
+                "ml_multiple_listings": sum(item["ml_status"] == "MULTIPLE_LISTINGS" for item in results),
+                "ml_not_comparable": sum(item["ml_status"] in {"NO_SNAPSHOT", "NO_EXACT_SKU"} for item in results),
             },
+            "ml_available": ml_available,
+            "ml_source": ml_source if ml_available else None,
+            "ml_snapshot_at": ml_snapshot_at,
             "items": results,
-            "policy": "Precios: referencia contra precio de lista Ecomm, no paridad obligatoria entre canales. Stock: instantáneas de momentos distintos pueden diferir. No se escribe en canales.",
+            "policy": "TN frente a precio de lista Ecomm: diferencias no son errores automáticos. ML: precio indicativo solo si el SKU coincide exactamente con una única publicación del último snapshot elegido; no verifica la presentación. Con varias ofertas se requiere revisión manual. No se compara stock ML porque esta fuente no lo suministra de modo fiable. Sin escrituras externas.",
         }
