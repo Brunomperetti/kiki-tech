@@ -52,7 +52,7 @@ export function GuidedCoreReview({issue,entries,onResolve,busy}:Props){
       <div className="kiki-core-guide-caution">No inventamos códigos de barras, marcas ni certificaciones. La resolución exige una fuente confiable y no modifica automáticamente Mercado Libre ni Tiendanube.</div>
       <div className="kiki-core-guide-actions">
         <button type="button" disabled={busy} onClick={()=>onResolve(current.item)}>{current.researchStarted?'Continuar verificación':'Verificar con fuente'} →</button>
-        {isBrand&&current.hasBrandSuggestion&&<Link className="secondary-link" to="/work/details?focus=brands">Ver marca candidata →</Link>}
+        {isBrand&&current.hasBrandSuggestion&&<Link className="secondary-link" to={`/work/details?focus=brands&q=${encodeURIComponent(current.item.product.sku_variant||current.item.product.sku_effective||current.item.product.sku||current.item.product.name||'')}`}>Ver marca candidata →</Link>}
         <button type="button" className="secondary" disabled={busy} onClick={()=>{setPostponed(set=>new Set(set).add(current.key));setPosition(0)}}>Posponer este caso</button>
       </div>
       <div className="kiki-core-guide-nav">
