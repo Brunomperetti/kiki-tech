@@ -94,3 +94,51 @@ def test_resolved_variants_keep_exact_ml_matches_as_published_but_confirmed_dupl
         service.save_decision(group["group_key"], "DUPLICATE_CONFIRMED")
         report = PublicationReadinessService(db).report()
         assert report["summary"]["BLOCKED"] == 2
+
+
+def test_bulk_variants_updates_selected_pending_groups_with_audit_atomically():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        run = add_run(db)
+        svc = DuplicateReviewService(db)
+        key = svc.queue()["items"][0]["group_key"]
+        result = svc.save_variants_batch([key], run.id, "Dos presentaciones verificadas manualmente.")
+        assert result["updated"] == 1
+        assert svc.queue()["items"][0]["review_decision"] == "VARIANTS"
+        assert len(db.query(DuplicateReviewDecision).one().history) == 1
+        assert db.query(DuplicateReviewDecision).one().note == "Dos presentaciones verificadas manualmente."
+
+
+def test_bulk_variants_rejects_stale_run_duplicate_keys_and_prior_decisions():
+    import pytest
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        run = add_run(db)
+        svc = DuplicateReviewService(db)
+        key = svc.queue()["items"][0]["group_key"]
+        with pytest.raises(ValueError, match="actualizado"):
+            svc.save_variants_batch([key], run.id + 1, "Presentaciones verificadas manualmente.")
+        with pytest.raises(ValueError, match="repetidos"):
+            svc.save_variants_batch([key, key], run.id, "Presentaciones verificadas manualmente.")
+        with pytest.raises(ValueError, match="no está disponible"):
+            svc.save_variants_batch([key, "DUP:does-not-exist"], run.id, "Presentaciones verificadas manualmente.")
+        assert db.query(DuplicateReviewDecision).count() == 0
+        svc.save_decision(key, "DISTINCT_PRODUCTS", "Dos productos distintos")
+        with pytest.raises(ValueError, match="ya tiene una decisión"):
+            svc.save_variants_batch([key], run.id, "Presentaciones verificadas manualmente.")
+        assert db.query(DuplicateReviewDecision).one().decision == "DISTINCT_PRODUCTS"
+
+
+def test_bulk_variants_rejects_weak_reason():
+    import pytest
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        run = add_run(db)
+        svc = DuplicateReviewService(db)
+        key = svc.queue()["items"][0]["group_key"]
+        with pytest.raises(ValueError, match="motivo"):
+            svc.save_variants_batch([key], run.id, "Son variantes")
+        assert db.query(DuplicateReviewDecision).count() == 0
