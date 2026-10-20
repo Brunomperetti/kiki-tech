@@ -92,6 +92,11 @@ export const api = {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({group_key: groupKey, decision, note: note || null}),
   }),
+  saveDuplicateVariantsBatch: (groupKeys:string[],reconciliationRunId:number,note:string)=>request<{updated:number;group_keys:string[];decision:'VARIANTS';policy:string}>('/api/duplicate-review/variants-batch',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({group_keys:groupKeys,reconciliation_run_id:reconciliationRunId,note,confirmed:true}),
+  }),
   publicationReadiness: () => request<ReadinessReport>('/api/publication-readiness'),
   catalogContinuity: () => request<CatalogContinuityReport>('/api/catalog-continuity'),
   saveCatalogContinuityDecision: (conflictKey: string, decision: CatalogContinuityDecision, note?: string) => request<CatalogContinuityItem>('/api/catalog-continuity/decision', {
