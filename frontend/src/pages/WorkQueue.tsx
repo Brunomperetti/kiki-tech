@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
+import {GuidedBrandReview} from '../components/GuidedBrandReview';
 import {api} from '../services/api';
 import type {
   CatalogContinuityDecision,
@@ -95,6 +96,7 @@ export function WorkQueue(){
   const [coreSearch,setCoreSearch]=useState('');
   const [corePage,setCorePage]=useState(1);
   const [brandPage,setBrandPage]=useState(1);
+  const [guidedBrandMode,setGuidedBrandMode]=useState(true);
   const [verifiedPage,setVerifiedPage]=useState(1);
   const PAGE_SIZE=50;
   const [likelyExceptionsOnly,setLikelyExceptionsOnly]=useState(false);
@@ -639,8 +641,8 @@ export function WorkQueue(){
     </section>
     </div>
     <div className={focus==='data'||focus==='brands'||focus==='all'?'':'kiki-focus-hidden'}>
-    <section className="panel core-pendings" id="datos-centrales">
-      <div className="panel-title-row"><div><p className="eyebrow">DATOS PARA PUBLICAR</p><h2>Completar datos centrales</h2><p>Estos productos de Ecomm todavía no pueden avanzar porque les falta información básica. Acá ya podés resolver el dato, no solo verlo.</p></div></div>
+    <section className={focus==='brands'?'panel core-pendings kiki-brand-only':'panel core-pendings'} id="datos-centrales">
+      <div className="panel-title-row"><div><p className="eyebrow">DATOS PARA PUBLICAR</p><h2>{focus==='brands'?'Marcas pendientes de validación':'Completar datos centrales'}</h2><p>{focus==='brands'?'Revisá una marca propuesta, comprobá la fuente y avanzá al siguiente producto.':'Estos productos de Ecomm todavía no pueden avanzar porque les falta información básica. Acá ya podés resolver el dato, no solo verlo.'}</p></div></div>
 
       <div className="core-pending-summary">
         <button className={coreIssue==='EAN_MISSING'?'active':''} onClick={()=>{setCoreIssue('EAN_MISSING');setCoreSearch('');setCorePage(1);setLikelyExceptionsOnly(false)}}>
@@ -696,7 +698,10 @@ export function WorkQueue(){
         </div>
         {brandError&&<div className="notice warning">{brandError}</div>}
         {brandProposals===null?<p>Las sugerencias no están disponibles en este momento.</p>:<>
-          <p>{filteredProposedBrands.length} propuestas pendientes · {highConfidenceBrands.length} de confianza alta en el catálogo</p>
+          <p>{filteredProposedBrands.length} candidatas sin revisión inicial · {approvedBrandProposals.length} aceptadas internamente que aún necesitan fuente · {highConfidenceBrands.length} coincidencias de confianza alta en el catálogo, no verificadas externamente.</p>
+          {focus==='brands'&&<div className="kiki-brand-mode-selector"><button type="button" className={guidedBrandMode?'is-active':''} aria-pressed={guidedBrandMode} onClick={()=>setGuidedBrandMode(true)}>Revisar de a una</button><button type="button" className={!guidedBrandMode?'is-active':''} aria-pressed={!guidedBrandMode} onClick={()=>setGuidedBrandMode(false)}>Ver lista y lotes</button></div>}
+          {focus==='brands'&&guidedBrandMode&&<GuidedBrandReview items={filteredProposedBrands} busy={brandBusy||evidenceBusy} onVerify={verifyBrandProposal} onKeepCandidate={approveBrand}/>}
+          {(focus!=='brands'||!guidedBrandMode)&&<>
           {selectableBrands.length>0&&<div className="bulk-selection-bar">
             <strong>{selectedBrandKeys.size} seleccionadas</strong>
             <button className="secondary" disabled={brandBusy} onClick={()=>setSelectedBrandKeys(new Set(selectableBrands.map(item=>item.product_key)))}>Seleccionar alta y media (filtradas)</button>
@@ -716,14 +721,16 @@ export function WorkQueue(){
             </article>)}
           </div>
           <Pagination page={brandPage} total={filteredProposedBrands.length} pageSize={PAGE_SIZE} onChange={setBrandPage} />
+          </>}
           {approvedBrandProposals.length>0&&<section className="brand-verify-section">
             <h3>Propuestas aceptadas · falta verificar la fuente ({approvedBrandProposals.length})</h3>
             <p>Estas marcas fueron aprobadas como candidatas, pero aún no resuelven el pendiente. Revisá la ficha del fabricante o proveedor antes de confirmarlas.</p>
-            <div className="brand-proposal-list">{visibleApprovedBrands.map(item=><article className="brand-proposal-card" key={item.product_key}>
+            <div className={focus==='brands'&&guidedBrandMode?'kiki-brand-approved-compact':'brand-proposal-list'}>{(focus==='brands'&&guidedBrandMode?visibleApprovedBrands.slice(0,3):visibleApprovedBrands).map(item=><article className="brand-proposal-card" key={item.product_key}>
               <div className="brand-proposal-details"><strong>{item.product.name||'Producto sin nombre'}</strong><div className="brand-proposal-meta"><span>Marca propuesta: <b>{item.proposed_brand}</b></span><span>Pendiente de fuente verificable</span></div></div>
               <button className="secondary" onClick={()=>verifyBrandProposal(item)}>Verificar marca</button>
             </article>)}</div>
-            <Pagination page={verifiedPage} total={filteredApprovedBrands.length} pageSize={PAGE_SIZE} onChange={setVerifiedPage}/>
+            {(focus!=='brands'||!guidedBrandMode)&&<Pagination page={verifiedPage} total={filteredApprovedBrands.length} pageSize={PAGE_SIZE} onChange={setVerifiedPage}/>}
+            {focus==='brands'&&guidedBrandMode&&approvedBrandProposals.length>3&&<button className="secondary" type="button" onClick={()=>setGuidedBrandMode(false)}>Ver todas las candidatas aceptadas ({approvedBrandProposals.length})</button>}
           </section>}
         </>}
       </section>}
