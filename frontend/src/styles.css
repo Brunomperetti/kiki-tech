@@ -449,3 +449,65 @@
   .kiki-detail-heading{flex-direction:column}
   .kiki-product-detail{padding:17px}
 }
+
+
+/* KIKI 3.0 / PR101 — A focused, source-backed daily task center. */
+.kiki-work-hub{display:grid;gap:22px;max-width:1380px;min-width:0}
+.kiki-work-hub>.kiki-home-header{margin:0}
+.kiki-work-next{background:linear-gradient(125deg,#e7f4e1 0%,#f7fbf4 78%);border:1px solid #cde0c6;border-radius:16px;padding:26px 28px;display:grid;gap:12px}
+.kiki-work-next-row{display:flex;justify-content:space-between;align-items:center;gap:30px}
+.kiki-work-next-row>div{min-width:0}
+.kiki-work-next h2{margin:4px 0 10px;color:#183d2b;font-size:23px;line-height:1.35;letter-spacing:-.03em}
+.kiki-work-next p:not(.eyebrow){font-size:13px;line-height:1.6;max-width:670px;color:#5e7865}
+.kiki-work-next small{display:block;font-size:11px;margin-top:13px;color:#577663}
+.kiki-work-next .kiki-main-action{flex:none;margin:0}
+.kiki-work-board{display:grid;gap:17px;background:#fff;border:1px solid #dfebe2;border-radius:16px;padding:24px;min-width:0}
+.kiki-work-board .kiki-panel-heading{margin:0}
+.kiki-work-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.kiki-work-tabs button{background:#f5f8f6;color:#3a5f49;border:1px solid #dce7df;padding:10px 16px;font-size:12px;border-radius:10px;white-space:nowrap}
+.kiki-work-tabs button:hover{background:#eaf3e9}
+.kiki-work-tabs button.is-active{background:#1b5139;color:#fff;border-color:#1b5139}
+.kiki-work-note{font-size:12px;color:#687c6e;line-height:1.6}
+.kiki-work-task-list{display:grid;gap:11px}
+.kiki-work-task{display:grid;grid-template-columns:125px minmax(0,1fr) auto;align-items:center;gap:18px;padding:20px;border:1px solid #e1ebe2;border-radius:13px;background:#fbfdfb;min-width:0}
+.kiki-work-task:first-child{border-color:#bcd6c0;background:#f7fbf5}
+.kiki-work-task-value{display:grid;gap:5px;align-content:center;min-width:0}
+.kiki-work-task-value strong{font-size:30px;line-height:1.1;letter-spacing:-.03em;color:#174b32;font-variant-numeric:tabular-nums}
+.kiki-work-task-value small{font-size:11px;line-height:1.4;color:#758777}
+.kiki-work-task-body{min-width:0;display:grid;gap:8px}
+.kiki-work-task-head{display:grid;gap:4px}
+.kiki-work-task-head>span{text-transform:uppercase;letter-spacing:.09em;font-size:10px;color:#61876c;font-weight:700}
+.kiki-work-task-head>strong{font-size:15px;line-height:1.4;color:#213e2c}
+.kiki-work-task-body p{font-size:12px;color:#64796a;line-height:1.6}
+.kiki-work-examples{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.kiki-work-examples>small{color:#78887b;font-size:10px}
+.kiki-work-examples>span{background:#ecf4ec;color:#3a5f46;border-radius:6px;font-size:10px;padding:5px 7px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kiki-work-caution{font-size:10px;line-height:1.45;color:#7d887e}
+.kiki-work-task-link{justify-self:end;white-space:nowrap;padding:10px 12px;font-size:12px;font-weight:700;text-decoration:none;color:#20543b;border-radius:9px;border:1px solid #c6dccb;background:#ecf5ec}
+.kiki-work-task-link:hover{color:#fff;background:#20543b}
+.kiki-work-placeholder{padding:22px;background:#fafcfb;border-radius:9px;color:#708575;font-size:12px;line-height:1.5}
+.kiki-work-secondary{border:1px solid #e5eee6;border-radius:11px;overflow:hidden}
+.kiki-work-secondary>summary{padding:16px 18px;color:#315840;font-weight:600;font-size:12px;cursor:pointer}
+.kiki-work-secondary-items{display:grid;border-top:1px solid #e8eee7}
+.kiki-work-secondary-row{display:flex;gap:18px;align-items:center;justify-content:space-between;padding:13px 17px;border-top:1px solid #edf2ed}
+.kiki-work-secondary-row:first-child{border-top:0}
+.kiki-work-secondary-row>div{display:grid;gap:4px;min-width:0}
+.kiki-work-secondary-row strong{font-size:12px;color:#244932}
+.kiki-work-secondary-row small{font-size:11px;color:#778879}
+.kiki-work-secondary-row a{font-size:12px;color:#286542;font-weight:700;text-decoration:none;white-space:nowrap}
+.kiki-work-hub>.kiki-home-footnote{font-size:11px;line-height:1.65}
+#datos-centrales,#revisar-marcas{scroll-margin-top:24px}
+@media(max-width:1150px){
+  .kiki-work-task{grid-template-columns:95px minmax(0,1fr);gap:13px}
+  .kiki-work-task-link{grid-column:2;justify-self:start}
+}
+@media(max-width:700px){
+  .kiki-work-next-row{flex-direction:column;align-items:flex-start}
+  .kiki-work-next,.kiki-work-board{padding:18px}
+  .kiki-work-task{grid-template-columns:1fr;gap:10px;padding:16px}
+  .kiki-work-task-value{display:flex;gap:9px;align-items:baseline}
+  .kiki-work-task-value strong{font-size:24px}
+  .kiki-work-task-link{grid-column:1}
+  .kiki-work-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kiki-work-secondary-row{align-items:flex-start;flex-direction:column;gap:8px}
+}
