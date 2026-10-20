@@ -94,3 +94,24 @@ def test_mercadolibre_no_exact_variant_sku_does_not_guess():
         item = svc.report()["items"][0]
         assert item["ml_status"] == "NO_EXACT_SKU"
         assert item["ml_price"] is None
+
+
+def test_all_ml_offer_prices_are_visible_separately_without_misleading_aggregate():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        svc = TiendanubePriceStockService(db)
+        svc.catalog.repo.save_snapshot("TIENDANUBE", [{"slug": "a", "name": "A", "sku": "A", "price": "120", "stock": "4"}])
+        svc.catalog.repo.save_snapshot("ECOMM_APP", [{"ecomm_id": "1", "sku": "A", "list_price": "110", "stock": "7"}])
+        svc.catalog.repo.save_snapshot("MERCADOLIBRE", [
+            {"external_id": "MLA2", "title": "Oferta 2", "sku": "A", "price": "169.00", "status": "paused"},
+            {"external_id": "MLA1", "title": "Oferta 1", "sku": "A", "price": "151.00", "status": "active"},
+            {"external_id": "MLA3", "title": "Oferta 3", "sku": "A", "price": None, "status": "active"},
+        ])
+        item = svc.report()["items"][0]
+        assert item["ml_status"] == "MULTIPLE_LISTINGS"
+        assert item["ml_price"] is None
+        assert [offer["external_id"] for offer in item["ml_offers"]] == ["MLA1", "MLA2", "MLA3"]
+        assert [offer["price"] for offer in item["ml_offers"]] == ["151.00", "169.00", None]
+        assert item["ml_offers"][1]["listing_status"] == "paused"
+        assert item["ml_stock"] is None
