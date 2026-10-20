@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {GuidedBrandReview} from '../components/GuidedBrandReview';
+import {GuidedCoreReview} from '../components/GuidedCoreReview';
 import {api} from '../services/api';
 import type {
   CatalogContinuityDecision,
@@ -97,6 +98,7 @@ export function WorkQueue(){
   const [corePage,setCorePage]=useState(1);
   const [brandPage,setBrandPage]=useState(1);
   const [guidedBrandMode,setGuidedBrandMode]=useState(true);
+  const [guidedCoreMode,setGuidedCoreMode]=useState(true);
   const [verifiedPage,setVerifiedPage]=useState(1);
   const PAGE_SIZE=50;
   const [likelyExceptionsOnly,setLikelyExceptionsOnly]=useState(false);
@@ -322,6 +324,22 @@ export function WorkQueue(){
       item.product.ean,
     ].some(value=>String(value||'').toLowerCase().includes(term)));
   },[coreIssue,coreSearch,likelyExceptionsOnly,pendingEanItems,pendingBrandItems]);
+
+  const brandCandidateKeys=useMemo(
+    ()=>new Set((brandProposals?.items||[])
+      .filter(item=>item.missing_fields.includes('Marca')&&Boolean(item.internal_evidence.brand_candidate))
+      .map(item=>item.product_key)),
+    [brandProposals],
+  );
+  const guidedCoreEntries=useMemo(()=>activeCoreItems.map((item,index)=>{
+    const productIdentity=productKey(item);
+    return {
+      key:productIdentity||`unidentified-row-${index}`,
+      item,
+      hasBrandSuggestion:Boolean(productIdentity&&brandCandidateKeys.has(productIdentity)),
+      researchStarted:Boolean(productIdentity&&researchByKey.get(productIdentity)),
+    };
+  }),[activeCoreItems,brandCandidateKeys,researchByKey]);
 
   const visibleBrandProposals=filteredProposedBrands.slice((brandPage-1)*PAGE_SIZE,brandPage*PAGE_SIZE);
   const visibleApprovedBrands=filteredApprovedBrands.slice((verifiedPage-1)*PAGE_SIZE,verifiedPage*PAGE_SIZE);
@@ -663,6 +681,12 @@ export function WorkQueue(){
         <div><h3>{coreIssue==='EAN_MISSING'?'Productos sin EAN/GTIN':'Productos sin marca'}</h3><p>{coreIssue==='EAN_MISSING'?'Validá el código de la presentación exacta con una fuente confiable.':'Validá la marca real del producto con una fuente confiable.'}</p></div>
         <input placeholder="Buscar por SKU o producto" value={coreSearch} onChange={event=>{setCoreSearch(event.target.value);setCorePage(1);setBrandPage(1);setVerifiedPage(1)}}/>
       </div>
+      {focus==='data'&&<div className="kiki-data-mode-selector" role="group" aria-label="Forma de resolver los datos">
+        <button type="button" className={guidedCoreMode?'is-active':''} aria-pressed={guidedCoreMode} onClick={()=>setGuidedCoreMode(true)}>Resolver de a uno</button>
+        <button type="button" className={!guidedCoreMode?'is-active':''} aria-pressed={!guidedCoreMode} onClick={()=>setGuidedCoreMode(false)}>Ver lista y lotes</button>
+      </div>}
+      {focus==='data'&&guidedCoreMode&&readinessAvailable&&<GuidedCoreReview key={coreIssue} issue={coreIssue} entries={guidedCoreEntries} onResolve={openResolution} busy={evidenceBusy||brandBusy}/>}
+      <div className={focus==='data'&&guidedCoreMode?'kiki-focus-hidden':''}>
       {coreIssue==='BRAND_MISSING'&&likelyUnbranded.length>0&&<section className="gtin-pilot-panel">
         <h3>Posibles productos sin marca comercial</h3>
         <p>KIKI detectó {likelyUnbranded.length} títulos con «suelto», «granel» o «fraccionado». Es solo una sugerencia: confirmá que se venden sin marca propia ni del proveedor.</p>
@@ -763,6 +787,7 @@ export function WorkQueue(){
         })}
         {activeCoreItems.length===0&&<div className="prepub-empty"><strong>No quedan productos pendientes para este control.</strong></div>}
       </div><Pagination page={corePage} total={activeCoreItems.length} pageSize={PAGE_SIZE} onChange={setCorePage}/></>}
+      </div>
     </section>
 
     </div>
