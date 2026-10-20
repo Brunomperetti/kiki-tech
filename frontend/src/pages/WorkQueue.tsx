@@ -562,8 +562,14 @@ export function WorkQueue(){
     }
   }
 
+  useEffect(()=>{
+    const fragment=window.location.hash.replace(/^#/,'');
+    if(!fragment||loading||!data.readiness)return;
+    window.requestAnimationFrame(()=>document.getElementById(fragment)?.scrollIntoView({block:'start'}));
+  },[loading,data.readiness]);
+
   return <>
-    <header><div><p className="eyebrow">TRABAJO PENDIENTE</p><h1>Resolver pendientes</h1><p>KIKI ordena lo que necesita una decisión humana. No hace falta recorrer todos los módulos.</p></div></header>
+    <header><div><p className="eyebrow">REVISIÓN DETALLADA</p><h1>Herramientas para resolver pendientes</h1><p>Acá están las funciones y decisiones detalladas del catálogo.</p><Link className="secondary-link" to="/work">← Volver al centro de tareas</Link></div></header>
     {error&&<div className="notice warning"><strong>{error}</strong><div style={{marginTop:10}}><button onClick={()=>void load()} disabled={loading}>{loading?'Reintentando…':'Reintentar conexión'}</button></div></div>}
     {success&&<div className="notice success">{success}</div>}
 
@@ -617,7 +623,7 @@ export function WorkQueue(){
           </article>)}</div>}
       </>}
     </section>
-    <section className="panel core-pendings">
+    <section className="panel core-pendings" id="datos-centrales">
       <div className="panel-title-row"><div><p className="eyebrow">DATOS PARA PUBLICAR</p><h2>Completar datos centrales</h2><p>Estos productos de Ecomm todavía no pueden avanzar porque les falta información básica. Acá ya podés resolver el dato, no solo verlo.</p></div></div>
 
       <div className="core-pending-summary">
@@ -668,7 +674,7 @@ export function WorkQueue(){
         </div>}
         {unbrandedError&&<div className="notice warning">{unbrandedError}</div>}
       </section>}
-      {coreIssue==='BRAND_MISSING'&&<section className="core-brand-proposals">
+      {coreIssue==='BRAND_MISSING'&&<section className="core-brand-proposals" id="revisar-marcas">
         <div className="core-list-toolbar">
           <div><h3>Marcas sugeridas por KIKI</h3><p>Candidatas del catálogo interno, con evidencia y nivel de confianza. Aprobar una propuesta no equivale a verificarla ni habilita publicación.</p></div>
         </div>
