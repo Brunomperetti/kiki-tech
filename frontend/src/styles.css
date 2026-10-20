@@ -511,3 +511,24 @@
   .kiki-work-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .kiki-work-secondary-row{align-items:flex-start;flex-direction:column;gap:8px}
 }
+
+
+/* KIKI 3.0 — task-driven detailed review. Keeps legacy flows accessible on demand. */
+.kiki-focus-hidden{display:none!important}
+.kiki-review-picker{display:grid;gap:18px;margin:24px 0 10px;background:#fff;border:1px solid #dce7df;border-radius:14px;padding:22px 24px}
+.kiki-review-picker h2{margin:6px 0 8px;color:#234332;font-size:20px;letter-spacing:-.025em}
+.kiki-review-picker p:not(.eyebrow){color:#66796d;font-size:13px;line-height:1.65}
+.kiki-review-picker nav{margin:0;display:flex;flex-direction:row;flex-wrap:wrap;gap:9px}
+.kiki-review-picker nav a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 14px;border-radius:9px;background:#f5f9f5;border:1px solid #dbe7dc;color:#28533c;text-decoration:none;font-weight:700;font-size:12px}
+.kiki-review-picker nav a:hover{background:#ebf4e8}
+.kiki-review-picker nav a.is-active{background:#204f39;border-color:#204f39;color:#fff}
+.kiki-review-picker-hint{background:#eef7ea;border:1px solid #d6e9cf;border-radius:11px;padding:16px 18px;color:#57715d;font-size:13px;line-height:1.6;margin:0 0 15px}
+.kiki-work-hub .kiki-work-note{font-size:13px}
+.kiki-work-hub .kiki-work-task-body p{font-size:13px}
+.kiki-work-hub .kiki-work-examples>small,.kiki-work-hub .kiki-work-examples>span{font-size:11px}
+.kiki-work-hub .kiki-work-task-value small,.kiki-work-hub .kiki-work-caution{font-size:11px}
+@media(max-width:700px){
+  .kiki-review-picker{padding:16px}
+  .kiki-review-picker nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kiki-review-picker nav a:last-child{grid-column:1/-1}
+}
