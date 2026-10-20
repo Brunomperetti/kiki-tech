@@ -22,6 +22,7 @@ export function DuplicateReview(){
   const [queue,setQueue]=useState<DuplicateReviewQueue|null>(null);
   const [search,setSearch]=useState('');
   const [decisionFilter,setDecisionFilter]=useState<DuplicateReviewDecision|''>('');
+  const [familyFilter,setFamilyFilter]=useState<''|'FAMILY_CANDIDATE'|'REVIEW_REQUIRED'>('');
   const [notes,setNotes]=useState<Record<string,string>>({});
   const [busy,setBusy]=useState('');
   const [message,setMessage]=useState('');
@@ -52,6 +53,7 @@ export function DuplicateReview(){
     const term=search.trim().toLowerCase();
     return (queue?.items||[]).filter(group=>{
       if(decisionFilter&&group.review_decision!==decisionFilter)return false;
+      if(familyFilter&&group.family_diagnosis?.status!==familyFilter)return false;
       if(!term)return true;
       return [
         ...group.shared_identifiers,
@@ -66,7 +68,7 @@ export function DuplicateReview(){
         ]),
       ].some(value=>String(value||'').toLowerCase().includes(term));
     });
-  },[queue,search,decisionFilter]);
+  },[queue,search,decisionFilter,familyFilter]);
 
   async function decide(group:DuplicateReviewGroup,decision:DuplicateReviewDecision){
     setBusy(group.group_key);
@@ -144,7 +146,9 @@ export function DuplicateReview(){
     </section>
 
     <section className="panel">
-      <div className="kiki-duplicate-instructions"><strong>Primero revisá cada grupo.</strong><p>Un SKU compartido puede representar variantes legítimas, productos diferentes o un duplicado erróneo. Para un lote, marcá solamente los grupos que verificaste: una presentación pack, distinta cantidad o sabor puede exigir otra decisión.</p></div>
+      <div className="kiki-duplicate-instructions"><strong>KIKI reconoce familias comerciales de SKU</strong>
+      <p>Según la regla del negocio, pueden pertenecer a la misma familia si tienen el mismo SKU, comparten los primeros 4 o 3 dígitos, o comparten los primeros 2 y alguno presenta una terminación especial de tres números repetidos (111, 222, 999) o número seguido de 00 (100, 200, 300…).</p>
+      <p><strong>Familia compatible no significa variante confirmada.</strong> Puede tratarse de un combo, precio especial o varias ofertas. Para guardar «Son variantes» revisá la presentación real; GTIN y publicaciones ML se verifican por separado. Las coincidencias de dos o tres dígitos son solo pistas y nunca desbloquean productos automáticamente.</p></div>
       <div className="review-filters">
         <input placeholder="Buscar SKU, EAN, producto o publicación ML" value={search} onChange={event=>setSearch(event.target.value)}/>
         <select value={decisionFilter} onChange={event=>setDecisionFilter(event.target.value as DuplicateReviewDecision|'')}>
@@ -153,6 +157,11 @@ export function DuplicateReview(){
           <option value="DUPLICATE_CONFIRMED">Duplicado confirmado</option>
           <option value="DISTINCT_PRODUCTS">Productos distintos</option>
           <option value="VARIANTS">Variantes</option>
+        </select>
+        <select aria-label="Filtrar por familia SKU" value={familyFilter} onChange={e=>setFamilyFilter(e.target.value as ''|'FAMILY_CANDIDATE'|'REVIEW_REQUIRED')}>
+          <option value="">Todas las coincidencias de familia</option>
+          <option value="FAMILY_CANDIDATE">Familia comercial posible</option>
+          <option value="REVIEW_REQUIRED">No cumple la regla / incompleto</option>
         </select>
       </div>
       <p className="result-count">Mostrando <strong>{items.length.toLocaleString('es-AR')}</strong> de {s.groups_total.toLocaleString('es-AR')} grupos</p>
@@ -179,6 +188,18 @@ export function DuplicateReview(){
             <div className="reconciliation-review-meta">{group.history_count>0?`${group.history_count} movimiento${group.history_count===1?'':'s'}`:'Sin decisiones previas'}</div>
           </div>
 
+          {group.family_diagnosis&&<section className={`kiki-sku-family ${group.family_diagnosis.status==='FAMILY_CANDIDATE'?'is-family':'needs-review'}`} aria-label="Diagnóstico de familia SKU">
+            <strong>{group.family_diagnosis.status==='FAMILY_CANDIDATE'?'Familia comercial posible':'Revisar relación entre estos SKU'}</strong>
+            <p>{group.family_diagnosis.headline}</p>
+            <details>
+              <summary>Ver por qué KIKI relaciona estos SKU ({group.family_diagnosis.matches}/{group.family_diagnosis.comparisons} coincidencias)</summary>
+              <div className="kiki-sku-family-pairs">{group.family_diagnosis.pairs.map((pair,i)=><div key={i} className={pair.related?'is-compatible':'is-unconfirmed'}>
+                <span>{pair.sku_a||'Sin SKU'} ↔ {pair.sku_b||'Sin SKU'}</span>
+                <small>{pair.explanation}</small>
+              </div>)}</div>
+            </details>
+            <small>{group.family_diagnosis.policy}</small>
+          </section>}
           <div className="duplicate-group-products">{group.products.map(item=><div className="review-side" key={item.product_key}>
             <h3>Ecomm-App</h3>
             <strong className="duplicate-product-title">{item.product.name||'Producto sin nombre'}</strong>
@@ -194,7 +215,7 @@ export function DuplicateReview(){
             </div>
           </div>)}</div>
 
-          <div className="duplicate-explanation"><strong>Qué hay que decidir:</strong> si estas fichas representan el mismo producto duplicado, productos realmente distintos o variantes legítimas del mismo producto base.</div>
+          <div className="duplicate-explanation"><strong>Qué hay que decidir:</strong> si estas fichas son duplicados reales, productos distintos o variantes físicas verificadas. Una familia comercial de combos/ofertas especiales es solo una pista, no determina por sí misma cuál de estas tres decisiones corresponde.</div>
           <textarea className="review-note" placeholder="Nota opcional: por ejemplo, mismo EAN y presentación / sabores diferentes / SKU mal asignado" value={notes[group.group_key]||''} onChange={event=>setNotes(current=>({...current,[group.group_key]:event.target.value}))}/>
 
           <div className="review-actions duplicate-actions">
