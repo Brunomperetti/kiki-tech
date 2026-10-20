@@ -626,3 +626,28 @@
 .kiki-guided-brand-filter label{display:grid;gap:7px;color:#4e6d55;font-size:12px;font-weight:700;min-width:190px;flex:1}
 .kiki-guided-brand-filter input{width:100%;padding:11px 12px;background:#fff;border:1px solid #cfdece;border-radius:8px;font-size:13px;color:#21432f}
 .kiki-guided-brand-filter button{font-size:12px;padding:10px 12px}
+
+
+/* Tiendanube — explain the outcome before the technical auditing tool. */
+.kiki-tn-welcome{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:20px;background:#eff7eb;border:1px solid #d4e8cf;border-radius:13px;padding:20px 22px}
+.kiki-tn-welcome>div strong{font-size:18px;color:#244b31}
+.kiki-tn-welcome>div p{font-size:12px;color:#5e7564;line-height:1.7;margin-top:7px}
+.kiki-tn-welcome ol{counter-reset:tn-steps;list-style:none;display:grid;gap:10px;padding:0;margin:0}
+.kiki-tn-welcome li{display:grid;gap:4px;position:relative;padding-left:35px;counter-increment:tn-steps}
+.kiki-tn-welcome li:before{content:counter(tn-steps);position:absolute;left:0;top:1px;width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:#d3e8cb;color:#235b37;font-weight:700;font-size:12px}
+.kiki-tn-welcome li strong{font-size:12px;color:#225137}
+.kiki-tn-welcome li small{font-size:11px;color:#657a6a;line-height:1.55}
+.kiki-tn-import-box{border:1px solid #e0eae0;border-radius:11px;background:#fbfdfa;padding:13px 16px}
+.kiki-tn-import-box>summary{font-size:12px;color:#345b42;font-weight:700;cursor:pointer}
+.kiki-tn-import-box>p{font-size:12px;color:#647967;line-height:1.6;margin:12px 0 6px}
+.kiki-tn-review-head{display:grid;gap:7px;margin-top:13px}
+.kiki-tn-review-head strong{font-size:17px;color:#1f4931}
+.kiki-tn-review-head p{font-size:12px;line-height:1.6;color:#647968}
+.tn-import-section details.tn-workflow-detail{border:1px solid #dce6dd;border-radius:11px;background:#fff;overflow:hidden}
+.tn-import-section details.tn-workflow-detail>summary{display:grid;gap:6px;padding:15px 17px;cursor:pointer;background:#f9fcf9;line-height:1.4}
+.tn-import-section details.tn-workflow-detail>summary:hover{background:#eff7ed}
+.tn-import-section details.tn-workflow-detail>summary span{font-size:14px;font-weight:700;color:#214f35}
+.tn-import-section details.tn-workflow-detail>summary small{font-size:12px;color:#647a6b;font-weight:400}
+.tn-import-section details.tn-workflow-detail[open]>summary{background:#ecf6e9;border-bottom:1px solid #dce8da}
+.tn-import-section details.tn-workflow-detail>.tn-assisted-panel{margin:14px}
+@media(max-width:800px){.kiki-tn-welcome{grid-template-columns:1fr;padding:16px}.tn-import-section details.tn-workflow-detail>summary{padding:13px 12px}}
