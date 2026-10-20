@@ -37,16 +37,20 @@ def compare_family_skus(left: str, right: str) -> dict:
     family relatives. Prefix-only matches remain candidates for human review.
     """
     a, b = str(left or "").strip(), str(right or "").strip()
+    if a and b and a == b:
+        return {
+            "rule": "SAME_SKU", "related": True,
+            "explanation": "Tienen exactamente el mismo SKU.",
+        }
     valid = bool(a and b and a.isascii() and b.isascii() and a.isdigit() and b.isdigit())
     if not valid:
         return {
             "rule": "NOT_NUMERIC", "related": False,
             "explanation": "No se pudo aplicar la regla numérica a estos SKU.",
         }
-    if a == b:
-        rule, explanation = "SAME_SKU", "Tienen exactamente el mismo SKU."
-    elif len(a) >= 4 and len(b) >= 4 and a[:4] == b[:4]:
+    if len(a) >= 4 and len(b) >= 4 and a[:4] == b[:4]:
         rule, explanation = "PREFIX_4", "Comparten los primeros cuatro dígitos."
+
     elif len(a) >= 3 and len(b) >= 3 and a[:3] == b[:3]:
         rule, explanation = "PREFIX_3", "Comparten los primeros tres dígitos."
     elif (
