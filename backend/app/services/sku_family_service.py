@@ -46,7 +46,7 @@ def compare_family_skus(left: str, right: str) -> dict:
     if not valid:
         return {
             "rule": "NOT_NUMERIC", "related": False,
-            "explanation": "No se pudo aplicar la regla numérica a estos SKU.",
+            "explanation": "La regla numérica de familias no aplica a estos SKU alfanuméricos o incompletos. Pueden ser variantes reales por sabor o presentación; verificá sus datos.",
         }
     if len(a) >= 4 and len(b) >= 4 and a[:4] == b[:4]:
         rule, explanation = "PREFIX_4", "Comparten los primeros cuatro dígitos."
@@ -95,9 +95,15 @@ def diagnose_duplicate_group(products: list[dict]) -> dict:
         status, headline = "FAMILY_CANDIDATE", (
             "La estructura de los SKU es compatible con una familia comercial."
         )
+    elif any(pair["rule"] == "NOT_NUMERIC" for pair in pairs):
+        status, headline = "REVIEW_REQUIRED", (
+            "La regla numérica no aplica a uno o más SKU. Esto NO indica un error: "
+            "pueden ser variantes reales por sabor o presentación."
+        )
     else:
         status, headline = "REVIEW_REQUIRED", (
-            "Hay SKU que no cumplen la regla familiar o no pueden interpretarse."
+            "Los SKU no coinciden con los patrones numéricos de familia conocidos. "
+            "Revisá si hay combos, distintas publicaciones o productos diferentes."
         )
     return {
         "status": status,
