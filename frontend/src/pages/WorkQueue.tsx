@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
-import {Link} from 'react-router-dom';
+import {Link,useSearchParams} from 'react-router-dom';
 import {api} from '../services/api';
 import type {
   CatalogContinuityDecision,
@@ -77,6 +77,9 @@ function draftFromResearch(item?:ExternalResearchItem):EvidenceDraft{
 }
 
 export function WorkQueue(){
+  const [searchParams] = useSearchParams();
+  const requestedFocus = searchParams.get('focus');
+  const focus = ['data','brands','memory','ml','all'].includes(requestedFocus||'') ? requestedFocus : 'menu';
   const [data,setData]=useState<PendingState>({
     linkage:null,
     reconciliation:null,
@@ -328,15 +331,6 @@ export function WorkQueue(){
   useEffect(()=>setVerifiedPage(p=>Math.min(p,verifiedTotalPages)),[verifiedTotalPages]);
   useEffect(()=>setCorePage(p=>Math.min(p,coreTotalPages)),[coreTotalPages]);
 
-  const corePendingKeys=useMemo(()=>{
-    const keys=new Set<string>();
-    for(const item of [...pendingEanItems,...pendingBrandItems]){
-      const key=productKey(item);
-      if(key)keys.add(key);
-    }
-    return keys;
-  },[pendingEanItems,pendingBrandItems]);
-
   const continuityAvailable=data.continuity!==null;
   const readinessAvailable=data.readiness!==null;
   const linkageAvailable=data.linkage!==null;
@@ -356,7 +350,6 @@ export function WorkQueue(){
   const finalReady=data.finalQueue?.summary.READY_FOR_FINAL_REVIEW??0;
   const finalChanged=data.finalQueue?.summary.STALE_APPROVAL??0;
   const priceInvalid=data.readiness?.reason_summary.find(item=>item.code==='PRICE_INVALID')?.count??0;
-  const totalPending=corePendingKeys.size+continuityConflicts+linkagePending+reconciliationPending+duplicatePending+finalReady+finalChanged;
 
   async function saveContinuityDecision(item:CatalogContinuityItem,decision:CatalogContinuityDecision){
     setContinuityBusy(item.conflict_key);
@@ -563,20 +556,41 @@ export function WorkQueue(){
   }
 
   useEffect(()=>{
-    const fragment=window.location.hash.replace(/^#/,'');
-    if(!fragment||loading||!data.readiness)return;
-    window.requestAnimationFrame(()=>document.getElementById(fragment)?.scrollIntoView({block:'start'}));
-  },[loading,data.readiness]);
+    if(focus==='brands'&&coreIssue!=='BRAND_MISSING'){
+      setCoreIssue('BRAND_MISSING');
+    }
+  },[focus,coreIssue]);
+
+  useEffect(()=>{
+    if(loading||!data.readiness)return;
+    if(focus!=='brands')return;
+    const frame=window.requestAnimationFrame(()=>{
+      document.getElementById('revisar-marcas')?.scrollIntoView({block:'start'});
+    });
+    return ()=>window.cancelAnimationFrame(frame);
+  },[loading,data.readiness,focus,coreIssue]);
 
   return <>
     <header><div><p className="eyebrow">REVISIÓN DETALLADA</p><h1>Herramientas para resolver pendientes</h1><p>Acá están las funciones y decisiones detalladas del catálogo.</p><Link className="secondary-link" to="/work">← Volver al centro de tareas</Link></div></header>
     {error&&<div className="notice warning"><strong>{error}</strong><div style={{marginTop:10}}><button onClick={()=>void load()} disabled={loading}>{loading?'Reintentando…':'Reintentar conexión'}</button></div></div>}
     {success&&<div className="notice success">{success}</div>}
 
-    <section className="guided-hero">
-      <div><span>Productos/casos que necesitan atención</span><strong>{readinessAvailable||continuityAvailable||linkageAvailable||reconciliationAvailable||duplicatesAvailable||finalQueueAvailable?totalPending.toLocaleString('es-AR'):'—'}</strong><p>Trabajá de arriba hacia abajo. KIKI te lleva al lugar correcto.</p></div>
+    <section className="kiki-review-picker" aria-label="Elegí el tipo de revisión">
+      <div><p className="eyebrow">ELEGÍ QUÉ NECESITÁS HACER</p>
+        <h2>{focus==='menu'?'Una tarea por vez.':focus==='data'?'Datos centrales':focus==='brands'?'Revisión de marcas':focus==='memory'?'Historial y decisiones':focus==='ml'?'Vinculaciones y preparación':'Todas las herramientas'}</h2>
+        <p>No necesitás recorrer todos los controles: elegí una tarea y KIKI muestra las herramientas relacionadas. Los conteos pueden superponerse; no se suman como productos únicos.</p>
+      </div>
+      <nav aria-label="Tipos de revisión">
+        <Link className={focus==='data'?'is-active':''} to="/work/details?focus=data">Datos centrales</Link>
+        <Link className={focus==='brands'?'is-active':''} to="/work/details?focus=brands">Marcas</Link>
+        <Link className={focus==='ml'?'is-active':''} to="/work/details?focus=ml">Mercado Libre</Link>
+        <Link className={focus==='memory'?'is-active':''} to="/work/details?focus=memory">Historial</Link>
+        <Link className={focus==='all'?'is-active':''} to="/work/details?focus=all">Ver todas</Link>
+      </nav>
     </section>
+    {focus==='menu'&&<p className="kiki-review-picker-hint">Para empezar, seleccioná uno de los temas de arriba. Las herramientas que ya conocés siguen disponibles y las decisiones guardadas no cambian.</p>}
 
+    <div className={focus==='memory'||focus==='all'?'':'kiki-focus-hidden'}>
     <section className="panel catalog-continuity-panel">
       <div className="panel-title-row">
         <div><p className="eyebrow">MEMORIA DE KIKI</p><h2>Datos validados que se conservan al actualizar Ecomm</h2><p>Cuando subís un Ecomm nuevo, KIKI mantiene las correcciones ya verificadas. Solo te consulta si el nuevo dato de origen contradice algo validado.</p></div>
@@ -623,6 +637,8 @@ export function WorkQueue(){
           </article>)}</div>}
       </>}
     </section>
+    </div>
+    <div className={focus==='data'||focus==='brands'||focus==='all'?'':'kiki-focus-hidden'}>
     <section className="panel core-pendings" id="datos-centrales">
       <div className="panel-title-row"><div><p className="eyebrow">DATOS PARA PUBLICAR</p><h2>Completar datos centrales</h2><p>Estos productos de Ecomm todavía no pueden avanzar porque les falta información básica. Acá ya podés resolver el dato, no solo verlo.</p></div></div>
 
@@ -742,6 +758,8 @@ export function WorkQueue(){
       </div><Pagination page={corePage} total={activeCoreItems.length} pageSize={PAGE_SIZE} onChange={setCorePage}/></>}
     </section>
 
+    </div>
+    <div className={focus==='ml'||focus==='all'?'':'kiki-focus-hidden'}>
     <section className="guided-work-list">
       <article className="guided-work-card">
         <div className="guided-step-number">1</div>
@@ -764,15 +782,16 @@ export function WorkQueue(){
       <article className="guided-work-card">
         <div className="guided-step-number">4</div>
         <div className="guided-work-copy"><h2>Aprobar productos para el lote ML</h2><p>Productos que ya pasaron controles y están esperando aprobación final, o cuya información cambió después de una aprobación.</p><div className="guided-metrics"><span>Para aprobar <strong>{metric(finalQueueAvailable,finalReady)}</strong></span><span>Cambiaron <strong>{metric(finalQueueAvailable,finalChanged)}</strong></span></div></div>
-        <Link className="guided-link" to="/prepublication">Ir a publicar en ML</Link>
+        <Link className="guided-link" to="/prepublication">Revisar preparación ML</Link>
       </article>
     </section>
 
     <section className="panel guided-help">
       <h2>Regla simple</h2>
-      <p><strong>Si ya existe en Mercado Libre:</strong> trabajalo en “Vincular con ML”. <strong>Si todavía no existe:</strong> completá sus datos y trabajalo en “Publicar en ML”.</p>
+      <p><strong>Si ya existe en Mercado Libre:</strong> trabajalo en “Vincular con ML”. <strong>Si todavía no existe:</strong> completá sus datos y trabajalo en “Preparar para ML” (sin publicar automáticamente).</p>
     </section>
 
+    </div>
     {bulkGtinOpen&&<div className="candidate-modal-overlay" role="presentation" onClick={()=>!bulkGtinBusy&&setBulkGtinOpen(false)}>
       <section className="candidate-modal core-resolution-modal" role="dialog" aria-modal="true" aria-label="Resolver GTIN en lote" onClick={event=>event.stopPropagation()}>
         <div className="candidate-modal-header">
