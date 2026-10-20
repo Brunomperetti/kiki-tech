@@ -95,13 +95,13 @@ export function WorkQueue(){
   const [success,setSuccess]=useState('');
   const [coreIssue,setCoreIssue]=useState<CoreIssue>('BRAND_MISSING');
   const [coreSearch,setCoreSearch]=useState('');
-  const requestedProductSearch = searchParams.get('q')||'';
-  useEffect(()=>{setCoreSearch(requestedProductSearch);setBrandPage(1);setVerifiedPage(1);},[requestedProductSearch,focus]);
   const [corePage,setCorePage]=useState(1);
   const [brandPage,setBrandPage]=useState(1);
   const [guidedBrandMode,setGuidedBrandMode]=useState(true);
   const [guidedCoreMode,setGuidedCoreMode]=useState(true);
   const [verifiedPage,setVerifiedPage]=useState(1);
+  const requestedProductSearch = searchParams.get('q')||'';
+  useEffect(()=>{setCoreSearch(requestedProductSearch);setBrandPage(1);setVerifiedPage(1);},[requestedProductSearch,focus]);
   const PAGE_SIZE=50;
   const [likelyExceptionsOnly,setLikelyExceptionsOnly]=useState(false);
   const [resolutionItem,setResolutionItem]=useState<ReadinessItem|null>(null);
