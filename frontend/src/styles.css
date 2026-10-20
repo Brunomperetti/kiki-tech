@@ -619,3 +619,10 @@
   .kiki-core-guide-actions{display:grid}
   .kiki-data-mode-selector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Jump from product data to the exact brand candidate without losing the search. */
+.kiki-guided-brand-filter{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:0 0 17px;padding:15px;background:#f5faf4;border:1px solid #dbe9d9;border-radius:10px}
+.kiki-guided-brand-filter label{display:grid;gap:7px;color:#4e6d55;font-size:12px;font-weight:700;min-width:190px;flex:1}
+.kiki-guided-brand-filter input{width:100%;padding:11px 12px;background:#fff;border:1px solid #cfdece;border-radius:8px;font-size:13px;color:#21432f}
+.kiki-guided-brand-filter button{font-size:12px;padding:10px 12px}
