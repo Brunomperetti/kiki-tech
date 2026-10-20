@@ -532,3 +532,51 @@
   .kiki-review-picker nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .kiki-review-picker nav a:last-child{grid-column:1/-1}
 }
+
+
+/* KIKI 3.0 / PR103 — evidence-first, one-product-at-a-time brand review. */
+.kiki-brand-only>.core-pending-summary,
+.kiki-brand-only>.core-list-toolbar,
+.kiki-brand-only>.gtin-pilot-panel,
+.kiki-brand-only>.result-count,
+.kiki-brand-only>.core-action-list,
+.kiki-brand-only>.work-pagination{display:none!important}
+.kiki-brand-only>.panel-title-row{margin-bottom:19px}
+.kiki-brand-only .core-brand-proposals{border:0;padding:0;background:transparent}
+.kiki-brand-mode-selector{display:flex;align-items:center;gap:8px;margin:17px 0;flex-wrap:wrap}
+.kiki-brand-mode-selector button{font-size:12px;background:#f3f8f3;border:1px solid #d7e4d6;color:#375f42;padding:10px 14px}
+.kiki-brand-mode-selector button.is-active{background:#1d5038;color:white;border-color:#1d5038}
+.kiki-brand-guide{border:1px solid #d5e4d5;border-radius:14px;padding:21px;background:#fff;display:grid;gap:18px}
+.kiki-brand-guide-top{display:flex;gap:14px;justify-content:space-between;align-items:center}
+.kiki-brand-guide-top h4{font-size:18px;line-height:1.3;color:#214932;margin:5px 0 0}
+.kiki-brand-guide-count{background:#ecf4e9;color:#3f6d46;border-radius:99px;padding:8px 11px;font-size:11px;font-weight:700}
+.kiki-brand-guide-card{display:grid;gap:18px}
+.kiki-brand-guide-name{display:grid;gap:9px;border-bottom:1px solid #edf1eb;padding-bottom:17px}
+.kiki-brand-guide-name small,.kiki-brand-evidence>small{font-size:10px;letter-spacing:.1em;color:#62816b;font-weight:700}
+.kiki-brand-guide-name strong{font-size:20px;line-height:1.4;color:#183d2d}
+.kiki-brand-guide-name>span{font-size:12px;color:#647867}
+.kiki-brand-evidence{display:grid;gap:10px;border:1px solid #d9e8d7;background:#f5faf3;padding:17px;border-radius:11px}
+.kiki-brand-evidence>strong{color:#1c5638;font-size:17px}
+.kiki-brand-evidence p{font-size:13px;color:#4b6c53;line-height:1.7}
+.kiki-brand-evidence-tags{display:flex;flex-wrap:wrap;gap:7px}
+.kiki-brand-evidence-tags span{font-size:11px;color:#3f6146;background:#e8f3e5;padding:6px 9px;border-radius:8px}
+.kiki-brand-guide-warning{background:#fff9e9;border:1px solid #f0e0b7;padding:13px 14px;color:#755e30;font-size:12px;line-height:1.65;border-radius:10px}
+.kiki-brand-guide-actions{display:flex;flex-wrap:wrap;gap:10px}
+.kiki-brand-guide-actions button{font-size:12px;padding:12px 15px}
+.kiki-brand-guide-actions button.secondary{color:#315641;background:#eef4ee;border:1px solid #d5e2d6}
+.kiki-brand-guide-navigation{display:flex;gap:10px;justify-content:space-between;align-items:center;border-top:1px solid #edf1eb;padding-top:15px}
+.kiki-brand-guide-navigation button{font-size:11px;padding:9px 11px}
+.kiki-brand-guide-navigation span{color:#7a8c7d;font-size:12px}
+.kiki-brand-guide-foot{font-size:11px;line-height:1.6;color:#718271}
+.kiki-brand-restore{font-size:12px;justify-self:start}
+.kiki-brand-guide-empty{padding:20px 18px;border:1px dashed #c5d6c4;background:#f8faf6;border-radius:10px;display:grid;gap:9px}
+.kiki-brand-guide-empty strong{color:#285238;font-size:13px}
+.kiki-brand-guide-empty p{font-size:12px}
+.kiki-brand-approved-compact{display:grid;gap:9px}
+.kiki-brand-approved-compact .brand-proposal-card{padding:12px}
+@media(max-width:700px){
+  .kiki-brand-guide{padding:14px}
+  .kiki-brand-guide-top{align-items:flex-start;flex-direction:column}
+  .kiki-brand-guide-actions{display:grid}
+  .kiki-brand-guide-name strong{font-size:17px}
+}
