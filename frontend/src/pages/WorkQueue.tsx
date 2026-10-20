@@ -334,7 +334,7 @@ export function WorkQueue(){
   const guidedCoreEntries=useMemo(()=>activeCoreItems.map((item,index)=>{
     const productIdentity=productKey(item);
     return {
-      key:productIdentity||`unidentified-row-${index}`,
+      key:[productIdentity||`unidentified-row-${index}`,item.product.sku_variant||'',item.product.sku||'',item.product.ean||'',item.product.name||''].join('|'),
       item,
       hasBrandSuggestion:Boolean(productIdentity&&brandCandidateKeys.has(productIdentity)),
       researchStarted:Boolean(productIdentity&&researchByKey.get(productIdentity)),
@@ -685,6 +685,7 @@ export function WorkQueue(){
         <button type="button" className={guidedCoreMode?'is-active':''} aria-pressed={guidedCoreMode} onClick={()=>setGuidedCoreMode(true)}>Resolver de a uno</button>
         <button type="button" className={!guidedCoreMode?'is-active':''} aria-pressed={!guidedCoreMode} onClick={()=>setGuidedCoreMode(false)}>Ver lista y lotes</button>
       </div>}
+      {focus==='data'&&guidedCoreMode&&!readinessAvailable&&<div className="notice warning" role="status">{loading?'Consultando productos pendientes…':'No se pudo consultar el catálogo de productos pendientes. Actualizá o reintentá más tarde; esto no significa que los pendientes sean cero.'}</div>}
       {focus==='data'&&guidedCoreMode&&readinessAvailable&&<GuidedCoreReview key={coreIssue} issue={coreIssue} entries={guidedCoreEntries} onResolve={openResolution} busy={evidenceBusy||brandBusy}/>}
       <div className={focus==='data'&&guidedCoreMode?'kiki-focus-hidden':''}>
       {coreIssue==='BRAND_MISSING'&&likelyUnbranded.length>0&&<section className="gtin-pilot-panel">
