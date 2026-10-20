@@ -52,3 +52,24 @@ def test_same_sku_still_needs_duplication_review():
     assert hint["status"] == "FAMILY_CANDIDATE"
     assert hint["pairs"][0]["rule"] == "SAME_SKU"
     assert "duplicados confirmados" in hint["policy"]
+
+
+def test_alphanumeric_flavor_skus_are_not_mislabeled_as_invalid_products():
+    hint = diagnose_duplicate_group([
+        {"sku": "VITANERALVAINILLA"},
+        {"sku": "VITANERALCHOCOLATE"},
+    ])
+    assert hint["status"] == "REVIEW_REQUIRED"
+    assert hint["pairs"][0]["rule"] == "NOT_NUMERIC"
+    assert "NO indica un error" in hint["headline"]
+    assert "variantes reales por sabor" in hint["headline"]
+
+
+def test_same_name_numeric_skus_outside_family_remain_unconfirmed():
+    hint = diagnose_duplicate_group([
+        {"sku": "5681100"},
+        {"sku": "8000100"},
+    ])
+    assert hint["status"] == "REVIEW_REQUIRED"
+    assert hint["pairs"][0]["rule"] == "NO_RULE"
+    assert "combos" in hint["headline"]
