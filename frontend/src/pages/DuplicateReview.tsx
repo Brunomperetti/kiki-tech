@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
+import {Link} from 'react-router-dom';
 import {api} from '../services/api';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
 import '../review.css';
@@ -25,11 +26,15 @@ export function DuplicateReview(){
   const [busy,setBusy]=useState('');
   const [message,setMessage]=useState('');
   const [success,setSuccess]=useState('');
+  const [selectedGroups,setSelectedGroups]=useState<Set<string>>(()=>new Set());
+  const [bulkNote,setBulkNote]=useState('');
+  const [bulkBusy,setBulkBusy]=useState(false);
 
   async function load(){
     try{
       const data=await api.duplicateReviewQueue();
       setQueue(data);
+      setSelectedGroups(previous=>new Set([...previous].filter(key=>data.items.some(group=>group.group_key===key&&group.review_decision==='PENDING'))));
       setNotes(current=>{
         const next={...current};
         for(const item of data.items){if(next[item.group_key]===undefined)next[item.group_key]=item.note||''}
@@ -86,12 +91,45 @@ export function DuplicateReview(){
     }
   }
 
+  async function saveSelectedVariants(){
+    if(!queue||bulkBusy||selectedGroups.size===0)return;
+    const keys=Array.from(selectedGroups);
+    const pending=queue.items.filter(item=>keys.includes(item.group_key)&&item.review_decision==='PENDING');
+    if(pending.length!==keys.length){
+      setMessage('La selección cambió. Actualizá los grupos y volvé a revisar.');return;
+    }
+    if(bulkNote.trim().length<15){
+      setMessage('Explicá qué verificaste para todos los grupos seleccionados (mínimo 15 caracteres).');return;
+    }
+    const summary=pending.map(item=>item.products.map(p=>p.product.name||'Sin nombre').slice(0,2).join(' / ')).join('\n• ');
+    if(!window.confirm(
+      `Confirmás que revisaste individualmente estos ${keys.length} grupos y que TODOS son variantes legítimas del mismo producto base?\n\n• ${summary}\n\nSe guardará una decisión interna con historial, sin modificar Ecomm-App ni Mercado Libre.`
+    ))return;
+    setBulkBusy(true);setMessage('');setSuccess('');
+    try{
+      const result=await api.saveDuplicateVariantsBatch(keys,queue.reconciliation_run_id,bulkNote.trim());
+      setSelectedGroups(new Set());setBulkNote('');
+      await load();
+      setSuccess(`Se guardaron ${result.updated} grupos como variantes en KIKI con historial. No se modificaron los canales.`);
+    }catch(error){
+      setMessage(error instanceof Error?error.message:'No se pudo guardar el lote de variantes.');
+    }finally{setBulkBusy(false)}
+  }
+
+  function toggleSelected(key:string){
+    setSelectedGroups(previous=>{
+      const next=new Set(previous);
+      if(next.has(key))next.delete(key);else next.add(key);
+      return next;
+    });
+  }
+
   if(message&&!queue)return <><header><div><p className="eyebrow">CONTROL HUMANO</p><h1>Revisión de duplicados Ecomm</h1></div></header><div className="notice warning">{message}</div></>;
   if(!queue)return <div className="auth-loading">Preparando revisión de duplicados…</div>;
 
   const s=queue.summary;
   return <>
-    <header><div><p className="eyebrow">CONTROL HUMANO</p><h1>Revisión de duplicados Ecomm</h1><p>Resolvé grupos donde productos Ecomm distintos comparten uno o más identificadores.</p></div></header>
+    <header><div><p className="eyebrow">CONTROL HUMANO</p><h1>Revisión de duplicados Ecomm</h1><p>Resolvé grupos donde productos Ecomm distintos comparten uno o más identificadores.</p><Link className="secondary-link kiki-duplicate-back" to="/work/details?focus=ml">← Volver a las tareas de Mercado Libre</Link></div></header>
     {message&&<div className="notice warning">{message}</div>}
     {success&&<div className="notice success">{success}</div>}
     <div className="notice warning"><strong>No modifica Ecomm-App ni Mercado Libre.</strong> La decisión queda guardada en KIKI Tech. Un duplicado confirmado sigue bloqueado; productos distintos o variantes pueden continuar con los controles normales.</div>
@@ -106,6 +144,7 @@ export function DuplicateReview(){
     </section>
 
     <section className="panel">
+      <div className="kiki-duplicate-instructions"><strong>Primero revisá cada grupo.</strong><p>Un SKU compartido puede representar variantes legítimas, productos diferentes o un duplicado erróneo. Para un lote, marcá solamente los grupos que verificaste: una presentación pack, distinta cantidad o sabor puede exigir otra decisión.</p></div>
       <div className="review-filters">
         <input placeholder="Buscar SKU, EAN, producto o publicación ML" value={search} onChange={event=>setSearch(event.target.value)}/>
         <select value={decisionFilter} onChange={event=>setDecisionFilter(event.target.value as DuplicateReviewDecision|'')}>
@@ -117,6 +156,14 @@ export function DuplicateReview(){
         </select>
       </div>
       <p className="result-count">Mostrando <strong>{items.length.toLocaleString('es-AR')}</strong> de {s.groups_total.toLocaleString('es-AR')} grupos</p>
+      <section className="kiki-duplicate-batch" aria-label="Clasificación grupal supervisada">
+        <div className="kiki-duplicate-batch-head"><div><strong>Resolver varios grupos como variantes</strong><p>Seleccioná cada grupo pendiente después de comprobar que sus productos son variantes legítimas. No se seleccionan automáticamente.</p></div><span>{selectedGroups.size} seleccionados</span></div>
+        <label>Justificación compartida (obligatoria para todos)
+          <textarea rows={2} value={bulkNote} onChange={e=>setBulkNote(e.target.value)} placeholder="Ejemplo: confirmé en el catálogo del fabricante que cada grupo corresponde a distintas presentaciones del mismo producto."/>
+        </label>
+        <div className="kiki-duplicate-batch-actions"><button type="button" disabled={bulkBusy||selectedGroups.size===0||bulkNote.trim().length<15} onClick={()=>void saveSelectedVariants()}>{bulkBusy?'Guardando…':`Confirmar ${selectedGroups.size} grupos como variantes`}</button><button type="button" className="secondary" disabled={bulkBusy||selectedGroups.size===0} onClick={()=>setSelectedGroups(new Set())}>Limpiar selección</button></div>
+        <small>El guardado se realiza como una única operación: si algún grupo cambió o ya fue decidido, se rechaza el lote completo. No vincula ni publica productos.</small>
+      </section>
 
       {!items.length&&<div className="review-empty">No hay grupos para el filtro seleccionado.</div>}
       <div className="reconciliation-review-list">{items.map(group=>{
@@ -124,6 +171,7 @@ export function DuplicateReview(){
         return <article className="reconciliation-review-item" key={group.group_key}>
           <div className="reconciliation-review-head">
             <div>
+              {group.review_decision==='PENDING'&&<label className="kiki-duplicate-select"><input type="checkbox" checked={selectedGroups.has(group.group_key)} onChange={()=>toggleSelected(group.group_key)} disabled={bulkBusy||busy!==''}/> Seleccionar este grupo para clasificarlo como variantes</label>}
               <span className={`review-decision ${group.review_decision}`}>{decisionLabel(group.review_decision)}</span>
               <h2>{group.products.length} productos relacionados</h2>
               <div className="duplicate-identifiers">{group.shared_identifiers.map(identifier=><span className="duplicate-identifier" key={identifier}>Identificador compartido: {identifier}</span>)}</div>

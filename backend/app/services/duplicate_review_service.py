@@ -140,6 +140,73 @@ class DuplicateReviewService:
         self.db.refresh(row)
         return self._serialize_group(group, row)
 
+    def save_variants_batch(
+        self,
+        group_keys: list[str],
+        reconciliation_run_id: int,
+        note: str,
+    ) -> dict:
+        """All-or-nothing explicit human variant classification of selected groups.
+
+        Never infer variants from shared SKUs/GTINs; caller must inspect each group.
+        This action only writes internal audit decisions, never remote catalogs.
+        """
+        keys = [str(key).strip() for key in group_keys]
+        if not 1 <= len(keys) <= 20 or any(not key for key in keys):
+            raise ValueError("Seleccioná entre 1 y 20 grupos válidos.")
+        if len(set(keys)) != len(keys):
+            raise ValueError("Hay grupos repetidos en la selección.")
+        reason = str(note or "").strip()
+        if not 15 <= len(reason) <= 1000:
+            raise ValueError("Indicá un motivo común verificable de 15 a 1000 caracteres.")
+
+        run = self.repo.latest_run()
+        if not run or run.id != reconciliation_run_id:
+            raise ValueError("El catálogo fue actualizado. Recargá la revisión antes de guardar.")
+        groups = {group["group_key"]: group for group in self._groups(run.results or [])}
+        if any(key not in groups for key in keys):
+            raise ValueError("Alguno de los grupos ya no está disponible: recargá la revisión.")
+
+        # Lock existing rows and validate the ENTIRE batch before changing anything.
+        rows = {
+            row.group_key: row
+            for row in self.db.query(DuplicateReviewDecision)
+                .filter(DuplicateReviewDecision.group_key.in_(keys))
+                .with_for_update().all()
+        }
+        if any(rows.get(key) and rows[key].decision != self.PENDING for key in keys):
+            raise ValueError("Un grupo ya tiene una decisión: actualizá y revisá nuevamente.")
+        now = datetime.now(timezone.utc)
+        for key in keys:
+            group = groups[key]
+            row = rows.get(key)
+            if row is None:
+                row = DuplicateReviewDecision(
+                    group_key=key,
+                    reconciliation_run_id=run.id,
+                    decision=self.VARIANTS,
+                    created_at=now,
+                    updated_at=now,
+                )
+                self.db.add(row)
+            row.reconciliation_run_id = run.id
+            row.decision = self.VARIANTS
+            row.note = reason
+            row.shared_identifiers = list(group["shared_identifiers"])
+            row.product_keys = list(group["product_keys"])
+            row.group_snapshot = [self._snapshot_result(item) for item in group["results"]]
+            row.updated_at = now
+            row.history = [*(row.history or []), {
+                "decision": self.VARIANTS,
+                "at": now.isoformat(),
+                "note": reason,
+                "shared_identifiers": list(group["shared_identifiers"]),
+                "product_keys": list(group["product_keys"]),
+            }][-100:]
+        self.db.commit()
+        return {"updated": len(keys), "group_keys": keys, "decision": self.VARIANTS,
+                "policy": "Solo clasificación interna como variantes. No se modifica Ecomm-App ni Mercado Libre."}
+
     @classmethod
     def product_decision_index(
         cls,
