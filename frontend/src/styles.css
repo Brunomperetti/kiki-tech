@@ -580,3 +580,42 @@
   .kiki-brand-guide-actions{display:grid}
   .kiki-brand-guide-name strong{font-size:17px}
 }
+
+
+/* KIKI Tech 3.0 — Guided data resolution, without removing legacy bulk review. */
+.kiki-data-mode-selector{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.kiki-data-mode-selector button{font-size:12px;padding:11px 15px;border-radius:9px;border:1px solid #d8e6d8;background:#f5f9f5;color:#325b41}
+.kiki-data-mode-selector button.is-active{background:#205139;border-color:#205139;color:#fff}
+.kiki-core-guide{display:grid;gap:19px;background:#fff;border:1px solid #d2e3d2;border-radius:13px;padding:23px;margin:12px 0 20px}
+.kiki-core-guide-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.kiki-core-guide-header h3{font-size:20px;color:#1a4530;line-height:1.3;margin:7px 0 9px}
+.kiki-core-guide-header p:not(.eyebrow){font-size:12px;color:#65796a}
+.kiki-core-guide-number{background:#e9f3e7;color:#356841;border-radius:999px;padding:9px 11px;font-size:12px;font-weight:700;white-space:nowrap}
+.kiki-core-guide-product{display:grid;gap:18px}
+.kiki-core-guide-product>div:first-child{display:grid;gap:10px;border-bottom:1px solid #e9efe8;padding-bottom:17px}
+.kiki-core-guide-product>div:first-child>small,.kiki-core-guide-detail>small{font-size:10px;font-weight:700;letter-spacing:.09em;color:#67846d}
+.kiki-core-guide-product>div:first-child>strong{font-size:19px;color:#1e4933;line-height:1.4}
+.kiki-core-guide-product>div:first-child>p{font-size:12px;color:#6a7e6f}
+.kiki-core-guide-detail{display:grid;gap:10px;background:#f5faf4;border:1px solid #dcebdc;padding:17px;border-radius:11px}
+.kiki-core-guide-detail>strong{font-size:16px;line-height:1.4;color:#224e38}
+.kiki-core-guide-detail>p{color:#52745d;font-size:13px;line-height:1.65}
+.kiki-core-guide-detail>.kiki-core-guide-suggestion{font-size:12px;color:#316e42;background:#eaf5e5;padding:9px 10px;border-radius:8px}
+.kiki-core-guide-caution{background:#fff8e9;color:#786139;border:1px solid #efdfbb;border-radius:10px;font-size:12px;line-height:1.65;padding:13px 15px}
+.kiki-core-guide-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.kiki-core-guide-actions button,.kiki-core-guide-actions .secondary-link{font-size:12px;padding:12px 15px}
+.kiki-core-guide-actions .secondary-link{border:1px solid #cfdece;border-radius:8px}
+.kiki-core-guide-nav{display:flex;gap:12px;align-items:center;justify-content:space-between;border-top:1px solid #e9efe8;padding-top:15px}
+.kiki-core-guide-nav button{font-size:12px;padding:9px 12px}
+.kiki-core-guide-nav span{font-size:12px;color:#738576}
+.kiki-core-guide-foot{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;font-size:12px;color:#55755e}
+.kiki-core-guide-foot button{font-size:12px;padding:9px 12px}
+.kiki-core-guide-empty{display:grid;gap:10px;background:#f5faf4;border:1px dashed #cbdcc9;border-radius:10px;padding:20px}
+.kiki-core-guide-empty strong{font-size:13px;color:#245537}
+.kiki-core-guide-empty p{font-size:12px;color:#667b6a;line-height:1.6}
+@media(max-width:700px){
+  .kiki-core-guide{padding:15px}
+  .kiki-core-guide-header{flex-direction:column}
+  .kiki-core-guide-product>div:first-child>strong{font-size:17px}
+  .kiki-core-guide-actions{display:grid}
+  .kiki-data-mode-selector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+}
