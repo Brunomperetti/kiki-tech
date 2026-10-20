@@ -6,6 +6,7 @@ const channelPaths = ['/channels', '/readiness', '/prepublication', '/tiendanube
 export function Layout(){
   const location = useLocation();
   const channelActive = channelPaths.includes(location.pathname);
+  const tasksActive = location.pathname === '/work/details';
   const advancedPaths = ['/enrichment','/external-research','/images','/metadata','/review','/duplicate-review','/imports'];
   const advancedActive = advancedPaths.includes(location.pathname);
 
@@ -17,13 +18,14 @@ export function Layout(){
       <nav className="primary-nav kiki-primary-nav" aria-label="Navegación principal">
         <NavLink to="/" end><span className="kiki-nav-icon" aria-hidden="true">⌂</span>Inicio</NavLink>
         <NavLink to="/products"><span className="kiki-nav-icon" aria-hidden="true">▦</span>Productos</NavLink>
-        <NavLink to="/work"><span className="kiki-nav-icon" aria-hidden="true">✓</span>Tareas</NavLink>
+        <NavLink to="/work" className={({isActive})=>isActive||tasksActive?'active':''}><span className="kiki-nav-icon" aria-hidden="true">✓</span>Tareas</NavLink>
         <NavLink to="/channels" className={({isActive})=>isActive||channelActive?'active':''}><span className="kiki-nav-icon" aria-hidden="true">◫</span>Canales de venta</NavLink>
       </nav>
 
       <details className="advanced-nav kiki-advanced-nav" key={advancedActive?'advanced-current':'advanced-other'} open={advancedActive?true:undefined}>
         <summary>Herramientas y configuración</summary>
         <nav aria-label="Herramientas avanzadas">
+          <NavLink to="/work/details">Revisión detallada</NavLink>
           <NavLink to="/imports">Importar archivos</NavLink>
           <NavLink to="/readiness">Vincular con Mercado Libre</NavLink>
           <NavLink to="/prepublication">Preparar para Mercado Libre</NavLink>
