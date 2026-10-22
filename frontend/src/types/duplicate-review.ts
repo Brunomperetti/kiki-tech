@@ -37,7 +37,36 @@ export interface SkuFamilyDiagnosis {
   policy:string;
 }
 
+export interface MlEvidenceRow {
+  mla:string;
+  sku:string;
+  variation_id:string;
+  title:string;
+  listing_status:string;
+  price:string|null;
+  classification:'ONE_EXACT_SKU_CANDIDATE'|'SHARED_EXACT_SKU'|'SHARED_ALIAS'|'ALIAS_CANDIDATE'|'NO_SKU_EVIDENCE'|'NOT_IN_SNAPSHOT';
+  candidates:{key:string;name:string}[];
+  explanation:string;
+}
+
+export interface MlGroupEvidence {
+  available:boolean;
+  source:string;
+  snapshot_at:string|null;
+  changed_since_run:boolean;
+  reason:string;
+  rows:MlEvidenceRow[];
+  summary?:{
+    mlas:number;
+    offer_rows:number;
+    exact_sku_candidate_rows:number;
+    ambiguous_rows:number;
+    with_variation_id:number;
+  };
+}
+
 export interface DuplicateReviewGroup {
+  ml_evidence?:MlGroupEvidence;
   group_key:string;
   family_diagnosis?:SkuFamilyDiagnosis;
   shared_identifiers:string[];
