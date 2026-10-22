@@ -47,3 +47,20 @@
 .kiki-shared-ml-warning>strong{color:#795724;font-size:13px}
 .kiki-shared-ml-warning p{font-size:12px;line-height:1.6;color:#756747}
 .kiki-shared-ml-warning code{white-space:normal;overflow-wrap:anywhere;font-size:11px;color:#6c5122}
+
+
+/* Read-only ML offer/variation investigation for each duplicate group. */
+.kiki-ml-identification{border:1px solid #d2e1d7;border-radius:12px;background:#f9fcfa;margin:12px 0 16px;overflow:hidden}
+.kiki-ml-identification>summary{cursor:pointer;font-size:13px;font-weight:700;color:#19563b;padding:14px 16px;background:#edf6ed}
+.kiki-ml-identification[open]>summary{border-bottom:1px solid #d6e8d9}
+.kiki-ml-identification-body{padding:15px;display:grid;gap:10px}
+.kiki-ml-identification-body>p{font-size:12px;line-height:1.6;color:#526d59}
+.kiki-ml-source-stale{background:#fff2d9;border:1px solid #eec87c;padding:10px;border-radius:8px}
+.kiki-ml-identification-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:10px}
+.kiki-ml-identification-row{border:1px solid #dfe9e0;border-radius:9px;padding:13px;display:grid;gap:8px;background:white}
+.kiki-ml-identification-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.kiki-ml-identification-head strong{font-size:12px;color:#185238}
+.kiki-ml-identification-head span{border-radius:999px;background:#edf3eb;font-size:11px;color:#48644e;padding:5px 9px}
+.kiki-ml-identification-row p{font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.kiki-ml-identification-row small{font-size:11px;line-height:1.6;color:#55745e}
+.kiki-ml-readonly-note{border-top:1px solid #dae8da;padding-top:10px;font-weight:600}
