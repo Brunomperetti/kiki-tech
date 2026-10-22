@@ -81,3 +81,67 @@ def test_identical_primary_sku_never_selects_arbitrary_product():
     )
     assert report["rows"][0]["classification"] == "SHARED_EXACT_SKU"
     assert len(report["rows"][0]["candidates"]) == 2
+
+
+
+def test_vitaneral_real_world_spaces_and_case_are_possible_format_matches_only():
+    rows = [
+        {"external_id": "MLA1696309857", "sku": "vitaneral chocolate",
+         "title": "Vitaneral chocolate", "price": "30000"},
+        {"external_id": "MLA3030370902", "sku": "Vitaneral Vainilla",
+         "title": "Vitaneral vainilla", "price": "30000"},
+        {"external_id": "MLA3289072432", "sku": "Vitaneral Vainilla",
+         "title": "Vitaneral vainilla", "price": "34737.25"},
+        {"external_id": "MLA3289072434", "sku": "vitaneral chocolate",
+         "title": "Vitaneral chocolate", "price": "34737.25"},
+    ]
+    group = group_with_vitaneral_aliases()
+    for index, row in enumerate(group["results"]):
+        row["matched_listing_ids"] = [item["external_id"] for item in rows]
+    report = explain_ml_evidence(
+        group, rows, "MERCADOLIBRE_API", "2026-10-05T11:18:55+00:00", False,
+    )
+    assert report["summary"]["mlas"] == 4
+    assert report["summary"]["normalized_sku_candidate_rows"] == 4
+    assert report["summary"]["exact_sku_candidate_rows"] == 0
+    assert report["summary"]["ambiguous_rows"] == 0
+    assert report["summary"]["with_variation_id"] == 0
+    for item in report["rows"]:
+        assert item["classification"] == "NORMALIZED_SKU_CANDIDATE"
+        assert len(item["candidates"]) == 1
+        assert item["variation_id"] == ""
+        assert "No es una vinculación verificada" in item["explanation"]
+        if "chocolate" in item["sku"].lower():
+            assert item["candidates"][0]["key"] == "12"
+        else:
+            assert item["candidates"][0]["key"] == "11"
+
+
+def test_normalization_collisions_block_even_a_single_literal_sku_match():
+    group = {
+        "results": [
+            {"product": {"ecomm_id": "1", "sku": "AB C"}, "matched_listing_ids": ["MLA1"]},
+            {"product": {"ecomm_id": "2", "sku": "A BC"}, "matched_listing_ids": ["MLA1"]},
+        ],
+    }
+    for ml_sku in ("ABC", "AB C"):
+        report = explain_ml_evidence(
+            group, [{"external_id": "MLA1", "sku": ml_sku}], "MERCADOLIBRE", None, False
+        )
+        assert report["rows"][0]["classification"] == "SHARED_NORMALIZED_SKU"
+        assert len(report["rows"][0]["candidates"]) == 2
+        assert report["summary"]["ambiguous_rows"] == 1
+
+
+def test_punctuation_is_not_deleted_from_normalization():
+    group = {
+        "results": [
+            {"product": {"ecomm_id": "1", "sku": "AB-12"}, "matched_listing_ids": ["MLA1"]},
+            {"product": {"ecomm_id": "2", "sku": "ZZ-12"}, "matched_listing_ids": ["MLA1"]},
+        ],
+    }
+    report = explain_ml_evidence(
+        group, [{"external_id": "MLA1", "sku": "AB 12"}], "MERCADOLIBRE", None, False
+    )
+    assert report["rows"][0]["classification"] == "NO_SKU_EVIDENCE"
+    assert report["summary"]["normalized_sku_candidate_rows"] == 0
