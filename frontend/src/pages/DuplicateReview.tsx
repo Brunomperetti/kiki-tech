@@ -209,6 +209,29 @@ export function DuplicateReview(){
             <p>Identificadores compartidos en el snapshot: <code>{overlappingMlIds.join(' · ')}</code></p>
             <p>Podrían ser variaciones bajo una publicación compartida, o asociaciones ambiguas por alias de SKU. Confirmá en Mercado Libre el SKU y la variante de cada publicación antes de vincular inventario. KIKI no cambiará ninguna asociación automáticamente.</p>
           </div>}
+          {group.ml_evidence&&<details className="kiki-ml-identification" aria-label="Investigar publicaciones y variantes ML">
+            <summary>Investigar MLA y SKU de cada publicación ({group.ml_evidence.rows.length} registros)</summary>
+            <div className="kiki-ml-identification-body">
+              <p><strong>Fuente:</strong> {group.ml_evidence.source==='MERCADOLIBRE_API'?'Snapshot de API ML':'Excel de publicaciones ML'} · <strong>Fecha:</strong> {dateLabel(group.ml_evidence.snapshot_at)||'Desconocida'}</p>
+              {group.ml_evidence.changed_since_run&&<p className="kiki-ml-source-stale"><strong>Atención:</strong> el snapshot cambió después de la conciliación. Recargá la conciliación antes de tomar cualquier decisión.</p>}
+              <p>{group.ml_evidence.reason}</p>
+              {group.ml_evidence.available&&group.ml_evidence.summary&&<p>Publicaciones MLA: <strong>{group.ml_evidence.summary.mlas}</strong> · Candidatos por SKU exacto: <strong>{group.ml_evidence.summary.exact_sku_candidate_rows}</strong> · Asociaciones sin identificar: <strong>{group.ml_evidence.summary.ambiguous_rows}</strong> · Filas con ID de variación: <strong>{group.ml_evidence.summary.with_variation_id}</strong></p>}
+              {group.ml_evidence.rows.length>0&&<div className="kiki-ml-identification-list">
+                {group.ml_evidence.rows.map((entry,i)=><article key={entry.mla+'|'+entry.sku+'|'+i} className="kiki-ml-identification-row">
+                  <div className="kiki-ml-identification-head">
+                    <strong>{entry.mla}</strong>
+                    <span>{entry.classification==='ONE_EXACT_SKU_CANDIDATE'?'Candidato por SKU exacto':entry.classification==='SHARED_ALIAS'?'Alias compartido':entry.classification==='SHARED_EXACT_SKU'?'SKU duplicado entre productos':entry.classification==='ALIAS_CANDIDATE'?'Solo alias, revisar':entry.classification==='NOT_IN_SNAPSHOT'?'No está en el snapshot':'Sin identidad comprobada'}</span>
+                  </div>
+                  {entry.title&&<p>{entry.title}</p>}
+                  <p><strong>SKU en ML:</strong> {entry.sku||'No disponible'} · <strong>ID de variación:</strong> {entry.variation_id||'No disponible'}</p>
+                  <p><strong>Estado importado:</strong> {entry.listing_status||'—'} · <strong>Precio importado:</strong> {entry.price!=null?Number(entry.price).toLocaleString('es-AR',{style:'currency',currency:'ARS'}):'—'}</p>
+                  {entry.candidates.length>0&&<p><strong>Candidatos Ecomm:</strong> {entry.candidates.map(item=>item.name||item.key).join(' / ')}</p>}
+                  <small>{entry.explanation}</small>
+                </article>)}
+              </div>}
+              <p className="kiki-ml-readonly-note">Diagnóstico de lectura. Un MLA compartido no es un ID de variación; los SKU no autorizan vinculación ni sincronización de stock sin comprobar la variante real.</p>
+            </div>
+          </details>}
           <div className="duplicate-group-products">{group.products.map(item=><div className="review-side" key={item.product_key}>
             <h3>Ecomm-App</h3>
             <strong className="duplicate-product-title">{item.product.name||'Producto sin nombre'}</strong>

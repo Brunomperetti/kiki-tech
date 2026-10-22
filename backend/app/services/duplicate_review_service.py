@@ -8,6 +8,7 @@ from ..database.duplicate_review import DuplicateReviewDecision
 from ..repositories.catalog_repository import CatalogRepository
 from .reconciliation_review_service import ReconciliationReviewService
 from .sku_family_service import diagnose_duplicate_group
+from .ml_listing_evidence_service import explain_ml_evidence
 
 
 class DuplicateReviewService:
@@ -45,6 +46,26 @@ class DuplicateReviewService:
             self._serialize_group(group, decisions.get(group["group_key"]))
             for group in groups
         ]
+        # Interpret only the ML source used by this reconciliation. A later
+        # XLSX/API refresh must never be mistaken for matched evidence.
+        source = str((run.summary or {}).get("mercadolibre_source") or "MERCADOLIBRE")
+        snapshot = self.repo.snapshot_record(source) if source in {"MERCADOLIBRE", "MERCADOLIBRE_API"} else None
+        changed = False
+        snapshot_at = None
+        if snapshot:
+            snap_date = snapshot.updated_at
+            run_date = run.created_at
+            if snap_date.tzinfo is None:
+                snap_date = snap_date.replace(tzinfo=timezone.utc)
+            if run_date.tzinfo is None:
+                run_date = run_date.replace(tzinfo=timezone.utc)
+            changed = snap_date > run_date
+            snapshot_at = snap_date.isoformat()
+        for group, item in zip(groups, items):
+            item["ml_evidence"] = explain_ml_evidence(
+                group, (snapshot.payload or []) if snapshot else None,
+                source, snapshot_at, changed,
+            )
         rank = {
             self.PENDING: 0,
             self.DUPLICATE_CONFIRMED: 1,
