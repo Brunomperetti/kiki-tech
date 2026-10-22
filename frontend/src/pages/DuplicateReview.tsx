@@ -215,12 +215,12 @@ export function DuplicateReview(){
               <p><strong>Fuente:</strong> {group.ml_evidence.source==='MERCADOLIBRE_API'?'Snapshot de API ML':'Excel de publicaciones ML'} · <strong>Fecha:</strong> {dateLabel(group.ml_evidence.snapshot_at)||'Desconocida'}</p>
               {group.ml_evidence.changed_since_run&&<p className="kiki-ml-source-stale"><strong>Atención:</strong> el snapshot cambió después de la conciliación. Recargá la conciliación antes de tomar cualquier decisión.</p>}
               <p>{group.ml_evidence.reason}</p>
-              {group.ml_evidence.available&&group.ml_evidence.summary&&<p>Publicaciones MLA: <strong>{group.ml_evidence.summary.mlas}</strong> · Candidatos por SKU exacto: <strong>{group.ml_evidence.summary.exact_sku_candidate_rows}</strong> · Asociaciones sin identificar: <strong>{group.ml_evidence.summary.ambiguous_rows}</strong> · Filas con ID de variación: <strong>{group.ml_evidence.summary.with_variation_id}</strong></p>}
+              {group.ml_evidence.available&&group.ml_evidence.summary&&<p>Publicaciones MLA: <strong>{group.ml_evidence.summary.mlas}</strong> · Candidatos por SKU exacto: <strong>{group.ml_evidence.summary.exact_sku_candidate_rows}</strong> · Posibles coincidencias por escritura del SKU: <strong>{group.ml_evidence.summary.normalized_sku_candidate_rows||0}</strong> · Sin candidato único: <strong>{group.ml_evidence.summary.ambiguous_rows}</strong> · Filas con ID de variación: <strong>{group.ml_evidence.summary.with_variation_id}</strong></p>}
               {group.ml_evidence.rows.length>0&&<div className="kiki-ml-identification-list">
                 {group.ml_evidence.rows.map((entry,i)=><article key={entry.mla+'|'+entry.sku+'|'+i} className="kiki-ml-identification-row">
                   <div className="kiki-ml-identification-head">
                     <strong>{entry.mla}</strong>
-                    <span>{entry.classification==='ONE_EXACT_SKU_CANDIDATE'?'Candidato por SKU exacto':entry.classification==='SHARED_ALIAS'?'Alias compartido':entry.classification==='SHARED_EXACT_SKU'?'SKU duplicado entre productos':entry.classification==='ALIAS_CANDIDATE'?'Solo alias, revisar':entry.classification==='NOT_IN_SNAPSHOT'?'No está en el snapshot':'Sin identidad comprobada'}</span>
+                    <span>{entry.classification==='ONE_EXACT_SKU_CANDIDATE'?'Candidato por SKU exacto':entry.classification==='NORMALIZED_SKU_CANDIDATE'?'Posible coincidencia por escritura':entry.classification==='SHARED_NORMALIZED_SKU'?'Coincidencia ambigua al normalizar':entry.classification==='SHARED_ALIAS'?'Alias compartido':entry.classification==='SHARED_EXACT_SKU'?'SKU duplicado entre productos':entry.classification==='ALIAS_CANDIDATE'?'Solo alias, revisar':entry.classification==='NOT_IN_SNAPSHOT'?'No está en el snapshot':'Sin identidad comprobada'}</span>
                   </div>
                   {entry.title&&<p>{entry.title}</p>}
                   <p><strong>SKU en ML:</strong> {entry.sku||'No disponible'} · <strong>ID de variación:</strong> {entry.variation_id||'No disponible'}</p>
@@ -229,7 +229,7 @@ export function DuplicateReview(){
                   <small>{entry.explanation}</small>
                 </article>)}
               </div>}
-              <p className="kiki-ml-readonly-note">Diagnóstico de lectura. Un MLA compartido no es un ID de variación; los SKU no autorizan vinculación ni sincronización de stock sin comprobar la variante real.</p>
+              <p className="kiki-ml-readonly-note">Diagnóstico de lectura. Las posibles coincidencias por escritura ignoran únicamente espacios y diferencias de mayúsculas/minúsculas: NO confirman identidad ni desbloquean productos. Un MLA no equivale a un ID de variación. No se autoriza vinculación ni sincronización de stock sin comprobación de la variante real.</p>
             </div>
           </details>}
           <div className="duplicate-group-products">{group.products.map(item=><div className="review-side" key={item.product_key}>
