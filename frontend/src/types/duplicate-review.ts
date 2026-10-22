@@ -44,7 +44,7 @@ export interface MlEvidenceRow {
   title:string;
   listing_status:string;
   price:string|null;
-  classification:'ONE_EXACT_SKU_CANDIDATE'|'SHARED_EXACT_SKU'|'SHARED_ALIAS'|'ALIAS_CANDIDATE'|'NO_SKU_EVIDENCE'|'NOT_IN_SNAPSHOT';
+  classification:'ONE_EXACT_SKU_CANDIDATE'|'NORMALIZED_SKU_CANDIDATE'|'SHARED_NORMALIZED_SKU'|'SHARED_EXACT_SKU'|'SHARED_ALIAS'|'ALIAS_CANDIDATE'|'NO_SKU_EVIDENCE'|'NOT_IN_SNAPSHOT';
   candidates:{key:string;name:string}[];
   explanation:string;
 }
@@ -60,6 +60,7 @@ export interface MlGroupEvidence {
     mlas:number;
     offer_rows:number;
     exact_sku_candidate_rows:number;
+    normalized_sku_candidate_rows:number;
     ambiguous_rows:number;
     with_variation_id:number;
   };
