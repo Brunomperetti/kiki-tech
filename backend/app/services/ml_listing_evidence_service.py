@@ -11,6 +11,15 @@ def _clean(value) -> str:
     return str(value).strip() if value is not None else ""
 
 
+def _format_key(value: str) -> str:
+    """Presentation-only SKU hint: ignore whitespace and letter case, not symbols.
+
+    Do NOT use this for canonical IDs, reconciliation, writes, or stock matching.
+    'AB C' and 'A BC' can collide, so all normalized owners must be checked.
+    """
+    return "".join(str(value or "").split()).casefold()
+
+
 def _product_skus(product: dict) -> tuple[set[str], set[str]]:
     primary = {
         _clean(product.get(field))
@@ -90,21 +99,48 @@ def explain_ml_evidence(group: dict, snapshot_rows: list[dict] | None,
             key = sku.casefold()
             strong = [p for p in products if key and key in p["skus"][0]]
             aliases = [p for p in products if key and key in p["skus"][1]]
-            matches = strong or aliases
-            if len(strong) == 1:
-                classification = "ONE_EXACT_SKU_CANDIDATE"
-                message = "SKU exacto en una ficha Ecomm; falta comprobar presentación y variante ML."
-            elif len(strong) > 1:
+            # Detect format-equivalent SKU ownership across ALL group products.
+            # A unique exact match is insufficient when removing whitespace
+            # would give the same identity to another product.
+            normalized = _format_key(sku)
+            normalized_primary = [
+                p for p in products
+                if normalized and any(_format_key(value) == normalized for value in p["skus"][0])
+            ]
+            if len(strong) > 1:
                 classification = "SHARED_EXACT_SKU"
+                matches = strong
                 message = "Este SKU figura como principal en varias fichas Ecomm; no se puede elegir una."
+            elif len(normalized_primary) > 1:
+                classification = "SHARED_NORMALIZED_SKU"
+                matches = normalized_primary
+                message = (
+                    "Al ignorar solo espacios y mayúsculas, el SKU coincide con varias "
+                    "fichas Ecomm. La normalización es ambigua: no asignar productos ni stock."
+                )
+            elif len(strong) == 1:
+                classification = "ONE_EXACT_SKU_CANDIDATE"
+                matches = strong
+                message = "SKU exacto en una ficha Ecomm; falta comprobar presentación y variante ML."
+            elif len(normalized_primary) == 1:
+                classification = "NORMALIZED_SKU_CANDIDATE"
+                matches = normalized_primary
+                message = (
+                    "Posible coincidencia de SKU por formato: al ignorar espacios "
+                    "y mayúsculas, corresponde a una sola ficha Ecomm de este grupo. "
+                    "No es una vinculación verificada; confirmá producto y publicación."
+                )
             elif len(aliases) > 1:
                 classification = "SHARED_ALIAS"
+                matches = aliases
                 message = "El SKU aparece como alias de varios productos. No asignar stock por este dato."
             elif len(aliases) == 1:
                 classification = "ALIAS_CANDIDATE"
+                matches = aliases
                 message = "SKU coincidente solo por alias; requiere confirmar la identidad de la variación."
             else:
                 classification = "NO_SKU_EVIDENCE"
+                matches = []
                 message = "Sin SKU exacto identificable para estas fichas; no se puede inferir una relación."
             variation_id = _clean(row.get("variation_id"))
             if not variation_id:
@@ -137,7 +173,11 @@ def explain_ml_evidence(group: dict, snapshot_rows: list[dict] | None,
             "mlas": len(ml_ids),
             "offer_rows": len(evidence),
             "exact_sku_candidate_rows": sum(r["classification"] == "ONE_EXACT_SKU_CANDIDATE" for r in evidence),
-            "ambiguous_rows": sum(r["classification"] not in {"ONE_EXACT_SKU_CANDIDATE"} for r in evidence),
+            "normalized_sku_candidate_rows": sum(r["classification"] == "NORMALIZED_SKU_CANDIDATE" for r in evidence),
+            "ambiguous_rows": sum(
+                r["classification"] not in {"ONE_EXACT_SKU_CANDIDATE", "NORMALIZED_SKU_CANDIDATE"}
+                for r in evidence
+            ),
             "with_variation_id": sum(bool(r["variation_id"]) for r in evidence),
         },
     }
