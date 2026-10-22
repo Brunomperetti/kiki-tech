@@ -45,7 +45,7 @@ export interface MlEvidenceRow {
   listing_status:string;
   price:string|null;
   classification:'ONE_EXACT_SKU_CANDIDATE'|'NORMALIZED_SKU_CANDIDATE'|'SHARED_NORMALIZED_SKU'|'SHARED_EXACT_SKU'|'SHARED_ALIAS'|'ALIAS_CANDIDATE'|'NO_SKU_EVIDENCE'|'NOT_IN_SNAPSHOT';
-  candidates:{key:string;name:string}[];
+  candidates:{key:string;ecomm_id:string;sku:string;name:string}[];
   explanation:string;
 }
 

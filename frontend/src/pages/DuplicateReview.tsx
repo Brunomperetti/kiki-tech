@@ -225,7 +225,13 @@ export function DuplicateReview(){
                   {entry.title&&<p>{entry.title}</p>}
                   <p><strong>SKU en ML:</strong> {entry.sku||'No disponible'} · <strong>ID de variación:</strong> {entry.variation_id||'No disponible'}</p>
                   <p><strong>Estado importado:</strong> {entry.listing_status||'—'} · <strong>Precio importado:</strong> {entry.price!=null?Number(entry.price).toLocaleString('es-AR',{style:'currency',currency:'ARS'}):'—'}</p>
-                  {entry.candidates.length>0&&<p><strong>Candidatos Ecomm:</strong> {entry.candidates.map(item=>item.name||item.key).join(' / ')}</p>}
+                  {entry.candidates.length>0&&<div className="kiki-ml-candidate-list">
+                    <strong>{entry.candidates.length===1?'Posible producto Ecomm (sin confirmar)':'Posibles productos Ecomm (sin confirmar)'}</strong>
+                    {entry.candidates.map((item,i)=><div className="kiki-ml-candidate" key={item.key+'-'+i}>
+                      <span><b>SKU: {item.sku||'No disponible'}</b>{item.ecomm_id?' · ID Ecomm: '+item.ecomm_id:''}</span>
+                      <small>{item.name||'Producto sin nombre'}</small>
+                    </div>)}
+                  </div>}
                   <small>{entry.explanation}</small>
                 </article>)}
               </div>}

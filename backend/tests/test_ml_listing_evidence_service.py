@@ -145,3 +145,27 @@ def test_punctuation_is_not_deleted_from_normalization():
     )
     assert report["rows"][0]["classification"] == "NO_SKU_EVIDENCE"
     assert report["summary"]["normalized_sku_candidate_rows"] == 0
+
+
+
+def test_identical_ecomm_product_names_remain_distinguishable_by_real_sku():
+    group = group_with_vitaneral_aliases()
+    for result in group["results"]:
+        result["product"]["name"] = "Vitaneral Natufarma Vitaminas y Minerales HMB 240gs"
+    report = explain_ml_evidence(
+        group,
+        [
+            {"external_id": "MLA1", "sku": "vitaneral chocolate"},
+            {"external_id": "MLA2", "sku": "Vitaneral Vainilla"},
+        ],
+        "MERCADOLIBRE_API", None, False,
+    )
+    candidates = {
+        row["mla"]: row["candidates"][0] for row in report["rows"] if row["candidates"]
+    }
+    assert candidates["MLA1"]["sku"] == "VITANERALCHOCOLATE"
+    assert candidates["MLA1"]["ecomm_id"] == "12"
+    assert candidates["MLA2"]["sku"] == "VITANERALVAINILLA"
+    assert candidates["MLA2"]["ecomm_id"] == "11"
+    assert candidates["MLA1"]["name"] == candidates["MLA2"]["name"]
+    assert report["summary"]["normalized_sku_candidate_rows"] == 2

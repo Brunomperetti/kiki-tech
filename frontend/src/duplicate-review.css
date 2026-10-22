@@ -64,3 +64,10 @@
 .kiki-ml-identification-row p{font-size:12px;line-height:1.55;overflow-wrap:anywhere}
 .kiki-ml-identification-row small{font-size:11px;line-height:1.6;color:#55745e}
 .kiki-ml-readonly-note{border-top:1px solid #dae8da;padding-top:10px;font-weight:600}
+
+/* Keep similarly named flavor candidates distinguishable by their actual Ecomm SKU. */
+.kiki-ml-candidate-list{display:grid;gap:7px;font-size:12px}
+.kiki-ml-candidate-list>strong{font-size:12px;color:#19563b}
+.kiki-ml-candidate{display:grid;gap:3px;padding:9px 10px;border:1px solid #d4e5dc;border-radius:8px;background:#f7fbf8}
+.kiki-ml-candidate span{font-size:12px;overflow-wrap:anywhere;color:#194d38}
+.kiki-ml-candidate small{font-size:11px;line-height:1.35;overflow-wrap:anywhere;color:#54675a}

@@ -45,6 +45,13 @@ def explain_ml_evidence(group: dict, snapshot_rows: list[dict] | None,
             "key": _clean((item.get("product") or {}).get("ecomm_id"))
                    or _clean((item.get("product") or {}).get("sku"))
                    or str(i),
+            "ecomm_id": _clean((item.get("product") or {}).get("ecomm_id")),
+            "sku": _clean(
+                (item.get("product") or {}).get("sku_variant")
+                or (item.get("product") or {}).get("sku_effective")
+                or (item.get("product") or {}).get("sku")
+                or (item.get("product") or {}).get("sku_product")
+            ),
             "name": _clean((item.get("product") or {}).get("name")),
             "skus": _product_skus(item.get("product") or {}),
         }
@@ -153,7 +160,13 @@ def explain_ml_evidence(group: dict, snapshot_rows: list[dict] | None,
                 "listing_status": _clean(row.get("status")),
                 "price": str(row.get("price")) if row.get("price") is not None else None,
                 "classification": classification,
-                "candidates": [{"key": p["key"], "name": p["name"]} for p in matches],
+                "candidates": [
+                    {
+                        "key": p["key"], "ecomm_id": p["ecomm_id"],
+                        "sku": p["sku"], "name": p["name"],
+                    }
+                    for p in matches
+                ],
                 "explanation": message,
             })
 
