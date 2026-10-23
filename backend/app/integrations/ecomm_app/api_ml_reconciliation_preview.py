@@ -120,7 +120,28 @@ def _pack_equivalence_reason(ecomm_title, ml_title):
     )
 
 
-def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] | None):
+def api_ml_reconciliation_preview(
+    pages: list[dict] | None,
+    ml_rows: list[dict] | None,
+    *,
+    cases_page: int | None = None,
+    cases_limit: int = 20,
+    cases_status: str = "",
+    cases_query: str = "",
+):
+    """One classifier for summary and searchable read-only review."""
+    if cases_page is not None:
+        if not isinstance(cases_page, int) or cases_page < 1 or cases_page > 100000:
+            raise ValueError("La página de casos no es válida.")
+        if not isinstance(cases_limit, int) or cases_limit < 1 or cases_limit > 50:
+            raise ValueError("El límite de casos debe estar entre 1 y 50.")
+        if cases_status and cases_status not in STATUSES:
+            raise ValueError("El filtro de estado de casos no es válido.")
+        if len(cases_query) > 80:
+            raise ValueError("La búsqueda admite hasta 80 caracteres.")
+    search_text = _sku(cases_query)
+    case_hits = []
+
     state = stage_status(pages)
     quality = state["quality"]
     blocking = (
@@ -277,6 +298,32 @@ def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] 
                     )
 
         counts[kind] += 1
+        if cases_page is not None and (
+            not cases_status or kind == cases_status
+        ) and (not search_text or any(search_text in _sku(v) for v in (
+            external_id, title, general_sku, explicit_variant,
+            selected["ecomm_id"] if selected else "",
+            selected["sku"] if selected else "",
+            selected["name"] if selected else "",
+        ))):
+            case_hits.append({
+                "status": kind,
+                "mla": external_id,
+                "ml_title": title[:160],
+                "ml_variant_sku": explicit_variant or None,
+                "ml_product_sku": general_sku or None,
+                "ml_gtin": ml_gtin or None,
+                "match_basis": match_basis,
+                "api_ecomm_id": selected["ecomm_id"] if selected else None,
+                "api_sku": selected["sku"] if selected else None,
+                "api_name": selected["name"] if selected else None,
+                "api_variant_description": (
+                    selected["variant_description"] if selected else None
+                ),
+                "api_is_combo": selected["is_combo"] if selected else None,
+                "api_gtin": selected["gtin"] if selected else None,
+                "reason": note,
+            })
         if len(examples[kind]) < MAX_EXAMPLES_PER_STATUS:
             examples[kind].append({
                 "status": kind,
@@ -316,6 +363,18 @@ def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] 
             **{kind: counts[kind] for kind in STATUSES},
         },
         "examples": dict(examples),
+        **({
+            "cases": {
+                "total": len(case_hits),
+                "page": cases_page,
+                "limit": cases_limit,
+                "status": cases_status,
+                "query": cases_query,
+                "items": case_hits[
+                    (cases_page - 1) * cases_limit:cases_page * cases_limit
+                ],
+            }
+        } if cases_page is not None else {}),
         "warning": (
             "Diagnóstico entre dos snapshots API, NO datos en tiempo real. "
             "SKU de publicación simple se compara como pista; la variante exige "
