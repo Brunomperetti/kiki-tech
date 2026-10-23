@@ -9,11 +9,12 @@ from collections import Counter, defaultdict
 import re
 
 from ...services.tiendanube_quality_audit_service import gtin_status
+from ...services.tiendanube_assisted_match_service import variant_conflict
 from .catalog_comparison import _str
 from .commercial_audit import _brand_class
 
 _LIMIT = 12
-_MLA = re.compile(r"^MLA\d+", re.IGNORECASE)
+_MLA = re.compile(r"^(MLA\d+)(?:#\d+)?$", re.IGNORECASE)
 
 
 def _ml_id(value):
@@ -99,6 +100,14 @@ def shared_gtin_sku_review(matched, owners_sku, owners_ean, owners_mla,
         if _brand_class(historical.get("brand")) == "PRESENT":
             counts["already_branded_ecomm"] += 1
             continue
+        if variant_conflict(
+            historical.get("name"),
+            historical.get("sku_variant") or historical.get("sku_effective") or historical.get("sku"),
+            row.get("title"),
+            row.get("variant_sku") or "",
+        ):
+            counts["presentation_conflict"] += 1
+            continue
         counts["sku_consistent_missing_brand_rows"] += 1
         all_review_leads[owner].append({
             "ecomm_id": owner,
@@ -141,6 +150,7 @@ def shared_gtin_sku_review(matched, owners_sku, owners_ean, owners_mla,
             "identity_contradiction": counts["identity_contradiction"],
             "no_stable_ecomm_id": counts["no_stable_ecomm_id"],
             "already_branded_ecomm": counts["already_branded_ecomm"],
+            "presentation_conflict": counts["presentation_conflict"],
             "sku_consistent_missing_brand_rows": counts["sku_consistent_missing_brand_rows"],
             "possible_ecomm_brand_review_ids": counts["possible_ecomm_brand_review_ids"],
             "conflicting_brands_same_ecomm": counts["conflicting_brands_same_ecomm"],
