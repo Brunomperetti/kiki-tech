@@ -48,7 +48,7 @@ def verify_current_stock(stage: list[dict], legacy: list[dict], ids: list[str], 
             "reason": "El ID no está presente una sola vez en ambas fuentes; no se consultó por SKU.",
         }
         outcomes.append(item)
-        if row["identity"] == "MATCHED_STABLE_ID" and row["api"] and row["api"]["sku"]:
+        if (row["identity"] == "MATCHED_STABLE_ID" and row["api"] and row["api"]["sku"] and len(row["api"]["sku"]) <= 128):
             permitted.append(item)
 
     if permitted:
