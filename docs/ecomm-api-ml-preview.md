@@ -19,7 +19,15 @@ Botón manual en `/pilot`, apartado 3.
 - `SKU_ONLY_REVIEW`: SKU exacto sin corroboración suficiente de GTIN.
 - `SHARED_GTIN`: GTIN repetido entre varios IDs Ecomm.
 - `GTIN_CONFLICT`: SKU exacto con códigos GTIN válidos distintos.
-- `PRESENTATION_CONFLICT`: diferencias de sabor/presentación conocidas.
+- `PRESENTATION_CONFLICT`: discrepancias de presentación sin equivalencia segura;
+  incluye productos o pack realmente diferentes.
+- `PACK_QUANTITY_EQUIVALENCE_REVIEW`: SKU exacto, pero la cantidad por
+  unidad multiplicada por el número del pack coincide con la cantidad total
+  de la otra descripción **y** al menos dos palabras distintivas de producto
+  se repiten. Esto es solo una explicación aritmética para revisión humana,
+  NO prueba identidad de producto, componentes de combo ni GTIN.
+  Ejemplo: pack x12 con 30 cápsulas por unidad vs 360 cápsulas totales.
+  Nunca esconder B12 frente a vinagre de sidra bajo esta categoría.
 - `INVALID_ML_GTIN`, `INVALID_ECOMM_GTIN`: identificador no verificable.
 - `DUPLICATE_API_SKU`: SKU API asignado a múltiples variantes.
 - `SKU_NOT_IN_API`: SKU exacto de ML no encontrado en la copia API.
@@ -59,3 +67,13 @@ inventario, GTIN, marca, MLA, decisiones humanas, Tiendanube ni Mercado Libre.
 Los ejemplos tienen límite por categoría. Se cuentan por separado\nfilas simples ML, filas de variación, SKU exactos únicos y casos\ncon SKU general sin asociación verificable. El nombre del modo es
 `API_ONLY_ML_READ_ONLY_PREVIEW`; `operational_reconciliation_activated`
 es siempre `false`.
+
+## Mejora de clasificación (PR posterior a #134)
+El diagnóstico del 23/10 mostró 2.684 coincidencias de SKU exacto:
+2.565 sin corroboración GTIN, 90 con discrepancias de presentación,
+29 GTIN ML inválidos; además 15 SKU sin coincidencia y 21 sin SKU.
+Separamos las diferencias aritméticas plausibles de pack como
+`PACK_QUANTITY_EQUIVALENCE_REVIEW`, manteniendo TODAS en revisión.
+La cifra real en esa categoría solo se conoce al volver a ejecutar en Render,
+y puede variar con capturas frescas. No se corrige ningún título, stock,
+GTIN, vínculo comercial ni aprobación.
