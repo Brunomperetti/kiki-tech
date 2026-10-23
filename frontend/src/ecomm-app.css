@@ -41,3 +41,28 @@
 .kiki-ecomm-focused-list>p{font-size:12px;line-height:1.4;color:#506c57}
 .kiki-ecomm-focused-list .kiki-ecomm-requested{display:grid;gap:5px}
 .kiki-ecomm-focused-list button{justify-self:start}
+
+/* Read-only adoption plan: separate proven identity from operational readiness. */
+.kiki-ecomm-adoption{display:grid;gap:12px;padding:16px;border:1px solid #d2e1d6;border-radius:12px;background:#fff}
+.kiki-ecomm-adoption-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.kiki-ecomm-adoption-heading h4{font-size:16px;margin:0 0 8px;color:#203f2e}
+.kiki-ecomm-adoption-heading p{font-size:13px;line-height:1.55;max-width:760px;margin:0}
+.kiki-ecomm-adoption-heading>span{font-size:11px;padding:7px 10px;border:1px solid #e8d8b4;border-radius:999px;background:#fff8e9;color:#795522;white-space:nowrap}
+.kiki-ecomm-adoption-counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,135px),1fr));gap:8px}
+.kiki-ecomm-adoption-counts>div{display:grid;gap:3px;padding:11px;border-radius:8px;background:#f6faf7;border:1px solid #e0e9e1}
+.kiki-ecomm-adoption-counts strong{font-size:23px;color:#184f34}
+.kiki-ecomm-adoption-counts small{font-size:11px;color:#54705c;line-height:1.4}
+.kiki-ecomm-adoption h5{margin:4px 0 0;font-size:14px;color:#204934}
+.kiki-ecomm-adoption-tasks{display:grid;gap:8px}
+.kiki-ecomm-adoption-task{display:grid;gap:5px;padding:12px;border:1px solid #dae5dc;border-radius:8px;background:#fafcfb}
+.kiki-ecomm-adoption-task-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.kiki-ecomm-adoption-task-head strong{font-size:12px}
+.kiki-ecomm-adoption-task-head span{font-size:12px;font-weight:700;color:#20583d}
+.kiki-ecomm-adoption-task p,.kiki-ecomm-adoption-gate p{font-size:12px;line-height:1.5;margin:0}
+.kiki-ecomm-adoption-task small{font-size:11px;color:#536b5a;line-height:1.45}
+.kiki-ecomm-adoption-gates{padding:11px;border:1px solid #dfebe2;border-radius:9px;background:#fafcfb}
+.kiki-ecomm-adoption-gates summary{font-weight:700;font-size:12px;cursor:pointer}
+.kiki-ecomm-adoption-gate{display:grid;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e3ebe4}
+.kiki-ecomm-adoption-gate>div{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px}
+.kiki-ecomm-adoption-gate span{font-size:11px;color:#5d714b;font-weight:700}
+.kiki-ecomm-adoption-footnote{font-size:11px;color:#57715e;line-height:1.5;margin:0}
