@@ -23,7 +23,7 @@ function PreviewList({data,label}:{data:EcommAppPreviewList;label:string}){
         <p><strong>SKU de variante:</strong> {variant.sku||'No informado'} · <strong>ID variante:</strong> {variant.id??'No informado'}</p>
         {variant.variant_description&&<p><strong>Presentación:</strong> {variant.variant_description}</p>}
         <p><strong>Combo de variante (API):</strong> {comboLabel(variant.is_combo)} · <strong>GTIN:</strong> {variant.barcode||'No informado'} · <strong>Stock total:</strong> {variant.total_stock??'No informado'}</p>
-        {variant.warehouse_sample.length>0&&<p>Depósitos: {variant.warehouse_sample.map(w=>`${w.id??'?'} (${w.stock??'sin dato'})`).join(' · ')}</p>
+        {variant.warehouse_sample.length>0&&<p>Depósitos: {variant.warehouse_sample.map(w=>`${w.id??'?'} (${w.stock??'sin dato'})`).join(' · ')}</p>}
         <small>Campos de variante: {variant.available_fields.join(', ')}</small>
       </div>)}
       {typeof item.variant_count==='number'&&item.variant_count>5&&<small>Se muestran solo 5 de {item.variant_count} variantes.</small>}
@@ -119,7 +119,7 @@ export function EcommAppConnector(){
         </section>
         <PreviewList data={lookup.product_preview} label="Productos padre y todas sus variantes devueltas"/>
         <small>{lookup.note}</small>
-      </div>
+      </div>}
     </details>
     <small>Esta integración no incluye todavía importación masiva ni vínculos Ecomm–Mercado Libre–Tiendanube. Facturación permanece fuera del alcance.</small>
   </section>;
