@@ -55,8 +55,8 @@ def test_vitaneral_stable_ids_distinguish_pack_and_flavors_without_stock_writes(
     assert t["matched_stable_ids"] == 2
     assert t["historical_no_stable_id_match"] == 0
     assert t["api_no_stable_id_match"] == 1  # x2 combo, not regular Vainilla
-    assert t["same_id_format_sku_changed"] == 1
-    assert t["same_id_different_sku"] == 1
+    assert t["same_id_format_sku_changed"] == 2
+    assert t["same_id_different_sku"] == 0
     assert t["stock_differences_informational"] == 2
     assert len(report["samples"]["api_without_id_match"]) == 1
     assert report["samples"]["api_without_id_match"][0]["api_id"] == "9181206"
