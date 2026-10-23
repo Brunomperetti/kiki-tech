@@ -199,3 +199,44 @@ export interface EcommStageComparison {
   };
   warning:string;
 }
+
+export interface EcommHybridPreview {
+  mode:'READ_ONLY_HYBRID_PREVIEW';
+  activation_allowed:false;
+  stage_capture_started:string|null;
+  stage_capture_finished:string|null;
+  coverage:{
+    matched_unique_ids:number;
+    legacy_price_present:number;
+    legacy_cost_present:number;
+    legacy_brand_present:number;
+    legacy_gtin_present:number;
+    api_stock_present:number;
+  };
+  rows:{
+    ecomm_id:string;
+    identity:'MATCHED_STABLE_ID'|'HISTORICAL_ONLY'|'API_ONLY'|'NOT_FOUND'|'AMBIGUOUS_DUPLICATE_ID';
+    sku_relation:'SAME_SKU'|'FORMAT_ONLY'|'SUBSTANTIVE_CHANGE'|null;
+    legacy:{
+      name:string|null;
+      sku:string;
+      brand:string|null;
+      list_price:string|number|null;
+      cost:string|number|null;
+      ean:string|null;
+      historical_stock:string|number|null;
+      source:string;
+    }|null;
+    api:{
+      parent_code:string|null;
+      sku:string;
+      variant_id:string|number|null;
+      is_combo:boolean|null;
+      total_stock:string|number|null;
+      warehouses:{id:string|number|null;stock:string|number|null}[]|null;
+      source:string;
+    }|null;
+    warning:string;
+  }[];
+  warning:string;
+}

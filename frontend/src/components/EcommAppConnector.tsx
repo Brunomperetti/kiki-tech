@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import {api} from '../services/api';
 import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup, EcommCatalogAudit, EcommStageStatus, EcommStageComparison} from '../types/ecomm-app';
 import {EcommAdoptionReadiness} from './EcommAdoptionReadiness';
+import {EcommHybridInspector} from './EcommHybridInspector';
 import '../ecomm-app.css';
 
 const comboLabel=(flag:boolean|null|undefined)=>flag===true?'Sí':flag===false?'No':'No informado';
@@ -225,6 +226,7 @@ export function EcommAppConnector(){
         {comparisonError&&<p className="kiki-ecomm-notice" role="alert">{comparisonError}</p>}
         {comparison&&<div className="kiki-ecomm-preview">
           <EcommAdoptionReadiness plan={comparison.adoption_plan}/>
+          <EcommHybridInspector comparison={comparison}/>
           <h4>Resultados de coincidencias entre fuentes</h4>
           <div className="kiki-ecomm-audit-metrics">
             <span>Productos históricos: <b>{comparison.totals.historical_products}</b></span>
