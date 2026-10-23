@@ -359,6 +359,50 @@ export interface EcommTnBrandEvidence {
 }
 
 export interface EcommMlBrandEvidence {
+  shared_gtin_review:{
+    counts:{
+      shared_gtin_ml_rows:number;
+      unique_sku_despite_shared_gtin:number;
+      explicit_unique_variant_sku:number;
+      unique_sku_without_variant_proof:number;
+      sku_inside_gtin_owners_no_mla_conflict:number;
+      no_unique_exact_sku:number;
+      identity_contradiction:number;
+      no_stable_ecomm_id:number;
+      already_branded_ecomm:number;
+      presentation_conflict:number;
+      sku_consistent_missing_brand_rows:number;
+      possible_ecomm_brand_review_ids:number;
+      conflicting_brands_same_ecomm:number;
+      no_brand_available:number;
+    };
+    review_leads:{
+      ecomm_id:string;
+      ecomm_sku:string;
+      ecomm_name:string;
+      ml_sku:string;
+      ml_title:string;
+      mla:string;
+      shared_gtin:string;
+      shared_gtin_ecomm_owner_count:number;
+      ml_brand:string;
+      brand_source:'EDIMA_LINKAGE'|'MERCADOLIBRE_API';
+      exact_variant_sku:boolean;
+      is_combo:boolean|null;
+      review_status:'NEEDS_HUMAN_VERIFICATION';
+      supporting_mlas:number;
+    }[];
+    rejected_samples:{
+      mla:string;
+      gtin:string;
+      sku:string;
+      gtin_owner_count:number;
+      reason:string;
+    }[];
+    sample_limit:number;
+    mode:'HYPOTHESIS_REQUIRES_MANUAL_VERIFICATION';
+    policy:string;
+  };
   diagnostics:{
     counts:{
       ml_rows_with_brand_available:number;
