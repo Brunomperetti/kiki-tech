@@ -142,5 +142,7 @@ def test_all_ml_rows_classified_once_without_data_writes():
     assert sum(report["summary"][key] for key in STATUSES) == len(cases)
     assert report["summary"]["ml_simple_rows"] == 2
     assert report["summary"]["ml_variation_rows"] == 2
-    assert report["summary"]["exact_unique_sku_candidates"] == 2
+    # The variation with a parent SKU but no variant SKU is intentionally NOT matched.
+    assert report["summary"]["exact_unique_sku_candidates"] == 1
+    assert report["summary"]["NO_EXPLICIT_VARIANT_SKU"] == 2
     assert report["historical_decisions_applied"] is False
