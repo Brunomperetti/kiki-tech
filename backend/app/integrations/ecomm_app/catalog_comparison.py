@@ -86,6 +86,7 @@ def compare_stage_to_legacy(stage_pages: list[dict], legacy: list[dict]) -> dict
             stage_by_format[_format_key(item["sku"])].append(item)
 
     summary = Counter()
+    changed_sku_cases = []
     samples = {
         "sku_changed_same_id": [],
         "stock_changed_same_id": [],
@@ -104,12 +105,20 @@ def compare_stage_to_legacy(stage_pages: list[dict], legacy: list[dict]) -> dict
             summary["same_id_format_sku_changed"] += 1
         else:
             summary["same_id_different_sku"] += 1
-        if old_sku != new_sku and len(samples["sku_changed_same_id"]) < 10:
-            samples["sku_changed_same_id"].append({
+        if old_sku != new_sku:
+            # Prioritize substantive changes first. The original first-10
+            # sample concealed both substantive cases in production.
+            is_format_only = bool(
+                old_sku and new_sku and
+                _format_key(old_sku) == _format_key(new_sku)
+            )
+            changed_sku_cases.append({
                 "ecomm_id": identifier,
                 "old_sku": old_sku, "api_sku": new_sku,
                 "product": _str(old.get("name") or new["name"]),
                 "api_parent_code": new["parent_code"],
+                "change_type": "FORMAT_ONLY" if is_format_only else "SUBSTANTIVE",
+                "api_is_combo": new["is_combo"],
             })
         old_stock = old.get("stock")
         new_stock = new["stock"]
@@ -178,12 +187,37 @@ def compare_stage_to_legacy(stage_pages: list[dict], legacy: list[dict]) -> dict
                 "basis": basis,
             })
 
-    for fresh in unmatched_api[:8]:
-        samples["api_without_id_match"].append({
+    # Focus the human review on real identifiers, not an arbitrary first 8.
+    # Treat is_combo as tri-state; code suffix '_m' is only a separate hint.
+    for fresh in unmatched_api:
+        flag = fresh["is_combo"]
+        if flag is True:
+            summary["api_only_combo_yes"] += 1
+        elif flag is False:
+            summary["api_only_combo_no"] += 1
+        else:
+            summary["api_only_combo_unknown"] += 1
+        if fresh["parent_code"].casefold().endswith("_m"):
+            summary["api_only_parent_m_suffix"] += 1
+    samples["sku_changed_same_id"] = sorted(
+        changed_sku_cases,
+        key=lambda x: (x["change_type"] != "SUBSTANTIVE", x["ecomm_id"]),
+    )[:30]
+    samples["api_without_id_match"] = [
+        {
             "api_id": fresh["id"], "sku": fresh["sku"],
             "parent_code": fresh["parent_code"],
             "is_combo": fresh["is_combo"],
-        })
+        }
+        for fresh in sorted(
+            unmatched_api,
+            key=lambda x: (
+                x["is_combo"] is not True,
+                x["parent_code"].casefold(),
+                x["id"],
+            ),
+        )[:120]
+    ]
     result = {
         "mode": "READ_ONLY_COMPARISON",
         "stage_complete": True,
@@ -195,6 +229,10 @@ def compare_stage_to_legacy(stage_pages: list[dict], legacy: list[dict]) -> dict
             "matched_stable_ids": len(matched_ids),
             "historical_no_stable_id_match": len(unmatched_historic),
             "api_no_stable_id_match": len(unmatched_api),
+            "api_only_combo_yes": summary["api_only_combo_yes"],
+            "api_only_combo_no": summary["api_only_combo_no"],
+            "api_only_combo_unknown": summary["api_only_combo_unknown"],
+            "api_only_parent_m_suffix": summary["api_only_parent_m_suffix"],
             "same_id_same_sku": summary["same_id_same_sku"],
             "same_id_format_sku_changed": summary["same_id_format_sku_changed"],
             "same_id_different_sku": summary["same_id_different_sku"],
@@ -208,8 +246,17 @@ def compare_stage_to_legacy(stage_pages: list[dict], legacy: list[dict]) -> dict
             "duplicate_stage_ids": summary["duplicate_stage_ids"],
         },
         "samples": samples,
+        "display_limits": {
+            "sku_changed_visible": len(samples["sku_changed_same_id"]),
+            "sku_changed_total": len(changed_sku_cases),
+            "api_only_visible": len(samples["api_without_id_match"]),
+            "api_only_total": len(unmatched_api),
+        },
         "warning": (
             "Las coincidencias por ID se muestran para diagnóstico. "
+            "Los registros API sin ID histórico no son necesariamente productos nuevos. "
+            "El atributo is_combo puede ser Sí, No o desconocido; el sufijo _m no "
+            "demuestra por sí solo la existencia de un combo. "
             "Los SKU sin ID coincidente son solo candidatos, no vínculos validados. "
             "Las diferencias de stock reflejan momentos de captura distintos y "
             "NO significan que haya que actualizar existencias. "
