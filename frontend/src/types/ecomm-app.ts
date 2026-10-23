@@ -125,6 +125,12 @@ export interface EcommStageStatus {
 }
 
 export interface EcommStageComparison {
+  display_limits:{
+    sku_changed_visible:number;
+    sku_changed_total:number;
+    api_only_visible:number;
+    api_only_total:number;
+  };
   mode:'READ_ONLY_COMPARISON';
   stage_complete:boolean;
   source:string;
@@ -135,6 +141,10 @@ export interface EcommStageComparison {
     matched_stable_ids:number;
     historical_no_stable_id_match:number;
     api_no_stable_id_match:number;
+    api_only_combo_yes:number;
+    api_only_combo_no:number;
+    api_only_combo_unknown:number;
+    api_only_parent_m_suffix:number;
     same_id_same_sku:number;
     same_id_format_sku_changed:number;
     same_id_different_sku:number;
@@ -148,7 +158,7 @@ export interface EcommStageComparison {
     duplicate_stage_ids:number;
   };
   samples:{
-    sku_changed_same_id:{ecomm_id:string;old_sku:string;api_sku:string;product:string;api_parent_code:string}[];
+    sku_changed_same_id:{ecomm_id:string;old_sku:string;api_sku:string;product:string;api_parent_code:string;change_type:'FORMAT_ONLY'|'SUBSTANTIVE';api_is_combo:boolean|null}[];
     stock_changed_same_id:{ecomm_id:string;sku:string;historical_stock:string;api_stock:string}[];
     historical_without_id_match:{ecomm_id:string;sku:string;product:string}[];
     api_without_id_match:{api_id:string;sku:string;parent_code:string;is_combo:boolean|null}[];
