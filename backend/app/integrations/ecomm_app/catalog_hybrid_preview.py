@@ -5,7 +5,6 @@ updates a snapshot, maps SKUs across IDs, authorizes a channel listing, or
 reports an old API snapshot as live inventory.
 """
 from collections import Counter, defaultdict
-from datetime import datetime
 
 from sqlalchemy import select
 
