@@ -108,3 +108,18 @@ export interface EcommCatalogAudit {
   }[];
   notice:string;
 }
+
+export interface EcommStageStatus {
+ mode:'READ_ONLY_STAGE';
+ source:string;
+ exists:boolean;
+ complete:boolean;
+ can_continue:boolean;
+ expected_parents:number|null;
+ expected_pages:number|null;
+ pages_saved:number;
+ next_page:number|null;
+ has_quality_warnings:boolean;
+ quality:Record<string,number>;
+ warning:string;
+}
