@@ -19,6 +19,7 @@ export function Layout(){
       <nav className="primary-nav kiki-primary-nav" aria-label="Navegación principal">
         <NavLink to="/" end><span className="kiki-nav-icon"><KikiIcon name="home"/></span>Inicio</NavLink>
         <NavLink to="/pilot"><span className="kiki-nav-icon"><KikiIcon name="layers"/></span>Catálogo por API</NavLink>
+        <NavLink to="/cases"><span className="kiki-nav-icon"><KikiIcon name="search"/></span>Casos para revisar</NavLink>
         <NavLink to="/channels"><span className="kiki-nav-icon"><KikiIcon name="store"/></span>Canales de venta</NavLink>
       </nav>
       <details className="advanced-nav kiki-advanced-nav" key={activeAdvanced?'opened':'closed'}

@@ -118,9 +118,9 @@ export function Dashboard(){
           <span><strong>Buscar un producto</strong><small>Consultá SKU, ID, combo y stock leído de Ecomm-App.</small></span>
           <KikiIcon name="arrow-right"/>
         </Link>
-        <Link to="/pilot#comparacion" className="kiki-client-action">
+        <Link to="/cases" className="kiki-client-action">
           <span className="kiki-action-icon"><KikiIcon name="chart" size={25}/></span>
-          <span><strong>Analizar Mercado Libre</strong><small>Examiná coincidencias y diferencias entre las dos copias API.</small></span>
+          <span><strong>Analizar Mercado Libre</strong><small>Abrí casos reales, buscá publicaciones y compará sus fichas.</small></span>
           <KikiIcon name="arrow-right"/>
         </Link>
         <Link to="/channels" className="kiki-client-action">
@@ -136,7 +136,7 @@ export function Dashboard(){
         <p className="eyebrow">DIAGNÓSTICO DE MERCADO LIBRE</p>
         <h2>Así se distribuyen las publicaciones</h2>
         <p>Una fila se cuenta una sola vez, según el motivo principal encontrado.</p></div>
-        <Link to="/pilot#comparacion" className="kiki-client-text-link">Ver casos concretos <KikiIcon name="arrow-right" size={17}/></Link>
+        <Link to="/cases" className="kiki-client-text-link">Explorar todos los casos <KikiIcon name="arrow-right" size={17}/></Link>
       </div>
       {preview&&total>0?
         <div className="kiki-client-chart">

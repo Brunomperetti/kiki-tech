@@ -616,3 +616,26 @@ export interface EcommMlBrandEvidence {
   };
   policy:string;
 }
+
+export interface EcommMlCase extends EcommMlPreviewExample {
+  api_variant_description:string|null;
+}
+export interface EcommMlCases {
+  mode:'API_ONLY_ML_READ_ONLY_PREVIEW';
+  ecomm_source:'ECOMM_APP_API_STAGE';
+  mercadolibre_source:'MERCADOLIBRE_API';
+  external_writes_enabled:false;
+  historical_decisions_applied:false;
+  ecomm_last_capture_at:string|null;
+  ml_snapshot_updated_at:string|null;
+  summary:EcommMlPreview['summary'];
+  cases:{
+    total:number;
+    page:number;
+    limit:number;
+    status:string;
+    query:string;
+    items:EcommMlCase[];
+  };
+  warning:string;
+}

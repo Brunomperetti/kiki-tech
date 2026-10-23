@@ -1,5 +1,5 @@
 import {FormEvent,useEffect,useState} from 'react';
-import {useLocation} from 'react-router-dom';
+import {Link,useLocation} from 'react-router-dom';
 import {KikiIcon} from '../components/KikiIcon';
 import '../client-ux.css';
 import {api} from '../services/api';
@@ -57,6 +57,14 @@ export function Pilot(){
     setLoading(false);
   }
   useEffect(()=>{void refresh()},[]);
+  // A case opened from the ML comparison points to its exact Ecomm SKU.
+  // It is a fresh query against the captured Ecomm API; never historical XLSX.
+  useEffect(()=>{
+    const incoming=new URLSearchParams(location.search).get('sku')?.trim();
+    if(!incoming || incoming.length>80)return;
+    setSearchInput(incoming);
+    void search(incoming,1);
+  },[location.search]);
   useEffect(()=>{
     const id=location.hash.startsWith('#')?decodeURIComponent(location.hash.slice(1)):'';
     if(!id)return;
@@ -239,6 +247,9 @@ export function Pilot(){
 
     <section className="kiki-pilot-steps" id="comparacion">
       <h2>3. Comparar Ecomm API con Mercado Libre API (diagnóstico)</h2>
+      <p>¿Querés revisar todos los casos con búsqueda y comparación lado a lado?
+        <Link to="/cases" className="kiki-case-internal-link">Abrir Centro de casos reales →</Link>
+      </p>
       <p>Comparación <strong>solo de lectura</strong> entre las dos copias API guardadas.
         Nunca utiliza el Excel histórico, no guarda vinculaciones y no publica productos.
         Se detectan coincidencias de SKU y posibles conflictos; ningún resultado confirma por sí solo

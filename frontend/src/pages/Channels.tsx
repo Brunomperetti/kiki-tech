@@ -39,7 +39,7 @@ export function Channels(){
         <h2>Mercado Libre</h2>
         <p>Compará Ecomm-App y Mercado Libre desde sus copias API. Los resultados son candidatos para revisión: no se aplican vínculos ni publicaciones.</p>
         <div className="kiki-channel-actions">
-          <Link className="kiki-main-action" to="/pilot#comparacion"><KikiIcon name="chart" size={16}/> Ver diagnóstico API <span aria-hidden="true">→</span></Link>
+          <Link className="kiki-main-action" to="/cases"><KikiIcon name="chart" size={16}/> Revisar casos reales <span aria-hidden="true">→</span></Link>
           <Link className="secondary-link" to="/readiness">Consultar revisión histórica (Excel)</Link>
         </div>
         <small>Mercado Libre necesita una nueva autorización del dueño para actualizar su copia. Hasta entonces, se muestran resultados históricos.</small>

@@ -145,6 +145,50 @@ def ecomm_app_ml_reconciliation_preview(
         raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
+@router.get("/stage/ml-cases")
+def ecomm_app_ml_cases(
+    status: str = Query(default="", max_length=60),
+    q: str = Query(default="", max_length=80),
+    page: int = Query(default=1, ge=1, le=100000),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Search case evidence in the two existing API captures only. No writes."""
+    stage = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE))
+    ml = db.scalar(select(CatalogSnapshot).where(
+        CatalogSnapshot.source == "MERCADOLIBRE_API"
+    ))
+    try:
+        result = api_ml_reconciliation_preview(
+            stage.payload if stage else [],
+            ml.payload if ml else [],
+            cases_page=page,
+            cases_limit=limit,
+            cases_status=status,
+            cases_query=q,
+        )
+        return {
+            "mode": result["mode"],
+            "ecomm_source": result["ecomm_source"],
+            "mercadolibre_source": result["mercadolibre_source"],
+            "external_writes_enabled": False,
+            "historical_decisions_applied": False,
+            "ecomm_last_capture_at": (
+                stage.payload[-1].get("captured_at")
+                if stage and stage.payload else None
+            ),
+            "ml_snapshot_updated_at": (
+                ml.updated_at.isoformat() if ml else None
+            ),
+            "summary": result["summary"],
+            "cases": result["cases"],
+            "warning": result["warning"],
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+
+
 @router.post("/stage/next")
 def ecomm_app_stage_next(
     db: Session = Depends(get_db), _session=Depends(require_csrf),

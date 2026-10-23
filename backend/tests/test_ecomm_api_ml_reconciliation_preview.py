@@ -194,3 +194,57 @@ def test_pack_unit_total_with_different_pack_multipliers_still_conflicts():
     ])
     assert result["summary"]["PRESENTATION_CONFLICT"] == 1
     assert result["summary"]["PACK_QUANTITY_EQUIVALENCE_REVIEW"] == 0
+
+
+
+def test_case_explorer_paginated_exact_identifiers_and_copy_only():
+    pages = captured()
+    rows = [
+        listing("MLA101", title="Magnesio con Potasio 30 cápsulas", sku="2500"),
+        listing("MLA102", title="Pack x2 Magnesio con Potasio 60 cápsulas", sku="2500400"),
+        listing("MLA103", title="No informado"),
+    ]
+    first = api_ml_reconciliation_preview(
+        pages, rows, cases_page=1, cases_limit=1, cases_status="PRODUCT_SKU_ONLY"
+    )
+    second = api_ml_reconciliation_preview(
+        pages, rows, cases_page=2, cases_limit=1, cases_status="PRODUCT_SKU_ONLY"
+    )
+    assert first["cases"]["total"] == 2
+    assert [x["mla"] for x in first["cases"]["items"]] == ["MLA101"]
+    assert [x["mla"] for x in second["cases"]["items"]] == ["MLA102"]
+    assert first["cases"]["items"][0]["api_ecomm_id"] == "1"
+    assert second["cases"]["items"][0]["api_ecomm_id"] == "2"
+    assert second["cases"]["items"][0]["api_is_combo"] is True
+    assert first["historical_decisions_applied"] is False
+    assert first["external_writes_enabled"] is False
+    assert "cases" not in api_ml_reconciliation_preview(pages, rows)
+
+
+def test_case_explorer_search_by_mla_sku_id_and_description():
+    rows = [
+        listing("MLA101", title="Magnesio con Potasio 30 cápsulas", sku="2500"),
+        listing("MLA102", title="Pack x2 Magnesio con Potasio 60 cápsulas", sku="2500400"),
+    ]
+    for q in ("2500400", "MLA102", "Pack x2", "2"):
+        report = api_ml_reconciliation_preview(
+            captured(), rows, cases_page=1, cases_query=q
+        )
+        assert "MLA102" in [item["mla"] for item in report["cases"]["items"]]
+
+
+def test_case_explorer_filters_unmatched_and_fail_closed():
+    rows = [listing("MLA999", sku="UNLISTED", title="Extra")]
+    result = api_ml_reconciliation_preview(
+        captured(), rows, cases_page=1, cases_status="SKU_NOT_IN_API"
+    )
+    assert result["cases"]["total"] == 1
+    assert result["cases"]["items"][0]["api_ecomm_id"] is None
+    with pytest.raises(ValueError, match="estado"):
+        api_ml_reconciliation_preview(captured(), rows, cases_page=1, cases_status="BAD")
+    with pytest.raises(ValueError, match="límite"):
+        api_ml_reconciliation_preview(captured(), rows, cases_page=1, cases_limit=51)
+    with pytest.raises(ValueError, match="80"):
+        api_ml_reconciliation_preview(captured(), rows, cases_page=1, cases_query="x" * 81)
+    with pytest.raises(ValueError, match="Mercado Libre API"):
+        api_ml_reconciliation_preview(captured(), [], cases_page=1)
