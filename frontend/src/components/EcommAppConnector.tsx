@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {api} from '../services/api';
-import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup, EcommCatalogAudit, EcommStageStatus} from '../types/ecomm-app';
+import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup, EcommCatalogAudit, EcommStageStatus, EcommStageComparison} from '../types/ecomm-app';
 import '../ecomm-app.css';
 
 const comboLabel=(flag:boolean|null|undefined)=>flag===true?'Sí':flag===false?'No':'No informado';
@@ -43,6 +43,9 @@ export function EcommAppConnector(){
   const [stage,setStage]=useState<EcommStageStatus|null>(null);
   const [stageBusy,setStageBusy]=useState(false);
   const [stageError,setStageError]=useState('');
+  const [comparison,setComparison]=useState<EcommStageComparison|null>(null);
+  const [comparisonBusy,setComparisonBusy]=useState(false);
+  const [comparisonError,setComparisonError]=useState('');
   const stageStop=useRef(false);
   const stageRunning=useRef(false);
 
@@ -95,6 +98,13 @@ export function EcommAppConnector(){
       }
     }catch(e){setStageError(e instanceof Error?e.message:'No se pudo continuar la copia de prueba.')}
     finally{stageRunning.current=false;setStageBusy(false)}
+  }
+
+  async function compareCatalogs(){
+    setComparisonBusy(true);setComparisonError('');
+    try{setComparison(await api.ecommStageCompare())}
+    catch(e){setComparisonError(e instanceof Error?e.message:'No se pudo comparar con el catálogo histórico.')}
+    finally{setComparisonBusy(false)}
   }
 
   return <section className="panel kiki-ecomm-connection">
@@ -203,6 +213,52 @@ export function EcommAppConnector(){
         {stage.has_quality_warnings&&<p className="kiki-ecomm-notice">Hay observaciones de calidad: se requiere inspección antes de utilizar estos datos.</p>}
       </div>}
       {stageError&&<p className="kiki-ecomm-notice" role="alert">{stageError} El progreso ya guardado se conserva; podés continuar desde la página pendiente.</p>}
+      {stage?.complete&&<div className="kiki-ecomm-sku-diagnosis">
+        <h4>Comparar la copia API con el inventario histórico</h4>
+        <p>Comprobamos el ID interno de cada variante y su SKU histórico. Solo mostramos diferencias: no se reemplaza ninguna ficha, stock ni decisión.</p>
+        <button type="button" disabled={comparisonBusy||stageBusy} onClick={()=>void compareCatalogs()}>
+          {comparisonBusy?'Comparando catálogos…':'Comparar con el Excel histórico (solo lectura)'}
+        </button>
+        {comparisonError&&<p className="kiki-ecomm-notice" role="alert">{comparisonError}</p>}
+        {comparison&&<div className="kiki-ecomm-preview">
+          <h4>Resultados de coincidencias entre fuentes</h4>
+          <div className="kiki-ecomm-audit-metrics">
+            <span>Productos históricos: <b>{comparison.totals.historical_products}</b></span>
+            <span>Variantes API: <b>{comparison.totals.api_variants}</b></span>
+            <span>Coinciden por ID: <b>{comparison.totals.matched_stable_ids}</b></span>
+            <span>Mismo ID y SKU: <b>{comparison.totals.same_id_same_sku}</b></span>
+            <span>Mismo ID, SKU escrito distinto: <b>{comparison.totals.same_id_format_sku_changed}</b></span>
+            <span>Mismo ID, SKU diferente: <b>{comparison.totals.same_id_different_sku}</b></span>
+            <span>Históricos sin ID coincidente: <b>{comparison.totals.historical_no_stable_id_match}</b></span>
+            <span>Variantes API sin ID histórico: <b>{comparison.totals.api_no_stable_id_match}</b></span>
+            <span>Posibles vínculos solo por SKU: <b>{comparison.totals.candidate_sku_only}</b></span>
+            <span>Stock diferente (orientativo): <b>{comparison.totals.stock_differences_informational}</b></span>
+            <span>GTIN discordante si ambos presentes: <b>{comparison.totals.gtin_disagreement_when_both_present}</b></span>
+            <span>ID histórico repetido: <b>{comparison.totals.duplicate_legacy_ids}</b></span>
+          </div>
+          <p className="kiki-ecomm-hint">{comparison.warning}</p>
+          <details>
+            <summary>Ver ejemplos de SKU modificados ({comparison.samples.sku_changed_same_id.length} mostrados)</summary>
+            {comparison.samples.sku_changed_same_id.length===0?<p>Sin diferencias de SKU en las muestras.</p>:comparison.samples.sku_changed_same_id.map(item=><div className="kiki-ecomm-requested" key={item.ecomm_id}>
+              <strong>ID Ecomm: {item.ecomm_id} · {item.product}</strong>
+              <p>SKU del Excel: <code>{item.old_sku||'No informado'}</code> → SKU API: <code>{item.api_sku||'No informado'}</code></p>
+            </div>)}
+          </details>
+          <details>
+            <summary>Ver ejemplos sin ID coincidente en el histórico</summary>
+            {comparison.samples.historical_without_id_match.map((item,i)=><p className="kiki-ecomm-requested" key={item.ecomm_id||i}>ID: {item.ecomm_id||'Sin ID'} · SKU: {item.sku||'Sin SKU'} · {item.product}</p>)}
+          </details>
+          <details>
+            <summary>Ver variantes nuevas o sin ID histórico coincidente</summary>
+            {comparison.samples.api_without_id_match.map((item,i)=><p className="kiki-ecomm-requested" key={item.api_id||i}>ID API: {item.api_id||'Sin ID'} · SKU: {item.sku||'Sin SKU'} · Producto: {item.parent_code||'Sin nombre'}</p>)}
+          </details>
+          <details>
+            <summary>Ver posibles vínculos por SKU (no confirmados)</summary>
+            {comparison.samples.candidate_by_sku.length===0?<p>Sin candidatos solo por SKU en la muestra.</p>:comparison.samples.candidate_by_sku.map((item,i)=><p className="kiki-ecomm-requested" key={i}>ID histórico: {item.historical_id||'No informado'} · {item.historical_sku} → ID API: {item.api_id||'No informado'} · {item.api_sku} ({item.basis==='SAME_SKU_DIFFERENT_ID'?'SKU idéntico, ID distinto':'Coincide solo al ignorar espacios y mayúsculas'})</p>)}
+          </details>
+          <small>Reporte no editable. No se promueve la copia API como fuente de KIKI ni se sincroniza stock.</small>
+        </div>}
+      </div>}
       {stage?.complete?<p><strong>Copia terminada.</strong> Sigue siendo independiente del catálogo actual. El próximo paso es comparar IDs y SKU antes de aprobar cualquier cambio.</p>:
         <div className="kiki-ecomm-actions">
           <button type="button" disabled={!status?.configured||stageBusy||busy!==''} onClick={()=>void copyStage()}>

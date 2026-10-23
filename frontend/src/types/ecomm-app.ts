@@ -123,3 +123,36 @@ export interface EcommStageStatus {
  quality:Record<string,number>;
  warning:string;
 }
+
+export interface EcommStageComparison {
+  mode:'READ_ONLY_COMPARISON';
+  stage_complete:boolean;
+  source:string;
+  totals:{
+    historical_products:number;
+    api_products_parent:number;
+    api_variants:number;
+    matched_stable_ids:number;
+    historical_no_stable_id_match:number;
+    api_no_stable_id_match:number;
+    same_id_same_sku:number;
+    same_id_format_sku_changed:number;
+    same_id_different_sku:number;
+    stock_differences_informational:number;
+    gtin_disagreement_when_both_present:number;
+    candidate_sku_only:number;
+    sku_points_to_other_matched_id:number;
+    legacy_without_id:number;
+    stage_without_id:number;
+    duplicate_legacy_ids:number;
+    duplicate_stage_ids:number;
+  };
+  samples:{
+    sku_changed_same_id:{ecomm_id:string;old_sku:string;api_sku:string;product:string;api_parent_code:string}[];
+    stock_changed_same_id:{ecomm_id:string;sku:string;historical_stock:string;api_stock:string}[];
+    historical_without_id_match:{ecomm_id:string;sku:string;product:string}[];
+    api_without_id_match:{api_id:string;sku:string;parent_code:string;is_combo:boolean|null}[];
+    candidate_by_sku:{historical_id:string;historical_sku:string;api_id:string;api_sku:string;basis:string}[];
+  };
+  warning:string;
+}
