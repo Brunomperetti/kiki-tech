@@ -248,7 +248,12 @@ def ml_brand_evidence_report(pages, historical, ml_rows, edima_rows, ml_source):
         for key, old in prior.items()
         if len(old) == 1 and len(api.get(key, [])) == 1
     )
+    blockers = ml_brand_blocker_diagnostics(
+        matched, owners_sku, owners_ean, owners_mla,
+        ml_rows, edima_rows, edima_brands,
+    )
     return {
+        "diagnostics": blockers,
         "available": bool(ml_rows or edima_rows),
         "mode": "REVIEW_ONLY_ML_BRAND_EVIDENCE",
         "activation_allowed": False,
@@ -275,6 +280,125 @@ def ml_brand_evidence_report(pages, historical, ml_rows, edima_rows, ml_source):
             "histórica única; señales incompatibles y marcas contradictorias se excluyen. "
             "MLA no identifica la variante. Combos requieren revisión. "
             "No se crea ni aprueba ningún vínculo, alias, stock o marca."
+        ),
+    }
+
+
+def ml_brand_blocker_diagnostics(matched, owners_sku, owners_ean, owners_mla,
+                                 ml_rows, edima_rows, edima_brands):
+    """Explain discarded ML rows without weakening a single identity gate.
+
+    Reasons overlap: one row may have a shared historical MLA AND a shared
+    product SKU. Preserve the full cause list while sampling at most 8 rows.
+    This routine only analyzes the existing in-memory snapshot dictionaries.
+    """
+    diagnostics = Counter()
+    examples = []
+    ambiguous_mlas = set()
+    available_edima_mlas = {
+        mla for mla, values in edima_brands.items() if len({v.casefold() for v in values}) == 1
+    }
+    ml_mlas = {_mla(row.get("external_id")) for row in ml_rows}
+    for row in ml_rows:
+        mla = _mla(row.get("external_id"))
+        if not mla:
+            diagnostics["invalid_mla_rows"] += 1
+            continue
+        brands_edima = {brand.casefold() for brand in edima_brands.get(mla, set())}
+        ml_has_brand = _brand_class(row.get("brand")) == "PRESENT"
+        if mla in available_edima_mlas:
+            diagnostics["rows_with_edima_mla"] += 1
+        if len(brands_edima) > 1 or (
+            ml_has_brand and brands_edima and _str(row["brand"]).casefold() not in brands_edima
+        ):
+            diagnostics["brand_disagreements"] += 1
+            continue
+        if not ml_has_brand and len(brands_edima) != 1:
+            diagnostics["rows_without_brand_in_either_source"] += 1
+            continue
+        diagnostics["rows_with_brand_available"] += 1
+        skus = _row_skus(row)
+        sku_candidates = {
+            owner for sku in skus for owner in owners_sku.get(sku, set())
+        }
+        gtin = _ean(row.get("ean"))
+        ean_candidates = owners_ean.get(gtin, set()) if gtin else set()
+        mla_candidates = owners_mla.get(mla, set())
+        unique_signals = {
+            next(iter(owners))
+            for owners in (sku_candidates, ean_candidates, mla_candidates)
+            if len(owners) == 1
+        }
+        reason_codes = []
+        if len(mla_candidates) > 1:
+            reason_codes.append("SHARED_HISTORICAL_MLA")
+        if len(sku_candidates) > 1:
+            reason_codes.append("SHARED_SKU")
+        if len(ean_candidates) > 1:
+            reason_codes.append("SHARED_GTIN")
+        if len(unique_signals) > 1:
+            reason_codes.append("IDENTITY_SIGNAL_CONFLICT")
+        if reason_codes:
+            diagnostics["ambiguous_ml_rows"] += 1
+            ambiguous_mlas.add(mla)
+            for code in reason_codes:
+                diagnostics[code] += 1
+            direct_variant = _sku(row.get("variant_sku"))
+            direct_owners = owners_sku.get(direct_variant, set()) if direct_variant else set()
+            if len(mla_candidates) > 1 and len(direct_owners) == 1:
+                diagnostics["shared_mla_with_unique_variant_sku"] += 1
+            if len(examples) < 8:
+                examples.append({
+                    "mla": mla,
+                    "ml_sku": _str(row.get("variant_sku") or row.get("sku_effective") or row.get("sku")),
+                    "reason_codes": reason_codes,
+                    "sku_owner_count": len(sku_candidates),
+                    "gtin_owner_count": len(ean_candidates),
+                    "historical_mla_owner_count": len(mla_candidates),
+                    "unique_variant_sku_present": len(direct_owners) == 1,
+                    "classification": "HUMAN_REVIEW_ONLY",
+                })
+            continue
+        if not unique_signals:
+            diagnostics["rows_without_unique_identity"] += 1
+            continue
+        owner = next(iter(unique_signals))
+        product = matched.get(owner)
+        if not product:
+            diagnostics["rows_not_stable_ecomm_id"] += 1
+        elif _brand_class(product[0].get("brand")) == "PRESENT":
+            diagnostics["rows_matching_already_branded_ecomm"] += 1
+        else:
+            diagnostics["rows_pointing_to_missing_brand_ecomm"] += 1
+
+    diagnostics["edima_only_rows"] = sum(
+        _mla(row.get("external_id")) not in ml_mlas for row in edima_rows
+    )
+    return {
+        "counts": {
+            "ml_rows_with_brand_available": diagnostics["rows_with_brand_available"],
+            "ml_rows_with_matching_edima_mla": diagnostics["rows_with_edima_mla"],
+            "ml_rows_without_brand_in_either_source": diagnostics["rows_without_brand_in_either_source"],
+            "ml_rows_with_brand_disagreements": diagnostics["brand_disagreements"],
+            "ml_rows_ambiguous": diagnostics["ambiguous_ml_rows"],
+            "distinct_mlas_ambiguous": len(ambiguous_mlas),
+            "shared_historical_mla": diagnostics["SHARED_HISTORICAL_MLA"],
+            "shared_sku": diagnostics["SHARED_SKU"],
+            "shared_gtin": diagnostics["SHARED_GTIN"],
+            "identity_signal_conflicts": diagnostics["IDENTITY_SIGNAL_CONFLICT"],
+            "shared_mla_with_unique_variant_sku": diagnostics["shared_mla_with_unique_variant_sku"],
+            "ml_rows_without_unique_identity": diagnostics["rows_without_unique_identity"],
+            "ml_rows_matching_already_branded_ecomm": diagnostics["rows_matching_already_branded_ecomm"],
+            "ml_rows_pointing_to_missing_brand_ecomm": diagnostics["rows_pointing_to_missing_brand_ecomm"],
+            "edima_rows_not_in_ml_snapshot": diagnostics["edima_only_rows"],
+        },
+        "examples": examples,
+        "sample_limit": 8,
+        "policy": (
+            "Una misma fila puede presentar múltiples motivos y las cantidades "
+            "por causa NO son sumables. Los MLA compartidos pueden representar "
+            "variantes de una publicación. Un SKU de variante único es solo una "
+            "pista: no se promueve a vínculo ni se asigna ninguna marca."
         ),
     }
 

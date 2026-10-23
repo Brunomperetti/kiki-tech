@@ -168,3 +168,65 @@ def test_service_only_reads_sqlite_snapshots_without_writes():
         ]:
             assert db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source==source)).payload==payload
     engine.dispose()
+
+
+def test_ambiguous_ml_reasons_are_reported_without_weakening_exclusions():
+    stage, historical, ml, edima = fixtures()
+    unchanged = deepcopy((stage, historical, ml, edima))
+    report = ml_brand_evidence_report(stage, historical, ml, edima, "MERCADOLIBRE_API")
+    counts = report["diagnostics"]["counts"]
+    assert counts["shared_sku"] >= 1
+    assert counts["identity_signal_conflicts"] >= 1
+    assert counts["ml_rows_with_brand_disagreements"] == 1
+    assert counts["ml_rows_ambiguous"] >= 2
+    assert counts["distinct_mlas_ambiguous"] >= 2
+    assert all(x["classification"] == "HUMAN_REVIEW_ONLY" for x in report["diagnostics"]["examples"])
+    assert {x["ecomm_id"] for x in report["candidates"]} == {"1", "2", "3"}
+    assert (stage, historical, ml, edima) == unchanged
+
+
+def test_shared_mla_with_unique_variant_sku_is_only_a_hint():
+    stage, historical, ml, edima = fixtures()
+    historical[0]["ecomm_rows"] = [{"listing_id": "MLA101"}]
+    historical[1]["ecomm_rows"] = [{"listing_id": "MLA101"}]
+    report = ml_brand_evidence_report(stage, historical, ml, edima, "MERCADOLIBRE_API")
+    detail = report["diagnostics"]["counts"]
+    assert detail["shared_historical_mla"] >= 1
+    assert detail["shared_mla_with_unique_variant_sku"] >= 1
+    assert report["diagnostics"]["examples"][0]["unique_variant_sku_present"] is True
+    assert "1" not in {x["ecomm_id"] for x in report["candidates"]}
+    assert report["activation_allowed"] is False
+
+
+def test_missing_source_diagnostics_have_zero_counts_and_no_examples():
+    stage, historical, _, _ = fixtures()
+    report = ml_brand_evidence_report(stage, historical, [], [], "MERCADOLIBRE")
+    assert report["diagnostics"]["counts"]["ml_rows_ambiguous"] == 0
+    assert report["diagnostics"]["examples"] == []
+
+
+def test_read_only_service_returns_diagnostics_and_preserves_database():
+    stage, historical, ml, edima = fixtures()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        for source, payload in [
+            (STAGE_SOURCE, stage),
+            ("ECOMM_APP", historical),
+            ("MERCADOLIBRE_API", ml),
+            ("EDIMA_LINKAGE", edima),
+        ]:
+            db.add(CatalogSnapshot(source=source, payload=payload))
+        db.commit()
+        report = EcommMlBrandEvidenceService(db).report()
+        assert "diagnostics" in report
+        assert report["diagnostics"]["counts"]["ml_rows_ambiguous"] >= 2
+        for source, payload in [
+            (STAGE_SOURCE, stage),
+            ("ECOMM_APP", historical),
+            ("MERCADOLIBRE_API", ml),
+            ("EDIMA_LINKAGE", edima),
+        ]:
+            stored = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == source))
+            assert stored.payload == payload
+    engine.dispose()
