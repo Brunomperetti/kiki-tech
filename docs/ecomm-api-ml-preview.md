@@ -22,9 +22,13 @@ Botón manual en `/pilot`, apartado 3.
 - `PRESENTATION_CONFLICT`: diferencias de sabor/presentación conocidas.
 - `INVALID_ML_GTIN`, `INVALID_ECOMM_GTIN`: identificador no verificable.
 - `DUPLICATE_API_SKU`: SKU API asignado a múltiples variantes.
-- `SKU_NOT_IN_API`: no coincide con ningún SKU exacto en copia API.
-- `NO_EXPLICIT_VARIANT_SKU`: ML no aporta SKU de variante.
-- `PRODUCT_SKU_ONLY`: existe pista por SKU general, no confirma variante.
+- `SKU_NOT_IN_API`: SKU exacto de ML no encontrado en la copia API.
+- `NO_EXPLICIT_VARIANT_SKU`: fila con `MLA#variation_id` pero sin SKU propio de variación; no usar SKU del padre como si identificara la variación.
+- `NO_ML_SKU`: publicación simple sin ningún SKU informado.
+- `PRODUCT_SKU_ONLY`: publicación SIMPLE (`MLA...`, sin `#variation_id`) cuyo SKU de producto tiene una sola coincidencia exacta de variante por SKU en Ecomm API, pero no tiene GTIN válido corroborado. Es candidato **sin aprobar**, NO prueba una relación comercial validada.
+- `SKU_ONLY_REVIEW`: fila con SKU propio de variante, coincidencia exacta única y GTIN sin corroboración suficiente.
+
+**Hallazgo real 23/10**: 2.684 de 2.720 filas fueron agrupadas antes como `PRODUCT_SKU_ONLY` porque existía un SKU general que aparece en API; 36 quedaron sin esa señal. La primera versión exigía `variant_sku` incluso para publicaciones simples, por lo que mostró falsamente 0 candidatos. La corrección distingue publicaciones simples de variaciones y separa SKU únicos, repetidos, presentaciones incompatibles y GTIN. El resultado numérico final debe tomarse de la nueva corrida en Render, nunca extrapolarse de estos 2.684 casos.
 
 Un SKU compartido por varios MLA no demuestra duplicación, ni que sus
 variaciones deban fusionarse. La coincidencia de familia SKU (ej.
@@ -52,6 +56,6 @@ silenciarse ni utilizar el Excel ML. No aprobar ningún vínculo con este inform
 ## Seguridad
 Ni este endpoint ni su UI modifican snapshots, `ReconciliationRun`,
 inventario, GTIN, marca, MLA, decisiones humanas, Tiendanube ni Mercado Libre.
-Los ejemplos tienen límite por categoría. El nombre del modo es
+Los ejemplos tienen límite por categoría. Se cuentan por separado\nfilas simples ML, filas de variación, SKU exactos únicos y casos\ncon SKU general sin asociación verificable. El nombre del modo es
 `API_ONLY_ML_READ_ONLY_PREVIEW`; `operational_reconciliation_activated`
 es siempre `false`.

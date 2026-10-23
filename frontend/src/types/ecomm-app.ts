@@ -158,7 +158,7 @@ export type EcommMlPreviewStatus =
   'SKU_GTIN_AGREE_REVIEW'|'SKU_ONLY_REVIEW'|'SHARED_GTIN'|
   'GTIN_CONFLICT'|'PRESENTATION_CONFLICT'|'INVALID_ML_GTIN'|
   'INVALID_ECOMM_GTIN'|'DUPLICATE_API_SKU'|'SKU_NOT_IN_API'|
-  'NO_EXPLICIT_VARIANT_SKU'|'PRODUCT_SKU_ONLY';
+  'NO_EXPLICIT_VARIANT_SKU'|'PRODUCT_SKU_ONLY'|'NO_ML_SKU';
 export interface EcommMlPreviewExample {
   status:EcommMlPreviewStatus;
   mla:string;
@@ -166,6 +166,7 @@ export interface EcommMlPreviewExample {
   ml_variant_sku:string|null;
   ml_product_sku:string|null;
   ml_gtin:string|null;
+  match_basis:'VARIANT_SKU'|'SIMPLE_PRODUCT_SKU'|'MISSING_VARIANT_SKU';
   api_ecomm_id:string|null;
   api_sku:string|null;
   api_name:string|null;
@@ -183,7 +184,11 @@ export interface EcommMlPreview {
   ecomm_last_capture_at:string|null;
   ml_snapshot_updated_at:string|null;
   summary:{api_variants:number;ml_api_rows:number;unique_api_sku:number;
-    ambiguous_api_skus:number;api_variants_with_multiple_ml_rows_by_sku:number}
+    ambiguous_api_skus:number;api_variants_with_multiple_ml_rows_by_sku:number;
+    ml_simple_rows:number;ml_variation_rows:number;ml_rows_with_variant_sku:number;
+    ml_simple_rows_with_product_sku:number;ml_variations_without_variant_sku:number;
+    exact_unique_sku_candidates:number;exact_simple_product_sku_candidates:number;
+    exact_variant_sku_candidates:number}
     & Record<EcommMlPreviewStatus,number>;
   examples:Partial<Record<EcommMlPreviewStatus,EcommMlPreviewExample[]>>;
   warning:string;

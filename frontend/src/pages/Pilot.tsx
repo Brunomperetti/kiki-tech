@@ -96,8 +96,9 @@ export function Pilot(){
     INVALID_ECOMM_GTIN:'GTIN Ecomm no válido',
     DUPLICATE_API_SKU:'SKU Ecomm repetido',
     SKU_NOT_IN_API:'SKU ML no encontrado en API',
-    NO_EXPLICIT_VARIANT_SKU:'ML sin SKU de variante',
-    PRODUCT_SKU_ONLY:'Solo SKU general de ML',
+    NO_EXPLICIT_VARIANT_SKU:'Variación ML sin SKU propio',
+    PRODUCT_SKU_ONLY:'Publicación simple: SKU exacto, falta GTIN',
+    NO_ML_SKU:'Publicación simple sin SKU',
   };
   const reportStatuses=Object.keys(reportStatusLabels) as EcommMlPreviewStatus[];
   const result=live?.sku_diagnosis?.requested?.[0];
@@ -236,9 +237,16 @@ export function Pilot(){
         <div className="kiki-api-preview-summary">
           <article><strong>{preview.summary.api_variants.toLocaleString('es-AR')}</strong><small>Variantes Ecomm API</small></article>
           <article><strong>{preview.summary.ml_api_rows.toLocaleString('es-AR')}</strong><small>Filas ML API</small></article>
-          <article><strong>{preview.summary.SKU_GTIN_AGREE_REVIEW.toLocaleString('es-AR')}</strong><small>SKU y GTIN compatibles (sin aprobar)</small></article>
-          <article><strong>{preview.summary.GTIN_CONFLICT.toLocaleString('es-AR')}</strong><small>GTIN contradictorios</small></article>
+          <article><strong>{preview.summary.exact_unique_sku_candidates.toLocaleString('es-AR')}</strong><small>SKU exactos con un ID candidato, sin aprobar</small></article>
+          <article><strong>{preview.summary.exact_simple_product_sku_candidates.toLocaleString('es-AR')}</strong><small>Candidatos de publicaciones simples por SKU</small></article>
         </div>
+        <p className="kiki-pilot-warning"><strong>Clave del análisis:</strong> KIKI distingue
+          { ' ' }{preview.summary.ml_simple_rows.toLocaleString('es-AR')} publicaciones simples de
+          { ' ' }{preview.summary.ml_variation_rows.toLocaleString('es-AR')} filas de variaciones.
+          Los SKU de producto de publicaciones simples se comparan por igualdad exacta con un
+          único ID Ecomm; las variaciones sin SKU propio permanecen sin vincular.
+          Los {preview.summary.exact_unique_sku_candidates.toLocaleString('es-AR')} candidatos
+          no están aprobados ni demuestran stock, composición o identidad comercial.</p>
         <h3>Motivos encontrados</h3>
         <div className="kiki-api-preview-reasons">
           {reportStatuses.map(key=><div key={key}><span>{reportStatusLabels[key]}</span>
@@ -261,7 +269,11 @@ export function Pilot(){
                 .flatMap(key=>(preview.examples[key]||[]).map((row,i)=><tr key={key+i}>
                   <td>{reportStatusLabels[key]}<small>{row.reason}</small></td>
                   <td>{row.mla||'Sin dato'}</td>
-                  <td>{row.ml_variant_sku||row.ml_product_sku||'Sin dato'}</td>
+                  <td>{row.ml_variant_sku||row.ml_product_sku||'Sin dato'}<small>
+                    {row.match_basis==='SIMPLE_PRODUCT_SKU'?'SKU de publicación simple':
+                      row.match_basis==='VARIANT_SKU'?'SKU propio de variante':
+                      'Falta SKU de variante'}
+                  </small></td>
                   <td>{row.api_ecomm_id||'Sin confirmar'}</td>
                   <td>{row.api_sku||'Sin confirmar'}</td>
                   <td>{row.ml_title}<small>{row.api_name||''}</small></td>
