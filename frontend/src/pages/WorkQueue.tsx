@@ -102,7 +102,8 @@ export function WorkQueue(){
   const [verifiedPage,setVerifiedPage]=useState(1);
   const requestedProductSearch = searchParams.get('q')||'';
   useEffect(()=>{setCoreSearch(requestedProductSearch);setBrandPage(1);setVerifiedPage(1);},[requestedProductSearch,focus]);
-  useEffect(()=>{setCoreIssue(searchParams.get('issue')==='ean'?'EAN_MISSING':'BRAND_MISSING');setCorePage(1)},[searchParams]);
+  const requestedIssue=searchParams.get('issue');
+  useEffect(()=>{setCoreIssue(requestedIssue==='ean'?'EAN_MISSING':'BRAND_MISSING');setCorePage(1)},[requestedIssue]);
   const PAGE_SIZE=50;
   const [likelyExceptionsOnly,setLikelyExceptionsOnly]=useState(false);
   const [resolutionItem,setResolutionItem]=useState<ReadinessItem|null>(null);
