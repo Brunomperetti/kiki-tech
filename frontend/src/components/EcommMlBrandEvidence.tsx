@@ -85,6 +85,40 @@ export function EcommMlBrandEvidence(){
         </details>
       </details>
 
+      <details className="kiki-ecomm-ml-shared-gtin">
+        <summary>Analizar GTIN compartidos: ¿el SKU ayuda a identificar la publicación?</summary>
+        <p>Una misma referencia de código de barras puede aparecer en varios productos. Investigamos si algún SKU exacto y único permite revisar la marca de una publicación, sin tratar ese GTIN como exclusivo.</p>
+        <div className="kiki-ecomm-commercial-metrics">
+          <div><strong>{report.shared_gtin_review.counts.shared_gtin_ml_rows}</strong><small>Filas ML con GTIN compartido</small></div>
+          <div><strong>{report.shared_gtin_review.counts.unique_sku_despite_shared_gtin}</strong><small>Con un único ID identificado por SKU</small></div>
+          <div><strong>{report.shared_gtin_review.counts.explicit_unique_variant_sku}</strong><small>Con SKU propio de variante único</small></div>
+          <div><strong>{report.shared_gtin_review.counts.no_unique_exact_sku}</strong><small>Sin SKU exacto y único</small></div>
+          <div><strong>{report.shared_gtin_review.counts.identity_contradiction}</strong><small>SKU y GTIN/MLA incompatibles</small></div>
+          <div><strong>{report.shared_gtin_review.counts.already_branded_ecomm}</strong><small>La ficha Ecomm ya tiene marca</small></div>
+          <div><strong>{report.shared_gtin_review.counts.possible_ecomm_brand_review_ids}</strong><small>Productos sin marca con pista para investigar</small></div>
+        </div>
+        <p>De las filas con SKU único, {report.shared_gtin_review.counts.sku_inside_gtin_owners_no_mla_conflict} apuntan a un propietario incluido en los GTIN y sin contradicción de MLA; {report.shared_gtin_review.counts.sku_consistent_missing_brand_rows} tienen marca histórica faltante antes de agrupar por ID y marca. {report.shared_gtin_review.counts.presentation_conflict} presentaciones contradictorias fueron excluidas.</p>
+        <p className="kiki-ecomm-hint">{report.shared_gtin_review.policy}</p>
+        <details>
+          <summary>Ver posibles marcas para investigar ({report.shared_gtin_review.review_leads.length} ejemplos)</summary>
+          {report.shared_gtin_review.review_leads.length===0?<p>Todavía no hay pistas coherentes con SKU único y GTIN compartido en estas fuentes. No se asignó ninguna marca.</p>:report.shared_gtin_review.review_leads.map(x=><article className="kiki-ecomm-commercial-row" key={x.ecomm_id}>
+            <strong>{x.ecomm_name} · ID Ecomm {x.ecomm_id}</strong>
+            <small>SKU Ecomm: {x.ecomm_sku} · SKU ML: {x.ml_sku} · {x.mla}</small>
+            <p><strong>Marca que indica {source(x.brand_source)}:</strong> {x.ml_brand}</p>
+            <small>GTIN compartido: {x.shared_gtin} · Aparece en {x.shared_gtin_ecomm_owner_count} IDs Ecomm · {x.exact_variant_sku?'SKU de variante único':'SKU único sin identidad de variante probada'} · Combo: {x.is_combo===true?'Sí':x.is_combo===false?'No':'Sin información'}</small>
+            <small>ML: {x.ml_title||'Sin título'} · {x.supporting_mlas} publicaciones de apoyo · Identidad y marca sin confirmar.</small>
+          </article>)}
+        </details>
+        <details>
+          <summary>Ver ejemplos descartados por contradicción ({report.shared_gtin_review.rejected_samples.length})</summary>
+          {report.shared_gtin_review.rejected_samples.length===0?<p>No hay ejemplos contradictorios dentro de los GTIN compartidos inspeccionados.</p>:report.shared_gtin_review.rejected_samples.map((x,i)=><article className="kiki-ecomm-commercial-row" key={x.mla+'-'+i}>
+            <strong>{x.mla} · GTIN {x.gtin}</strong>
+            <small>SKU ML {x.sku||'No informado'} · {x.gtin_owner_count} IDs con ese GTIN.</small>
+            <small>{x.reason}</small>
+          </article>)}
+        </details>
+      </details>
+
       <details>
         <summary>Ver fuentes y fechas de la información</summary>
         <p>Snapshot de Mercado Libre: {updated(report.source_dates.ml_snapshot)} · Reporte EDIMA: {updated(report.source_dates.edima)}</p>
