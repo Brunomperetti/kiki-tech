@@ -19,6 +19,10 @@ class LookupRequest(BaseModel):
     skus: list[str] = Field(min_length=1, max_length=3)
 
 
+class CatalogAuditRequest(BaseModel):
+    start_page: int = Field(default=1, ge=1, le=10000)
+
+
 def _client() -> EcommAppInventoryClient:
     return EcommAppInventoryClient(get_settings().ecomm_app_api_token)
 
@@ -58,5 +62,14 @@ def ecomm_app_preview(_session=Depends(require_csrf)):
 def ecomm_app_lookup(body: LookupRequest, _session=Depends(require_csrf)):
     try:
         return _client().lookup(body.skus)
+    except (EcommAppApiError, ValueError) as exc:
+        _raise_safe(exc)
+
+
+@router.post("/catalog-audit")
+def ecomm_app_catalog_audit(body: CatalogAuditRequest, _session=Depends(require_csrf)):
+    """Only reads two pages (<=100 parent products) and does not persist data."""
+    try:
+        return _client().catalog_audit(body.start_page)
     except (EcommAppApiError, ValueError) as exc:
         _raise_safe(exc)
