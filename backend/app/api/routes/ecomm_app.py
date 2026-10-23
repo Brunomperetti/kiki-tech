@@ -11,6 +11,7 @@ from ...database.session import get_db
 from sqlalchemy.orm import Session
 from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
 from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
+from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
 from ...integrations.ecomm_app.public_api import (
     EcommAppApiError,
     EcommAppInventoryClient,
@@ -21,6 +22,10 @@ router = APIRouter(prefix="/api/ecomm-app", tags=["ecomm-app"])
 
 class LookupRequest(BaseModel):
     skus: list[str] = Field(min_length=1, max_length=3)
+
+
+class HybridPreviewRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=5)
 
 
 class CatalogAuditRequest(BaseModel):
@@ -108,5 +113,18 @@ def ecomm_app_stage_compare(
     """
     try:
         return EcommAppStageComparisonService(db).report()
+    except ValueError as exc:
+        _raise_safe(exc)
+
+
+@router.post("/stage/hybrid-preview")
+def ecomm_app_hybrid_preview(
+    body: HybridPreviewRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    """Simulate read-only comparison by stable ID: never promote stock or price."""
+    try:
+        return EcommHybridCatalogService(db).preview(body.ids)
     except ValueError as exc:
         _raise_safe(exc)
