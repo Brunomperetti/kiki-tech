@@ -310,6 +310,36 @@ export interface EcommTnBrandEvidence {
     no_exact_tn_sku:number;
     tn_brand_empty:number;
   }|Record<string,number>;
+  indirect_diagnostics?:{
+    summary:{
+      tn_rows:number;
+      tn_rows_with_brand:number;
+      tn_rows_matching_any_ecomm_sku:number;
+      ecomm_ids_with_any_tn_sku:number;
+      ecomm_ids_with_existing_brand_and_tn_sku:number;
+      review_leads:number;
+      review_by_valid_unique_ean:number;
+      review_by_unique_exact_full_name:number;
+      conflicting_indirect_signals:number;
+      presentation_conflict:number;
+      tn_sku_claimed_by_other_id:number;
+    };
+    leads:{
+      ecomm_id:string;
+      ecomm_name:string;
+      ecomm_sku:string;
+      tn_name:string;
+      tn_sku:string;
+      tn_slug:string;
+      tn_brand:string;
+      match_basis:'VALID_UNIQUE_EAN'|'UNIQUE_EXACT_FULL_NAME';
+      shared_ean:string|null;
+      is_combo:boolean|null;
+      review_status:'NOT_CONFIRMED';
+    }[];
+    sampling_limit:number;
+    note:string;
+  };
   candidates:{
     ecomm_id:string;
     ecomm_sku:string;
