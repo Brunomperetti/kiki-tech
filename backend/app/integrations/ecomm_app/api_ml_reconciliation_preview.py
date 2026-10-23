@@ -61,6 +61,7 @@ _GENERIC_WORDS = {
     "comprimidos", "tabletas", "caps", "cap", "gramos", "gramo",
     "frascos", "frasco", "suplemento", "suplementos", "producto",
     "polvo", "bebible", "natier", "vitamin", "way",
+    "vitamina", "vitaminas", "geonat",
 }
 
 
@@ -90,7 +91,7 @@ def _distinctive_words(name):
 def _pack_equivalence_reason(ecomm_title, ml_title):
     """Only a review lead when a documented pack has an arithmetical explanation.
 
-    Conservatively require at least three shared distinctive product words;
+    Conservatively require at least two shared distinctive product words;
     otherwise a different ingredient with the same pack size stays a conflict.
     """
     ec_pack = _pack_multiplier(ecomm_title)
@@ -109,7 +110,7 @@ def _pack_equivalence_reason(ecomm_title, ml_title):
     if larger != smaller * ec_pack:
         return None
     shared_words = _distinctive_words(ecomm_title) & _distinctive_words(ml_title)
-    if len(shared_words) < 3:
+    if len(shared_words) < 2:
         return None
     return (
         f"Posible equivalencia entre {ec_pack} unidades de {smaller} "
