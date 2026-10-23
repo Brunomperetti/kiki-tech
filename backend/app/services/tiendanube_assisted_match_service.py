@@ -32,7 +32,9 @@ FLAVOR_TERMS = {
     "manzana": ("manzana", "apple"),
     "durazno": ("durazno", "peach"),
 }
-UNITS = {"g", "gr", "grs", "gramos", "kg", "ml", "cc", "l", "litros"}
+UNITS = {"g", "gr", "grs", "gramos", "kg", "ml", "cc", "l", "litros",
+         "capsula", "capsulas", "caps", "cap",
+         "comprimido", "comprimidos", "tableta", "tabletas"}
 
 def product_flavors(*values):
     words = set(normalize(" ".join(str(v or "") for v in values)).split())
@@ -47,8 +49,12 @@ def pack_units(value):
     units = []
     for i, token in enumerate(tokens[1:], start=1):
         if token in UNITS and re.fullmatch(r"\d+", tokens[i-1]):
-            units.append((int(tokens[i-1]), "g" if token in {"gr", "grs", "gramos"} else
-                          "ml" if token == "cc" else "l" if token == "litros" else token))
+            unit = ("g" if token in {"gr", "grs", "gramos"} else
+                    "ml" if token == "cc" else "l" if token == "litros" else
+                    "capsulas" if token in {"capsula", "capsulas", "caps", "cap"} else
+                    "comprimidos" if token in {"comprimido", "comprimidos"} else
+                    "tabletas" if token in {"tableta", "tabletas"} else token)
+            units.append((int(tokens[i-1]), unit))
     return set(units)
 
 def variant_conflict(source_name, source_sku, target_name, target_sku):
