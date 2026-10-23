@@ -45,7 +45,14 @@ def product_flavors(*values):
             if any(alias in words or sku_compact.endswith(alias) for alias in aliases)}
 
 def pack_units(value):
-    tokens = re.sub(r"\bx(?=\d)", "x ", normalize(value)).split()
+    normalized = normalize(value)
+    # Some supplier titles write amounts without spaces: "485g", "180caps".
+    normalized = re.sub(
+        r"(\d+)(g|gr|grs|gramos|kg|ml|cc|l|litros|capsula|capsulas|caps|cap|comprimido|comprimidos|tableta|tabletas)\b",
+        r"\1 \2",
+        normalized,
+    )
+    tokens = re.sub(r"\bx(?=\d)", "x ", normalized).split()
     units = []
     for i, token in enumerate(tokens[1:], start=1):
         if token in UNITS and re.fullmatch(r"\d+", tokens[i-1]):
