@@ -154,8 +154,12 @@ class EcommTnBrandEvidenceService:
         tn = self.db.scalar(
             select(CatalogSnapshot).where(CatalogSnapshot.source == "TIENDANUBE")
         )
-        return brand_evidence_report(
-            stage.payload if stage else [],
-            old.payload if old else [],
-            tn.payload if tn else [],
-        )
+        stage_rows = stage.payload if stage else []
+        old_rows = old.payload if old else []
+        tn_rows = tn.payload if tn else []
+        result = brand_evidence_report(stage_rows, old_rows, tn_rows)
+        if result["available"]:
+            result["indirect_diagnostics"] = diagnose_tn_brand_gaps(
+                stage_rows, old_rows, tn_rows
+            )
+        return result
