@@ -10,6 +10,7 @@ from .api.routes.auth import router as auth_router
 from .api.routes.prepublication import router as prepublication_router
 from .api.routes.reconciliation_review import router as reconciliation_review_router
 from .api.routes.duplicate_review import router as duplicate_review_router
+from .api.routes.ecomm_app import router as ecomm_app_router
 from .core.config import get_settings
 from .core.logging import configure_logging
 from .database.models import Base
@@ -47,6 +48,7 @@ def create_app(settings=None) -> FastAPI:
     application.include_router(prepublication_router)
     application.include_router(reconciliation_review_router)
     application.include_router(duplicate_review_router)
+    application.include_router(ecomm_app_router)
 
     @application.get("/health")
     def health():
