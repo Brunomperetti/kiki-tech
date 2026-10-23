@@ -75,7 +75,7 @@ export function EcommHybridInspector({comparison}:{comparison:EcommStageComparis
         </button>
         {liveError&&<p role="alert" className="kiki-ecomm-notice">{liveError}</p>}
         {live&&<div className="kiki-ecomm-live-rows" aria-live="polite">
-          <p><strong>Momento de consulta:</strong> {new Date(live.checked_at).toLocaleString('es-AR')}</p>
+          <p><strong>Momento de consulta:</strong> {new Date(live.checked_at).toLocaleString('es-AR',{timeZone:'America/Argentina/Cordoba',hour12:false})}</p>
           <p className="kiki-ecomm-hint">{live.warning}</p>
           {live.rows.map(item=><div className="kiki-ecomm-live-record" key={item.ecomm_id}>
             <strong>ID {item.ecomm_id} · {item.sku||'SKU no disponible'}</strong>
