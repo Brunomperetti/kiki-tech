@@ -46,6 +46,8 @@ export function EcommAppConnector(){
   const [comparison,setComparison]=useState<EcommStageComparison|null>(null);
   const [comparisonBusy,setComparisonBusy]=useState(false);
   const [comparisonError,setComparisonError]=useState('');
+  const [extraFilter,setExtraFilter]=useState<'ALL'|'COMBO'|'REGULAR'|'UNKNOWN'>('ALL');
+  const [showAllExtras,setShowAllExtras]=useState(false);
   const stageStop=useRef(false);
   const stageRunning=useRef(false);
 
@@ -231,26 +233,64 @@ export function EcommAppConnector(){
             <span>Mismo ID, SKU diferente: <b>{comparison.totals.same_id_different_sku}</b></span>
             <span>Históricos sin ID coincidente: <b>{comparison.totals.historical_no_stable_id_match}</b></span>
             <span>Variantes API sin ID histórico: <b>{comparison.totals.api_no_stable_id_match}</b></span>
+            <span>Solo API: combo Sí: <b>{comparison.totals.api_only_combo_yes??0}</b></span>
+            <span>Solo API: combo No: <b>{comparison.totals.api_only_combo_no??0}</b></span>
+            <span>Solo API: combo no informado: <b>{comparison.totals.api_only_combo_unknown??0}</b></span>
             <span>Posibles vínculos solo por SKU: <b>{comparison.totals.candidate_sku_only}</b></span>
             <span>Stock diferente (orientativo): <b>{comparison.totals.stock_differences_informational}</b></span>
             <span>GTIN discordante si ambos presentes: <b>{comparison.totals.gtin_disagreement_when_both_present}</b></span>
             <span>ID histórico repetido: <b>{comparison.totals.duplicate_legacy_ids}</b></span>
           </div>
           <p className="kiki-ecomm-hint">{comparison.warning}</p>
-          <details>
-            <summary>Ver ejemplos de SKU modificados ({comparison.samples.sku_changed_same_id.length} mostrados)</summary>
-            {comparison.samples.sku_changed_same_id.length===0?<p>Sin diferencias de SKU en las muestras.</p>:comparison.samples.sku_changed_same_id.map(item=><div className="kiki-ecomm-requested" key={item.ecomm_id}>
+          <details open>
+            <summary>Revisar los SKU realmente distintos ({comparison.totals.same_id_different_sku})</summary>
+            <p>Conservan el mismo ID interno, pero su SKU cambió más allá de espacios o mayúsculas. Estos casos tienen prioridad de revisión.</p>
+            {comparison.samples.sku_changed_same_id.filter(item=>item.change_type==='SUBSTANTIVE').map(item=><div className="kiki-ecomm-requested" key={item.ecomm_id}>
               <strong>ID Ecomm: {item.ecomm_id} · {item.product}</strong>
-              <p>SKU del Excel: <code>{item.old_sku||'No informado'}</code> → SKU API: <code>{item.api_sku||'No informado'}</code></p>
+              <p>SKU anterior: <code>{item.old_sku||'No informado'}</code> → SKU API: <code>{item.api_sku||'No informado'}</code></p>
+              <small>Producto padre: {item.api_parent_code||'No informado'} · Combo según API: {comboLabel(item.api_is_combo)}</small>
             </div>)}
           </details>
           <details>
-            <summary>Ver ejemplos sin ID coincidente en el histórico</summary>
-            {comparison.samples.historical_without_id_match.map((item,i)=><p className="kiki-ecomm-requested" key={item.ecomm_id||i}>ID: {item.ecomm_id||'Sin ID'} · SKU: {item.sku||'Sin SKU'} · {item.product}</p>)}
+            <summary>Revisar diferencias de escritura ({comparison.totals.same_id_format_sku_changed})</summary>
+            <p>El mismo ID interno continúa vigente. La diferencia puede ser de espacios y mayúsculas; no hace falta cambiar automáticamente el SKU histórico.</p>
+            {comparison.samples.sku_changed_same_id.filter(item=>item.change_type==='FORMAT_ONLY').map(item=><div className="kiki-ecomm-requested" key={item.ecomm_id}>
+              <strong>ID Ecomm: {item.ecomm_id} · {item.product}</strong>
+              <p>SKU anterior: <code>{item.old_sku||'No informado'}</code> → SKU API: <code>{item.api_sku||'No informado'}</code></p>
+            </div>)}
           </details>
           <details>
-            <summary>Ver variantes nuevas o sin ID histórico coincidente</summary>
-            {comparison.samples.api_without_id_match.map((item,i)=><p className="kiki-ecomm-requested" key={item.api_id||i}>ID API: {item.api_id||'Sin ID'} · SKU: {item.sku||'Sin SKU'} · Producto: {item.parent_code||'Sin nombre'}</p>)}
+            <summary>Revisar el producto histórico sin ID coincidente ({comparison.totals.historical_no_stable_id_match})</summary>
+            {comparison.samples.historical_without_id_match.map((item,i)=><p className="kiki-ecomm-requested" key={item.ecomm_id||i}>ID: {item.ecomm_id||'Sin ID'} · SKU: {item.sku||'Sin SKU'} · {item.product}</p>)}
+            <small>Sin coincidencia por ID no significa eliminado. Verificar en Ecomm-App antes de modificar nada.</small>
+          </details>
+          <details>
+            <summary>Investigar variantes que solo figuran en la API ({comparison.totals.api_no_stable_id_match})</summary>
+            <p>Se identifican por su ID. Pueden ser combos, productos nuevos o registros que no estaban en el Excel anterior. El atributo «Combo» proviene de la API.</p>
+            <p><strong>Combo Sí:</strong> {comparison.totals.api_only_combo_yes??0} · <strong>Combo No:</strong> {comparison.totals.api_only_combo_no??0} · <strong>Sin dato de combo:</strong> {comparison.totals.api_only_combo_unknown??0}</p>
+            <small>Productos padre con sufijo _m: {comparison.totals.api_only_parent_m_suffix??0} (solo una pista, no una clasificación).</small>
+            <label className="kiki-ecomm-filter-label">Mostrar
+              <select value={extraFilter} onChange={event=>{setExtraFilter(event.target.value as typeof extraFilter);setShowAllExtras(false)}}>
+                <option value="ALL">Todas las variantes sin ID histórico</option>
+                <option value="COMBO">Solo combos confirmados</option>
+                <option value="REGULAR">Solo no combos</option>
+                <option value="UNKNOWN">Combo sin dato</option>
+              </select>
+            </label>
+            {(()=> {
+              const rows=comparison.samples.api_without_id_match.filter(item=>extraFilter==='ALL'||(extraFilter==='COMBO'&&item.is_combo===true)||(extraFilter==='REGULAR'&&item.is_combo===false)||(extraFilter==='UNKNOWN'&&item.is_combo==null));
+              const shown=showAllExtras?rows:rows.slice(0,12);
+              return <div className="kiki-ecomm-focused-list">
+                <p>Mostrando {shown.length} de {rows.length} registros disponibles con este filtro{comparison.display_limits.api_only_total>comparison.display_limits.api_only_visible?' (la respuesta completa supera el límite de visualización)':''}.</p>
+                {shown.map((item,i)=><div className="kiki-ecomm-requested" key={item.api_id||i}>
+                  <strong>SKU: {item.sku||'Sin SKU'} · ID API: {item.api_id||'Sin ID'}</strong>
+                  <p>Producto padre: {item.parent_code||'No informado'} · <strong>Combo (API): {comboLabel(item.is_combo)}</strong></p>
+                </div>)}
+                {rows.length>12&&!showAllExtras&&<button type="button" onClick={()=>setShowAllExtras(true)}>Mostrar las {rows.length} variantes de este filtro</button>}
+                {showAllExtras&&rows.length>12&&<button type="button" onClick={()=>setShowAllExtras(false)}>Mostrar solo 12</button>}
+              </div>;
+            })()}
+            <small>No se incorporan estos registros al catálogo operativo ni se vinculan publicaciones.</small>
           </details>
           <details>
             <summary>Ver posibles vínculos por SKU (no confirmados)</summary>
