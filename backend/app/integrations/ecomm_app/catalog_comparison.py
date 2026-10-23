@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from ...database.models import CatalogSnapshot
 from .catalog_stage import STAGE_SOURCE, stage_status
+from .catalog_adoption import build_adoption_plan
 
 
 def _str(value) -> str:
@@ -263,6 +264,7 @@ def compare_stage_to_legacy(stage_pages: list[dict], legacy: list[dict]) -> dict
             "No se cambió la fuente de KIKI ni ninguna decisión."
         ),
     }
+    result["adoption_plan"] = build_adoption_plan(result, state)
     return result
 
 
