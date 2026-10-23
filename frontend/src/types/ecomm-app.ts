@@ -260,3 +260,37 @@ export interface EcommLiveStockCheck {
   }[];
   warning:string;
 }
+
+export interface EcommCommercialAudit {
+  mode:'READ_ONLY_COMMERCIAL_AUDIT';
+  source:string;
+  reference:string;
+  activation_allowed:false;
+  counts:{
+    matched_ids:number;
+    brand_present:number;
+    brand_missing:number;
+    brand_placeholder:number;
+    price_positive:number;
+    price_zero:number;
+    price_missing:number;
+    price_negative:number;
+    price_invalid:number;
+    cost_positive:number;
+    cost_zero:number;
+    cost_missing:number;
+    cost_negative:number;
+    cost_invalid:number;
+    ean_present:number;
+    ean_blank:number;
+    combo_matched:number;
+    combo_without_brand:number;
+  };
+  samples:{
+    without_brand:{ecomm_id:string;sku:string;name:string;api_sku:string;is_combo:boolean|null;parent_code:string;brand_status:'MISSING'|'PLACEHOLDER'}[];
+    price_review:{ecomm_id:string;sku:string;name:string;api_sku:string;is_combo:boolean|null;parent_code:string;status:string;value:string|null}[];
+    cost_review:{ecomm_id:string;sku:string;name:string;api_sku:string;is_combo:boolean|null;parent_code:string;status:string;value:string|null}[];
+  };
+  sampling_limit:number;
+  note:string;
+}
