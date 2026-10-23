@@ -83,7 +83,7 @@ def ecomm_app_stage_status(
     db: Session = Depends(get_db), _session=Depends(require_session),
 ):
     """Return compact progress only, without returning copied inventory rows."""
-    return EcommAppStageService(db, _client()).status()
+    return EcommAppStageService(db, None).status()
 
 
 @router.post("/stage/next")
