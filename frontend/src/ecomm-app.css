@@ -35,3 +35,9 @@
 .kiki-ecomm-sku-diagnosis small{font-size:11px;color:#536b5c;line-height:1.5}
 .kiki-ecomm-audit-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:7px}
 .kiki-ecomm-audit-metrics span{background:#fff;border:1px solid #d9e6dc;border-radius:8px;padding:9px;font-size:12px}
+.kiki-ecomm-filter-label{display:grid;gap:6px;max-width:440px;margin:12px 0;color:#244e39;font-size:12px;font-weight:650}
+.kiki-ecomm-filter-label select{background:#fff;border:1px solid #c9dace;border-radius:8px;padding:9px;font-size:12px;color:#193e2c;max-width:100%;min-width:0}
+.kiki-ecomm-focused-list{display:grid;gap:7px;padding-top:8px}
+.kiki-ecomm-focused-list>p{font-size:12px;line-height:1.4;color:#506c57}
+.kiki-ecomm-focused-list .kiki-ecomm-requested{display:grid;gap:5px}
+.kiki-ecomm-focused-list button{justify-self:start}
