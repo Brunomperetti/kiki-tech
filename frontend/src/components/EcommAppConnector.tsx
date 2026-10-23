@@ -3,6 +3,9 @@ import {api} from '../services/api';
 import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup} from '../types/ecomm-app';
 import '../ecomm-app.css';
 
+const comboLabel=(flag:boolean|null|undefined)=>flag===true?'Sí':flag===false?'No':'No informado';
+
+
 function PreviewList({data,label}:{data:EcommAppPreviewList;label:string}){
   return <section className="kiki-ecomm-result">
     <h4>{label}</h4>
@@ -12,10 +15,14 @@ function PreviewList({data,label}:{data:EcommAppPreviewList;label:string}){
     {data.samples.map((item,i)=><article className="kiki-ecomm-sample" key={i}>
       <strong>{item.code||item.name||item.description||'Registro '+(i+1)}</strong>
       {item.description&&item.code&&<p>{item.description}</p>}
+      {item.code&&<p><strong>Producto padre (code):</strong> {item.code}</p>}
+      {typeof item.variant_count==='number'&&<p><strong>Variantes dentro de este producto:</strong> {item.variant_count} · <strong>Combo declarado por API:</strong> {comboLabel(item.is_combo)}</p>}
       {item.id!=null&&<p>ID de depósito: {item.id}</p>}
       <small>Campos presentes: {item.available_fields.join(', ')||'Sin campos'}</small>
       {(item.variants||[]).map((variant,j)=><div className="kiki-ecomm-variant" key={j}>
-        <p><strong>SKU:</strong> {variant.sku||'No informado'} · <strong>GTIN:</strong> {variant.barcode||'No informado'} · <strong>Stock total:</strong> {variant.total_stock??'No informado'}</p>
+        <p><strong>SKU de variante:</strong> {variant.sku||'No informado'} · <strong>ID variante:</strong> {variant.id??'No informado'}</p>
+        {variant.variant_description&&<p><strong>Presentación:</strong> {variant.variant_description}</p>}
+        <p><strong>Combo de variante (API):</strong> {comboLabel(variant.is_combo)} · <strong>GTIN:</strong> {variant.barcode||'No informado'} · <strong>Stock total:</strong> {variant.total_stock??'No informado'}</p>
         {variant.warehouse_sample.length>0&&<p>Depósitos: {variant.warehouse_sample.map(w=>`${w.id??'?'} (${w.stock??'sin dato'})`).join(' · ')}</p>}
         <small>Campos de variante: {variant.available_fields.join(', ')}</small>
       </div>)}
@@ -92,7 +99,25 @@ export function EcommAppConnector(){
         {busy==='lookup'?'Consultando…':'Consultar SKU sin modificar stock'}
       </button>
       {lookup&&<div className="kiki-ecomm-preview">
-        <PreviewList data={lookup.product_preview} label="Respuesta de stock por SKU"/>
+        <section className="kiki-ecomm-sku-diagnosis">
+          <h4>¿Cuáles de los SKU pedidos encontró realmente la API?</h4>
+          {lookup.sku_diagnosis.warning&&<p className="kiki-ecomm-notice">{lookup.sku_diagnosis.warning}</p>}
+          <p><strong>Productos padre devueltos:</strong> {lookup.sku_diagnosis.parent_count??'No verificable'} · <strong>Variantes incluidas:</strong> {lookup.sku_diagnosis.variant_count??'No verificable'} · <strong>Otras variantes hermanas:</strong> {lookup.sku_diagnosis.sibling_variant_count??'No verificable'}</p>
+          <p className="kiki-ecomm-hint">El número de productos no indica cuántos SKU se encontraron: cada producto puede incluir otras variantes. Nunca sumamos sus stocks automáticamente.</p>
+          {lookup.sku_diagnosis.requested.map((item,i)=><article className="kiki-ecomm-requested" key={item.sku+'-'+i}>
+            <div className="kiki-ecomm-requested-head">
+              <strong>SKU pedido: {item.sku}</strong>
+              <span>{item.status==='EXACT_SINGLE'?'Encontrado literalmente':item.status==='MULTIPLE_EXACT'?'Duplicado exacto: revisar':item.status==='UNKNOWN_SHAPE'?'Formato por identificar':'Sin coincidencia literal en la respuesta'}</span>
+            </div>
+            {item.matches.map((match,j)=><div className="kiki-ecomm-request-match" key={j}>
+              <p><strong>Producto padre:</strong> {match.parent_code||'No informado'} · <strong>Combo (API):</strong> {comboLabel(match.parent_is_combo)}</p>
+              <p><strong>Variante:</strong> {match.variant_sku} · <strong>ID:</strong> {match.variant_id??'No informado'} · <strong>Combo (API):</strong> {comboLabel(match.variant_is_combo)} · <strong>Stock:</strong> {match.total_stock??'No informado'}</p>
+              {match.variant_description&&<p><strong>Presentación:</strong> {match.variant_description}</p>}
+            </div>)}
+          </article>)}
+          <small>Coincidencia literal solo para diagnóstico. No se confirma correspondencia con los SKU históricos de KIKI ni se vincula stock.</small>
+        </section>
+        <PreviewList data={lookup.product_preview} label="Productos padre y todas sus variantes devueltas"/>
         <small>{lookup.note}</small>
       </div>}
     </details>

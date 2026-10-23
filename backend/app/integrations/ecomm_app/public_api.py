@@ -153,6 +153,10 @@ def _preview_items(data: object, *, kind: str) -> dict:
             warehouses = variant.get("warehouses")
             shown.append({
                 "sku": variant.get("sku") or variant.get("code"),
+                "id": variant.get("id"),
+                "description": variant.get("description"),
+                "variant_description": variant.get("variant_description"),
+                "is_combo": variant.get("is_combo") if isinstance(variant.get("is_combo"), bool) else None,
                 "barcode": variant.get("barcode") or variant.get("gtin"),
                 "total_stock": variant.get("total_stock"),
                 "available_fields": sorted(variant.keys())[:25],
@@ -165,6 +169,8 @@ def _preview_items(data: object, *, kind: str) -> dict:
         samples.append({
             "code": item.get("code") or item.get("sku_madre"),
             "description": item.get("description") or item.get("name"),
+            "is_combo": item.get("is_combo") if isinstance(item.get("is_combo"), bool) else None,
+            "total_stock": item.get("total_stock"),
             "variant_count": len(variants),
             "variants": shown,
             "available_fields": sorted(item.keys())[:25],
@@ -173,6 +179,74 @@ def _preview_items(data: object, *, kind: str) -> dict:
         "shape_recognized": True, "count": len(items),
         "envelope_keys": envelope_keys,
         "samples": samples, "warning": None,
+    }
+
+
+def _requested_sku_diagnosis(data: object, requested: list[str]) -> dict:
+    """Distinguish requested exact variants from extra sibling variants.
+
+    Ecomm returns parent products WITH their sibling variants. The number of
+    parent records is not the number of matched SKUs. Never identify a
+    requested SKU using an alias, title, prefix, or cosmetic normalization.
+    """
+    parents, envelope_keys = _items(data)
+    if parents is None:
+        return {
+            "shape_recognized": False, "parent_count": None,
+            "variant_count": None, "sibling_variant_count": None,
+            "envelope_keys": envelope_keys,
+            "requested": [
+                {"sku": sku, "status": "UNKNOWN_SHAPE", "matches": []}
+                for sku in requested
+            ],
+            "warning": "Ecomm-App respondió, pero aún no se reconoce el formato de consulta.",
+        }
+
+    exact_matches = {sku: [] for sku in requested}
+    total_variants = 0
+    sibling_variants = 0
+    for parent in parents:
+        variants = parent.get("variants")
+        if not isinstance(variants, list):
+            continue
+        for variant in variants:
+            if not isinstance(variant, dict):
+                continue
+            total_variants += 1
+            variant_sku = variant.get("sku")
+            if isinstance(variant_sku, str) and variant_sku in exact_matches:
+                exact_matches[variant_sku].append({
+                    "parent_code": parent.get("code"),
+                    "parent_description": parent.get("description"),
+                    "parent_is_combo": parent.get("is_combo") if isinstance(parent.get("is_combo"), bool) else None,
+                    "variant_id": variant.get("id"),
+                    "variant_sku": variant_sku,
+                    "variant_is_combo": variant.get("is_combo") if isinstance(variant.get("is_combo"), bool) else None,
+                    "total_stock": variant.get("total_stock"),
+                    "variant_description": variant.get("variant_description"),
+                })
+            else:
+                sibling_variants += 1
+    results = []
+    for sku in requested:
+        matches = exact_matches[sku]
+        if len(matches) > 1:
+            status = "MULTIPLE_EXACT"
+        elif len(matches) == 1:
+            status = "EXACT_SINGLE"
+        else:
+            status = "NO_EXACT"
+        results.append({
+            "sku": sku, "status": status, "matches": matches,
+        })
+    return {
+        "shape_recognized": True,
+        "parent_count": len(parents),
+        "variant_count": total_variants,
+        "sibling_variant_count": sibling_variants,
+        "envelope_keys": envelope_keys,
+        "requested": results,
+        "warning": None,
     }
 
 
@@ -216,10 +290,12 @@ class EcommAppInventoryClient:
         return {
             "mode": "READ_ONLY_SKU_LOOKUP",
             "requested_skus": skus,
+            "sku_diagnosis": _requested_sku_diagnosis(products, skus),
             "product_preview": _preview_items(products, kind="products"),
             "note": (
                 "El POST de consulta es de solo lectura y no modifica stock. "
-                "Los SKU inexistentes pueden omitirse; revisar la respuesta "
-                "antes de interpretar su ausencia."
+                "Ecomm puede devolver variantes hermanas del mismo producto. "
+                "Solo las coincidencias literales del SKU pedido se presentan "
+                "como exactas; ninguna autoriza cambios en inventario."
             ),
         }

@@ -144,3 +144,126 @@ def test_token_required_and_transport_whitelisted():
         _fetch("DELETE", f"{API_PREFIX}/productos", "secret")
     with pytest.raises(ValueError, match="Solo se permite el POST de consulta"):
         _fetch("POST", f"{API_PREFIX}/depositos", "secret", body={"x": 1})
+
+
+def test_real_vitaneral_response_keeps_parent_sibling_combo_separate():
+    """Screenshots: two requested SKUs, two parents, three variants."""
+    products = {
+        "items": [
+            {
+                "code": "Vitaneral Vainilla100_m",
+                "description": "Pack X 2 Vitaneral Natufarma",
+                "is_combo": True,
+                "total_stock": 10,
+                "variants": [{
+                    "id": 3101,
+                    "sku": "Vitaneral Vainilla100",
+                    "total_stock": 10,
+                    "is_combo": True,
+                    "variant_description": "Pack X 2",
+                    "warehouses": [{"id": 2210, "stock": 6},
+                                   {"id": 17063, "stock": 4}],
+                }],
+            },
+            {
+                "code": "Vitaneral",
+                "description": "Vitaneral Natufarma Vitaminas y Minerales",
+                "is_combo": False,
+                "total_stock": 49,
+                "variants": [
+                    {
+                        "id": 3102, "sku": "vitaneral chocolate",
+                        "total_stock": 27, "is_combo": False,
+                        "warehouses": [{"id": 2210, "stock": 17},
+                                       {"id": 17063, "stock": 10}],
+                    },
+                    {
+                        "id": 3103, "sku": "Vitaneral Vainilla",
+                        "total_stock": 22, "is_combo": False,
+                        "warehouses": [{"id": 2210, "stock": 13},
+                                       {"id": 17063, "stock": 9}],
+                    },
+                ],
+            },
+        ],
+        "pagination": {"page": 1},
+    }
+
+    def requester(method, path, token, *, params=None, body=None):
+        assert method == "POST" and path.endswith("/productos/consulta")
+        assert body == {"skus": ["Vitaneral Vainilla100", "vitaneral chocolate"]}
+        return products
+
+    client = EcommAppInventoryClient("fake-private-token", requester=requester)
+    report = client.lookup(["Vitaneral Vainilla100", "vitaneral chocolate"])
+    diagnosis = report["sku_diagnosis"]
+    assert diagnosis["shape_recognized"]
+    assert diagnosis["parent_count"] == 2
+    assert diagnosis["variant_count"] == 3
+    assert diagnosis["sibling_variant_count"] == 1
+    assert [item["status"] for item in diagnosis["requested"]] == [
+        "EXACT_SINGLE", "EXACT_SINGLE"
+    ]
+    pack = diagnosis["requested"][0]["matches"][0]
+    assert pack["parent_code"] == "Vitaneral Vainilla100_m"
+    assert pack["variant_id"] == 3101
+    assert pack["parent_is_combo"] is True
+    assert pack["variant_is_combo"] is True
+    assert pack["total_stock"] == 10
+    chocolate = diagnosis["requested"][1]["matches"][0]
+    assert chocolate["variant_sku"] == "vitaneral chocolate"
+    assert chocolate["total_stock"] == 27
+    assert chocolate["parent_code"] == "Vitaneral"
+    assert report["product_preview"]["samples"][1]["variant_count"] == 2
+    sibling = report["product_preview"]["samples"][1]["variants"][1]
+    assert sibling["sku"] == "Vitaneral Vainilla"
+    assert sibling["id"] == 3103
+    assert sibling["total_stock"] == 22
+    assert sibling["warehouse_sample"] == [
+        {"id": 2210, "stock": 13},
+        {"id": 17063, "stock": 9},
+    ]
+    assert report["mode"] == "READ_ONLY_SKU_LOOKUP"
+    assert "fake-private-token" not in json.dumps(report)
+
+
+def test_siblings_not_counted_as_exact_requested_and_missing_is_not_zero_stock():
+    client, _ = _client_fake()
+    report = client.lookup(["VITANERALCHOCOLATE", "SKU-INEXISTENTE"])
+    diag = report["sku_diagnosis"]
+    assert diag["requested"][0]["status"] == "EXACT_SINGLE"
+    assert diag["requested"][1]["status"] == "NO_EXACT"
+    assert diag["requested"][1]["matches"] == []
+    assert diag["sibling_variant_count"] == 1
+
+
+def test_duplicate_literal_sku_never_chooses_arbitrary_parent():
+    from app.integrations.ecomm_app.public_api import _requested_sku_diagnosis
+
+    data = {"items": [
+        {"code": "PRODUCTO-A", "variants": [{"id": 1, "sku": "SAME", "total_stock": 5}]},
+        {"code": "PRODUCTO-B", "variants": [{"id": 2, "sku": "SAME", "total_stock": 6}]},
+    ]}
+    diag = _requested_sku_diagnosis(data, ["SAME"])
+    assert diag["requested"][0]["status"] == "MULTIPLE_EXACT"
+    assert len(diag["requested"][0]["matches"]) == 2
+
+
+def test_unknown_response_shape_does_not_imply_sku_missing():
+    from app.integrations.ecomm_app.public_api import _requested_sku_diagnosis
+
+    diag = _requested_sku_diagnosis({"pagination": {"total": 10}}, ["SKU"])
+    assert not diag["shape_recognized"]
+    assert diag["requested"][0]["status"] == "UNKNOWN_SHAPE"
+    assert diag["parent_count"] is None
+
+
+def test_absent_combo_flag_stays_unknown_not_false():
+    preview = _preview_items(
+        {"items": [{"code": "P", "variants": [{"sku": "V", "id": 20}]}]},
+        kind="products",
+    )
+    row = preview["samples"][0]
+    assert row["is_combo"] is None
+    assert row["variants"][0]["is_combo"] is None
+    assert row["variants"][0]["id"] == 20
