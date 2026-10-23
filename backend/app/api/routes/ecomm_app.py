@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
 from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
 from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
+from ...integrations.ecomm_app.live_stock_check import EcommLiveStockService
 from ...integrations.ecomm_app.public_api import (
     EcommAppApiError,
     EcommAppInventoryClient,
@@ -127,4 +128,17 @@ def ecomm_app_hybrid_preview(
     try:
         return EcommHybridCatalogService(db).preview(body.ids)
     except ValueError as exc:
+        _raise_safe(exc)
+
+
+@router.post("/stage/live-stock-check")
+def ecomm_app_live_stock_check(
+    body: HybridPreviewRequest,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    """Explicit read-only vendor lookup; does not update snapshots or channels."""
+    try:
+        return EcommLiveStockService(db, _client()).verify(body.ids)
+    except (ValueError, EcommAppApiError) as exc:
         _raise_safe(exc)
