@@ -124,7 +124,40 @@ export interface EcommStageStatus {
  warning:string;
 }
 
+export interface EcommAdoptionPlan {
+  mode:'PLANNING_ONLY';
+  activation_allowed:false;
+  operational_source:string;
+  comparison_source:string;
+  mapped_by_stable_id:number;
+  mapped_with_identical_sku:number;
+  mapped_with_format_difference:number;
+  mapped_with_substantive_sku_change:number;
+  informational_stock_differences:number;
+  first_stage_page_at:string|null;
+  last_stage_page_at:string|null;
+  tasks:{
+    key:string;
+    title:string;
+    count:number;
+    priority:'HIGH'|'REVIEW'|'DONE'|'INFO';
+    description:string;
+    review:string;
+    combo_yes?:number;
+    combo_no?:number;
+    combo_unknown?:number;
+  }[];
+  gates:{
+    key:string;
+    title:string;
+    status:'PASS'|'BLOCKED'|'PENDING';
+    reason:string;
+  }[];
+  note:string;
+}
+
 export interface EcommStageComparison {
+  adoption_plan:EcommAdoptionPlan;
   display_limits:{
     sku_changed_visible:number;
     sku_changed_total:number;
