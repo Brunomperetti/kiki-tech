@@ -1,57 +1,73 @@
-# KIKI Tech — Protocolo de prueba con KIKI Market
+# KIKI Tech — Piloto API Ecomm-App exclusiva (primera etapa)
 
-## Objetivo
+## Decisión del cliente
+El 23/10/2026 se pidió trabajar con Ecomm-App **solo por API**, sin seguir
+utilizando como catálogo vigente el archivo Excel de septiembre.
 
-El cliente puede probar **un recorrido real y seguro** del producto, no una demostración ficticia de publicación masiva. Este documento define qué debe ocurrir, qué cuenta como aprobado y qué sigue bloqueado.
+### Qué está implementado en esta etapa
+- `/pilot` muestra el **catálogo Ecomm capturado desde API**, no el Excel.
+- `GET /api/ecomm-app/stage/catalog` devuelve un catálogo de variantes
+  paginado (máximo 50 por página), filtrado por SKU/ID/descripción/GTIN,
+  únicamente desde `ECOMM_APP_API_STAGE`.
+- Rechaza la consulta si la copia API no está completa, sin recurrir al Excel.
+- Muestra ID de variante, SKU, nombre, bandera `is_combo`, GTIN informado,
+  depósitos y stock **al momento de captura**.
+- Desde cada variante con SKU permite consultar **en forma puntual y explícita**
+  a Ecomm-App mediante el endpoint autorizado de lectura por SKU.
+  Solo presenta stock de la respuesta como coincidente si la consulta devuelve
+  un SKU exacto único con el **mismo ID** de variante.
+- Mercado Libre y Tiendanube se consultan por separado como fuentes de canal,
+  sin asumir que fueron conciliadas con el catálogo API.
+- La navegación diferencia Catálogo Ecomm API de Productos/Tareas históricos.
 
-## Antes de la reunión
+### Qué todavía NO está migrado
+El reconciliador principal, las decisiones internas, Productos/Tareas históricos
+y Preparación ML siguen utilizando `ECOMM_APP` (Excel). Quedan identificados
+como históricos en la interfaz y **no deben presentarse como resultados del
+nuevo catálogo API**. Esta etapa NO activa escrituras, stock sincronizado ni
+publicación masiva.
 
-1. Confirmar que KIKI Tech se despliega en Render, backend y frontend. Abrir `/pilot` con la cuenta autorizada y verificar que el panel se actualiza.
-2. Confirmar que el resumen del catálogo **histórico** Ecomm-App está cargado; la copia de API es **independiente**, `READ_ONLY_STAGE` y no es el inventario operativo de KIKI.
-3. Confirmar que ML tenga conexión válida y mostrar la **fecha de última sincronización**; no confundir un snapshot con datos en vivo.
-4. Confirmar si existe CSV Tiendanube. Si no existe o el servicio falla, se muestra «Pendiente» o «No se pudo comprobar», **no cero**.
-5. Elegir un producto real, simple, con SKU y evidencia disponible, para poder demostrar un flujo sin necesitar inventar marcas, GTIN, relaciones de packs o resultados.
+No se usará `ECOMM_APP` como fallback silencioso de los endpoints API.
+Las decisiones existentes se conservan intactas hasta que haya migración
+probada por ID de variante y controles de integridad.
 
-## Flujo de aceptación — 10 a 15 minutos de uso real (sin automatización de tiempos)
+## Prueba de aceptación
+1. En Render Live, entrar con sesión a `/pilot`. Verificar que Ecomm API
+   esté completa, con 63/63 páginas si la captura sigue siendo la misma.
+2. Comprobar variantes API (~3.127 en el snapshot de 23/10) en lugar de 3.029
+   productos canónicos históricos.
+3. Buscar un SKU de combo conocido, por ejemplo `2500400`, y verificar
+   que aparece con su **ID de variante propio**; no unificarlo con `2500`.
+4. Pulsar **Consultar API** sobre una variante; confirmar que se distingue
+   `EXACT_SINGLE` + ID idéntico de los demás casos, sin asignar stock por
+   coincidencia aproximada.
+5. Intentar una búsqueda sin resultados; debe mostrar cero coincidencias en
+   una copia completa, sin recuperarlas silenciosamente del Excel.
+6. Si falta copia API, se debe mostrar error y no un catálogo vacío.
+7. Verificar que no hubo escrituras en `ECOMM_APP`, snapshots de canales,
+   decisiones históricas o publicaciones.
 
-### A. Inicio y catálogo
-- Entrar a `/pilot`; el menú principal también ofrece **Probar KIKI**.
-- Verificar que el catálogo Ecomm histórico, la copia API, el estado de ML y el CSV de TN se presentan por separado, con advertencias de frescura cuando corresponda.
-- Abrir **Productos** y localizar un producto por SKU.
-- **Aprobación:** muestra ficha real y los datos disponibles; no llama producto «listo» solo por tener SKU.
+## Requisitos antes de activar la API como fuente operativa general
+- Reconfirmar extracción completa y consistencia temporal de las páginas API.
+- Cobertura real y vigente de precios, costos, marca y datos por canal; el
+  scope `inventario:leer` no garantiza esos campos.
+- Revisión de 99 variantes API sin ID histórico, un ID histórico faltante,
+  dos cambios sustanciales de SKU y duplicidades de GTIN/combo.
+- Migración y trazabilidad de decisiones existentes por **ID estable**,
+  evitando decisiones por prefijo de SKU.
+- Conciliación ML/TN en modo simulación, métricas comparativas, pruebas,
+  puntos de control y reversión antes del cambio definitivo.
+- Aprobación explícita del cambio operativo; por defecto sigue bloqueado.
 
-### B. Pendiente real y decisión registrada
-- Abrir el ejemplo propuesto en **Resolver un dato pendiente**, o usar `/work/details?focus=data`.
-- Elegir una marca o GTIN que necesite comprobación. Guardar un **borrador** con la evidencia disponible; **no usar «Aceptar evidencia»** sin fuente y presentación verificadas.
-- Volver a abrir el mismo producto y comprobar que la investigación persiste. Verificar la trazabilidad donde aplique.
-- **Aprobación:** borrador accesible después de recargar; errores visibles y ningún cambio en Ecomm-App ni ML.
-- **Falla:** el borrador desaparece, falla el guardado, la app adjudica marca/GTIN sin autorización, o una fuente ausente se muestra como cero.
+## Regla de negocio
+`5028`, `5028000`, `5028999` pueden ser una familia comercial, pero
+no demuestran una misma variante física. Nunca fusionar stock, GTIN, marca o
+componentes de combo solo por el prefijo.
 
-### C. Preparación ML
-- Entrar a **Preparación ML** desde el piloto.
-- Mostrar estados de productos, motivos de bloqueo y controles pendientes. Evitar aprobar una ficha sin datos verificados.
-- **Aprobación:** resultados coherentes con las fuentes de KIKI y no se genera publicación ML automáticamente.
+## Criterio de comunicación
+Podemos afirmar: **"Ya podemos buscar y verificar productos exclusivamente
+desde la API de Ecomm-App; ahora debemos migrar de forma segura el resto del
+sistema para que las decisiones y la conciliación también usen esa fuente."**
 
-### D. Tiendanube
-- Abrir **Revisar Tiendanube** y comprobar que sus datos proceden del CSV, no de una API en vivo.
-- La generación real con OpenAI **NO forma parte de esta prueba por defecto**: requiere confirmación explícita porque consume créditos.
-
-## Qué se puede afirmar hoy
-
-- KIKI reconcilia fuentes importadas, expone información, permite trabajo interno y conserva decisiones donde el flujo existente lo permite.
-- La API Ecomm pública es **solo lectura** y la copia de inventario todavía **no reemplaza** el catálogo histórico. La composición real de combos tampoco viene en los endpoints actuales.
-- Las familias SKU por prefijos son señales de negocio y **no prueban por sí solas variantes, composición, fabricante ni GTIN**.
-- La publicación masiva ML/TN y sincronización automática de stock **siguen fuera del alcance de este piloto**.
-
-## Condiciones para habilitar posteriormente integración operativa
-
-- Resolver discrepancias sustanciales de SKU e IDs Ecomm y aprobar un plan de adopción del inventario API con precios, costos y marca preservados.
-- Definir estrategia para GTIN compartidos, combos y variaciones con evidencia de composición, no solo el patrón SKU.
-- Verificar la frescura de inventario ML y un mecanismo de revalidación antes de operaciones externas.
-- Pruebas de publicación en canal con permisos expresos del cliente, idempotencia, revisión por lotes, estados de error y rollback/reconciliación según capacidades reales.
-
-## Guía de comunicación
-
-Decir: **«Probamos con un producto: encontramos la ficha, documentamos la evidencia, recuperamos la decisión y vemos cómo se prepara para el canal. La publicación externa se habilitará por etapas una vez validados los controles.»**
-
-No decir: «Ya sincroniza stock», «ya publica solo en Mercado Libre», «ya completó automáticamente todas las marcas» ni «las familias SKU demuestran que los packs tienen el GTIN de su componente».
+No afirmar: "Todos los módulos ya trabajan con API" ni "el stock de la
+copia por páginas es en vivo".

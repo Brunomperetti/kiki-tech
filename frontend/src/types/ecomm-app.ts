@@ -124,6 +124,36 @@ export interface EcommStageStatus {
  warning:string;
 }
 
+export interface EcommApiCatalogRow {
+  ecomm_id:string|null;
+  sku:string|null;
+  product_name:string|null;
+  parent_code:string|null;
+  variant_description:string|null;
+  is_combo:boolean|null;
+  parent_is_combo:boolean|null;
+  gtin:string|null;
+  stock_at_capture:number|string|null;
+  warehouses:{id:string|number|null;stock:number|string|null}[]|null;
+  captured_at:string|null;
+}
+export interface EcommApiCatalog {
+  mode:'API_CAPTURE_READ_ONLY';
+  source:'ECOMM_APP_API_STAGE';
+  operational_source_activated:false;
+  external_writes_enabled:false;
+  capture_first_at:string|null;
+  capture_last_at:string|null;
+  total_variants_in_capture:number;
+  quality:Record<string,number>;
+  query:string;
+  total_matches:number;
+  page:number;
+  page_size:number;
+  items:EcommApiCatalogRow[];
+  warning:string;
+}
+
 export interface EcommAdoptionPlan {
   mode:'PLANNING_ONLY';
   activation_allowed:false;

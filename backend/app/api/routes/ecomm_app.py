@@ -2,13 +2,14 @@
 
 This router cannot modify remote inventory or local catalog snapshots.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ...core.config import get_settings
 from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from sqlalchemy.orm import Session
+from ...integrations.ecomm_app.api_catalog_browser import api_catalog_rows
 from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
 from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
 from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
@@ -97,6 +98,22 @@ def ecomm_app_stage_status(
 ):
     """Return compact progress only, without returning copied inventory rows."""
     return EcommAppStageService(db, None).status()
+
+
+@router.get("/stage/catalog")
+def ecomm_app_stage_catalog(
+    q: str = Query(default="", max_length=80),
+    page: int = Query(default=1, ge=1, le=100000),
+    limit: int = Query(default=25, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Browse ONLY the completed API capture, never historical XLSX data."""
+    stage = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE))
+    try:
+        return api_catalog_rows(stage.payload if stage else [], query=q, page=page, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
 @router.post("/stage/next")

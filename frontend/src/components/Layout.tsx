@@ -17,9 +17,9 @@ export function Layout(){
       <p className="kiki-nav-kicker">TRABAJO DIARIO</p>
       <nav className="primary-nav kiki-primary-nav" aria-label="Navegación principal">
         <NavLink to="/" end><span className="kiki-nav-icon" aria-hidden="true">⌂</span>Inicio</NavLink>
-        <NavLink to="/pilot"><span className="kiki-nav-icon" aria-hidden="true">▶</span>Probar KIKI</NavLink>
-        <NavLink to="/products"><span className="kiki-nav-icon" aria-hidden="true">▦</span>Productos</NavLink>
-        <NavLink to="/work" className={({isActive})=>isActive||tasksActive?'active':''}><span className="kiki-nav-icon" aria-hidden="true">✓</span>Tareas</NavLink>
+        <NavLink to="/pilot"><span className="kiki-nav-icon" aria-hidden="true">▶</span>Catálogo Ecomm API</NavLink>
+        <NavLink to="/products"><span className="kiki-nav-icon" aria-hidden="true">▦</span>Productos (Excel)</NavLink>
+        <NavLink to="/work" className={({isActive})=>isActive||tasksActive?'active':''}><span className="kiki-nav-icon" aria-hidden="true">✓</span>Tareas (Excel)</NavLink>
         <NavLink to="/channels" className={({isActive})=>isActive||channelActive?'active':''}><span className="kiki-nav-icon" aria-hidden="true">◫</span>Canales de venta</NavLink>
       </nav>
 

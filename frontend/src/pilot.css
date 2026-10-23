@@ -23,3 +23,19 @@
 .kiki-pilot-footer-links a{color:#193f2e;font-weight:700}
 @media(max-width:1100px){.kiki-pilot-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:670px){.kiki-pilot-source-grid,.kiki-pilot-steps-grid{grid-template-columns:1fr}.kiki-pilot-sources,.kiki-pilot-steps,.kiki-pilot-summary{padding:16px}}
+
+/* API-only inventory browsing. The historical catalog is intentionally not used. */
+.kiki-api-search{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kiki-api-search label{font-size:13px;font-weight:700}
+.kiki-api-search input{flex:1;min-width:210px;padding:11px 13px;border:1px solid #b9c9bf;border-radius:8px;background:white;color:#193f2e}
+.kiki-api-search button,.kiki-api-pages button,.kiki-api-table button{padding:9px 12px;border:1px solid #315740;border-radius:8px;background:#193f2e;color:#fff;cursor:pointer;font-size:13px}
+.kiki-api-search button:disabled,.kiki-api-pages button:disabled,.kiki-api-table button:disabled{opacity:.45;cursor:not-allowed}
+.kiki-api-table-wrap{overflow-x:auto;border:1px solid #dce5df;border-radius:9px}
+.kiki-api-table{width:100%;border-collapse:collapse;font-size:13px;min-width:780px}
+.kiki-api-table th,.kiki-api-table td{padding:11px;text-align:left;border-bottom:1px solid #e5ebe7;vertical-align:top}
+.kiki-api-table th{background:#f2f7f4;font-size:12px}
+.kiki-api-table td small{display:block;color:#697c6f;font-size:11px}
+.kiki-api-pages{display:flex;justify-content:flex-end;gap:10px}
+.kiki-api-live-result{padding:14px;background:#edf6ef;border:1px solid #b6d7bf;border-radius:10px}
+.kiki-api-live-result h3{margin:0 0 8px}
+@media(max-width:670px){.kiki-api-search input{width:100%}.kiki-api-source-grid{grid-template-columns:1fr}}
