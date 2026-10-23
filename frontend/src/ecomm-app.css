@@ -21,3 +21,15 @@
 .kiki-ecomm-sku-check label{display:grid;gap:6px;font-size:12px}
 .kiki-ecomm-sku-check textarea{width:100%;resize:vertical;border:1px solid #cbd7cf;border-radius:8px;padding:10px}
 .kiki-ecomm-sku-check button{margin-top:8px}
+
+/* Exact SKU lookup result is separate from extra sibling variants. */
+.kiki-ecomm-sku-diagnosis{display:grid;gap:11px;border:1px solid #cbdfd3;border-radius:10px;background:#f5faf6;padding:14px}
+.kiki-ecomm-sku-diagnosis h4{font-size:14px;margin:0;color:#194b35}
+.kiki-ecomm-sku-diagnosis p{font-size:12px;line-height:1.55}
+.kiki-ecomm-hint{background:#fff8e9;border-radius:8px;border:1px solid #ead8b4;padding:10px}
+.kiki-ecomm-requested{display:grid;gap:8px;padding:12px;border:1px solid #d7e5da;border-radius:8px;background:white;min-width:0}
+.kiki-ecomm-requested-head{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.kiki-ecomm-requested-head strong{font-size:12px;overflow-wrap:anywhere}
+.kiki-ecomm-requested-head span{background:#eaf4ec;border-radius:8px;padding:5px 8px;font-size:11px;color:#26543a}
+.kiki-ecomm-request-match{border-left:3px solid #accfbc;padding-left:9px;display:grid;gap:5px}
+.kiki-ecomm-sku-diagnosis small{font-size:11px;color:#536b5c;line-height:1.5}
