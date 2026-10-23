@@ -128,3 +128,16 @@
 .kiki-ecomm-tn-brand-results details{padding:10px 12px;border:1px solid #dce9df;border-radius:8px;background:white}
 .kiki-ecomm-tn-brand-results summary{cursor:pointer;font-size:12px;font-weight:700}
 .kiki-ecomm-tn-brand-results .kiki-ecomm-commercial-row p{margin:0;font-size:12px}
+
+/* Safe read-only ML + EDIMA brand evidence and provenance. */
+.kiki-ecomm-ml-brands{display:grid;gap:12px;padding:14px;border:1px solid #d6e5d9;border-radius:10px;background:#f9fcfa}
+.kiki-ecomm-ml-brands>summary{cursor:pointer;font-size:13px;font-weight:750;color:#214b36}
+.kiki-ecomm-ml-brands>p,.kiki-ecomm-ml-brands>small{font-size:12px;line-height:1.5;margin:0}
+.kiki-ecomm-ml-brands>button{justify-self:start}
+.kiki-ecomm-ml-brand-results{display:grid;gap:10px;padding-top:10px}
+.kiki-ecomm-ml-brand-results h4{font-size:14px;margin:0;color:#24543b}
+.kiki-ecomm-ml-brand-results>p,.kiki-ecomm-ml-brand-results>small{font-size:12px;line-height:1.5;margin:0}
+.kiki-ecomm-ml-brand-results details{padding:10px 12px;border:1px solid #dce9df;border-radius:8px;background:white}
+.kiki-ecomm-ml-brand-results summary{cursor:pointer;font-size:12px;font-weight:700}
+.kiki-ecomm-ml-brand-results details p{font-size:12px;line-height:1.5}
+.kiki-ecomm-ml-brand-results .kiki-ecomm-commercial-row p{margin:0;font-size:12px}

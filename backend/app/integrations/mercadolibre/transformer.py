@@ -23,6 +23,7 @@ def transform_item(item: dict) -> list[ChannelListing]:
         "title": item.get("title"),
         "status": item.get("status"),
         "url": item.get("permalink"),
+        "brand": _attribute(attributes, {"BRAND"}),
     }
     variations = item.get("variations") or []
     if not variations:

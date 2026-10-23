@@ -357,3 +357,45 @@ export interface EcommTnBrandEvidence {
   sampling_limit?:number;
   policy:string;
 }
+
+export interface EcommMlBrandEvidence {
+  available:boolean;
+  mode:'REVIEW_ONLY_ML_BRAND_EVIDENCE';
+  activation_allowed:false;
+  sources:{
+    ml_source:string;
+    ml_rows:number;
+    ml_rows_with_brand:number;
+    edima_rows:number;
+    edima_rows_with_brand:number;
+  };
+  summary:{
+    missing_historical_brand:number;
+    unique_brand_review_leads:number;
+    combo_leads:number;
+    conflicting_listing_brands:number;
+    ambiguous_identifiers:number;
+    conflicting_brands_per_ecomm_id:number;
+  };
+  candidates:{
+    ecomm_id:string;
+    ecomm_name:string;
+    ecomm_sku:string;
+    ml_brand:string;
+    mla:string;
+    ml_title:string;
+    ml_source:string;
+    match_basis:'UNIQUE_EXACT_ML_SKU'|'UNIQUE_VALID_ML_GTIN'|'UNIQUE_HISTORICAL_MLA_REFERENCE'|'UNIQUE_VALID_EDIMA_GTIN';
+    is_combo:boolean|null;
+    supporting_listings:number;
+    review_status:'NEEDS_HUMAN_VERIFICATION';
+  }[];
+  sampling_limit:number;
+  source_dates:{
+    ecomm_api_stage:string|null;
+    ecomm_historical:string|null;
+    ml_snapshot:string|null;
+    edima:string|null;
+  };
+  policy:string;
+}

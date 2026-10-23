@@ -34,6 +34,7 @@ class MercadoLibreExcelImporter(ExcelImporter):
             "Producto",
         },
         "status": {"Estado", "Status"},
+        "brand": {"Marca", "Brand"},
         "price": {"Precio", "Price"},
         "url": {"URL", "Link", "Permalink"},
         "inventory_linked": {
@@ -72,4 +73,5 @@ class MercadoLibreExcelImporter(ExcelImporter):
             price=normalize_decimal(get("price")),
             url=clean(get("url")),
             inventory_linked=clean(get("inventory_linked")),
+            brand=clean(get("brand")),
         )

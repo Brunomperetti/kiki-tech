@@ -123,6 +123,7 @@ class ChannelListing(BaseModel):
     price: Decimal | None = None
     url: str | None = None
     inventory_linked: str | None = None
+    brand: str | None = None
 
 
 class ValidationIssue(BaseModel):
