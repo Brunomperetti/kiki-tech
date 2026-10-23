@@ -93,7 +93,7 @@ export function WorkQueue(){
   });
   const [error,setError]=useState('');
   const [success,setSuccess]=useState('');
-  const [coreIssue,setCoreIssue]=useState<CoreIssue>('BRAND_MISSING');
+  const [coreIssue,setCoreIssue]=useState<CoreIssue>(searchParams.get('issue')==='ean'?'EAN_MISSING':'BRAND_MISSING');
   const [coreSearch,setCoreSearch]=useState('');
   const [corePage,setCorePage]=useState(1);
   const [brandPage,setBrandPage]=useState(1);
@@ -102,6 +102,8 @@ export function WorkQueue(){
   const [verifiedPage,setVerifiedPage]=useState(1);
   const requestedProductSearch = searchParams.get('q')||'';
   useEffect(()=>{setCoreSearch(requestedProductSearch);setBrandPage(1);setVerifiedPage(1);},[requestedProductSearch,focus]);
+  const requestedIssue=searchParams.get('issue');
+  useEffect(()=>{setCoreIssue(requestedIssue==='ean'?'EAN_MISSING':'BRAND_MISSING');setCorePage(1)},[requestedIssue]);
   const PAGE_SIZE=50;
   const [likelyExceptionsOnly,setLikelyExceptionsOnly]=useState(false);
   const [resolutionItem,setResolutionItem]=useState<ReadinessItem|null>(null);
@@ -321,6 +323,8 @@ export function WorkQueue(){
     if(!term)return source;
     return source.filter(item=>[
       item.product.sku,
+      item.product.sku_variant,
+      item.product.sku_effective,
       item.product.name,
       item.product.brand,
       item.product.ean,
