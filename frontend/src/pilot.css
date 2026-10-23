@@ -1,0 +1,25 @@
+.kiki-pilot{display:grid;gap:26px}
+.kiki-pilot-sources,.kiki-pilot-steps,.kiki-pilot-summary{background:white;border:1px solid #dce5df;border-radius:14px;padding:24px;display:grid;gap:14px}
+.kiki-pilot h2{font-size:20px;margin:0;color:#18372a}
+.kiki-pilot h3{font-size:16px;color:#18372a;margin:8px 0}
+.kiki-pilot p{font-size:14px}
+.kiki-pilot-source-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kiki-pilot-source-grid article{border:1px solid #dce5df;border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0}
+.kiki-pilot-source-grid article>strong{font-size:13px}
+.kiki-pilot-source-grid article>b{font-size:21px;color:#193f2e}
+.kiki-pilot-source-grid small{color:#68786f;overflow-wrap:anywhere;font-size:12px}
+.kiki-pilot-state{border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700}
+.kiki-pilot-state.is-ok{background:#e8f3e6;color:#28623f}
+.kiki-pilot-state.is-caution{background:#fff3d9;color:#805d23}
+.kiki-pilot-state.is-unknown{background:#eef0ef;color:#6f7773}
+.kiki-pilot-last{color:#68786f;font-size:12px}
+.kiki-pilot-steps-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.kiki-pilot-steps-grid article{display:flex;flex-direction:column;gap:8px;border:1px solid #dce5df;border-radius:12px;padding:20px}
+.kiki-pilot-step{font-weight:700;font-size:12px;color:#47762d;letter-spacing:.04em}
+.kiki-pilot-link{display:inline-flex;margin-top:auto;align-self:flex-start;padding:10px 15px;background:#193f2e;color:white;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none}
+.kiki-pilot-link:hover{background:#285c42}
+.kiki-pilot-warning{background:#fff8e7;border:1px solid #f0d899;border-radius:9px;padding:14px;color:#67501f}
+.kiki-pilot-footer-links{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+.kiki-pilot-footer-links a{color:#193f2e;font-weight:700}
+@media(max-width:1100px){.kiki-pilot-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:670px){.kiki-pilot-source-grid,.kiki-pilot-steps-grid{grid-template-columns:1fr}.kiki-pilot-sources,.kiki-pilot-steps,.kiki-pilot-summary{padding:16px}}
