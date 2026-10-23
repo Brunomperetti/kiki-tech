@@ -86,3 +86,14 @@
 .kiki-ecomm-hybrid-columns h5{margin:0 0 5px;font-size:12px;color:#1f5037}
 .kiki-ecomm-hybrid-columns p{margin:0;font-size:12px;overflow-wrap:anywhere;line-height:1.45}
 @media(max-width:720px){.kiki-ecomm-hybrid-columns{grid-template-columns:minmax(0,1fr)}}
+
+/* Explicit live read-only verification follows the historical API-stage preview. */
+.kiki-ecomm-live-check{display:grid;gap:10px;padding:13px;border:1px solid #d6e5dd;border-radius:10px;background:#f5faf7}
+.kiki-ecomm-live-check h4{margin:0;font-size:14px;color:#204e36}
+.kiki-ecomm-live-check p{margin:0;font-size:12px;line-height:1.55}
+.kiki-ecomm-live-check>button{justify-self:start}
+.kiki-ecomm-live-rows{display:grid;gap:8px}
+.kiki-ecomm-live-record{display:grid;gap:7px;border:1px solid #cfdfd2;border-radius:8px;padding:12px;background:#fff;overflow-wrap:anywhere}
+.kiki-ecomm-live-record strong{font-size:12px}
+.kiki-ecomm-live-record p{font-size:12px;margin:0;line-height:1.5}
+.kiki-ecomm-live-record small{font-size:11px;color:#5c7564;line-height:1.45}
