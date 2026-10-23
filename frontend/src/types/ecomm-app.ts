@@ -15,10 +15,16 @@ export interface EcommAppPreviewList {
     name?:string|null;
     code?:string|null;
     description?:string|null;
+    is_combo?:boolean|null;
+    total_stock?:number|string|null;
     variant_count?:number;
     available_fields:string[];
     variants?:{
       sku?:string|null;
+      id?:number|string|null;
+      description?:string|null;
+      variant_description?:string|null;
+      is_combo?:boolean|null;
       barcode?:string|null;
       total_stock?:number|string|null;
       available_fields:string[];
@@ -33,7 +39,30 @@ export interface EcommAppPreview {
   product_preview:EcommAppPreviewList;
   note:string;
 }
+export interface EcommAppSkuDiagnosis {
+  shape_recognized:boolean;
+  parent_count:number|null;
+  variant_count:number|null;
+  sibling_variant_count:number|null;
+  envelope_keys:string[];
+  warning:string|null;
+  requested:{
+    sku:string;
+    status:'EXACT_SINGLE'|'MULTIPLE_EXACT'|'NO_EXACT'|'UNKNOWN_SHAPE';
+    matches:{
+      parent_code:string|null;
+      parent_description:string|null;
+      parent_is_combo:boolean|null;
+      variant_id:number|string|null;
+      variant_sku:string;
+      variant_is_combo:boolean|null;
+      total_stock:number|string|null;
+      variant_description:string|null;
+    }[];
+  }[];
+}
 export interface EcommAppLookup {
+  sku_diagnosis:EcommAppSkuDiagnosis;
   mode:'READ_ONLY_SKU_LOOKUP';
   requested_skus:string[];
   product_preview:EcommAppPreviewList;
