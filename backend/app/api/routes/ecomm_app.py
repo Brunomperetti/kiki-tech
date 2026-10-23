@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 
 from ...core.config import get_settings
 from ...core.security import require_csrf, require_session
+from ...database.session import get_db
+from sqlalchemy.orm import Session
+from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
 from ...integrations.ecomm_app.public_api import (
     EcommAppApiError,
     EcommAppInventoryClient,
@@ -71,5 +74,24 @@ def ecomm_app_catalog_audit(body: CatalogAuditRequest, _session=Depends(require_
     """Only reads two pages (<=100 parent products) and does not persist data."""
     try:
         return _client().catalog_audit(body.start_page)
+    except (EcommAppApiError, ValueError) as exc:
+        _raise_safe(exc)
+
+
+@router.get("/stage/status")
+def ecomm_app_stage_status(
+    db: Session = Depends(get_db), _session=Depends(require_session),
+):
+    """Return compact progress only, without returning copied inventory rows."""
+    return EcommAppStageService(db, None).status()
+
+
+@router.post("/stage/next")
+def ecomm_app_stage_next(
+    db: Session = Depends(get_db), _session=Depends(require_csrf),
+):
+    """Append up to three fully validated pages to isolated KIKI staging data."""
+    try:
+        return EcommAppStageService(db, _client()).next_batch()
     except (EcommAppApiError, ValueError) as exc:
         _raise_safe(exc)
