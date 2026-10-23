@@ -92,6 +92,7 @@ export function Pilot(){
     SHARED_GTIN:'GTIN compartido, investigar',
     GTIN_CONFLICT:'SKU y GTIN contradictorios',
     PRESENTATION_CONFLICT:'Presentaciones incompatibles',
+    PACK_QUANTITY_EQUIVALENCE_REVIEW:'Packs: unidad x cantidad puede equivaler al total (revisar)',
     INVALID_ML_GTIN:'GTIN ML no válido',
     INVALID_ECOMM_GTIN:'GTIN Ecomm no válido',
     DUPLICATE_API_SKU:'SKU Ecomm repetido',
@@ -248,6 +249,11 @@ export function Pilot(){
           Los {preview.summary.exact_unique_sku_candidates.toLocaleString('es-AR')} candidatos
           no están aprobados ni demuestran stock, composición o identidad comercial.</p>
         <h3>Motivos encontrados</h3>
+        <p className="kiki-pilot-last">
+          Las diferencias de presentación pueden ser incompatibilidades reales o
+          cantidades expresadas por unidad frente al total del pack.
+          En ambos casos se exige revisión y no se aplica ningún cambio.
+        </p>
         <div className="kiki-api-preview-reasons">
           {reportStatuses.map(key=><div key={key}><span>{reportStatusLabels[key]}</span>
             <strong>{preview.summary[key].toLocaleString('es-AR')}</strong></div>)}
