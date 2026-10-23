@@ -4,6 +4,7 @@ import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLooku
 import {EcommAdoptionReadiness} from './EcommAdoptionReadiness';
 import {EcommHybridInspector} from './EcommHybridInspector';
 import {EcommCommercialAudit} from './EcommCommercialAudit';
+import {EcommTnBrandEvidence} from './EcommTnBrandEvidence';
 import '../ecomm-app.css';
 
 const comboLabel=(flag:boolean|null|undefined)=>flag===true?'Sí':flag===false?'No':'No informado';
@@ -228,6 +229,7 @@ export function EcommAppConnector(){
         {comparison&&<div className="kiki-ecomm-preview">
           <EcommAdoptionReadiness plan={comparison.adoption_plan}/>
           <EcommCommercialAudit/>
+          <EcommTnBrandEvidence/>
           <EcommHybridInspector comparison={comparison}/>
           <h4>Resultados de coincidencias entre fuentes</h4>
           <div className="kiki-ecomm-audit-metrics">
