@@ -187,6 +187,7 @@ def test_ambiguous_ml_reasons_are_reported_without_weakening_exclusions():
 
 def test_shared_mla_with_unique_variant_sku_is_only_a_hint():
     stage, historical, ml, edima = fixtures()
+    historical[0]["ecomm_rows"] = [{"listing_id": "MLA101"}]
     historical[1]["ecomm_rows"] = [{"listing_id": "MLA101"}]
     report = ml_brand_evidence_report(stage, historical, ml, edima, "MERCADOLIBRE_API")
     detail = report["diagnostics"]["counts"]
