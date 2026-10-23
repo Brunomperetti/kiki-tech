@@ -154,6 +154,41 @@ export interface EcommApiCatalog {
   warning:string;
 }
 
+export type EcommMlPreviewStatus =
+  'SKU_GTIN_AGREE_REVIEW'|'SKU_ONLY_REVIEW'|'SHARED_GTIN'|
+  'GTIN_CONFLICT'|'PRESENTATION_CONFLICT'|'INVALID_ML_GTIN'|
+  'INVALID_ECOMM_GTIN'|'DUPLICATE_API_SKU'|'SKU_NOT_IN_API'|
+  'NO_EXPLICIT_VARIANT_SKU'|'PRODUCT_SKU_ONLY';
+export interface EcommMlPreviewExample {
+  status:EcommMlPreviewStatus;
+  mla:string;
+  ml_title:string;
+  ml_variant_sku:string|null;
+  ml_product_sku:string|null;
+  ml_gtin:string|null;
+  api_ecomm_id:string|null;
+  api_sku:string|null;
+  api_name:string|null;
+  api_is_combo:boolean|null;
+  api_gtin:string|null;
+  reason:string;
+}
+export interface EcommMlPreview {
+  mode:'API_ONLY_ML_READ_ONLY_PREVIEW';
+  ecomm_source:'ECOMM_APP_API_STAGE';
+  mercadolibre_source:'MERCADOLIBRE_API';
+  external_writes_enabled:false;
+  operational_reconciliation_activated:false;
+  historical_decisions_applied:false;
+  ecomm_last_capture_at:string|null;
+  ml_snapshot_updated_at:string|null;
+  summary:{api_variants:number;ml_api_rows:number;unique_api_sku:number;
+    ambiguous_api_skus:number;api_variants_with_multiple_ml_rows_by_sku:number}
+    & Record<EcommMlPreviewStatus,number>;
+  examples:Partial<Record<EcommMlPreviewStatus,EcommMlPreviewExample[]>>;
+  warning:string;
+}
+
 export interface EcommAdoptionPlan {
   mode:'PLANNING_ONLY';
   activation_allowed:false;
