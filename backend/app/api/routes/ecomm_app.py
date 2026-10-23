@@ -10,6 +10,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from sqlalchemy.orm import Session
 from ...integrations.ecomm_app.api_catalog_browser import api_catalog_rows
+from ...integrations.ecomm_app.api_ml_reconciliation_preview import api_ml_reconciliation_preview
 from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
 from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
 from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
@@ -112,6 +113,34 @@ def ecomm_app_stage_catalog(
     stage = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE))
     try:
         return api_catalog_rows(stage.payload if stage else [], query=q, page=page, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+
+
+@router.get("/stage/ml-reconciliation-preview")
+def ecomm_app_ml_reconciliation_preview(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Compare completed Ecomm API capture with ML API snapshot without side effects.
+
+    Absolutely no fallback to legacy ECOMM_APP or MERCADOLIBRE Excel.
+    """
+    stage = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE))
+    ml = db.scalar(select(CatalogSnapshot).where(
+        CatalogSnapshot.source == "MERCADOLIBRE_API"
+    ))
+    try:
+        report = api_ml_reconciliation_preview(
+            stage.payload if stage else [], ml.payload if ml else [],
+        )
+        report["ecomm_last_capture_at"] = (
+            stage.payload[-1].get("captured_at") if stage and stage.payload else None
+        )
+        report["ml_snapshot_updated_at"] = (
+            ml.updated_at.isoformat() if ml else None
+        )
+        return report
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
 
