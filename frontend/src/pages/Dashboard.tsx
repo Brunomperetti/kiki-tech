@@ -99,8 +99,8 @@ export function Dashboard(){
     </section>
 
     <section className="kiki-pilot-invite" style={{marginBottom:20,padding:"18px 22px",background:"#ffffff",border:"1px solid #dce5df",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-      <div><strong>¿Vas a mostrar KIKI al cliente?</strong><p>Comprobá fuentes y seguí una prueba guiada con un producto real, sin publicar nada.</p></div>
-      <Link className="kiki-main-action" to="/pilot">Iniciar prueba con KIKI →</Link>
+      <div><strong>Ecomm-App: catálogo por API</strong><p>Buscá variantes y consultá SKU directamente a Ecomm-App. Las pantallas históricas aún usan Excel y no son datos actuales.</p></div>
+      <Link className="kiki-main-action" to="/pilot">Abrir catálogo API →</Link>
     </section>
 
     <div className="kiki-home-columns">
