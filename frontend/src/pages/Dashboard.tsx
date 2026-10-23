@@ -38,7 +38,6 @@ export function Dashboard(){
 
   const summary=preview?.summary;
   const mlConnected=ml?.connected===true&&!ml.token_expired;
-  const reconciled=Boolean(preview&&preview.external_writes_enabled===false);
   const bars=preview?[
     {id:'PRODUCT_SKU_ONLY',name:'SKU exacto, falta corroboración',count:summary!.PRODUCT_SKU_ONLY,tone:'mint'},
     {id:'PRESENTATION_CONFLICT',name:'Presentaciones diferentes',count:summary!.PRESENTATION_CONFLICT,tone:'rose'},
@@ -88,7 +87,7 @@ export function Dashboard(){
         <span className="kiki-stat-icon"><KikiIcon name="box"/></span>
         <small>Variantes Ecomm por API</small>
         <strong>{loading?'…':ecomm?.complete?n(ecomm.quality.variants):'—'}</strong>
-        <span>{ecomm?.complete?''${ecomm.pages_saved}/${ecomm.expected_pages??'?'} páginas capturadas por API'':'Copia API no verificada'}</span>
+        <span>{ecomm?.complete?ecomm.pages_saved+'/'+(ecomm.expected_pages??'?')+' páginas capturadas por API':'Copia API no verificada'}</span>
       </article>
       <article className="kiki-client-stat">
         <span className="kiki-stat-icon"><KikiIcon name="store"/></span>
