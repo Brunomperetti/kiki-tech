@@ -1,4 +1,6 @@
 import {FormEvent,useEffect,useState} from 'react';
+import {KikiIcon} from '../components/KikiIcon';
+import '../client-ux.css';
 import {api} from '../services/api';
 import type {MercadoLibreStatus} from '../types/catalog';
 import type {EcommApiCatalog,EcommApiCatalogRow,EcommAppLookup,EcommMlPreview,EcommMlPreviewStatus,EcommStageStatus} from '../types/ecomm-app';
@@ -53,6 +55,12 @@ export function Pilot(){
     setLoading(false);
   }
   useEffect(()=>{void refresh()},[]);
+  // After a category is selected, bring its actual examples into view.
+  useEffect(()=>{
+    if(showPreviewExamples)document.getElementById('kiki-examples')?.scrollIntoView({
+      behavior:'smooth',block:'start',
+    });
+  },[showPreviewExamples,previewFilter]);
 
   async function search(q:string,nextPage:number){
     setCatalogBusy(true);
@@ -120,12 +128,18 @@ export function Pilot(){
       </button>
     </header>
 
+    <nav className="kiki-pilot-jump" aria-label="Ir a un área del centro API">
+      <a href="#fuentes"><KikiIcon name="shield"/>Ver fuentes</a>
+      <a href="#catalogo"><KikiIcon name="search"/>Buscar producto</a>
+      <a href="#comparacion"><KikiIcon name="chart"/>Comparar con ML</a>
+    </nav>
+
     {errors.length>0&&<div role="alert" className="notice warning">
       <strong>Hay fuentes que no respondieron.</strong>
       <p>{errors.join(' · ')} No los interpretes como catálogos vacíos.</p>
     </div>}
 
-    <section className="kiki-pilot-sources">
+    <section className="kiki-pilot-sources" id="fuentes">
       <h2>1. Fuente Ecomm-App: API exclusivamente</h2>
       <p>Los productos se consultan desde la copia completa obtenida por API. El stock mostrado corresponde
         a la fecha de captura; no se sincroniza en vivo automáticamente.</p>
@@ -167,7 +181,7 @@ export function Pilot(){
       </small>
     </section>
 
-    <section className="kiki-pilot-steps">
+    <section className="kiki-pilot-steps" id="catalogo">
       <h2>2. Buscar productos en el catálogo API</h2>
       <p>Buscá por SKU exacto o parcial, ID interno, descripción o GTIN. Se mantienen
         separadas las variantes y los combos aunque compartan familia o código de barras.</p>
@@ -215,7 +229,7 @@ export function Pilot(){
       </div>}
     </section>
 
-    <section className="kiki-pilot-steps">
+    <section className="kiki-pilot-steps" id="comparacion">
       <h2>3. Comparar Ecomm API con Mercado Libre API (diagnóstico)</h2>
       <p>Comparación <strong>solo de lectura</strong> entre las dos copias API guardadas.
         Nunca utiliza el Excel histórico, no guarda vinculaciones y no publica productos.
@@ -254,15 +268,23 @@ export function Pilot(){
           cantidades expresadas por unidad frente al total del pack.
           En ambos casos se exige revisión y no se aplica ningún cambio.
         </p>
-        <div className="kiki-api-preview-reasons">
-          {reportStatuses.map(key=><div key={key}><span>{reportStatusLabels[key]}</span>
-            <strong>{preview.summary[key].toLocaleString('es-AR')}</strong></div>)}
+        <div className="kiki-api-preview-reasons" aria-label="Filtrar por motivo">
+          {reportStatuses.map(key=><button key={key} type="button"
+            className={'kiki-pilot-reason-button '+(preview.summary[key]===0?'is-zero':'')}
+            disabled={preview.summary[key]===0}
+            aria-label={reportStatusLabels[key]+': '+preview.summary[key]+'. Ver ejemplos'}
+            onClick={()=>{setPreviewFilter(key);setShowPreviewExamples(true)}}>
+            <KikiIcon name={preview.summary[key]>0?'search':'check'} size={15}/>
+            <span>{reportStatusLabels[key]}</span>
+            <strong>{preview.summary[key].toLocaleString('es-AR')}</strong>
+          </button>)}
         </div>
+        <p className="kiki-pilot-last">Seleccioná un motivo con casos para abrir sus ejemplos directamente.</p>
         <button type="button" className="kiki-api-action" onClick={()=>setShowPreviewExamples(!showPreviewExamples)}>
           {showPreviewExamples?'Ocultar ejemplos':'Ver casos concretos (muestra limitada)'}
         </button>
-        {showPreviewExamples&&<>
-          <label htmlFor="kiki-preview-filter">Filtrar ejemplos por motivo</label>
+        {showPreviewExamples&&<div id="kiki-examples" className="kiki-pilot-details">
+          <label htmlFor="kiki-preview-filter">Filtrar ejemplos por motivo (muestra de hasta 6 por categoría)</label>
           <select id="kiki-preview-filter" value={previewFilter}
             onChange={e=>setPreviewFilter(e.target.value as EcommMlPreviewStatus|'ALL')}>
             <option value="ALL">Todos los motivos</option>
@@ -287,7 +309,7 @@ export function Pilot(){
               </tbody>
             </table>
           </div>
-        </>}
+        </div>}
         <p className="kiki-pilot-warning">{preview.warning}</p>
       </>}
     </section>
