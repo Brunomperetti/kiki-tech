@@ -98,6 +98,11 @@ export function Dashboard(){
       </article>)}
     </section>
 
+    <section className="kiki-pilot-invite" style={{marginBottom:20,padding:"18px 22px",background:"#ffffff",border:"1px solid #dce5df",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+      <div><strong>¿Vas a mostrar KIKI al cliente?</strong><p>Comprobá fuentes y seguí una prueba guiada con un producto real, sin publicar nada.</p></div>
+      <Link className="kiki-main-action" to="/pilot">Iniciar prueba con KIKI →</Link>
+    </section>
+
     <div className="kiki-home-columns">
       <section className="kiki-feature-panel">
         <p className="eyebrow">{next.eyebrow}</p>
