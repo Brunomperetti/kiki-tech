@@ -359,6 +359,37 @@ export interface EcommTnBrandEvidence {
 }
 
 export interface EcommMlBrandEvidence {
+  diagnostics:{
+    counts:{
+      ml_rows_with_brand_available:number;
+      ml_rows_with_matching_edima_mla:number;
+      ml_rows_without_brand_in_either_source:number;
+      ml_rows_with_brand_disagreements:number;
+      ml_rows_ambiguous:number;
+      distinct_mlas_ambiguous:number;
+      shared_historical_mla:number;
+      shared_sku:number;
+      shared_gtin:number;
+      identity_signal_conflicts:number;
+      shared_mla_with_unique_variant_sku:number;
+      ml_rows_without_unique_identity:number;
+      ml_rows_matching_already_branded_ecomm:number;
+      ml_rows_pointing_to_missing_brand_ecomm:number;
+      edima_rows_not_in_ml_snapshot:number;
+    };
+    examples:{
+      mla:string;
+      ml_sku:string;
+      reason_codes:string[];
+      sku_owner_count:number;
+      gtin_owner_count:number;
+      historical_mla_owner_count:number;
+      unique_variant_sku_present:boolean;
+      classification:'HUMAN_REVIEW_ONLY';
+    }[];
+    sample_limit:number;
+    policy:string;
+  };
   available:boolean;
   mode:'REVIEW_ONLY_ML_BRAND_EVIDENCE';
   activation_allowed:false;
