@@ -1,7 +1,7 @@
 import type {BulkGtinNotApplicablePayload, BulkGtinNotApplicableResult, CatalogContinuityDecision, CatalogContinuityItem, CatalogContinuityReport, EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
-import type {EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence} from '../types/ecomm-app';
+import type {EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence,EcommMlBrandEvidence} from '../types/ecomm-app';
 
 const base = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || 'http://localhost:8000')
@@ -219,6 +219,7 @@ export const api = {
   ecommStageCompare: () => request<EcommStageComparison>('/api/ecomm-app/stage/compare'),
   ecommCommercialAudit: () => request<EcommCommercialAudit>('/api/ecomm-app/stage/commercial-audit'),
   ecommTnBrandEvidence: () => request<EcommTnBrandEvidence>('/api/ecomm-app/stage/tn-brand-evidence'),
+  ecommMlBrandEvidence: () => request<EcommMlBrandEvidence>('/api/ecomm-app/stage/ml-brand-evidence'),
   ecommHybridPreview: (ids:string[]) => request<EcommHybridPreview>('/api/ecomm-app/stage/hybrid-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})}),
   ecommLiveStockCheck: (ids:string[]) => request<EcommLiveStockCheck>('/api/ecomm-app/stage/live-stock-check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})}),
   ecommStageNext: () => request<EcommStageStatus>('/api/ecomm-app/stage/next',{method:'POST'}),
