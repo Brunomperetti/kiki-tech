@@ -240,3 +240,23 @@ export interface EcommHybridPreview {
   }[];
   warning:string;
 }
+
+export interface EcommLiveStockCheck {
+  mode:'READ_ONLY_LIVE_STOCK_VERIFICATION';
+  activation_allowed:false;
+  checked_at:string;
+  snapshot_captured_at:string|null;
+  queried_skus:number;
+  rows:{
+    ecomm_id:string;
+    sku:string|null;
+    is_combo:boolean|null;
+    historical_stock:number|string|null;
+    captured_stock:number|string|null;
+    current_stock:number|string|null;
+    warehouses:{id:string|number;stock:string|number}[]|null;
+    status:'NOT_ELIGIBLE'|'SKU_NOT_FOUND'|'AMBIGUOUS_SKU'|'ID_MISMATCH'|'STOCK_NOT_REPORTED'|'WAREHOUSES_NOT_REPORTED'|'WAREHOUSE_TOTAL_CONFLICT'|'IDENTITY_AND_STOCK_VERIFIED';
+    reason:string;
+  }[];
+  warning:string;
+}
