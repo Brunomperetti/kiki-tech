@@ -368,6 +368,8 @@ export interface EcommMlBrandEvidence {
       sku_inside_gtin_owners_no_mla_conflict:number;
       no_unique_exact_sku:number;
       identity_contradiction:number;
+      sku_outside_gtin_owners:number;
+      historical_mla_conflict:number;
       no_stable_ecomm_id:number;
       already_branded_ecomm:number;
       presentation_conflict:number;
@@ -396,8 +398,20 @@ export interface EcommMlBrandEvidence {
       mla:string;
       gtin:string;
       sku:string;
+      sku_ecomm_id:string;
+      gtin_owner_ids:string[];
+      historical_mla_owner_ids:string[];
       gtin_owner_count:number;
       reason:string;
+      reason_codes:('SKU_NOT_IN_GTIN_OWNERS'|'HISTORICAL_MLA_POINTS_ELSEWHERE')[];
+    }[];
+    presentation_rejected_samples:{
+      ecomm_id:string;
+      ecomm_name:string;
+      ml_title:string;
+      mla:string;
+      sku:string;
+      review_status:'PRESENTATION_CONFLICT';
     }[];
     sample_limit:number;
     mode:'HYPOTHESIS_REQUIRES_MANUAL_VERIFICATION';
