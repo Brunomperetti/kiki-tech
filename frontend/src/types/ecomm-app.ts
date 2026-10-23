@@ -68,3 +68,43 @@ export interface EcommAppLookup {
   product_preview:EcommAppPreviewList;
   note:string;
 }
+
+export interface EcommCatalogAudit {
+  mode:'READ_ONLY_AUDIT';
+  start_page:number;
+  page_size:number;
+  pages_read:number;
+  is_full_catalog:false;
+  pages:{
+    page:number;
+    parents:number;
+    envelope_fields:string[];
+    pagination:{
+      present:boolean;
+      available_fields:string[];
+      values:Record<string,number|boolean>;
+    };
+  }[];
+  next_page_to_check:number|null;
+  totals_in_this_batch:{
+    parents:number;
+    variants:number;
+    combo_parents:number;
+    combo_variants:number;
+    variants_without_id:number;
+    variants_without_sku:number;
+    variants_without_total_stock:number;
+    parents_without_variants_array:number;
+    invalid_variants:number;
+    repeated_variant_ids:number;
+    repeated_skus:number;
+  };
+  examples:{
+    parent_code:string|null;
+    sku:string|null;
+    variant_id:string|number|null;
+    is_combo:boolean|null;
+    total_stock:number|string|null;
+  }[];
+  notice:string;
+}
