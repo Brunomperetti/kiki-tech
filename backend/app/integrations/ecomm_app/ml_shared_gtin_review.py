@@ -19,7 +19,7 @@ _MLA = re.compile(r"^(MLA\d+)(?:#\d+)?$", re.IGNORECASE)
 
 def _ml_id(value):
     match = _MLA.match(_str(value))
-    return match.group().upper() if match else ""
+    return match.group(1).upper() if match else ""
 
 
 def _key(value):
