@@ -1,151 +1,179 @@
 import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {api} from '../services/api';
-import type {FinalPublicationQueueReport,InventoryLinkageReport,MercadoLibreStatus,Summary,ReadinessReport} from '../types/catalog';
+import {KikiIcon} from '../components/KikiIcon';
+import type {MercadoLibreStatus} from '../types/catalog';
+import type {EcommMlPreview,EcommStageStatus} from '../types/ecomm-app';
+import '../client-ux.css';
 
-const count=(value?:number|null)=>value==null?'—':value.toLocaleString('es-AR');
-const date=(value?:string)=>value?new Date(value).toLocaleString('es-AR'):'Sin registro';
+const n=(x:number|null|undefined)=>x==null?'—':x.toLocaleString('es-AR');
+const date=(raw:string|null|undefined)=>{
+  if(!raw)return 'No disponible';
+  const d=new Date(raw);
+  return Number.isNaN(d.getTime())?'No disponible':d.toLocaleString('es-AR');
+};
 
 export function Dashboard(){
-  const [data,setData]=useState<Summary|null>(null);
+  const [ecomm,setEcomm]=useState<EcommStageStatus|null>(null);
   const [ml,setMl]=useState<MercadoLibreStatus|null>(null);
-  const [linkage,setLinkage]=useState<InventoryLinkageReport|null>(null);
-  const [finalQueue,setFinalQueue]=useState<FinalPublicationQueueReport|null>(null);
-  const [readiness,setReadiness]=useState<ReadinessReport|null>(null);
-  const [tn,setTn]=useState<Awaited<ReturnType<typeof api.tiendanubeReport>>|null>(null);
-  const [tnStatus,setTnStatus]=useState<'loading'|'available'|'unavailable'>('loading');
+  const [preview,setPreview]=useState<EcommMlPreview|null>(null);
   const [loading,setLoading]=useState(true);
-  const [busy,setBusy]=useState(false);
-  const [syncing,setSyncing]=useState(false);
-  const [message,setMessage]=useState('');
+  const [errors,setErrors]=useState<string[]>([]);
 
   async function load(){
-    setLoading(true);
+    setLoading(true);setErrors([]);
     const results=await Promise.allSettled([
-      api.dashboard(),
-      api.mlStatus(),
-      api.inventoryLinkage(),
-      api.finalPublicationQueue(),
-      api.publicationReadiness(),
-      api.tiendanubeReport(),
-    ]);
-    setData(results[0].status==='fulfilled'?results[0].value:null);
+      api.ecommStageStatus(),api.mlStatus(),api.ecommMlPreview(),
+    ] as const);
+    setEcomm(results[0].status==='fulfilled'?results[0].value:null);
     setMl(results[1].status==='fulfilled'?results[1].value:null);
-    setLinkage(results[2].status==='fulfilled'?results[2].value:null);
-    setFinalQueue(results[3].status==='fulfilled'?results[3].value:null);
-    setReadiness(results[4].status==='fulfilled'?results[4].value:null);
-    setTn(results[5].status==='fulfilled'?results[5].value:null);
-    setTnStatus(results[5].status==='fulfilled'?'available':'unavailable');
+    setPreview(results[2].status==='fulfilled'?results[2].value:null);
+    setErrors(results.flatMap((r,i)=>r.status==='rejected'
+      ?[(['Ecomm-App API','Conexión Mercado Libre','Comparación API'][i])+
+        ': '+(r.reason instanceof Error?r.reason.message:'No respondió')]
+      :[]));
     setLoading(false);
   }
-  useEffect(()=>{void load().catch(e=>{setLoading(false);setMessage(e instanceof Error?e.message:'No se pudo actualizar el inicio.')})},[]);
+  useEffect(()=>{void load()},[]);
 
-  async function analyze(){
-    setBusy(true);setMessage('');
-    try{await api.analyze('AUTO');await load();setMessage('Catálogo analizado. Los indicadores se actualizaron.')}
-    catch(e){setMessage(e instanceof Error?e.message:'No se pudo analizar el catálogo.')}
-    finally{setBusy(false)}
-  }
-  async function connect(){
-    try{const {url}=await api.mlAuthUrl();window.location.assign(url)}
-    catch(e){setMessage(e instanceof Error?e.message:'No se pudo conectar Mercado Libre.')}
-  }
-  async function sync(){
-    setSyncing(true);setMessage('');
-    try{const result=await api.mlSync();await load();setMessage(`Sincronización finalizada: ${result.listing_count} publicaciones.`)}
-    catch(e){setMessage(e instanceof Error?e.message:'No se pudo sincronizar Mercado Libre.')}
-    finally{setSyncing(false)}
-  }
+  const summary=preview?.summary;
+  const mlConnected=ml?.connected===true&&!ml.token_expired;
+  const reconciled=Boolean(preview&&preview.external_writes_enabled===false);
+  const bars=preview?[
+    {id:'PRODUCT_SKU_ONLY',name:'SKU exacto, falta corroboración',count:summary!.PRODUCT_SKU_ONLY,tone:'mint'},
+    {id:'PRESENTATION_CONFLICT',name:'Presentaciones diferentes',count:summary!.PRESENTATION_CONFLICT,tone:'rose'},
+    {id:'PACK_QUANTITY_EQUIVALENCE_REVIEW',name:'Packs con posible equivalencia',count:summary!.PACK_QUANTITY_EQUIVALENCE_REVIEW,tone:'violet'},
+    {id:'INVALID_ML_GTIN',name:'GTIN ML no válido',count:summary!.INVALID_ML_GTIN,tone:'amber'},
+    {id:'SKU_NOT_IN_API',name:'SKU no encontrado en Ecomm',count:summary!.SKU_NOT_IN_API,tone:'slate'},
+    {id:'NO_ML_SKU',name:'Publicación sin SKU',count:summary!.NO_ML_SKU,tone:'blue'},
+    {id:'OTHERS',name:'Otros estados de revisión',
+      count:Math.max(0,summary!.ml_api_rows-(
+        summary!.PRODUCT_SKU_ONLY+summary!.PRESENTATION_CONFLICT+
+        summary!.PACK_QUANTITY_EQUIVALENCE_REVIEW+summary!.INVALID_ML_GTIN+
+        summary!.SKU_NOT_IN_API+summary!.NO_ML_SKU)),tone:'grey'},
+  ].filter(b=>b.count>0):[];
+  const total=summary?.ml_api_rows||0;
 
-  const ecomm=data?.import_diagnostics?.find(item=>item.source==='ECOMM_APP');
-  const mlImport=data?.import_diagnostics?.find(item=>item.source==='MERCADOLIBRE');
-  const mlSnapshot=Boolean(mlImport||ml?.last_sync||(data?.total_listings||0)>0);
-  const tnImported=tnStatus==='available'&&tn?.available===true;
-  const readyCount=finalQueue?.summary.READY_FOR_FINAL_REVIEW;
-  const reviewCount=readiness?.summary.REVIEW_REQUIRED;
-  const linkageCount=linkage?.available?linkage.summary.review_required:null;
-  const next=!ecomm
-    ? {eyebrow:'PRIMER PASO',title:'Cargar el catálogo de Ecomm-App',description:'Importá la fuente principal para que KIKI pueda comparar productos y preparar las revisiones.',to:'/imports',cta:'Actualizar información'}
-    : reviewCount!=null&&reviewCount>0
-    ? {eyebrow:'SIGUIENTE ACCIÓN',title:'Resolver los productos que necesitan revisión',description:'Hay fichas que todavía requieren completar o verificar información antes de avanzar con Mercado Libre.',to:'/work',cta:'Ver tareas pendientes'}
-    : readyCount!=null&&readyCount>0
-    ? {eyebrow:'SIGUIENTE ACCIÓN',title:'Revisar los productos preparados para ML',description:'Tenés productos listos para una revisión final interna. Todavía no se publican en Mercado Libre.',to:'/prepublication',cta:'Ver productos preparados'}
-    : {eyebrow:'SIGUIENTE PASO',title:'Elegí dónde querés trabajar',description:'Consultá las tareas o revisá el estado de Mercado Libre y Tiendanube desde Canales de venta.',to:'/channels',cta:'Ver canales de venta'};
-  const kpis=[
-    {label:'Productos en Ecomm',value:ecomm?count(data?.total_products):'—',detail:ecomm?'Catálogo importado':'Falta cargar o verificar fuente'},
-    {label:'Publicaciones ML',value:mlSnapshot?count(data?.total_listings):'—',detail:'Último catálogo registrado, no en vivo'},
-    {label:'Productos Tiendanube',value:tnImported?count(tn?.summary.products):'—',detail:tnStatus==='unavailable'?'No se pudieron consultar':tnImported?'CSV importado':'Sin catálogo disponible'},
-    {label:'Para revisar antes de ML',value:count(reviewCount),detail:'Revisión previa a publicación; no todas las tareas'},
-  ];
-
-  return <div className="kiki-home">
+  return <div className="kiki-home kiki-client-home">
     <header className="kiki-home-header">
       <div>
-        <p className="eyebrow">KIKI TECH · VISTA GENERAL</p>
-        <h1>Tu catálogo, en una sola mirada.</h1>
-        <p>Lo importante primero: qué tenés, qué necesita atención y dónde continuar.</p>
+        <p className="eyebrow">KIKI TECH · CENTRO DE CONTROL</p>
+        <h1>Tu catálogo, más claro.</h1>
+        <p>Explorá los productos de Ecomm-App por API y entendé qué pasa
+          con las publicaciones guardadas de Mercado Libre, sin tocar las tiendas.</p>
       </div>
-      <button type="button" className="kiki-refresh" disabled={loading} onClick={()=>void load()}>{loading?'Actualizando…':'↻ Actualizar datos'}</button>
+      <button type="button" className="kiki-refresh" disabled={loading} onClick={()=>void load()}>
+        <KikiIcon name="refresh" size={16}/> {loading?'Consultando…':'Actualizar'}
+      </button>
     </header>
-    {message&&<div className="notice" role="status">{message}</div>}
-    {!loading&&!data&&<div className="notice warning" role="alert">No se pudo consultar el resumen del catálogo. Podés volver a intentar con «Actualizar datos». Los valores no disponibles se muestran con —.</div>}
 
-    <section className="kiki-metrics" aria-label="Indicadores del catálogo">
-      {kpis.map(item=><article className="kiki-metric" key={item.label}>
-        <small>{item.label}</small>
-        <strong>{loading?'…':item.value}</strong>
-        <span>{item.detail}</span>
-      </article>)}
-    </section>
-
-    <section className="kiki-pilot-invite" style={{marginBottom:20,padding:"18px 22px",background:"#ffffff",border:"1px solid #dce5df",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-      <div><strong>Ecomm-App: catálogo por API</strong><p>Buscá variantes y consultá SKU directamente a Ecomm-App. Las pantallas históricas aún usan Excel y no son datos actuales.</p></div>
-      <Link className="kiki-main-action" to="/pilot">Abrir catálogo API →</Link>
-    </section>
-
-    <div className="kiki-home-columns">
-      <section className="kiki-feature-panel">
-        <p className="eyebrow">{next.eyebrow}</p>
-        <h2>{next.title}</h2>
-        <p>{next.description}</p>
-        <Link className="kiki-main-action" to={next.to}>{next.cta} <span aria-hidden="true">→</span></Link>
-      </section>
-      <section className="kiki-task-panel">
-        <div className="kiki-panel-heading">
-          <div><p className="eyebrow">TRABAJO DIARIO</p><h2>Accesos rápidos</h2></div>
-          <Link to="/work">Todas las tareas →</Link>
-        </div>
-        <Link className="kiki-quick-row" to="/work"><span className="kiki-row-symbol" aria-hidden="true">✓</span><span><strong>Resolver pendientes</strong><small>Marcas, códigos y datos que faltan comprobar</small></span><b>→</b></Link>
-        <Link className="kiki-quick-row" to="/readiness"><span className="kiki-row-symbol" aria-hidden="true">⇄</span><span><strong>Revisar vinculaciones ML</strong><small>{linkageCount==null?'Consultar estado':`${count(linkageCount)} casos necesitan revisión`}</small></span><b>→</b></Link>
-        <Link className="kiki-quick-row" to="/tiendanube"><span className="kiki-row-symbol" aria-hidden="true">✧</span><span><strong>Mejorar fichas Tiendanube</strong><small>Revisar propuestas comerciales de KIKI AI</small></span><b>→</b></Link>
-      </section>
+    <div className="kiki-client-status" role="status">
+      <span className={'kiki-status-pill '+(ecomm?.complete?'good':'caution')}>
+        <KikiIcon name={ecomm?.complete?'check':'alert'} size={15}/>
+        {loading?'Validando origen API':ecomm?.complete?'Ecomm API: copia completa':'Ecomm API: comprobar'}
+      </span>
+      <span className={'kiki-status-pill '+(mlConnected?'good':'caution')}>
+        <KikiIcon name={mlConnected?'link':'clock'} size={15}/>
+        {mlConnected?'ML conectado':'ML pendiente de conexión'}
+      </span>
+      <span className="kiki-status-caption">Consultas de solo lectura · No hay publicaciones automáticas</span>
     </div>
+    {errors.length>0&&<div role="alert" className="kiki-client-alert">
+      <KikiIcon name="alert"/><span>Algunos datos no están disponibles. No se interpretan como cero:
+        {errors.join(' · ')}</span>
+    </div>}
 
-    <section className="kiki-sources-panel">
-      <div className="kiki-panel-heading">
-        <div><p className="eyebrow">FUENTES DE INFORMACIÓN</p><h2>Estado de tus catálogos</h2></div>
-        <Link to="/channels">Ver canales →</Link>
-      </div>
-      <div className="kiki-sources-grid">
-        <article><div className="kiki-source-head"><strong>Ecomm-App</strong><span className={ecomm?'kiki-source-pill is-ok':'kiki-source-pill'}>{ecomm?'Importado':'Sin confirmar'}</span></div><p>Base de productos para comparar.</p><small>{ecomm?.filename||'No hay una importación registrada en el resumen.'}</small></article>
-        <article><div className="kiki-source-head"><strong>Mercado Libre</strong><span className={ml?.connected&&!ml.token_expired?'kiki-source-pill is-ok':'kiki-source-pill'}>{ml===null?'No disponible':ml.connected&&!ml.token_expired?'API conectada':ml.token_expired?'Requiere reconectar':'API sin conectar'}</span></div><p>Publicaciones y vinculación con inventario.</p><small>{mlSnapshot?`Último registro: ${count(data?.total_listings)} publicaciones`:'Sin publicaciones verificables en el resumen.'}</small></article>
-        <article><div className="kiki-source-head"><strong>Tiendanube</strong><span className={tnImported?'kiki-source-pill is-ok':'kiki-source-pill'}>{tnStatus==='unavailable'?'No disponible':tnImported?'CSV importado':'Sin CSV'}</span></div><p>Catálogo para conciliar y mejorar fichas.</p><small>{tnImported?`${count(tn?.summary.products)} productos en el CSV · no es conexión en vivo`:'No se confirmó un catálogo importado.'}</small></article>
+    <section aria-label="Indicadores desde la API" className="kiki-client-stats">
+      <article className="kiki-client-stat">
+        <span className="kiki-stat-icon"><KikiIcon name="box"/></span>
+        <small>Variantes Ecomm por API</small>
+        <strong>{loading?'…':ecomm?.complete?n(ecomm.quality.variants):'—'}</strong>
+        <span>{ecomm?.complete?''${ecomm.pages_saved}/${ecomm.expected_pages??'?'} páginas capturadas por API'':'Copia API no verificada'}</span>
+      </article>
+      <article className="kiki-client-stat">
+        <span className="kiki-stat-icon"><KikiIcon name="store"/></span>
+        <small>Filas ML en la copia API</small>
+        <strong>{loading?'…':n(summary?.ml_api_rows)}</strong>
+        <span>{preview?'Copia guardada, no sincronizada en vivo':'Comparación no disponible'}</span>
+      </article>
+      <article className="kiki-client-stat kiki-stat-primary">
+        <span className="kiki-stat-icon"><KikiIcon name="link"/></span>
+        <small>SKU con un candidato único</small>
+        <strong>{loading?'…':n(summary?.exact_unique_sku_candidates)}</strong>
+        <span>Coincidencias para revisar, no aprobadas</span>
+      </article>
+      <article className="kiki-client-stat">
+        <span className="kiki-stat-icon"><KikiIcon name="alert"/></span>
+        <small>Presentaciones a verificar</small>
+        <strong>{loading?'…':summary?n(summary.PRESENTATION_CONFLICT+summary.PACK_QUANTITY_EQUIVALENCE_REVIEW):'—'}</strong>
+        <span>Incompatibles o packs con posible equivalencia</span>
+      </article>
+    </section>
+
+    <section className="kiki-client-journey" aria-label="Acciones principales">
+      <div className="kiki-client-section-title"><p className="eyebrow">EMPEZÁ POR ACÁ</p>
+        <h2>¿Qué querés hacer?</h2></div>
+      <div className="kiki-client-actions">
+        <Link to="/pilot#catalogo" className="kiki-client-action">
+          <span className="kiki-action-icon"><KikiIcon name="search" size={25}/></span>
+          <span><strong>Buscar un producto</strong><small>Consultá SKU, ID, combo y stock leído de Ecomm-App.</small></span>
+          <KikiIcon name="arrow-right"/>
+        </Link>
+        <Link to="/pilot#comparacion" className="kiki-client-action">
+          <span className="kiki-action-icon"><KikiIcon name="chart" size={25}/></span>
+          <span><strong>Analizar Mercado Libre</strong><small>Examiná coincidencias y diferencias entre las dos copias API.</small></span>
+          <KikiIcon name="arrow-right"/>
+        </Link>
+        <Link to="/channels" className="kiki-client-action">
+          <span className="kiki-action-icon"><KikiIcon name="store" size={25}/></span>
+          <span><strong>Ver canales de venta</strong><small>Consultá el estado de Mercado Libre y Tiendanube.</small></span>
+          <KikiIcon name="arrow-right"/>
+        </Link>
       </div>
     </section>
 
-    <details className="kiki-diagnostics-panel">
-      <summary><span><strong>Diagnóstico y conexiones</strong><small>Opciones técnicas para cuando las necesites</small></span><span aria-hidden="true">⌄</span></summary>
-      <div className="kiki-diagnostics-content">
-        <p><strong>Ecomm:</strong> {ecomm?.filename||'Sin archivo registrado'} · <strong>Última sincronización ML:</strong> {date(ml?.last_sync)}</p>
-        <p><strong>Preparación ML:</strong> {count(readyCount)} para revisión final · {count(finalQueue?.summary.APPROVED_FOR_PUBLICATION)} aprobados internamente. Los indicadores pueden referirse a conjuntos distintos y no deben sumarse.</p>
-        <div className="kiki-diagnostic-actions">
-          <Link className="secondary-link" to="/imports">Importar datos</Link>
-          <button type="button" disabled={busy} onClick={()=>void analyze()}>{busy?'Analizando…':'Reanalizar catálogo'}</button>
-          {ml&&(!ml.connected||ml.token_expired)&&<button type="button" className="secondary" onClick={()=>void connect()}>Reconectar Mercado Libre</button>}
-          {ml?.connected&&!ml.token_expired&&<button type="button" disabled={syncing} onClick={()=>void sync()}>{syncing?'Sincronizando…':'Sincronizar Mercado Libre'}</button>}
-        </div>
+    <section className="kiki-client-data-panel">
+      <div className="kiki-client-panel-head"><div>
+        <p className="eyebrow">DIAGNÓSTICO DE MERCADO LIBRE</p>
+        <h2>Así se distribuyen las publicaciones</h2>
+        <p>Una fila se cuenta una sola vez, según el motivo principal encontrado.</p></div>
+        <Link to="/pilot#comparacion" className="kiki-client-text-link">Ver casos concretos <KikiIcon name="arrow-right" size={17}/></Link>
       </div>
-    </details>
-    <p className="kiki-home-footnote">KIKI trabaja con la información importada y las conexiones habilitadas. Aprobar una ficha o preparación no publica automáticamente productos en los canales externos.</p>
+      {preview&&total>0?
+        <div className="kiki-client-chart">
+          <div className="kiki-client-chart-line" role="img"
+            aria-label={bars.map(b=>b.name+': '+n(b.count)).join('; ')}>
+            {bars.map(b=><span key={b.id} className={'tone-'+b.tone}
+              style={{width:(100*b.count/total)+'%'}} title={b.name+': '+n(b.count)}/>)}
+          </div>
+          <div className="kiki-client-legend">
+            {bars.map(b=><div key={b.id}>
+              <span className={'kiki-chart-dot tone-'+b.tone}/><span>{b.name}</span>
+              <strong>{n(b.count)}</strong><small>{(100*b.count/total).toLocaleString('es-AR',{maximumFractionDigits:1})}%</small>
+            </div>)}
+          </div>
+        </div>:
+        <div className="kiki-client-empty"><KikiIcon name="chart" size={27}/>
+          <p>{loading?'Cargando análisis API…':'Sin diagnóstico disponible. La comparación requiere las dos copias API guardadas.'}</p>
+          <Link to="/pilot#comparacion">Abrir diagnóstico</Link>
+        </div>}
+      {preview&&<p className="kiki-client-chart-foot">
+        Fuente Ecomm: {date(preview.ecomm_last_capture_at)} · Copia ML: {date(preview.ml_snapshot_updated_at)}.
+        No son datos en tiempo real ni confirman vínculos.
+      </p>}
+    </section>
+
+    <section className="kiki-client-next">
+      <div className="kiki-client-next-icon"><KikiIcon name="shield" size={27}/></div>
+      <div><h2>Ya se puede explorar KIKI. La publicación sigue protegida.</h2>
+        <p>Guillermo y Mercedes pueden buscar productos, consultar la API y recorrer el diagnóstico.
+          Los módulos antiguos de Productos, Tareas y preparación siguen dependiendo de Excel;
+          los mantenemos separados hasta completar la migración.</p></div>
+      <Link to="/pilot" className="kiki-main-action">Abrir centro API <KikiIcon name="arrow-right" size={16}/></Link>
+    </section>
+
+    <p className="kiki-home-footnote">La próxima conexión de Mercado Libre debe autorizarla el titular.
+      Mientras tanto, KIKI presenta la última copia API de ML como histórica.
+      No se modifica inventario, publicaciones ni decisiones guardadas desde estas pantallas.</p>
   </div>;
 }
