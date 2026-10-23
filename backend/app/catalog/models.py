@@ -56,6 +56,7 @@ class EcommChannelRow(BaseModel):
     cost: Decimal | None = None
     stock: Decimal | None = None
     inventory_linked: str | None = None
+    brand: str | None = None
 
 
 class EdimaLinkageRow(BaseModel):
