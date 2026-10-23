@@ -6,7 +6,7 @@ need to be verified against real vendor results.
 """
 from collections import Counter
 
-from .public_api import _items, API_PREFIX, EcommAppApiError
+from .public_api import _items, EcommAppApiError
 
 
 PAGE_SIZE = 50
