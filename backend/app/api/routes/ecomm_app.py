@@ -10,6 +10,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from sqlalchemy.orm import Session
 from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
+from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
 from ...integrations.ecomm_app.public_api import (
     EcommAppApiError,
     EcommAppInventoryClient,
@@ -94,4 +95,18 @@ def ecomm_app_stage_next(
     try:
         return EcommAppStageService(db, _client()).next_batch()
     except (EcommAppApiError, ValueError) as exc:
+        _raise_safe(exc)
+
+
+@router.get("/stage/compare")
+def ecomm_app_stage_compare(
+    db: Session = Depends(get_db), _session=Depends(require_session),
+):
+    """Read-only comparison with historical ECOMM_APP snapshot.
+
+    Returns only counts and small samples, never a transformed snapshot.
+    """
+    try:
+        return EcommAppStageComparisonService(db).report()
+    except ValueError as exc:
         _raise_safe(exc)
