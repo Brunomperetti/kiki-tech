@@ -13,6 +13,7 @@ from .catalog_comparison import _format_key, _legacy_sku, _str
 from .catalog_hybrid_preview import _indexes
 from .catalog_stage import STAGE_SOURCE, stage_status
 from .commercial_audit import _brand_class
+from .tn_brand_secondary import diagnose_tn_brand_gaps
 
 SAMPLE_LIMIT = 20
 
