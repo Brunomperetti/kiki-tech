@@ -14,6 +14,7 @@ from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparison
 from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
 from ...integrations.ecomm_app.live_stock_check import EcommLiveStockService
 from ...integrations.ecomm_app.commercial_audit import commercial_fields_audit
+from ...integrations.ecomm_app.tn_brand_evidence import EcommTnBrandEvidenceService
 from ...database.models import CatalogSnapshot
 from ...integrations.ecomm_app.catalog_stage import STAGE_SOURCE
 from sqlalchemy import select
@@ -161,5 +162,17 @@ def ecomm_app_commercial_audit(
             stage.payload if stage else [],
             legacy.payload if legacy else [],
         )
+    except ValueError as exc:
+        _raise_safe(exc)
+
+
+@router.get("/stage/tn-brand-evidence")
+def ecomm_app_tn_brand_evidence(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Review suggestions, never verified manufacturer brands or writes."""
+    try:
+        return EcommTnBrandEvidenceService(db).report()
     except ValueError as exc:
         _raise_safe(exc)
