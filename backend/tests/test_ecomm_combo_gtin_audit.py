@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database.models import Base, CatalogSnapshot
 from app.integrations.ecomm_app.catalog_stage import STAGE_SOURCE
 from app.integrations.ecomm_app.ml_brand_evidence import (
-    EcommMlBrandEvidenceService, ml_brand_evidence_report,
+    EcommMlBrandEvidenceService,
 )
 from app.integrations.ecomm_app.combo_gtin_audit import combo_gtin_conflict_audit
 
@@ -133,7 +133,7 @@ def test_invalid_barcode_no_brand_and_conflicting_brands_are_ignored():
     pages, old, matched, by_sku, by_gtin, ml = records()
     variants = [
         {**ml[0], "ean": "4006381333932"},
-        {**ml[0], "brand": None},
+        {**ml[0], "brand": None, "external_id": "MLA115"},
         {**ml[0], "brand": "Different"},
     ]
     result = combo_gtin_conflict_audit(
