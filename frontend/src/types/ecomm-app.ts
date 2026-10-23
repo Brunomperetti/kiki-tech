@@ -294,3 +294,36 @@ export interface EcommCommercialAudit {
   sampling_limit:number;
   note:string;
 }
+
+export interface EcommTnBrandEvidence {
+  available:boolean;
+  mode:'REVIEW_ONLY_TN_BRAND_EVIDENCE';
+  activation_allowed:false;
+  summary:{
+    missing_brand_unique_id:number;
+    candidate_unique_exact_sku:number;
+    combo_candidate:number;
+    api_sku_changed:number;
+    without_historical_sku:number;
+    ambiguous_ecomm_sku:number;
+    ambiguous_tn_sku:number;
+    no_exact_tn_sku:number;
+    tn_brand_empty:number;
+  }|Record<string,number>;
+  candidates:{
+    ecomm_id:string;
+    ecomm_sku:string;
+    api_sku:string;
+    ecomm_name:string;
+    tn_sku:string;
+    tn_name:string;
+    tn_slug:string;
+    brand_from_tn:string;
+    is_combo:boolean|null;
+    match_basis:string;
+    review_status:'NEEDS_HUMAN_VERIFICATION';
+    note:string;
+  }[];
+  sampling_limit?:number;
+  policy:string;
+}
