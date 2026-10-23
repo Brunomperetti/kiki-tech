@@ -146,3 +146,51 @@ def test_all_ml_rows_classified_once_without_data_writes():
     assert report["summary"]["exact_unique_sku_candidates"] == 1
     assert report["summary"]["NO_EXPLICIT_VARIANT_SKU"] == 2
     assert report["historical_decisions_applied"] is False
+
+
+def test_pack_unit_total_arithmetic_is_a_review_not_an_approval():
+    pages = captured()
+    parent = pages[0]["items"][1]
+    parent["description"] = "Pack X12 Magnesio Con Potasio Vitamin Way 360 Capsulas"
+    parent["variants"][0]["description"] = "360 Capsulas"
+    result = api_ml_reconciliation_preview(pages, [
+        listing(
+            "MLA500", sku="2500400",
+            title="Pack X12 Magnesio Con Potasio Vitamin Way X 30 Capsulas",
+        ),
+    ])
+    assert result["summary"]["PACK_QUANTITY_EQUIVALENCE_REVIEW"] == 1
+    row = result["examples"]["PACK_QUANTITY_EQUIVALENCE_REVIEW"][0]
+    assert row["api_ecomm_id"] == "2"
+    assert "360" in row["reason"] and "30" in row["reason"]
+    assert result["external_writes_enabled"] is False
+    assert result["operational_reconciliation_activated"] is False
+
+
+def test_same_pack_arithmetic_but_different_ingredient_remains_conflict():
+    pages = captured()
+    parent = pages[0]["items"][1]
+    parent["description"] = "Pack X3 Vinagre Sidra De Manzana Natier 150 Capsulas"
+    result = api_ml_reconciliation_preview(pages, [
+        listing(
+            "MLA501", sku="2500400",
+            title="Suplemento Vitamina B12 Vegana Natier 50 Capsulas Pack X3",
+        ),
+    ])
+    assert result["summary"]["PRESENTATION_CONFLICT"] == 1
+    assert result["summary"]["PACK_QUANTITY_EQUIVALENCE_REVIEW"] == 0
+
+
+def test_pack_unit_total_with_different_pack_multipliers_still_conflicts():
+    pages = captured()
+    pages[0]["items"][1]["description"] = (
+        "Pack X12 Magnesio Con Potasio Vitamin Way 360 Capsulas"
+    )
+    result = api_ml_reconciliation_preview(pages, [
+        listing(
+            "MLA502", sku="2500400",
+            title="Pack X4 Magnesio Con Potasio Vitamin Way 30 Capsulas",
+        ),
+    ])
+    assert result["summary"]["PRESENTATION_CONFLICT"] == 1
+    assert result["summary"]["PACK_QUANTITY_EQUIVALENCE_REVIEW"] == 0
