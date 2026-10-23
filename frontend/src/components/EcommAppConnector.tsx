@@ -1,6 +1,6 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {api} from '../services/api';
-import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup, EcommCatalogAudit} from '../types/ecomm-app';
+import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup, EcommCatalogAudit, EcommStageStatus} from '../types/ecomm-app';
 import '../ecomm-app.css';
 
 const comboLabel=(flag:boolean|null|undefined)=>flag===true?'Sí':flag===false?'No':'No informado';
@@ -40,6 +40,11 @@ export function EcommAppConnector(){
   const [lookup,setLookup]=useState<EcommAppLookup|null>(null);
   const [skuText,setSkuText]=useState('');
   const [audit,setAudit]=useState<EcommCatalogAudit|null>(null);
+  const [stage,setStage]=useState<EcommStageStatus|null>(null);
+  const [stageBusy,setStageBusy]=useState(false);
+  const [stageError,setStageError]=useState('');
+  const stageStop=useRef(false);
+  const stageRunning=useRef(false);
 
   useEffect(()=>{
     let active=true;
@@ -47,7 +52,8 @@ export function EcommAppConnector(){
       .then(data=>{if(active)setStatus(data)})
       .catch(e=>{if(active)setError(e instanceof Error?e.message:'No se pudo consultar el estado de Ecomm-App.')})
       .finally(()=>{if(active)setChecking(false)});
-    return ()=>{active=false};
+    api.ecommStageStatus().then(data=>{if(active)setStage(data)}).catch(()=>{});
+    return ()=>{active=false;stageStop.current=true};
   },[]);
 
   async function testConnection(){
@@ -71,6 +77,24 @@ export function EcommAppConnector(){
     try{setAudit(await api.ecommAppCatalogAudit(page))}
     catch(e){setError(e instanceof Error?e.message:'No se pudo auditar el catálogo.')}
     finally{setBusy('')}
+  }
+
+  async function copyStage(){
+    if(stageRunning.current) return;
+    stageRunning.current=true;
+    stageStop.current=false;
+    setStageBusy(true);
+    setStageError('');
+    try{
+      // Explicit one-click foreground process. Every successful batch
+      // persists separately, so reloading can resume from its cursor.
+      for(let batch=0;batch<100&&!stageStop.current;batch++){
+        const next=await api.ecommStageNext();
+        setStage(next);
+        if(next.complete||!next.can_continue)break;
+      }
+    }catch(e){setStageError(e instanceof Error?e.message:'No se pudo continuar la copia de prueba.')}
+    finally{stageRunning.current=false;setStageBusy(false)}
   }
 
   return <section className="panel kiki-ecomm-connection">
@@ -159,6 +183,34 @@ export function EcommAppConnector(){
         </button>}
         <small>Los indicadores muestran únicamente este bloque, no todo el inventario. No guardamos registros ni reemplazamos planillas anteriores.</small>
       </section>}
+    </details>
+    <details className="kiki-ecomm-sku-check">
+      <summary>Crear una copia completa de prueba del catálogo por API</summary>
+      <p>Copiamos los productos y variantes en un <strong>espacio independiente de KIKI</strong>. No reemplaza los Excel anteriores, no cambia inventario ni activa la conciliación con estos datos.</p>
+      {stage&&<div className="kiki-ecomm-sku-diagnosis" aria-live="polite">
+        <h4>{stage.complete?'Copia de prueba terminada · pendiente de comparación':stage.exists?'Copia de prueba en preparación':'Aún no se creó una copia'}</h4>
+        <p><strong>Avance:</strong> {stage.pages_saved}{stage.expected_pages!=null?' de '+stage.expected_pages:''} páginas · <strong>Productos copiados:</strong> {stage.quality.parents}{stage.expected_parents!=null?' de '+stage.expected_parents:''} · <strong>Variantes:</strong> {stage.quality.variants}</p>
+        <div className="kiki-ecomm-audit-metrics">
+          <span>Padres combo: <b>{stage.quality.combo_parents}</b></span>
+          <span>Variantes combo: <b>{stage.quality.combo_variants}</b></span>
+          <span>Sin ID de variante: <b>{stage.quality.without_variant_id}</b></span>
+          <span>Sin SKU: <b>{stage.quality.without_sku}</b></span>
+          <span>Sin dato de stock: <b>{stage.quality.without_total_stock}</b></span>
+          <span>ID variante repetido: <b>{stage.quality.duplicate_variant_ids}</b></span>
+          <span>SKU repetidos: <b>{stage.quality.duplicate_skus}</b></span>
+        </div>
+        <p className="kiki-ecomm-hint">{stage.warning}</p>
+        {stage.has_quality_warnings&&<p className="kiki-ecomm-notice">Hay observaciones de calidad: se requiere inspección antes de utilizar estos datos.</p>}
+      </div>}
+      {stageError&&<p className="kiki-ecomm-notice" role="alert">{stageError} El progreso ya guardado se conserva; podés continuar desde la página pendiente.</p>}
+      {stage?.complete?<p><strong>Copia terminada.</strong> Sigue siendo independiente del catálogo actual. El próximo paso es comparar IDs y SKU antes de aprobar cualquier cambio.</p>:
+        <div className="kiki-ecomm-actions">
+          <button type="button" disabled={!status?.configured||stageBusy||busy!==''} onClick={()=>void copyStage()}>
+            {stageBusy?'Preparando copia…':stage?.exists?'Continuar copia de prueba':'Preparar copia de prueba (solo lectura)'}
+          </button>
+          {stageBusy&&<button type="button" onClick={()=>{stageStop.current=true}}>Pausar al terminar el bloque</button>}
+        </div>}
+      <small>El proceso funciona mientras esta página esté abierta. Se guarda cada bloque de hasta 3 páginas. Si interrumpís la operación, podrás retomarla sin comenzar desde cero.</small>
     </details>
     <small>Esta integración no incluye todavía importación masiva ni vínculos Ecomm–Mercado Libre–Tiendanube. Facturación permanece fuera del alcance.</small>
   </section>;
