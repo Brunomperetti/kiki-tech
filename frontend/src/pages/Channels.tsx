@@ -2,6 +2,8 @@ import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {api} from '../services/api';
 import type {MercadoLibreStatus} from '../types/catalog';
+import {KikiIcon} from '../components/KikiIcon';
+import '../client-ux.css';
 
 const count=(value?:number|null)=>value==null?'—':value.toLocaleString('es-AR');
 
@@ -35,12 +37,12 @@ export function Channels(){
       <article className="kiki-channel-card">
         <div className="kiki-channel-card-top"><div className="kiki-channel-icon" aria-hidden="true">ML</div><span className={ml?.connected&&!ml.token_expired?'kiki-source-pill is-ok':'kiki-source-pill'}>{loading?'Consultando…':!mlAvailable?'Estado no disponible':ml?.connected&&!ml?.token_expired?'API conectada':ml?.token_expired?'Reconectar API':'API sin conectar'}</span></div>
         <h2>Mercado Libre</h2>
-        <p>Relacioná publicaciones existentes con Ecomm-App y prepará los productos nuevos para una revisión final.</p>
+        <p>Compará Ecomm-App y Mercado Libre desde sus copias API. Los resultados son candidatos para revisión: no se aplican vínculos ni publicaciones.</p>
         <div className="kiki-channel-actions">
-          <Link className="kiki-main-action" to="/readiness">Revisar vinculaciones <span aria-hidden="true">→</span></Link>
-          <Link className="secondary-link" to="/prepublication">Preparar publicaciones</Link>
+          <Link className="kiki-main-action" to="/pilot#comparacion"><KikiIcon name="chart" size={16}/> Ver diagnóstico API <span aria-hidden="true">→</span></Link>
+          <Link className="secondary-link" to="/readiness">Consultar revisión histórica (Excel)</Link>
         </div>
-        <small>Preparar o aprobar internamente no publica en Mercado Libre.</small>
+        <small>Mercado Libre necesita una nueva autorización del dueño para actualizar su copia. Hasta entonces, se muestran resultados históricos.</small>
       </article>
       <article className="kiki-channel-card">
         <div className="kiki-channel-card-top"><div className="kiki-channel-icon" aria-hidden="true">TN</div><span className={tn?.available?'kiki-source-pill is-ok':'kiki-source-pill'}>{loading?'Consultando…':!tnAvailable?'Estado no disponible':tn?.available?'CSV importado':'Sin catálogo CSV'}</span></div>
@@ -54,8 +56,8 @@ export function Channels(){
       </article>
     </section>
     <section className="kiki-channel-help">
-      <div><p className="eyebrow">¿NECESITÁS ACTUALIZAR LA INFORMACIÓN?</p><h2>Primero cargá las fuentes</h2><p>Ecomm-App es nuestra base principal; Mercado Libre y Tiendanube se analizan por separado. Una fuente importada no significa conexión en tiempo real.</p></div>
-      <Link className="secondary-link" to="/imports">Ir a importaciones →</Link>
+      <div><p className="eyebrow">¿NECESITÁS ACTUALIZAR LA INFORMACIÓN?</p><h2>Primero cargá las fuentes</h2><p>Ecomm-App se consulta mediante su API. Mercado Libre utiliza una copia API guardada y Tiendanube conserva un CSV importado. Ninguno debe confundirse con stock en tiempo real.</p></div>
+      <Link className="secondary-link" to="/pilot#fuentes">Ver estado de fuentes API →</Link>
     </section>
   </div>;
 }
