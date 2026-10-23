@@ -1,8 +1,8 @@
-"""Read-only Ecomm API snapshot vs ML API snapshot reconciliation *preview*.
+"""Conservative read-only diagnostic: Ecomm API variants vs Mercado Libre API listings.
 
-Never reads ECOMM_APP/ECOMM_APP_RAW (historical Excel), never creates a
-ReconciliationRun, and never applies any prior decision or changes stock.
-SKU is a lead for manual verification, not an approved channel link.
+No historical Excel, mutations, operational reconciliation runs or decisions.
+ML simple listings have product-level SKU; variations need a variation SKU.
+Exact SKU and matching GTIN are still EVIDENCE, not validated channel linkage.
 """
 from collections import Counter, defaultdict
 
@@ -12,12 +12,29 @@ from .catalog_stage import stage_status
 
 MAX_EXAMPLES_PER_STATUS = 6
 
+STATUSES = (
+    "SKU_GTIN_AGREE_REVIEW",
+    "SKU_ONLY_REVIEW",
+    "PRODUCT_SKU_ONLY",
+    "SHARED_GTIN",
+    "GTIN_CONFLICT",
+    "PRESENTATION_CONFLICT",
+    "INVALID_ML_GTIN",
+    "INVALID_ECOMM_GTIN",
+    "DUPLICATE_API_SKU",
+    "SKU_NOT_IN_API",
+    "NO_EXPLICIT_VARIANT_SKU",
+    "NO_ML_SKU",
+)
+
 
 def _string(value):
     return str(value).strip() if value is not None else ""
 
 
 def _sku(value):
+    # Only case/outer whitespace normalization. Never infer SKU families,
+    # strip punctuation, or use prefixes to connect separate variants.
     return _string(value).casefold()
 
 
@@ -26,16 +43,24 @@ def _gtin(value):
     return code if gtin_status(code) == "VALID_CHECK_DIGIT" else ""
 
 
-def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] | None):
-    status = stage_status(pages)
-    quality = status["quality"]
-    blocking = (
-        "parents_without_variants", "invalid_variants", "without_variant_id",
-        "without_sku", "duplicate_variant_ids",
+def _product_sku(row):
+    return _string(
+        row.get("sku_product") or row.get("sku_effective") or row.get("sku")
     )
-    if (not status["complete"] or
-            quality["parents"] != status["expected_parents"] or
-            any(quality.get(field, 0) for field in blocking)):
+
+
+def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] | None):
+    state = stage_status(pages)
+    quality = state["quality"]
+    blocking = (
+        "parents_without_variants", "invalid_variants",
+        "without_variant_id", "without_sku", "duplicate_variant_ids",
+    )
+    if (
+        not state["complete"]
+        or quality["parents"] != state["expected_parents"]
+        or any(quality.get(field, 0) for field in blocking)
+    ):
         raise ValueError("La copia Ecomm API no está completa o tiene problemas de identidad.")
     if not isinstance(ml_rows, list) or not ml_rows:
         raise ValueError(
@@ -48,24 +73,27 @@ def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] 
     api_ids = set()
     for page in pages or []:
         for parent in page.get("items") or []:
+            if not isinstance(parent, dict):
+                raise ValueError("La copia Ecomm API tiene datos incompletos.")
             for variant in parent.get("variants") or []:
                 if not isinstance(variant, dict) or variant.get("invalid"):
-                    continue
+                    raise ValueError("La copia Ecomm API tiene variantes inválidas.")
                 ecomm_id = _string(variant.get("id"))
                 sku = _string(variant.get("sku"))
-                name = _string(parent.get("description"))
-                detail = _string(variant.get("variant_description") or variant.get("description"))
+                if not ecomm_id or not sku:
+                    raise ValueError("La copia Ecomm API contiene una variante sin ID/SKU.")
                 candidate = {
                     "ecomm_id": ecomm_id,
                     "sku": sku,
-                    "name": name,
-                    "variant_description": detail,
+                    "name": _string(parent.get("description")),
+                    "variant_description": _string(
+                        variant.get("variant_description") or variant.get("description")
+                    ),
                     "is_combo": variant.get("is_combo"),
                     "gtin": _string(variant.get("gtin") or variant.get("barcode")),
                 }
                 api_ids.add(ecomm_id)
-                if _sku(sku):
-                    by_sku[_sku(sku)].append(candidate)
+                by_sku[_sku(sku)].append(candidate)
                 valid = _gtin(candidate["gtin"])
                 if valid:
                     gtin_owners[valid].add(ecomm_id)
@@ -73,68 +101,110 @@ def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] 
     counts = Counter()
     examples = defaultdict(list)
     results_by_id = defaultdict(set)
+    identity_counts = Counter()
     for ml in ml_rows:
         if not isinstance(ml, dict):
             raise ValueError("Hay registros ML API que no son objetos válidos.")
         external_id = _string(ml.get("external_id"))
-        listing_sku = _string(ml.get("variant_sku"))
-        product_sku = _string(ml.get("sku_effective") or ml.get("sku"))
+        explicit_variant = _string(ml.get("variant_sku"))
+        general_sku = _product_sku(ml)
         ml_gtin = _string(ml.get("ean"))
         title = _string(ml.get("title"))
-        candidates = by_sku.get(_sku(listing_sku), []) if listing_sku else []
 
+        # The ML transformer creates "MLA...#variation_id" ONLY when a real
+        # variation exists. Product-level SKU from that record must NEVER be
+        # assigned to a variation whose own SELLER_SKU is missing.
+        has_variation = "#" in external_id
+        if has_variation:
+            identity_counts["ml_variation_rows"] += 1
+        else:
+            identity_counts["ml_simple_rows"] += 1
+
+        if explicit_variant:
+            lookup_sku = explicit_variant
+            match_basis = "VARIANT_SKU"
+            identity_counts["ml_rows_with_variant_sku"] += 1
+        elif has_variation:
+            lookup_sku = ""
+            match_basis = "MISSING_VARIANT_SKU"
+            identity_counts["ml_variations_without_variant_sku"] += 1
+        else:
+            lookup_sku = general_sku
+            match_basis = "SIMPLE_PRODUCT_SKU"
+            if general_sku:
+                identity_counts["ml_simple_rows_with_product_sku"] += 1
+
+        candidates = by_sku.get(_sku(lookup_sku), []) if lookup_sku else []
         selected = None
         note = ""
-        if not listing_sku:
+        if has_variation and not explicit_variant:
             kind = "NO_EXPLICIT_VARIANT_SKU"
             note = (
-                "ML no informa SKU de variante verificable. "
-                "Un SKU general no confirma identidad de variación."
+                "Publicación con variación ML sin SKU propio de variante. "
+                "El SKU del producto madre, si existe, no la identifica."
             )
-            if product_sku and by_sku.get(_sku(product_sku)):
-                kind = "PRODUCT_SKU_ONLY"
+        elif not lookup_sku:
+            kind = "NO_ML_SKU"
+            note = "La publicación simple ML no informa SKU para comparar."
         elif len(candidates) > 1:
             kind = "DUPLICATE_API_SKU"
-            note = "El SKU de variante ML pertenece a varios IDs API; no elegir uno."
+            note = "El SKU exacto apunta a varios IDs Ecomm; no se elige uno."
         elif not candidates:
             kind = "SKU_NOT_IN_API"
-            note = "No existe coincidencia exacta para SKU de variante en la copia API."
+            note = "El SKU exacto ML no aparece en la copia API Ecomm."
         else:
             selected = candidates[0]
+            identity_counts["exact_unique_sku_candidates"] += 1
+            if match_basis == "SIMPLE_PRODUCT_SKU":
+                identity_counts["exact_simple_product_sku_candidates"] += 1
+            else:
+                identity_counts["exact_variant_sku_candidates"] += 1
             results_by_id[selected["ecomm_id"]].add(external_id)
             full_name = " ".join((selected["name"], selected["variant_description"]))
-            if variant_conflict(full_name, selected["sku"], title, listing_sku):
+            if variant_conflict(full_name, selected["sku"], title, lookup_sku):
                 kind = "PRESENTATION_CONFLICT"
-                note = "El SKU coincide, pero hay una discrepancia de presentación."
+                note = "El SKU coincide pero se detectó una presentación incompatible."
             else:
                 api_gtin = _gtin(selected["gtin"])
                 listing_gtin = _gtin(ml_gtin)
                 if ml_gtin and not listing_gtin:
                     kind = "INVALID_ML_GTIN"
-                    note = "GTIN ML inválido o no verificable; no concluir identidad."
+                    note = "El GTIN de ML no es válido o comprobable."
                 elif selected["gtin"] and not api_gtin:
                     kind = "INVALID_ECOMM_GTIN"
-                    note = "GTIN Ecomm inválido o no verificable; no concluir identidad."
+                    note = "El GTIN de Ecomm no es válido o comprobable."
                 elif api_gtin and listing_gtin and api_gtin != listing_gtin:
                     kind = "GTIN_CONFLICT"
-                    note = "El SKU coincide, pero el GTIN es distinto; investigar packs/componentes."
+                    note = "SKU exacto pero GTIN válidos diferentes; verificar presentaciones."
                 elif api_gtin and listing_gtin and len(gtin_owners[api_gtin]) > 1:
                     kind = "SHARED_GTIN"
-                    note = "GTIN compartido entre IDs API; confirmar presentación real."
+                    note = "GTIN repetido entre IDs Ecomm; no inferir composición de combos."
                 elif api_gtin and listing_gtin and api_gtin == listing_gtin:
                     kind = "SKU_GTIN_AGREE_REVIEW"
-                    note = "SKU y GTIN coinciden; todavía requiere verificación comercial."
+                    note = "SKU y GTIN coinciden; falta confirmar identidad comercial."
+                elif match_basis == "SIMPLE_PRODUCT_SKU":
+                    kind = "PRODUCT_SKU_ONLY"
+                    note = (
+                        "Publicación simple con SKU de producto exacto y único. "
+                        "No hay corroboración suficiente de GTIN; revisar, no aprobar."
+                    )
                 else:
                     kind = "SKU_ONLY_REVIEW"
-                    note = "Solo coincide el SKU de variante. No se comprobó un GTIN válido en ambos."
+                    note = (
+                        "Variante ML con SKU de variante exacto y único. "
+                        "Sin corroboración suficiente de GTIN; revisar, no aprobar."
+                    )
 
         counts[kind] += 1
         if len(examples[kind]) < MAX_EXAMPLES_PER_STATUS:
             examples[kind].append({
-                "status": kind, "mla": external_id, "ml_title": title[:160],
-                "ml_variant_sku": listing_sku or None,
-                "ml_product_sku": product_sku or None,
+                "status": kind,
+                "mla": external_id,
+                "ml_title": title[:160],
+                "ml_variant_sku": explicit_variant or None,
+                "ml_product_sku": general_sku or None,
                 "ml_gtin": ml_gtin or None,
+                "match_basis": match_basis,
                 "api_ecomm_id": selected["ecomm_id"] if selected else None,
                 "api_sku": selected["sku"] if selected else None,
                 "api_name": selected["name"] if selected else None,
@@ -142,7 +212,6 @@ def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] 
                 "api_gtin": selected["gtin"] if selected else None,
                 "reason": note,
             })
-
     repeated = sum(len(ids) > 1 for ids in results_by_id.values())
     return {
         "mode": "API_ONLY_ML_READ_ONLY_PREVIEW",
@@ -157,19 +226,21 @@ def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] 
             "unique_api_sku": sum(len(value) == 1 for value in by_sku.values()),
             "ambiguous_api_skus": sum(len(value) > 1 for value in by_sku.values()),
             "api_variants_with_multiple_ml_rows_by_sku": repeated,
-            **{kind: counts[kind] for kind in (
-                "SKU_GTIN_AGREE_REVIEW", "SKU_ONLY_REVIEW", "SHARED_GTIN",
-                "GTIN_CONFLICT", "PRESENTATION_CONFLICT", "INVALID_ML_GTIN",
-                "INVALID_ECOMM_GTIN", "DUPLICATE_API_SKU", "SKU_NOT_IN_API",
-                "NO_EXPLICIT_VARIANT_SKU", "PRODUCT_SKU_ONLY",
+            **{name: identity_counts[name] for name in (
+                "ml_simple_rows", "ml_variation_rows",
+                "ml_rows_with_variant_sku", "ml_simple_rows_with_product_sku",
+                "ml_variations_without_variant_sku", "exact_unique_sku_candidates",
+                "exact_simple_product_sku_candidates", "exact_variant_sku_candidates",
             )},
+            **{kind: counts[kind] for kind in STATUSES},
         },
         "examples": dict(examples),
         "warning": (
-            "Diagnóstico entre dos copias por API, NO datos en tiempo real. "
-            "No se leyó Excel, no se aplicaron decisiones anteriores y no se "
-            "creó reconciliación operativa. Coincidir por SKU/GTIN no confirma "
-            "por sí solo publicación, variante ni composición de combos. "
-            "Se requiere verificar frescura, precios y vínculos antes de operar."
+            "Diagnóstico entre dos snapshots API, NO datos en tiempo real. "
+            "SKU de publicación simple se compara como pista; la variante exige "
+            "SKU propio. Coincidencias exactas, incluso por GTIN, requieren "
+            "verificación humana y no confirman vínculos de inventario. "
+            "No se leyó Excel, no se aplicaron decisiones y no se creó "
+            "reconciliación operativa ni publicaciones."
         ),
     }
