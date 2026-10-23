@@ -1,6 +1,7 @@
 import type {BulkGtinNotApplicablePayload, BulkGtinNotApplicableResult, CatalogContinuityDecision, CatalogContinuityItem, CatalogContinuityReport, EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
+import type {EcommAppStatus,EcommAppPreview,EcommAppLookup} from '../types/ecomm-app';
 
 const base = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || 'http://localhost:8000')
@@ -210,6 +211,9 @@ export const api = {
   uploadTiendanubeImages: (file:File) => {const form=new FormData();form.append('file',file);return request<{images:number;product_ids:number;policy:string}>('/api/tiendanube/images/import-csv',{method:'POST',body:form})},
   tiendanubeReport: () => request<{available:boolean;summary:Record<string,number>;items:{slug:string;name:string;sku:string;ean_raw:string;brand:string;price:string|null;stock:string|null;status:string;matched_ecomm_id:string|null}[];policy?:string}>('/api/tiendanube/reconciliation'),
   uploadTiendanube: (file:File) => {const form=new FormData();form.append('file',file);return request<{records:number;products:number;status:string}>('/api/tiendanube/import-csv',{method:'POST',body:form});},
+  ecommAppStatus: () => request<EcommAppStatus>('/api/ecomm-app/status'),
+  ecommAppPreview: () => request<EcommAppPreview>('/api/ecomm-app/preview',{method:'POST'}),
+  ecommAppLookup: (skus:string[]) => request<EcommAppLookup>('/api/ecomm-app/lookup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skus})}),
   imports: () => request<ImportJob[]>('/api/imports'),
   analyze: (source = 'AUTO') => request<unknown>(`/api/reconciliations?ml_source=${source}`, {method: 'POST'}),
   mlStatus: () => request<MercadoLibreStatus>('/api/mercadolibre/status'),
