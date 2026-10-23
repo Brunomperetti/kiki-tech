@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {api} from '../services/api';
+import {EcommComboGtinAudit} from './EcommComboGtinAudit';
 import type {EcommMlBrandEvidence as Report} from '../types/ecomm-app';
 
 const method=(key:string)=>({
@@ -130,6 +131,8 @@ export function EcommMlBrandEvidence(){
           </article>)}
         </details>
       </details>
+
+      <EcommComboGtinAudit audit={report.combo_gtin_audit}/>
 
       <details>
         <summary>Ver fuentes y fechas de la información</summary>

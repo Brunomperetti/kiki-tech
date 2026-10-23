@@ -18,6 +18,7 @@ from .catalog_hybrid_preview import _indexes
 from .catalog_stage import STAGE_SOURCE, stage_status
 from .commercial_audit import _brand_class
 from .ml_shared_gtin_review import shared_gtin_sku_review
+from .combo_gtin_audit import combo_gtin_conflict_audit
 
 SAMPLE_LIMIT = 20
 MLA_RE = re.compile(r"^(MLA\d+)(?:#\d+)?$", re.IGNORECASE)
@@ -256,7 +257,12 @@ def ml_brand_evidence_report(pages, historical, ml_rows, edima_rows, ml_source):
     shared_gtin = shared_gtin_sku_review(
         matched, owners_sku, owners_ean, owners_mla, ml_rows, edima_brands
     )
+    combo_audit = combo_gtin_conflict_audit(
+        matched, owners_sku, owners_ean, owners_mla, ml_rows,
+        edima_brands, pages,
+    )
     return {
+        "combo_gtin_audit": combo_audit,
         "shared_gtin_review": shared_gtin,
         "diagnostics": blockers,
         "available": bool(ml_rows or edima_rows),

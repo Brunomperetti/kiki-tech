@@ -359,6 +359,64 @@ export interface EcommTnBrandEvidence {
 }
 
 export interface EcommMlBrandEvidence {
+  combo_gtin_audit:{
+    mode:'COMBO_GTIN_DIAGNOSTIC_ONLY';
+    components_available_in_snapshot:false;
+    activation_allowed:false;
+    counts:{
+      contradictory_ml_rows:number;
+      distinct_mlas:number;
+      distinct_gtins:number;
+      distinct_sku_ids:number;
+      distinct_sku_gtin_cases:number;
+      sku_outside_gtin_owners_rows:number;
+      mla_reference_conflict_rows:number;
+      sku_variant_combo_yes_rows:number;
+      sku_variant_combo_no_rows:number;
+      sku_variant_combo_unknown_rows:number;
+      gtin_has_noncombo_owner_rows:number;
+      gtin_has_combo_owner_rows:number;
+      gtin_has_unknown_combo_owner_rows:number;
+      numeric_family_hint_rows:number;
+      possible_combo_component_pattern_rows:number;
+      COMBO_SKU_WITH_NONCOMBO_GTIN_OWNER:number;
+      COMBO_SKU_COMPONENTS_UNKNOWN:number;
+      NONCOMBO_SKU_GTIN_HAS_COMBO_OWNER:number;
+      SKU_NOT_FLAGGED_COMBO:number;
+      SKU_COMBO_FLAG_UNKNOWN:number;
+    };
+    examples:{
+      ecomm_id_by_sku:string;
+      ecomm_sku:string;
+      ecomm_name:string;
+      gtin:string;
+      gtin_owner_count:number;
+      gtin_owners:{
+        ecomm_id:string;
+        sku:string;
+        name:string;
+        variant_is_combo:boolean|null;
+        parent_is_combo:boolean|null;
+        api_gtin:string;
+        family_rule:string|null;
+        identity_confirmed:false;
+      }[];
+      ecomm_variant_is_combo:boolean|null;
+      ecomm_parent_is_combo:boolean|null;
+      ecomm_api_gtin:string;
+      category:'COMBO_SKU_WITH_NONCOMBO_GTIN_OWNER'|'COMBO_SKU_COMPONENTS_UNKNOWN'|'NONCOMBO_SKU_GTIN_HAS_COMBO_OWNER'|'SKU_NOT_FLAGGED_COMBO'|'SKU_COMBO_FLAG_UNKNOWN';
+      numeric_sku_family_hint:boolean;
+      review_status:'DIAGNOSTIC_ONLY';
+      component_membership_confirmed:false;
+      mlas:string[];
+      mla_count:number;
+      ml_titles:string[];
+      reason_codes:string[];
+    }[];
+    sample_limit:number;
+    policy:string;
+    next_step:string;
+  };
   shared_gtin_review:{
     counts:{
       shared_gtin_ml_rows:number;
