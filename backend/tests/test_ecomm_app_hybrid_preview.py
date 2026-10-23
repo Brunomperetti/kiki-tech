@@ -149,7 +149,7 @@ def test_database_snapshots_are_read_only_after_preview():
         report = EcommHybridCatalogService(db).preview(["9183101", "8859967"])
         assert len(report["rows"]) == 2
         assert report["rows"][1]["sku_relation"] == "FORMAT_ONLY"
-        assert db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source="ECOMM_APP")).payload == legacy
-        assert db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source=STAGE_SOURCE)).payload == pages
-        assert db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source="ECOMM_APP_RAW")).payload == [{"original": True}]
+        assert db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == "ECOMM_APP")).payload == legacy
+        assert db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE)).payload == pages
+        assert db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == "ECOMM_APP_RAW")).payload == [{"original": True}]
     engine.dispose()
