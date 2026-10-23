@@ -1,7 +1,7 @@
 import {FormEvent,useEffect,useState} from 'react';
 import {api} from '../services/api';
 import type {MercadoLibreStatus} from '../types/catalog';
-import type {EcommApiCatalog,EcommApiCatalogRow,EcommAppLookup,EcommStageStatus} from '../types/ecomm-app';
+import type {EcommApiCatalog,EcommApiCatalogRow,EcommAppLookup,EcommMlPreview,EcommMlPreviewStatus,EcommStageStatus} from '../types/ecomm-app';
 import '../pilot.css';
 
 type TnReport=Awaited<ReturnType<typeof api.tiendanubeReport>>;
@@ -29,6 +29,11 @@ export function Pilot(){
   const [selected,setSelected]=useState<EcommApiCatalogRow|null>(null);
   const [liveBusy,setLiveBusy]=useState(false);
   const [liveError,setLiveError]=useState('');
+  const [preview,setPreview]=useState<EcommMlPreview|null>(null);
+  const [previewBusy,setPreviewBusy]=useState(false);
+  const [previewError,setPreviewError]=useState('');
+  const [showPreviewExamples,setShowPreviewExamples]=useState(false);
+  const [previewFilter,setPreviewFilter]=useState<EcommMlPreviewStatus|'ALL'>('ALL');
 
   async function refresh(){
     setLoading(true);
@@ -75,6 +80,26 @@ export function Pilot(){
     catch(e){setLiveError(errorMessage(e));}
     finally{setLiveBusy(false)}
   }
+  async function runPreview(){
+    setPreviewBusy(true);setPreview(null);setPreviewError('');setShowPreviewExamples(false);
+    try{setPreview(await api.ecommMlPreview());}
+    catch(e){setPreviewError(errorMessage(e));}
+    finally{setPreviewBusy(false)}
+  }
+  const reportStatusLabels:Record<EcommMlPreviewStatus,string>={
+    SKU_GTIN_AGREE_REVIEW:'SKU y GTIN compatibles, revisar',
+    SKU_ONLY_REVIEW:'Solo SKU exacto, revisar',
+    SHARED_GTIN:'GTIN compartido, investigar',
+    GTIN_CONFLICT:'SKU y GTIN contradictorios',
+    PRESENTATION_CONFLICT:'Presentaciones incompatibles',
+    INVALID_ML_GTIN:'GTIN ML no válido',
+    INVALID_ECOMM_GTIN:'GTIN Ecomm no válido',
+    DUPLICATE_API_SKU:'SKU Ecomm repetido',
+    SKU_NOT_IN_API:'SKU ML no encontrado en API',
+    NO_EXPLICIT_VARIANT_SKU:'ML sin SKU de variante',
+    PRODUCT_SKU_ONLY:'Solo SKU general de ML',
+  };
+  const reportStatuses=Object.keys(reportStatusLabels) as EcommMlPreviewStatus[];
   const result=live?.sku_diagnosis?.requested?.[0];
   const exact=result?.status==='EXACT_SINGLE' && result.matches.length===1;
   const verified=exact && String(result.matches[0]?.variant_id)===selected?.ecomm_id;
@@ -188,8 +213,69 @@ export function Pilot(){
       </div>}
     </section>
 
+    <section className="kiki-pilot-steps">
+      <h2>3. Comparar Ecomm API con Mercado Libre API (diagnóstico)</h2>
+      <p>Comparación <strong>solo de lectura</strong> entre las dos copias API guardadas.
+        Nunca utiliza el Excel histórico, no guarda vinculaciones y no publica productos.
+        Se detectan coincidencias de SKU y posibles conflictos; ningún resultado confirma por sí solo
+        que una variante de Mercado Libre esté correctamente vinculada.</p>
+      <p className="kiki-pilot-warning">
+        La última captura ML registrada es del {dateLabel(ml?.last_sync)} y
+        {ml?.connected&&!ml.token_expired?' la cuenta aparece conectada.':' la cuenta no tiene conexión válida comprobada.'}
+        El diagnóstico puede ejecutarse contra la copia guardada, pero es obligatorio
+        actualizar Mercado Libre antes de tomar decisiones operativas.
+      </p>
+      <button className="kiki-api-action" type="button" onClick={()=>void runPreview()} disabled={previewBusy}>
+        {previewBusy?'Analizando copias…':'Analizar catálogos API sin modificar datos'}
+      </button>
+      {previewError&&<p className="kiki-pilot-warning" role="alert">{previewError}</p>}
+      {preview&&<>
+        <p className="kiki-pilot-last">Ecomm API capturada: {dateLabel(preview.ecomm_last_capture_at)}.
+          ML API guardada: {dateLabel(preview.ml_snapshot_updated_at)}.
+          No se aplicaron decisiones históricas.</p>
+        <div className="kiki-api-preview-summary">
+          <article><strong>{preview.summary.api_variants.toLocaleString('es-AR')}</strong><small>Variantes Ecomm API</small></article>
+          <article><strong>{preview.summary.ml_api_rows.toLocaleString('es-AR')}</strong><small>Filas ML API</small></article>
+          <article><strong>{preview.summary.SKU_GTIN_AGREE_REVIEW.toLocaleString('es-AR')}</strong><small>SKU y GTIN compatibles (sin aprobar)</small></article>
+          <article><strong>{preview.summary.GTIN_CONFLICT.toLocaleString('es-AR')}</strong><small>GTIN contradictorios</small></article>
+        </div>
+        <h3>Motivos encontrados</h3>
+        <div className="kiki-api-preview-reasons">
+          {reportStatuses.map(key=><div key={key}><span>{reportStatusLabels[key]}</span>
+            <strong>{preview.summary[key].toLocaleString('es-AR')}</strong></div>)}
+        </div>
+        <button type="button" className="kiki-api-action" onClick={()=>setShowPreviewExamples(!showPreviewExamples)}>
+          {showPreviewExamples?'Ocultar ejemplos':'Ver casos concretos (muestra limitada)'}
+        </button>
+        {showPreviewExamples&&<>
+          <label htmlFor="kiki-preview-filter">Filtrar ejemplos por motivo</label>
+          <select id="kiki-preview-filter" value={previewFilter}
+            onChange={e=>setPreviewFilter(e.target.value as EcommMlPreviewStatus|'ALL')}>
+            <option value="ALL">Todos los motivos</option>
+            {reportStatuses.map(key=><option value={key} key={key}>{reportStatusLabels[key]}</option>)}
+          </select>
+          <div className="kiki-api-table-wrap">
+            <table className="kiki-api-table">
+              <thead><tr><th>Motivo</th><th>MLA</th><th>SKU ML</th><th>ID API</th><th>SKU Ecomm</th><th>Producto</th></tr></thead>
+              <tbody>{reportStatuses.filter(key=>previewFilter==='ALL'||previewFilter===key)
+                .flatMap(key=>(preview.examples[key]||[]).map((row,i)=><tr key={key+i}>
+                  <td>{reportStatusLabels[key]}<small>{row.reason}</small></td>
+                  <td>{row.mla||'Sin dato'}</td>
+                  <td>{row.ml_variant_sku||row.ml_product_sku||'Sin dato'}</td>
+                  <td>{row.api_ecomm_id||'Sin confirmar'}</td>
+                  <td>{row.api_sku||'Sin confirmar'}</td>
+                  <td>{row.ml_title}<small>{row.api_name||''}</small></td>
+                </tr>))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+        <p className="kiki-pilot-warning">{preview.warning}</p>
+      </>}
+    </section>
+
     <section className="kiki-pilot-summary">
-      <h2>3. Qué falta para operar 100 % con la API</h2>
+      <h2>4. Qué falta para operar 100 % con la API</h2>
       <p className="kiki-pilot-warning"><strong>Importante:</strong> las pantallas antiguas de
         Productos, Tareas y Preparación ML todavía usan el catálogo histórico. No las
         utilices para dar por actuales stock, precios ni datos de Ecomm-App.
