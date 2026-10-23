@@ -98,7 +98,7 @@ def diagnose_tn_brand_gaps(stage_pages: list[dict], historical: list[dict], tn: 
         old = source_rows[0]
         if _brand_class(old.get("brand")) == "PRESENT":
             continue
-        parent, variant = api_rows[0]
+        _, variant = api_rows[0]
         # A meaningful SKU change must be investigated independently.
         old_sku = _sku(_legacy_sku(old))
         api_sku = _sku(variant.get("sku"))
