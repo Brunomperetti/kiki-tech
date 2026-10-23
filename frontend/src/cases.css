@@ -74,3 +74,14 @@
 @media(max-width:1200px){.kiki-cases-two-col{grid-template-columns:1fr}.kiki-cases-list{max-height:430px}.kiki-cases-steps{grid-template-columns:1fr}}
 @media(max-width:670px){.kiki-cases-browser{padding:15px}.kiki-cases-compare{grid-template-columns:1fr}.kiki-cases-browser-head{align-items:flex-start}.kiki-cases-search>div{flex-wrap:wrap}.kiki-cases-search button{width:100%;justify-content:center}.kiki-cases-filters{max-height:126px}}
 @media(prefers-reduced-motion:reduce){.kiki-cases-chip{transition:none}}
+
+/* Meeting-room legibility at 1366px desktop and laptop scales. */
+.kiki-cases-browser-head p:not(.eyebrow),.kiki-cases-freshness,
+.kiki-cases-search label,.kiki-cases-item-name,.kiki-case-explanation,
+.kiki-cases-selection p{font-size:13px}
+.kiki-cases-item-top small,.kiki-cases-label,.kiki-cases-compare dl,
+.kiki-cases-disclaimer{font-size:12px}
+.kiki-cases-item{min-height:95px}
+.kiki-cases-compare h4{font-size:15px}
+.kiki-cases-chip{font-size:12px}
+.kiki-case-internal-link{display:inline-flex;margin-left:9px;color:#225d3b;font-weight:750;text-decoration:underline;text-underline-offset:3px}
