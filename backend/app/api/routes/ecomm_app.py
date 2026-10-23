@@ -13,6 +13,10 @@ from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
 from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
 from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
 from ...integrations.ecomm_app.live_stock_check import EcommLiveStockService
+from ...integrations.ecomm_app.commercial_audit import commercial_fields_audit
+from ...database.models import CatalogSnapshot
+from ...integrations.ecomm_app.catalog_stage import STAGE_SOURCE
+from sqlalchemy import select
 from ...integrations.ecomm_app.public_api import (
     EcommAppApiError,
     EcommAppInventoryClient,
@@ -141,4 +145,21 @@ def ecomm_app_live_stock_check(
     try:
         return EcommLiveStockService(db, _client()).verify(body.ids)
     except (ValueError, EcommAppApiError) as exc:
+        _raise_safe(exc)
+
+
+@router.get("/stage/commercial-audit")
+def ecomm_app_commercial_audit(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Read-only, bounded brand/price/cost/EAN quality audit of historical IDs."""
+    stage = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE))
+    legacy = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == "ECOMM_APP"))
+    try:
+        return commercial_fields_audit(
+            stage.payload if stage else [],
+            legacy.payload if legacy else [],
+        )
+    except ValueError as exc:
         _raise_safe(exc)
