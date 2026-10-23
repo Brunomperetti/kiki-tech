@@ -61,7 +61,7 @@ def brand_evidence_report(pages: list[dict], legacy: list[dict], tn: list[dict])
         api_rows = new_by_id.get(identifier, [])
         if len(old_rows) != 1 or len(api_rows) != 1:
             continue
-        old, (parent, variant) = old_rows[0], api_rows[0]
+        old, (_, variant) = old_rows[0], api_rows[0]
         if _brand_class(old.get("brand")) == "PRESENT":
             continue
         counts["missing_brand_unique_id"] += 1
