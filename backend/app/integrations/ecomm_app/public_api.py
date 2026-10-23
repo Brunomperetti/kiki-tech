@@ -276,6 +276,17 @@ class EcommAppInventoryClient:
             ),
         }
 
+    def catalog_audit(self, start_page: int = 1) -> dict:
+        # Kept separate from the normal catalog and persisted snapshots.
+        from .catalog_audit import audit_catalog_pages
+        return audit_catalog_pages(
+            lambda page: self._call(
+                "GET", f"{API_PREFIX}/productos",
+                params={"page": page, "limit": 50, "sort": "sku_asc"},
+            ),
+            start_page=start_page,
+        )
+
     def lookup(self, skus: list[str]) -> dict:
         if not 1 <= len(skus) <= 3 or any(
             not isinstance(sku, str) or not 1 <= len(sku.strip()) <= 128
