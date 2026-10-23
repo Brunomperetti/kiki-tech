@@ -1,191 +1,205 @@
-import {useEffect,useMemo,useState} from 'react';
-import {Link} from 'react-router-dom';
+import {FormEvent,useEffect,useState} from 'react';
 import {api} from '../services/api';
-import type {Summary,ReadinessReport,MercadoLibreStatus} from '../types/catalog';
-import type {EcommStageStatus} from '../types/ecomm-app';
+import type {MercadoLibreStatus} from '../types/catalog';
+import type {EcommApiCatalog,EcommApiCatalogRow,EcommAppLookup,EcommStageStatus} from '../types/ecomm-app';
 import '../pilot.css';
 
-type Sources={
-  summary:Summary|null;
-  readiness:ReadinessReport|null;
-  stage:EcommStageStatus|null;
-  ml:MercadoLibreStatus|null;
-  tn:Awaited<ReturnType<typeof api.tiendanubeReport>>|null;
-  history:Awaited<ReturnType<typeof api.internalDecisionHistory>>|null;
+type TnReport=Awaited<ReturnType<typeof api.tiendanubeReport>>;
+const errorMessage=(e:unknown)=>e instanceof Error?e.message:'No se pudo consultar la fuente.';
+const fmt=(value:number|string|null|undefined)=>value==null?'Sin informar':String(value);
+const dateLabel=(s:string|null|undefined)=>{
+  if(!s)return 'Sin fecha registrada';
+  const value=new Date(s);
+  return Number.isNaN(value.getTime())?'Fecha no disponible':value.toLocaleString('es-AR');
 };
-const initial:Sources={summary:null,readiness:null,stage:null,ml:null,tn:null,history:null};
-const asNum=(n?:number|null)=>n==null?'No disponible':n.toLocaleString('es-AR');
-function sourceName(summary:Summary|null){
-  return summary?.import_diagnostics?.find(x=>x.source==='ECOMM_APP');
-}
-function dateLabel(value?:string|null){
-  if(!value)return 'No hay fecha de sincronización disponible';
-  const date=new Date(value);
-  return Number.isNaN(date.valueOf())?'Fecha no disponible':date.toLocaleString('es-AR');
-}
-function statusText(ok:boolean|null){
-  return ok===true?'Disponible':ok===false?'Pendiente':'No se pudo comprobar';
-}
-function sourceClass(ok:boolean|null){
-  return ok===true?'is-ok':ok===false?'is-caution':'is-unknown';
-}
 
 export function Pilot(){
-  const [sources,setSources]=useState<Sources>(initial);
+  const [stage,setStage]=useState<EcommStageStatus|null>(null);
+  const [catalog,setCatalog]=useState<EcommApiCatalog|null>(null);
+  const [ml,setMl]=useState<MercadoLibreStatus|null>(null);
+  const [tn,setTn]=useState<TnReport|null>(null);
   const [loading,setLoading]=useState(true);
   const [errors,setErrors]=useState<string[]>([]);
-  const [loadedAt,setLoadedAt]=useState<Date|null>(null);
+  const [searchInput,setSearchInput]=useState('');
+  const [activeQuery,setActiveQuery]=useState('');
+  const [page,setPage]=useState(1);
+  const [catalogBusy,setCatalogBusy]=useState(false);
+  const [catalogError,setCatalogError]=useState('');
+  const [live,setLive]=useState<EcommAppLookup|null>(null);
+  const [selected,setSelected]=useState<EcommApiCatalogRow|null>(null);
+  const [liveBusy,setLiveBusy]=useState(false);
+  const [liveError,setLiveError]=useState('');
 
   async function refresh(){
     setLoading(true);
-    const results=await Promise.allSettled([
-      api.dashboard(),
-      api.publicationReadiness(),
+    const responses=await Promise.allSettled([
       api.ecommStageStatus(),
+      api.ecommApiCatalog(activeQuery,page),
       api.mlStatus(),
       api.tiendanubeReport(),
-      api.internalDecisionHistory(),
     ] as const);
-    const get=<T,>(i:number):T|null=>{
-      const r=results[i];
-      return r.status==='fulfilled'?r.value as T:null;
-    };
-    setSources({
-      summary:get<Summary>(0),
-      readiness:get<ReadinessReport>(1),
-      stage:get<EcommStageStatus>(2),
-      ml:get<MercadoLibreStatus>(3),
-      tn:get<Awaited<ReturnType<typeof api.tiendanubeReport>>>(4),
-      history:get<Awaited<ReturnType<typeof api.internalDecisionHistory>>>(5),
-    });
-    setErrors(results.flatMap((r,i)=>r.status==='rejected'?
-      [(['Resumen Ecomm','Revisión de productos','Copia API Ecomm','Conexión ML','CSV Tiendanube','Historial interno'][i])+' no respondió.']:[]));
-    setLoadedAt(new Date());
+    const [stageResponse,catalogResponse,mlResponse,tnResponse]=responses;
+    setStage(stageResponse.status==='fulfilled'?stageResponse.value:null);
+    setCatalog(catalogResponse.status==='fulfilled'?catalogResponse.value:null);
+    setMl(mlResponse.status==='fulfilled'?mlResponse.value:null);
+    setTn(tnResponse.status==='fulfilled'?tnResponse.value:null);
+    setErrors(responses.flatMap((r,i)=>r.status==='rejected'?
+      [(['Copia API Ecomm','Catálogo API Ecomm','Mercado Libre','Tiendanube'][i])+': '+errorMessage(r.reason)]:[]));
     setLoading(false);
   }
   useEffect(()=>{void refresh()},[]);
-  const excel=sourceName(sources.summary);
-  const haveExcel=sources.summary?Boolean(excel):null;
-  const haveReview=sources.readiness?Boolean(sources.readiness.reconciliation_run_id>0):null;
-  const stageReady=sources.stage?Boolean(sources.stage.exists&&sources.stage.complete):null;
-  const mlConnected=sources.ml?Boolean(sources.ml.connected&&!sources.ml.token_expired):null;
-  const tnReady=sources.tn?Boolean(sources.tn.available):null;
 
-  const example=useMemo(()=>{
-    const pending=(sources.readiness?.items||[]).filter(x=>
-      x.readiness_status==='REVIEW_REQUIRED' &&
-      (x.reason_codes.includes('BRAND_MISSING')||x.reason_codes.includes('EAN_MISSING'))
-    );
-    const simple=pending.find(x=>{
-      const name=String(x.product.name||'').toLocaleLowerCase();
-      return (x.product.stock??0)>0 &&
-        Boolean(x.product.sku_variant||x.product.sku_effective||x.product.sku)&&
-        !/(pack|combo|kit|x\s*[2-9]\b|x\s*10\b)/.test(name);
-    });
-    return simple??pending.find(x=>Boolean(x.product.sku_variant||x.product.sku_effective||x.product.sku))??null;
-  },[sources.readiness]);
+  async function search(q:string,nextPage:number){
+    setCatalogBusy(true);
+    setCatalogError('');
+    setLive(null);
+    setSelected(null);
+    try{
+      const result=await api.ecommApiCatalog(q,nextPage);
+      setCatalog(result);
+      setActiveQuery(q);
+      setPage(nextPage);
+    }catch(e){
+      setCatalog(null);
+      setCatalogError(errorMessage(e));
+    }finally{setCatalogBusy(false)}
+  }
+  function submit(event:FormEvent){
+    event.preventDefault();
+    void search(searchInput.trim(),1);
+  }
+  async function checkSku(row:EcommApiCatalogRow){
+    if(!row.sku)return;
+    setLiveBusy(true);setLive(null);setLiveError('');setSelected(row);
+    try{setLive(await api.ecommAppLookup([row.sku]));}
+    catch(e){setLiveError(errorMessage(e));}
+    finally{setLiveBusy(false)}
+  }
+  const result=live?.sku_diagnosis?.requested?.[0];
+  const exact=result?.status==='EXACT_SINGLE' && result.matches.length===1;
+  const verified=exact && String(result.matches[0]?.variant_id)===selected?.ecomm_id;
+  const more=catalog?catalog.page*catalog.page_size<catalog.total_matches:false;
 
-  const exampleSku=example?.product.sku_variant||example?.product.sku_effective||example?.product.sku||'';
-  const exampleSearch=exampleSku||example?.product.name||'';
-  const exampleIssue=example?.reason_codes.includes('BRAND_MISSING')?'brand':'ean';
-  const exampleHref='/work/details?focus=data&issue='+exampleIssue+(exampleSearch?'&q='+encodeURIComponent(exampleSearch):'');
-  const canWalkThrough=haveExcel===true&&haveReview===true;
   return <div className="kiki-pilot">
     <header className="kiki-home-header">
       <div>
-        <p className="eyebrow">KIKI TECH · PRUEBA CON EL CLIENTE</p>
-        <h1>Probemos KIKI con productos reales.</h1>
-        <p>Un recorrido corto para comprobar lo que funciona, mostrar los pendientes y dejar una decisión registrada. No se publica ni modifica nada en los canales de venta.</p>
+        <p className="eyebrow">KIKI TECH · ECOMM-APP API</p>
+        <h1>Catálogo Ecomm-App por API.</h1>
+        <p>Desde acá trabajamos <strong>solo con datos de Ecomm-App obtenidos por API</strong>.
+          No se leen productos del Excel histórico, no se mezclan identidades y no se publica nada.</p>
       </div>
-      <button className="kiki-refresh" type="button" onClick={()=>void refresh()} disabled={loading}>
-        {loading?'Verificando…':'↻ Verificar nuevamente'}
+      <button type="button" className="kiki-refresh" onClick={()=>void refresh()} disabled={loading}>
+        {loading?'Consultando…':'↻ Verificar fuentes'}
       </button>
     </header>
 
     {errors.length>0&&<div role="alert" className="notice warning">
-      <strong>Parte de la información no respondió.</strong>
-      <p>{errors.join(' ')} No interpretes los datos ausentes como cero ni tomes decisiones hasta que vuelvan a cargar.</p>
+      <strong>Hay fuentes que no respondieron.</strong>
+      <p>{errors.join(' · ')} No los interpretes como catálogos vacíos.</p>
     </div>}
-    <section className="kiki-pilot-sources" aria-label="Estado de fuentes para la demostración">
-      <h2>1. Comprobar las fuentes</h2>
-      <p>Esto se consulta al abrir o actualizar la página. Los números provienen de las fuentes guardadas en KIKI, no son un stock en vivo.</p>
-      <div className="kiki-pilot-source-grid">
+
+    <section className="kiki-pilot-sources">
+      <h2>1. Fuente Ecomm-App: API exclusivamente</h2>
+      <p>Los productos se consultan desde la copia completa obtenida por API. El stock mostrado corresponde
+        a la fecha de captura; no se sincroniza en vivo automáticamente.</p>
+      <div className="kiki-pilot-source-grid kiki-api-source-grid">
         <article>
-          <span className={'kiki-pilot-state '+sourceClass(haveExcel)}>{statusText(haveExcel)}</span>
-          <strong>Catálogo Ecomm histórico</strong>
-          <b>{loading?'Consultando…':haveExcel?asNum(sources.summary?.total_products):'Sin confirmar'}</b>
-          <small>{excel?.filename||'No se detectó Excel operativo'}</small>
+          <span className={'kiki-pilot-state '+(stage?.complete?'is-ok':'is-caution')}>
+            {stage?.complete?'Copia completa':'No confirmada'}
+          </span>
+          <strong>Productos padre Ecomm</strong>
+          <b>{loading?'…':stage?.quality?.parents==null?'No disponible':stage.quality.parents.toLocaleString('es-AR')}</b>
+          <small>API, no Excel</small>
         </article>
         <article>
-          <span className={'kiki-pilot-state '+sourceClass(stageReady)}>{statusText(stageReady)}</span>
-          <strong>Copia API Ecomm-App</strong>
-          <b>{loading?'Consultando…':sources.stage?.complete?'Copia completa':'En diagnóstico'}</b>
-          <small>{sources.stage? 
-            `${sources.stage.pages_saved}/${sources.stage.expected_pages??'?'} páginas guardadas · no es la fuente operativa`:
-            'Copia no verificable'}</small>
+          <span className={'kiki-pilot-state '+(stage?.complete?'is-ok':'is-caution')}>Variantes API</span>
+          <strong>IDs de variantes</strong>
+          <b>{loading?'…':stage?.quality?.variants==null?'No disponible':stage.quality.variants.toLocaleString('es-AR')}</b>
+          <small>{stage?stage.pages_saved+'/'+(stage.expected_pages??'?')+' páginas capturadas':'Sin copia verificable'}</small>
         </article>
         <article>
-          <span className={'kiki-pilot-state '+sourceClass(mlConnected)}>{statusText(mlConnected)}</span>
-          <strong>Mercado Libre</strong>
-          <b>{loading?'Consultando…':sources.ml?asNum(sources.ml.listing_count):'Sin verificar'}</b>
-          <small>API {mlConnected?'conectada':'sin conexión comprobada'} · último registro: {dateLabel(sources.ml?.last_sync)}</small>
+          <span className={'kiki-pilot-state '+(ml?.connected&&!ml.token_expired?'is-ok':'is-caution')}>
+            {ml?.connected&&!ml.token_expired?'Conectado':'Sin conexión comprobada'}
+          </span>
+          <strong>Mercado Libre · otra fuente</strong>
+          <b>{ml?.listing_count==null?'No disponible':ml.listing_count.toLocaleString('es-AR')}</b>
+          <small>Último snapshot: {dateLabel(ml?.last_sync)}. No se concilia desde esta pantalla.</small>
         </article>
         <article>
-          <span className={'kiki-pilot-state '+sourceClass(tnReady)}>{statusText(tnReady)}</span>
-          <strong>Tiendanube</strong>
-          <b>{loading?'Consultando…':tnReady?asNum(sources.tn?.summary.products):'Sin verificar'}</b>
-          <small>CSV guardado, no conexión en tiempo real</small>
+          <span className={'kiki-pilot-state '+(tn?.available?'is-ok':'is-caution')}>
+            {tn?.available?'CSV disponible':'Sin confirmar'}
+          </span>
+          <strong>Tiendanube · otra fuente</strong>
+          <b>{tn?.available?fmt(tn.summary?.products):'No disponible'}</b>
+          <small>Datos de canal por CSV, no de Ecomm-App</small>
         </article>
       </div>
-      {loadedAt&&<small className="kiki-pilot-last">Estado consultado: {loadedAt.toLocaleString('es-AR')}. La conexión de Ecomm-App es de lectura; no sincroniza stock ni precios automáticamente.</small>}
+      <small className="kiki-pilot-last">
+        Última página API capturada: {dateLabel(catalog?.capture_last_at)}.
+        La copia API es de solo lectura y aún no está activada como fuente de la conciliación general.
+      </small>
     </section>
 
-    <section className="kiki-pilot-steps" aria-label="Prueba guiada">
-      <h2>2. Hacer una prueba de punta a punta</h2>
-      <p>Usá un producto real conocido por Guillermo. El ejemplo se selecciona de los pendientes actuales y es una sugerencia de navegación, no una aprobación ni un diagnóstico de identidad.</p>
-      <div className="kiki-pilot-steps-grid">
-        <article>
-          <span className="kiki-pilot-step">01 · Encontrar</span>
-          <h3>Buscar un producto</h3>
-          <p>Abrí Productos, buscá su SKU y revisá nombre, código, marca y estado frente a Mercado Libre.</p>
-          <Link className="kiki-pilot-link" to="/products">Ir a productos →</Link>
-        </article>
-        <article>
-          <span className="kiki-pilot-step">02 · Investigar</span>
-          <h3>Resolver un dato pendiente</h3>
-          {canWalkThrough&&example?<p>Ejemplo real: <strong>{example.product.name||'Producto sin nombre'}</strong> · SKU {exampleSku}. Verificá su marca o GTIN con el proveedor.</p>:
-            <p>{!canWalkThrough?'Falta comprobar catálogo o conciliación antes de mostrar pendientes.':'No hay ejemplo disponible entre los pendientes consultados. Elegí una ficha desde Tareas.'}</p>}
-          <Link className="kiki-pilot-link" to={canWalkThrough&&example?exampleHref:'/work/details?focus=data'}>
-            {canWalkThrough&&example?'Abrir este pendiente →':'Ver tareas de datos →'}
-          </Link>
-        </article>
-        <article>
-          <span className="kiki-pilot-step">03 · Guardar y comprobar</span>
-          <h3>Dejar evidencia en KIKI</h3>
-          <p>Si hay una fuente verificable, guardá la evidencia como borrador. Volvé a abrir la ficha y comprobá que persista. No aceptes un dato sin haberlo comprobado.</p>
-          <Link className="kiki-pilot-link" to="/work/details?focus=data">Continuar la revisión →</Link>
-        </article>
-        <article>
-          <span className="kiki-pilot-step">04 · Ver preparación</span>
-          <h3>Evaluar Mercado Libre</h3>
-          <p>Mostrá por qué una publicación está lista, bloqueada o necesita revisión, y cómo se prepara internamente. Este paso <strong>no publica</strong> productos.</p>
-          <Link className="kiki-pilot-link" to="/prepublication">Ver preparación ML →</Link>
-        </article>
-      </div>
+    <section className="kiki-pilot-steps">
+      <h2>2. Buscar productos en el catálogo API</h2>
+      <p>Buscá por SKU exacto o parcial, ID interno, descripción o GTIN. Se mantienen
+        separadas las variantes y los combos aunque compartan familia o código de barras.</p>
+      <form className="kiki-api-search" onSubmit={submit}>
+        <label htmlFor="api-sku-query">SKU, ID o producto</label>
+        <input id="api-sku-query" value={searchInput} onChange={e=>setSearchInput(e.target.value)}
+          maxLength={80} placeholder="Ej.: 2500400" />
+        <button type="submit" disabled={catalogBusy||loading}>{catalogBusy?'Buscando…':'Buscar en API'}</button>
+      </form>
+      {catalogError&&<p className="kiki-pilot-warning" role="alert">{catalogError}</p>}
+      {catalog&&<>
+        <p className="kiki-pilot-last">{catalog.total_matches.toLocaleString('es-AR')} variantes coinciden.
+          Mostrando página {catalog.page}, hasta {catalog.page_size} resultados. Solo fuente {catalog.source}.</p>
+        <div className="kiki-api-table-wrap">
+          <table className="kiki-api-table">
+            <thead><tr><th>ID Ecomm</th><th>SKU</th><th>Producto</th><th>Combo</th><th>GTIN</th><th>Stock capturado</th><th>Consulta puntual</th></tr></thead>
+            <tbody>{catalog.items.map((row,i)=><tr key={(row.ecomm_id||'sin-id')+'-'+i}>
+              <td>{fmt(row.ecomm_id)}</td>
+              <td><strong>{fmt(row.sku)}</strong></td>
+              <td>{fmt(row.product_name)}<small>{row.variant_description||''}</small></td>
+              <td>{row.is_combo===null?'Sin dato':row.is_combo?'Sí':'No'}</td>
+              <td>{fmt(row.gtin)}</td>
+              <td>{fmt(row.stock_at_capture)}</td>
+              <td><button type="button" disabled={!row.sku||liveBusy}
+                onClick={()=>void checkSku(row)}>Consultar API</button></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {catalog.total_matches===0&&<p>No se encontraron productos en la copia API para esta búsqueda.</p>}
+        <div className="kiki-api-pages">
+          <button type="button" disabled={catalogBusy||catalog.page===1} onClick={()=>void search(activeQuery,catalog.page-1)}>← Anterior</button>
+          <button type="button" disabled={catalogBusy||!more} onClick={()=>void search(activeQuery,catalog.page+1)}>Siguiente →</button>
+        </div>
+      </>}
+      {liveBusy&&<p>Consultando el SKU directamente en Ecomm-App…</p>}
+      {liveError&&<p className="kiki-pilot-warning" role="alert">La consulta directa falló: {liveError}</p>}
+      {selected&&live&&<div className="kiki-api-live-result" role="status">
+        <h3>Resultado de Ecomm-App para SKU {fmt(selected.sku)}</h3>
+        <p>Estado: <strong>{result?.status||'Sin respuesta identificable'}</strong>.
+          ID esperado: {fmt(selected.ecomm_id)}.
+          {verified?' La API devolvió una coincidencia exacta con el mismo ID.':
+            ' No está verificada la correspondencia exacta de SKU e ID; no aplicar cambios.'}</p>
+        {verified&&<p>Stock informado ahora por Ecomm-App: <strong>{fmt(result?.matches[0]?.total_stock)}</strong>.
+          Es una lectura puntual; no actualiza stock de KIKI ni de los canales.</p>}
+      </div>}
     </section>
 
     <section className="kiki-pilot-summary">
-      <h2>3. Qué podemos afirmar al finalizar</h2>
-      <p><strong>Revisión de productos:</strong> {sources.readiness?.reconciliation_run_id?
-        `${asNum(sources.readiness.summary.REVIEW_REQUIRED)} en revisión según el último análisis de preparación ML`:
-        'no se pudo verificar una conciliación actual'}.{' '}
-        <strong>Historial interno:</strong> {sources.history?asNum(sources.history.total)+' registros recuperables':'no disponible'}. Estos valores pertenecen a flujos distintos y no deben sumarse.</p>
-      <p className="kiki-pilot-warning"><strong>Por ahora no prometemos publicación masiva ni stock sincronizado:</strong> la copia API Ecomm sigue separada del Excel operativo; los vínculos ML/GTIN y las familias SKU requieren controles. Cuando aprueben la prueba interna podremos planificar la activación por etapas.</p>
-      <div className="kiki-pilot-footer-links">
-        <Link to="/work">Ver todas las tareas</Link>
-        <Link to="/tiendanube">Revisar Tiendanube</Link>
-        <Link to="/imports">Herramientas de importación</Link>
-      </div>
+      <h2>3. Qué falta para operar 100 % con la API</h2>
+      <p className="kiki-pilot-warning"><strong>Importante:</strong> las pantallas antiguas de
+        Productos, Tareas y Preparación ML todavía usan el catálogo histórico. No las
+        utilices para dar por actuales stock, precios ni datos de Ecomm-App.
+        El nuevo buscador de esta pantalla NO consulta ese Excel.</p>
+      <p>Antes de migrar la conciliación y las aprobaciones necesitamos asegurar
+        precio, costo, marca y vínculos comerciales desde fuentes válidas; resolver IDs/SKU
+        discrepantes; recapturar la API de forma consistente; y probar las decisiones guardadas.
+        No se deduce el contenido de un combo por familia SKU.</p>
+      <p>Podemos consultar productos reales por API desde hoy, pero no afirmar todavía
+        que el sistema completo opera exclusivamente desde ella.</p>
     </section>
   </div>;
 }
