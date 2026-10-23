@@ -5,8 +5,10 @@ ML simple listings have product-level SKU; variations need a variation SKU.
 Exact SKU and matching GTIN are still EVIDENCE, not validated channel linkage.
 """
 from collections import Counter, defaultdict
+import re
+import unicodedata
 
-from ...services.tiendanube_assisted_match_service import variant_conflict
+from ...services.tiendanube_assisted_match_service import pack_units, variant_conflict
 from ...services.tiendanube_quality_audit_service import gtin_status
 from .catalog_stage import stage_status
 
@@ -19,6 +21,7 @@ STATUSES = (
     "SHARED_GTIN",
     "GTIN_CONFLICT",
     "PRESENTATION_CONFLICT",
+    "PACK_QUANTITY_EQUIVALENCE_REVIEW",
     "INVALID_ML_GTIN",
     "INVALID_ECOMM_GTIN",
     "DUPLICATE_API_SKU",
@@ -46,6 +49,73 @@ def _gtin(value):
 def _product_sku(row):
     return _string(
         row.get("sku_product") or row.get("sku_effective") or row.get("sku")
+    )
+
+
+# Conservative: arithmetic agreement can EXPLAIN a unit/total discrepancy,
+# but never establish product identity, GTIN, combo components or approval.
+_GENERIC_WORDS = {
+    "pack", "kit", "combo", "un", "und", "unidad", "unidades",
+    "con", "sin", "los", "las", "una", "uno", "para", "de", "del",
+    "en", "por", "las", "sabor", "sabores", "capsula", "capsulas",
+    "comprimidos", "tabletas", "caps", "cap", "gramos", "gramo",
+    "frascos", "frasco", "suplemento", "suplementos", "producto",
+    "polvo", "bebible", "natier", "vitamin", "way",
+}
+
+
+def _pack_multiplier(name):
+    normalized = unicodedata.normalize("NFKD", _string(name)).encode(
+        "ascii", "ignore"
+    ).decode().lower()
+    matches = {
+        int(value)
+        for value in re.findall(
+            r"\\b(?:pack|kit|combo)\\s*(?:x\\s*)?(\\d{1,3})\\b", normalized
+        )
+    }
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
+def _distinctive_words(name):
+    normalized = unicodedata.normalize("NFKD", _string(name)).encode(
+        "ascii", "ignore"
+    ).decode().lower()
+    return {
+        word for word in re.findall(r"\\b[a-z][a-z0-9]*\\b", normalized)
+        if len(word) >= 3 and word not in _GENERIC_WORDS
+    }
+
+
+def _pack_equivalence_reason(ecomm_title, ml_title):
+    """Only a review lead when a documented pack has an arithmetical explanation.
+
+    Conservatively require at least three shared distinctive product words;
+    otherwise a different ingredient with the same pack size stays a conflict.
+    """
+    ec_pack = _pack_multiplier(ecomm_title)
+    ml_pack = _pack_multiplier(ml_title)
+    if not ec_pack or ec_pack < 2 or ec_pack != ml_pack:
+        return None
+    ec_amounts = pack_units(ecomm_title)
+    ml_amounts = pack_units(ml_title)
+    if len(ec_amounts) != 1 or len(ml_amounts) != 1:
+        return None
+    (ec_amount, ec_unit), = ec_amounts
+    (ml_amount, ml_unit), = ml_amounts
+    if ec_unit != ml_unit or ec_amount == ml_amount:
+        return None
+    smaller, larger = sorted((ec_amount, ml_amount))
+    if larger != smaller * ec_pack:
+        return None
+    shared_words = _distinctive_words(ecomm_title) & _distinctive_words(ml_title)
+    if len(shared_words) < 3:
+        return None
+    return (
+        f"Posible equivalencia entre {ec_pack} unidades de {smaller} "
+        f"{ec_unit} y un total de {larger} {ec_unit}. "
+        "Los títulos mantienen diferencias; revisar manualmente producto, "
+        "presentación y componentes antes de cualquier vínculo."
     )
 
 
@@ -162,8 +232,18 @@ def api_ml_reconciliation_preview(pages: list[dict] | None, ml_rows: list[dict] 
             results_by_id[selected["ecomm_id"]].add(external_id)
             full_name = " ".join((selected["name"], selected["variant_description"]))
             if variant_conflict(full_name, selected["sku"], title, lookup_sku):
-                kind = "PRESENTATION_CONFLICT"
-                note = "El SKU coincide pero se detectó una presentación incompatible."
+                # Check the parent product name separately, avoiding duplicated
+                # or unrelated variant-description quantities in the heuristic.
+                pack_reason = _pack_equivalence_reason(selected["name"], title)
+                if pack_reason:
+                    kind = "PACK_QUANTITY_EQUIVALENCE_REVIEW"
+                    note = pack_reason
+                else:
+                    kind = "PRESENTATION_CONFLICT"
+                    note = (
+                        "El SKU coincide pero hay una diferencia de presentación "
+                        "sin explicación segura; verificar producto y pack."
+                    )
             else:
                 api_gtin = _gtin(selected["gtin"])
                 listing_gtin = _gtin(ml_gtin)
