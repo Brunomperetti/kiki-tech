@@ -142,5 +142,5 @@ def test_token_required_and_transport_whitelisted():
         EcommAppInventoryClient("")
     with pytest.raises(ValueError, match="admitida"):
         _fetch("DELETE", f"{API_PREFIX}/productos", "secret")
-    with pytest.raises(ValueError, match="admitida"):
+    with pytest.raises(ValueError, match="Solo se permite el POST de consulta"):
         _fetch("POST", f"{API_PREFIX}/depositos", "secret", body={"x": 1})
