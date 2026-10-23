@@ -71,7 +71,7 @@ def _pack_multiplier(name):
     matches = {
         int(value)
         for value in re.findall(
-            r"\\b(?:pack|kit|combo)\\s*(?:x\\s*)?(\\d{1,3})\\b", normalized
+            r"\b(?:pack|kit|combo)\s*(?:x\s*)?(\d{1,3})\b", normalized
         )
     }
     return next(iter(matches)) if len(matches) == 1 else None
@@ -82,7 +82,7 @@ def _distinctive_words(name):
         "ascii", "ignore"
     ).decode().lower()
     return {
-        word for word in re.findall(r"\\b[a-z][a-z0-9]*\\b", normalized)
+        word for word in re.findall(r"\b[a-z][a-z0-9]*\b", normalized)
         if len(word) >= 3 and word not in _GENERIC_WORDS
     }
 
