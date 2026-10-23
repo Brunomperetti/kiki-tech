@@ -30,6 +30,30 @@ export function EcommTnBrandEvidence(){
       </div>
       <p><strong>Requieren otras verificaciones:</strong> {s?.tn_brand_empty??0} coincidencias sin marca en Tiendanube; {s?.api_sku_changed??0} SKU cambiados en la API; {s?.combo_candidate??0} candidatos corresponden a combos y requieren atención adicional.</p>
       <p className="kiki-ecomm-hint">{report.policy}</p>
+      {report.indirect_diagnostics&&<section className="kiki-ecomm-tn-brand-diagnostics">
+        <h4>¿Por qué aparecen cero coincidencias?</h4>
+        <p>El cruce anterior exige SKU idéntico. Estos datos muestran cuánto se superponen los catálogos, incluso en productos que ya tienen marca en Ecomm-App.</p>
+        <div className="kiki-ecomm-commercial-metrics">
+          <div><strong>{report.indirect_diagnostics.summary.tn_rows}</strong><small>Filas cargadas en Tiendanube</small></div>
+          <div><strong>{report.indirect_diagnostics.summary.tn_rows_with_brand}</strong><small>Filas Tiendanube con marca</small></div>
+          <div><strong>{report.indirect_diagnostics.summary.ecomm_ids_with_any_tn_sku}</strong><small>IDs históricos con algún SKU de Tiendanube</small></div>
+          <div><strong>{report.indirect_diagnostics.summary.ecomm_ids_with_existing_brand_and_tn_sku}</strong><small>De esos IDs, ya tenían marca en Ecomm-App</small></div>
+          <div><strong>{report.indirect_diagnostics.summary.review_leads}</strong><small>Otras pistas para investigar (sin confirmar)</small></div>
+        </div>
+        <p>Se detectaron {report.indirect_diagnostics.summary.review_by_valid_unique_ean} pistas por EAN válido y único y {report.indirect_diagnostics.summary.review_by_unique_exact_full_name} por título completo normalizado y único. Ninguna autoriza cambiar una marca.</p>
+        <p className="kiki-ecomm-hint">{report.indirect_diagnostics.note}</p>
+        <details>
+          <summary>Investigar otras posibles coincidencias ({report.indirect_diagnostics.leads.length} ejemplos)</summary>
+          {report.indirect_diagnostics.leads.length===0?<p>No se encontraron pistas únicas por EAN o título completo en las copias actuales. Conviene revisar la cobertura del CSV de Tiendanube y las otras fuentes.</p>:report.indirect_diagnostics.leads.map(x=><article className="kiki-ecomm-commercial-row" key={x.ecomm_id}>
+            <strong>{x.ecomm_name||'Producto sin título'} · ID Ecomm {x.ecomm_id}</strong>
+            <small>SKU Ecomm: {x.ecomm_sku} · SKU Tiendanube: {x.tn_sku}</small>
+            <p><strong>Marca registrada en Tiendanube:</strong> {x.tn_brand}</p>
+            <small>{x.match_basis==='VALID_UNIQUE_EAN'?'EAN único con dígito verificador correcto':'Nombre completo normalizado único'} · {x.shared_ean?'EAN: '+x.shared_ean+' · ':''}Combo: {x.is_combo===true?'Sí':x.is_combo===false?'No':'No informado'}</small>
+            <small>Referencia TN: {x.tn_name||x.tn_slug||'Sin nombre'} · Pendiente de confirmar identidad, marca y presentación.</small>
+          </article>)}
+        </details>
+      </section>}
+
       <details>
         <summary>Ver candidatos encontrados ({report.candidates.length} ejemplos)</summary>
         {report.candidates.length===0?<p>No se encontraron candidatos con estas reglas de coincidencia segura.</p>:report.candidates.map(x=><article className="kiki-ecomm-commercial-row" key={x.ecomm_id}>
