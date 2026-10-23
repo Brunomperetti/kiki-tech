@@ -87,7 +87,8 @@ export function Pilot(){
 
   const exampleSku=example?.product.sku_variant||example?.product.sku_effective||example?.product.sku||'';
   const exampleSearch=exampleSku||example?.product.name||'';
-  const exampleHref='/work/details?focus=data'+(exampleSearch?'&q='+encodeURIComponent(exampleSearch):'');
+  const exampleIssue=example?.reason_codes.includes('BRAND_MISSING')?'brand':'ean';
+  const exampleHref='/work/details?focus=data&issue='+exampleIssue+(exampleSearch?'&q='+encodeURIComponent(exampleSearch):'');
   const canWalkThrough=haveExcel===true&&haveReview===true;
   return <div className="kiki-pilot">
     <header className="kiki-home-header">
