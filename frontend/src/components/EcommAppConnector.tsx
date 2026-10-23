@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {api} from '../services/api';
-import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup} from '../types/ecomm-app';
+import type {EcommAppPreviewList, EcommAppStatus, EcommAppPreview, EcommAppLookup, EcommCatalogAudit} from '../types/ecomm-app';
 import '../ecomm-app.css';
 
 const comboLabel=(flag:boolean|null|undefined)=>flag===true?'Sí':flag===false?'No':'No informado';
@@ -34,11 +34,12 @@ function PreviewList({data,label}:{data:EcommAppPreviewList;label:string}){
 export function EcommAppConnector(){
   const [status,setStatus]=useState<EcommAppStatus|null>(null);
   const [checking,setChecking]=useState(true);
-  const [busy,setBusy]=useState<'preview'|'lookup'|''>('');
+  const [busy,setBusy]=useState<'preview'|'lookup'|'audit'|''>('');
   const [error,setError]=useState('');
   const [preview,setPreview]=useState<EcommAppPreview|null>(null);
   const [lookup,setLookup]=useState<EcommAppLookup|null>(null);
   const [skuText,setSkuText]=useState('');
+  const [audit,setAudit]=useState<EcommCatalogAudit|null>(null);
 
   useEffect(()=>{
     let active=true;
@@ -62,6 +63,13 @@ export function EcommAppConnector(){
     setBusy('lookup');setError('');setLookup(null);
     try{setLookup(await api.ecommAppLookup(skus))}
     catch(e){setError(e instanceof Error?e.message:'No se pudo consultar esos SKU.')}
+    finally{setBusy('')}
+  }
+
+  async function auditPages(page:number){
+    setBusy('audit');setError('');
+    try{setAudit(await api.ecommAppCatalogAudit(page))}
+    catch(e){setError(e instanceof Error?e.message:'No se pudo auditar el catálogo.')}
     finally{setBusy('')}
   }
 
@@ -120,6 +128,37 @@ export function EcommAppConnector(){
         <PreviewList data={lookup.product_preview} label="Productos padre y todas sus variantes devueltas"/>
         <small>{lookup.note}</small>
       </div>}
+    </details>
+    <details className="kiki-ecomm-sku-check">
+      <summary>Auditar el catálogo de Ecomm-App por páginas (sin importar)</summary>
+      <p>Revisamos como máximo <strong>dos páginas de 50 productos</strong> por consulta. Comprobamos IDs de variantes, SKU, combos y paginación, sin tocar el catálogo actual.</p>
+      <button type="button" disabled={!status?.configured||busy!==''} onClick={()=>void auditPages(1)}>
+        {busy==='audit'?'Leyendo páginas…':'Auditar las primeras 2 páginas'}
+      </button>
+      {audit&&<section className="kiki-ecomm-sku-diagnosis">
+        <h4>Resultado de la auditoría parcial</h4>
+        <p><strong>Páginas consultadas:</strong> {audit.pages.map(x=>x.page).join(' y ')} · <strong>Productos padre:</strong> {audit.totals_in_this_batch.parents} · <strong>Variantes:</strong> {audit.totals_in_this_batch.variants}</p>
+        <div className="kiki-ecomm-audit-metrics">
+          <span>Padres combo: <b>{audit.totals_in_this_batch.combo_parents}</b></span>
+          <span>Variantes combo: <b>{audit.totals_in_this_batch.combo_variants}</b></span>
+          <span>Sin ID variante: <b>{audit.totals_in_this_batch.variants_without_id}</b></span>
+          <span>Sin SKU: <b>{audit.totals_in_this_batch.variants_without_sku}</b></span>
+          <span>Sin dato de stock: <b>{audit.totals_in_this_batch.variants_without_total_stock}</b></span>
+          <span>IDs repetidos en este bloque: <b>{audit.totals_in_this_batch.repeated_variant_ids}</b></span>
+          <span>SKU repetidos en este bloque: <b>{audit.totals_in_this_batch.repeated_skus}</b></span>
+        </div>
+        {audit.pages.map(item=><div className="kiki-ecomm-requested" key={item.page}>
+          <strong>Página {item.page}: {item.parents} productos</strong>
+          <small>Metadatos de paginación: {item.pagination.present?'Disponibles':'No identificados'}</small>
+          <small>Campos de paginación: {item.pagination.available_fields.join(', ')||'Ninguno'}</small>
+          {Object.keys(item.pagination.values).length>0&&<small>Valores: {Object.entries(item.pagination.values).map(([key,value])=>key+': '+String(value)).join(' · ')}</small>}
+        </div>)}
+        <p className="kiki-ecomm-hint">{audit.notice}</p>
+        {audit.next_page_to_check!=null&&<button type="button" disabled={busy!==''} onClick={()=>void auditPages(audit.next_page_to_check!)}>
+          {busy==='audit'?'Leyendo…':'Revisar páginas '+audit.next_page_to_check+' y '+(audit.next_page_to_check+1)}
+        </button>}
+        <small>Los indicadores muestran únicamente este bloque, no todo el inventario. No guardamos registros ni reemplazamos planillas anteriores.</small>
+      </section>}
     </details>
     <small>Esta integración no incluye todavía importación masiva ni vínculos Ecomm–Mercado Libre–Tiendanube. Facturación permanece fuera del alcance.</small>
   </section>;
