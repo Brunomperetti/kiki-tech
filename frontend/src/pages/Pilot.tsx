@@ -1,4 +1,5 @@
 import {FormEvent,useEffect,useState} from 'react';
+import {useLocation} from 'react-router-dom';
 import {KikiIcon} from '../components/KikiIcon';
 import '../client-ux.css';
 import {api} from '../services/api';
@@ -16,6 +17,7 @@ const dateLabel=(s:string|null|undefined)=>{
 };
 
 export function Pilot(){
+  const location=useLocation();
   const [stage,setStage]=useState<EcommStageStatus|null>(null);
   const [catalog,setCatalog]=useState<EcommApiCatalog|null>(null);
   const [ml,setMl]=useState<MercadoLibreStatus|null>(null);
@@ -55,6 +57,12 @@ export function Pilot(){
     setLoading(false);
   }
   useEffect(()=>{void refresh()},[]);
+  useEffect(()=>{
+    const id=location.hash.startsWith('#')?decodeURIComponent(location.hash.slice(1)):'';
+    if(!id)return;
+    const frame=requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({block:'start'}));
+    return ()=>cancelAnimationFrame(frame);
+  },[location.hash]);
   // After a category is selected, bring its actual examples into view.
   useEffect(()=>{
     if(showPreviewExamples)document.getElementById('kiki-examples')?.scrollIntoView({
