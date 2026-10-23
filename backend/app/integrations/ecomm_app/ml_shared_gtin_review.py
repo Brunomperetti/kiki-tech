@@ -31,6 +31,7 @@ def shared_gtin_sku_review(matched, owners_sku, owners_ean, owners_mla,
     counts = Counter()
     all_review_leads = defaultdict(list)
     rejected = []
+    presentation_rejected = []
     for row in ml_rows:
         gtin = _str(row.get("ean"))
         if not gtin or gtin_status(gtin) != "VALID_CHECK_DIGIT":
@@ -80,15 +81,36 @@ def shared_gtin_sku_review(matched, owners_sku, owners_ean, owners_mla,
             counts["unique_sku_without_variant_proof"] += 1
 
         mla_ids = owners_mla.get(mla, set())
-        if owner not in gtin_ids or (mla_ids and mla_ids != {owner}):
+        gtin_disagrees = owner not in gtin_ids
+        mla_disagrees = bool(mla_ids) and mla_ids != {owner}
+        if gtin_disagrees or mla_disagrees:
             counts["identity_contradiction"] += 1
+            if gtin_disagrees:
+                counts["sku_outside_gtin_owners"] += 1
+            if mla_disagrees:
+                counts["historical_mla_conflict"] += 1
+            reasons = [
+                reason for condition, reason in (
+                    (gtin_disagrees, "El SKU apunta a un ID Ecomm distinto de los propietarios del GTIN."),
+                    (mla_disagrees, "El MLA histórico apunta a otro ID Ecomm."),
+                ) if condition
+            ]
             if len(rejected) < _LIMIT:
                 rejected.append({
                     "mla": mla,
                     "gtin": gtin,
                     "sku": _str(row.get("variant_sku") or row.get("sku_effective") or row.get("sku")),
+                    "sku_ecomm_id": owner,
+                    "gtin_owner_ids": sorted(gtin_ids)[:8],
+                    "historical_mla_owner_ids": sorted(mla_ids)[:8],
                     "gtin_owner_count": len(gtin_ids),
-                    "reason": "SKU no pertenece al conjunto GTIN, o referencia MLA histórica contradictoria.",
+                    "reason": " ".join(reasons),
+                    "reason_codes": [
+                        code for condition, code in (
+                            (gtin_disagrees, "SKU_NOT_IN_GTIN_OWNERS"),
+                            (mla_disagrees, "HISTORICAL_MLA_POINTS_ELSEWHERE"),
+                        ) if condition
+                    ],
                 })
             continue
         counts["sku_inside_gtin_owners_no_mla_conflict"] += 1
@@ -107,6 +129,15 @@ def shared_gtin_sku_review(matched, owners_sku, owners_ean, owners_mla,
             row.get("variant_sku") or "",
         ):
             counts["presentation_conflict"] += 1
+            if len(presentation_rejected) < _LIMIT:
+                presentation_rejected.append({
+                    "ecomm_id": owner,
+                    "ecomm_name": _str(historical.get("name")),
+                    "ml_title": _str(row.get("title")),
+                    "mla": mla,
+                    "sku": _str(row.get("variant_sku") or row.get("sku_effective") or row.get("sku")),
+                    "review_status": "PRESENTATION_CONFLICT",
+                })
             continue
         counts["sku_consistent_missing_brand_rows"] += 1
         all_review_leads[owner].append({
@@ -148,6 +179,8 @@ def shared_gtin_sku_review(matched, owners_sku, owners_ean, owners_mla,
             "sku_inside_gtin_owners_no_mla_conflict": counts["sku_inside_gtin_owners_no_mla_conflict"],
             "no_unique_exact_sku": counts["no_unique_exact_sku"],
             "identity_contradiction": counts["identity_contradiction"],
+            "sku_outside_gtin_owners": counts["sku_outside_gtin_owners"],
+            "historical_mla_conflict": counts["historical_mla_conflict"],
             "no_stable_ecomm_id": counts["no_stable_ecomm_id"],
             "already_branded_ecomm": counts["already_branded_ecomm"],
             "presentation_conflict": counts["presentation_conflict"],
@@ -158,6 +191,7 @@ def shared_gtin_sku_review(matched, owners_sku, owners_ean, owners_mla,
         },
         "review_leads": candidates,
         "rejected_samples": rejected,
+        "presentation_rejected_samples": presentation_rejected,
         "sample_limit": _LIMIT,
         "mode": "HYPOTHESIS_REQUIRES_MANUAL_VERIFICATION",
         "policy": (

@@ -144,3 +144,66 @@ def test_shared_gtin_weak_evidence_never_associates_contradictory_mla():
     assert report["counts"]["identity_contradiction"] == 1
     assert report["counts"]["possible_ecomm_brand_review_ids"] == 0
     assert len(report["rejected_samples"]) == 1
+
+
+def test_capsule_presentation_conflict_is_not_a_brand_candidate():
+    # The actual KIKI finding: Ecomm pack x3 240 cápsulas vs ML x3 180.
+    pages, legacy, ml, edima = samples()
+    legacy[0]["name"] = "Pack X 3 Colágeno + Calcio Vitamin Way 240 Cápsulas"
+    ml[0]["title"] = "Pack X 3 Colágeno + Calcio Vitamin Way 180 Cápsulas Neutro"
+    result = ml_brand_evidence_report(pages, legacy, ml, edima, "MERCADOLIBRE_API")
+    report = result["shared_gtin_review"]
+    assert report["counts"]["presentation_conflict"] == 1
+    assert report["counts"]["possible_ecomm_brand_review_ids"] == 0
+    assert report["review_leads"] == []
+    row = report["presentation_rejected_samples"][0]
+    assert row["ecomm_id"] == "1"
+    assert "240 Cápsulas" in row["ecomm_name"]
+    assert "180 Cápsulas" in row["ml_title"]
+    assert row["review_status"] == "PRESENTATION_CONFLICT"
+    assert result["activation_allowed"] is False
+
+
+def test_same_485g_peanut_product_remains_eligible_only_as_review_hint():
+    pages, legacy, ml, edima = samples()
+    legacy[0]["name"] = "Pasta De Mani Natural Mani King X 485g Sin Tacc"
+    ml[0]["title"] = "Pasta De Mani Natural Mani King X 485g"
+    result = ml_brand_evidence_report(pages, legacy, ml, edima, "MERCADOLIBRE_API")
+    report = result["shared_gtin_review"]
+    assert report["counts"]["possible_ecomm_brand_review_ids"] == 1
+    assert report["review_leads"][0]["review_status"] == "NEEDS_HUMAN_VERIFICATION"
+
+
+def test_precise_conflicting_gtin_reason_excludes_mla_when_none_exists():
+    pages, legacy, ml, edima = samples()
+    owners_sku = {"a1": {"1"}}
+    owners_ean = {EAN: {"2", "3"}}
+    report = shared_gtin_sku_review(
+        {"1": (legacy[0], pages[0]["items"][0]["variants"][0])},
+        owners_sku, owners_ean, {}, [ml[0]],
+        {"MLA101": {"Brand A"}},
+    )
+    counts = report["counts"]
+    assert counts["identity_contradiction"] == 1
+    assert counts["sku_outside_gtin_owners"] == 1
+    assert counts["historical_mla_conflict"] == 0
+    case = report["rejected_samples"][0]
+    assert case["reason_codes"] == ["SKU_NOT_IN_GTIN_OWNERS"]
+    assert case["sku_ecomm_id"] == "1"
+    assert case["gtin_owner_ids"] == ["2", "3"]
+
+
+def test_precise_historical_mla_conflict_with_sku_inside_gtin_group():
+    pages, legacy, ml, edima = samples()
+    owners_sku = {"a1": {"1"}}
+    owners_ean = {EAN: {"1", "2"}}
+    report = shared_gtin_sku_review(
+        {"1": (legacy[0], pages[0]["items"][0]["variants"][0])},
+        owners_sku, owners_ean, {"MLA101": {"2"}}, [ml[0]],
+        {"MLA101": {"Brand A"}},
+    )
+    assert report["counts"]["identity_contradiction"] == 1
+    assert report["counts"]["sku_outside_gtin_owners"] == 0
+    assert report["counts"]["historical_mla_conflict"] == 1
+    assert report["rejected_samples"][0]["reason_codes"] == ["HISTORICAL_MLA_POINTS_ELSEWHERE"]
+    assert report["counts"]["possible_ecomm_brand_review_ids"] == 0

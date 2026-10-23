@@ -2,7 +2,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.database.models import Base
-from app.services.tiendanube_assisted_match_service import TiendanubeAssistedMatchService
+from app.services.tiendanube_assisted_match_service import (
+    TiendanubeAssistedMatchService, pack_units, variant_conflict,
+)
 
 
 def test_assisted_match_suggests_similar_without_writing_or_guessing_gtin():
@@ -43,3 +45,18 @@ def test_assisted_match_rejects_brand_and_pack_conflicts():
         report = svc.report()
         assert report["summary"]["with_proposals"] == 0
         assert report["items"][0]["status"] == "NO_SAFE_CANDIDATE"
+
+
+def test_unit_quantities_reject_different_capsules_and_compact_weights():
+    assert pack_units("Pack X 3 Colageno 240 Cápsulas") == {(240, "capsulas")}
+    assert pack_units("Pack x3 Colageno 180 caps") == {(180, "capsulas")}
+    assert pack_units("Pasta de mani x485g") == {(485, "g")}
+    assert pack_units("Pasta de mani X 480 grs") == {(480, "g")}
+    assert pack_units("Colageno 30 comprimidos") == {(30, "comprimidos")}
+    assert pack_units("Colageno 30 comp") == set()
+    assert variant_conflict("Pack X 3 Colageno 240 Cápsulas", "5243200",
+                            "Pack X 3 Colageno 180 Cápsulas Neutro", "5243200")
+    assert variant_conflict("Pasta de mani 485g", "246", "Pasta de mani 480g", "246")
+    assert not variant_conflict("Pasta de mani 485g", "246", "Pasta de mani X 485 gr", "246")
+    assert not variant_conflict("Colageno 240 Cápsulas", "5243200",
+                                "Colageno", "5243200")  # Unknown remains unconfirmed.

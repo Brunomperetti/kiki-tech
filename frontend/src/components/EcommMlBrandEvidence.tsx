@@ -93,7 +93,10 @@ export function EcommMlBrandEvidence(){
           <div><strong>{report.shared_gtin_review.counts.unique_sku_despite_shared_gtin}</strong><small>Con un único ID identificado por SKU</small></div>
           <div><strong>{report.shared_gtin_review.counts.explicit_unique_variant_sku}</strong><small>Con SKU propio de variante único</small></div>
           <div><strong>{report.shared_gtin_review.counts.no_unique_exact_sku}</strong><small>Sin SKU exacto y único</small></div>
-          <div><strong>{report.shared_gtin_review.counts.identity_contradiction}</strong><small>SKU y GTIN/MLA incompatibles</small></div>
+          <div><strong>{report.shared_gtin_review.counts.identity_contradiction}</strong><small>Filas con identificadores contradictorios</small></div>
+          <div><strong>{report.shared_gtin_review.counts.sku_outside_gtin_owners}</strong><small>SKU pertenece a otro ID distinto del GTIN</small></div>
+          <div><strong>{report.shared_gtin_review.counts.historical_mla_conflict}</strong><small>Referencia MLA histórica contradictoria</small></div>
+          <div><strong>{report.shared_gtin_review.counts.presentation_conflict}</strong><small>Diferencias claras de presentación detectadas</small></div>
           <div><strong>{report.shared_gtin_review.counts.already_branded_ecomm}</strong><small>La ficha Ecomm ya tiene marca</small></div>
           <div><strong>{report.shared_gtin_review.counts.possible_ecomm_brand_review_ids}</strong><small>Productos sin marca con pista para investigar</small></div>
         </div>
@@ -110,11 +113,20 @@ export function EcommMlBrandEvidence(){
           </article>)}
         </details>
         <details>
+          <summary>Ver presentaciones incompatibles descartadas ({report.shared_gtin_review.presentation_rejected_samples.length} ejemplos)</summary>
+          {report.shared_gtin_review.presentation_rejected_samples.length===0?<p>No hay ejemplos de presentación incompatible entre las filas inspeccionadas.</p>:report.shared_gtin_review.presentation_rejected_samples.map((x,i)=><article className="kiki-ecomm-commercial-row" key={x.ecomm_id+'-'+x.mla+'-'+i}>
+            <strong>{x.ecomm_name} · ID Ecomm {x.ecomm_id}</strong>
+            <small>Mercado Libre: {x.ml_title||'Sin título'} · {x.mla} · SKU {x.sku}</small>
+            <p><strong>Bloqueado:</strong> las presentaciones parecen diferentes (por ejemplo, cápsulas, peso, volumen o sabor). No se propone la marca de esta publicación hasta verificar los productos reales.</p>
+          </article>)}
+        </details>
+        <details>
           <summary>Ver ejemplos descartados por contradicción ({report.shared_gtin_review.rejected_samples.length})</summary>
           {report.shared_gtin_review.rejected_samples.length===0?<p>No hay ejemplos contradictorios dentro de los GTIN compartidos inspeccionados.</p>:report.shared_gtin_review.rejected_samples.map((x,i)=><article className="kiki-ecomm-commercial-row" key={x.mla+'-'+i}>
             <strong>{x.mla} · GTIN {x.gtin}</strong>
-            <small>SKU ML {x.sku||'No informado'} · {x.gtin_owner_count} IDs con ese GTIN.</small>
+            <small>SKU ML {x.sku||'No informado'} · ID Ecomm por SKU: {x.sku_ecomm_id} · {x.gtin_owner_count} IDs con ese GTIN.</small>
             <small>{x.reason}</small>
+            <small>IDs por GTIN: {x.gtin_owner_ids.join(', ')||'No identificados'} · IDs por MLA histórico: {x.historical_mla_owner_ids.join(', ')||'Sin referencia única'}.</small>
           </article>)}
         </details>
       </details>
