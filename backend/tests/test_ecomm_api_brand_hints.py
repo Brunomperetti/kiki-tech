@@ -10,6 +10,7 @@ from test_ecomm_api_product_workspace import capture
 
 
 def make_db(tmp_path, tn=None, ml=None, stage=None):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     engine = create_engine("sqlite:///" + str(tmp_path / "brands.db"))
     Base.metadata.create_all(engine)
     with Session(engine) as db:
