@@ -113,6 +113,13 @@ export function Dashboard(){
       <div className="kiki-client-section-title"><p className="eyebrow">EMPEZÁ POR ACÁ</p>
         <h2>¿Qué querés hacer?</h2></div>
       <div className="kiki-client-actions">
+        <Link to="/queue" className="kiki-client-action">
+          <span className="kiki-action-icon"><KikiIcon name="chart" size={25}/></span>
+          <span><strong>Cola de mejoras y revisión por lotes</strong>
+            <small>KIKI organiza automáticamente productos sin trabajar, packs y borradores
+              desde el catálogo Ecomm-App API. Elegí, buscá y exportá casos.</small></span>
+          <KikiIcon name="arrow-right"/>
+        </Link>
         <Link to="/workspace" className="kiki-client-action">
           <span className="kiki-action-icon"><KikiIcon name="check" size={25}/></span>
           <span><strong>Mejorar productos y guardar</strong><small>Editá fichas vinculadas a Ecomm-App API. Historial y borradores persistentes dentro de KIKI.</small></span>
