@@ -157,6 +157,7 @@ def test_pack_per_unit_and_container_inference_is_withheld_but_title_remains(tmp
                 again = EcommAiEditor(db).suggest("102", 0)
                 assert again["reused"] is True
                 assert again["description"] == ""
+                assert again["warnings"]
                 provider.assert_called_once()
         assert len(db.scalars(select(KikiEcommAiDailySlot)).all()) == 1
 
