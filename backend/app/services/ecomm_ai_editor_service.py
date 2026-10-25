@@ -56,20 +56,20 @@ def _ascii(value: str) -> str:
 # These claims imply a packaging detail or a quantity-per-unit relationship;
 # a title like "Pack x2 ... 60 cápsulas" does NOT imply either.
 _CONTAINER = re.compile(
-    r"\\b(?:frascos?|botellas?|envases?|potes?|cajas?|blisters?|sobres?|blisters?)\\b",
+    r"\b(?:frascos?|botellas?|envases?|potes?|cajas?|blisters?|sobres?|blisters?)\b",
     flags=re.I,
 )
 _PER_UNIT = re.compile(
-    r"\\b(?:cada\\s+(?:uno|una|frasco|botella|envase|pote|caja|unidad)|"
-    r"por\\s+(?:frasco|botella|envase|pote|caja|unidad)|"
-    r"c\\s*/\\s*u|por\\s+unidad)\\b",
+    r"\b(?:cada\s+(?:uno|una|frasco|botella|envase|pote|caja|unidad)|"
+    r"por\s+(?:frasco|botella|envase|pote|caja|unidad)|"
+    r"c\s*/\s*u|por\s+unidad)\b",
     flags=re.I,
 )
 _PACK_COMPONENT_CLAIM = re.compile(
-    r"\\b(?:incluye|contiene|trae|compuesto\\s+por|formado\\s+por)\\s+"
-    r"(?:(?:hasta|al\\s+menos|exactamente)\\s+)?"
-    r"(?:\\d+|dos|tres|cuatro|cinco)\\s+"
-    r"(?:frascos?|botellas?|envases?|potes?|cajas?|unidades?|productos?)\\b",
+    r"\b(?:incluye|contiene|trae|compuesto\s+por|formado\s+por)\s+"
+    r"(?:(?:hasta|al\s+menos|exactamente)\s+)?"
+    r"(?:\d+|dos|tres|cuatro|cinco)\s+"
+    r"(?:frascos?|botellas?|envases?|potes?|cajas?|unidades?|productos?)\b",
     flags=re.I,
 )
 
@@ -98,9 +98,9 @@ def _guard_proposal(title: str, description: str, questions: list, facts: dict):
     declared = _declared_product_text(facts)
     warnings = []
     # Linguistic duplication, not a substantive change to variant facts.
-    if re.search(r"\\bsabor\\s+sin\\s+sabor\\b", _ascii(title)):
+    if re.search(r"\bsabor\s+sin\s+sabor\b", _ascii(title)):
         title = re.sub(
-            r"\\bsabor\\s+sin\\s+sabor\\b",
+            r"\bsabor\s+sin\s+sabor\b",
             "sin sabor" if "sin sabor" in _ascii(declared) else "",
             title, flags=re.I,
         )
@@ -113,7 +113,7 @@ def _guard_proposal(title: str, description: str, questions: list, facts: dict):
     if set(NUMBERS.findall(title + " " + description)) - declared_numbers:
         raise ValueError("La IA incorporó cantidades no declaradas en la descripción API.")
     is_pack = facts.get("is_combo") is True or bool(
-        re.search(r"\\b(?:pack|combo|kit)\\s*(?:x\\s*)?\\d+\\b", _ascii(declared))
+        re.search(r"\b(?:pack|combo|kit)\s*(?:x\s*)?\d+\b", _ascii(declared))
     )
     if is_pack:
         if _needs_pack_verification(title, declared):
