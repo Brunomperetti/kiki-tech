@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -334,5 +334,22 @@ class EcommApiProductEdit(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class KikiEcommAiDailySlot(Base):
+    """Concurrency-safe reserved call slot for the Ecomm API-assisted editor.
+
+    Retains failed attempts to bound provider spending.
+    """
+    __tablename__ = "kiki_ecomm_ai_daily_slots"
+    __table_args__ = (UniqueConstraint("day_utc", "slot", name="uq_ecomm_ai_day_slot"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day_utc: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    slot: Mapped[int] = mapped_column(Integer, nullable=False)
+    ecomm_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="RESERVED")
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
