@@ -699,3 +699,18 @@ export interface EcommAiLatest {
   remaining_today:number;
   enabled:boolean;
 }
+
+export interface EcommApiBrandHints {
+  status:'AMBIGUOUS_API_SKU'|'CONFLICT'|'EVIDENCE_FOUND'|'NO_EVIDENCE';
+  brand:string|null;
+  ecomm_id?:string;
+  sku?:string;
+  source?:'ECOMM_APP_API_STAGE';
+  reason:string;
+  evidence:{
+    brand:string;channel:'TIENDANUBE_CSV'|'MERCADOLIBRE_API';
+    source_id:string;title:string;snapshot_at:string|null;
+    identifier_match:string;verification:string;
+  }[];
+  external_writes_enabled:false;
+}
