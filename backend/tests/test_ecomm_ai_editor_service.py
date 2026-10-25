@@ -183,7 +183,10 @@ def test_old_cached_unsafe_draft_is_redacted_on_retrieval_no_new_call(tmp_path):
         assert current["description"] == ""
         assert "sabor sin sabor" not in current["title"].lower()
         assert current["warnings"]
-        assert EcommAiEditor(db).suggest("102", 0)["reused"] is True
+        with patch("app.services.ecomm_ai_editor_service.get_settings", return_value=Settings()):
+            with patch("app.services.ecomm_ai_editor_service.urlopen") as provider:
+                assert EcommAiEditor(db).suggest("102", 0)["reused"] is True
+                provider.assert_not_called()
         # Keep historical audit intact; only the served version is guarded.
         assert db.scalars(select(KikiAiEditorialDraft)).one().description.startswith(
             "Pack que incluye dos frascos"
