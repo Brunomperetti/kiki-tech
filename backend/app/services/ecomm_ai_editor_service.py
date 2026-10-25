@@ -167,11 +167,17 @@ class EcommAiEditor:
         title, description, questions, warnings = (
             record.title, record.description, list(record.questions or []), []
         )
+        # Keep a quality warning visible even after a risky field was
+        # removed before persistence; cached drafts must remain auditable.
+        for entry in record.history or []:
+            if isinstance(entry, dict):
+                warnings.extend(entry.get("quality_warnings") or [])
         if facts:
             try:
-                title, description, questions, warnings = _guard_proposal(
+                title, description, questions, fresh_warnings = _guard_proposal(
                     title, description, questions, facts
                 )
+                warnings.extend(fresh_warnings)
             except ValueError:
                 # A historical saved suggestion should never crash the editor,
                 # nor remain copyable if it fails today's validation rules.
@@ -184,7 +190,7 @@ class EcommAiEditor:
             "title": title,
             "description": description,
             "questions": questions,
-            "warnings": warnings,
+            "warnings": list(dict.fromkeys(warnings)),
             "evidence": list(record.source_facts or []),
             "model": record.model,
             "source_current": current,
@@ -317,7 +323,7 @@ class EcommAiEditor:
                 "La propuesta no pasó los controles de contenido. No se aplicó ningún cambio."
             )
         try:
-            title, description, questions, _ = _guard_proposal(
+            title, description, questions, quality_warnings = _guard_proposal(
                 title, description, questions, facts
             )
         except ValueError as exc:
@@ -345,6 +351,7 @@ class EcommAiEditor:
                 "event": "GENERATED_FOR_ECOMM_API",
                 "at": datetime.now(timezone.utc).isoformat(),
                 "note": "IA sin verificar. No se aplica a campos ni a canales externos.",
+                "quality_warnings": quality_warnings,
             }],
         )
         self.db.add(record)
