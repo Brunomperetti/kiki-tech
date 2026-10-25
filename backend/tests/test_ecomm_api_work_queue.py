@@ -142,3 +142,43 @@ def test_gtin_missing_from_api_is_not_treated_as_confirmed_missing_ean(tmp_path)
         assert updated["gtin_data_quality"]["gtin_unavailable_in_capture"] == 1
         assert updated["gtin_data_quality"]["status"] == "PARTIAL_OR_COMPLETE_COVERAGE"
         assert updated["summary"]["missing_gtin"] == 1
+
+
+def test_ai_eligible_filter_returns_only_simple_unique_api_variants(tmp_path):
+    engine = db_fixture(tmp_path)
+    with Session(engine) as db:
+        summary = build_queue(db)
+        assert summary["summary"]["ai_eligible"] == 1
+        assert summary["summary"]["pack"] == 1
+        eligible = build_queue(db, filter_name="ai_eligible")
+        assert eligible["total"] == 1
+        assert eligible["items"][0]["ecomm_id"] == "101"
+        assert eligible["items"][0]["is_combo"] is False
+        assert not eligible["items"][0]["identity_issue"]
+        assert eligible["items"][0]["flags"].count("ai_eligible") == 1
+        assert build_queue(db, filter_name="ai_eligible", query="2500400")["total"] == 0
+        assert build_queue(db, filter_name="ai_eligible", page=2, limit=1)["items"] == []
+
+
+def test_ai_eligible_rejects_identity_ambiguous_and_sku_drift(tmp_path):
+    engine = db_fixture(tmp_path)
+    with Session(engine) as db:
+        saved = EcommApiProductWorkspace(db)
+        saved.save("101", payload(), "DRAFT", 0)
+        assert build_queue(db, filter_name="ai_eligible")["total"] == 1
+        stage = db.scalar(select(CatalogSnapshot).where(
+            CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
+        ))
+        changed = deepcopy(stage.payload)
+        changed[0]["items"][0]["variants"][0]["sku"] = "MODIFIED"
+        stage.payload = changed
+        db.commit()
+        assert build_queue(db, filter_name="ai_eligible")["total"] == 0
+        assert build_queue(db, filter_name="identity")["total"] == 1
+        # A second API variant holding same SKU also blocks this filter.
+        another = deepcopy(stage.payload)
+        another[0]["items"][1]["variants"][0]["sku"] = "MODIFIED"
+        stage.payload = another
+        db.commit()
+        assert build_queue(db, filter_name="ai_eligible")["total"] == 0
+        assert build_queue(db)["summary"]["identity"] == 2

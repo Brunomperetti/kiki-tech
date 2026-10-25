@@ -8,13 +8,13 @@ import '../queue.css';
 const fmt=(value:number|undefined)=>value===undefined?'—':value.toLocaleString('es-AR');
 const day=(raw:string|null)=>raw?new Date(raw).toLocaleString('es-AR'):'Sin fecha';
 const reason=(flag:EcommQueueFilter)=>({
-  all:'Todas',identity:'Identidad a revisar',draft:'Borradores',ready:'En revisión interna',
+  all:'Todas',ai_eligible:'Simples aptos para IA',identity:'Identidad a revisar',draft:'Borradores',ready:'En revisión interna',
   untouched:'Sin trabajar',pack:'Packs / combos',
   missing_title:'Sin título propuesto',missing_brand:'Sin marca en KIKI',
   missing_description:'Sin descripción propuesta',missing_gtin:'GTIN no disponible en copia API',
 }[flag]);
 const filters:EcommQueueFilter[]=[
-  'all','identity','draft','untouched','pack','ready','missing_brand',
+  'all','ai_eligible','identity','draft','untouched','pack','ready','missing_brand',
   'missing_title','missing_description','missing_gtin',
 ];
 const tag=(row:EcommQueueRow)=>row.identity_issue?'Identidad a revisar':
@@ -173,6 +173,8 @@ export function EnrichmentQueue(){
 
   const visible=data?.items??[];
   const eligible=visible.filter(row=>!!row.ecomm_id);
+  const batchEligible=visible.filter(row=>!row.is_combo&&!row.identity_issue
+    &&!!row.ecomm_id&&!!row.sku);
   const selectedRows=visible.filter(row=>selected.includes(row.ecomm_id));
   const pageAll=eligible.length>0&&eligible.every(row=>selected.includes(row.ecomm_id));
   const summary=data?.summary;
@@ -255,6 +257,19 @@ export function EnrichmentQueue(){
             <p>Primera etapa: hasta 3 productos simples por lote. No incluye
               packs, combos ni identidades dudosas. Ninguna propuesta se aplica automáticamente.</p></div>
         </div>
+        <div className="kiki-queue-ai-shortcuts">
+          <button type="button" className="kiki-queue-ai-shortcut"
+            onClick={()=>{setInput('');setQuery('');changeFilter('ai_eligible')}}>
+            <KikiIcon name="layers" size={16}/>
+            Ver solo productos simples aptos para IA
+          </button>
+          <button type="button" className="kiki-queue-ai-shortcut"
+            disabled={loading||batchBusy||batchEligible.length===0}
+            onClick={()=>setSelected(batchEligible.slice(0,3).map(row=>row.ecomm_id))}>
+            <KikiIcon name="check" size={16}/>
+            Elegir 3 simples de esta página
+          </button>
+        </div>
         <div className="kiki-queue-ai-actions">
           <button type="button" onClick={()=>void prepareAiBatch()}
             disabled={batchBusy||selected.length===0||selected.length>3}>
@@ -265,6 +280,10 @@ export function EnrichmentQueue(){
         {selected.length>3&&<p className="kiki-queue-ai-hint">
           Elegí como máximo 3 productos. La selección de 25 es útil para exportar CSV,
           pero no dispara 25 solicitudes pagas.</p>}
+        {filter==='ai_eligible'&&<p className="kiki-queue-ai-hint">
+          Estos productos no figuran como combo y tienen identidad API estable.
+          Eso permite preparar propuestas, pero no confirma marca, GTIN ni datos comerciales.
+        </p>}
         {batchError&&<p className="kiki-queue-error" role="alert">{batchError}</p>}
         {batchPlan&&<div className="kiki-queue-ai-plan">
           <strong>Revisión previa del lote</strong>
