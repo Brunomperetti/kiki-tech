@@ -118,3 +118,27 @@ def test_unrecognized_filter_and_beyond_page_are_safe(tmp_path):
             build_queue(db, page=0)
         final = build_queue(db, page=10, limit=1)
         assert final["total"] == 2 and final["items"] == []
+
+
+def test_gtin_missing_from_api_is_not_treated_as_confirmed_missing_ean(tmp_path):
+    engine = db_fixture(tmp_path)
+    with Session(engine) as db:
+        q = build_queue(db)
+        assert q["gtin_data_quality"]["status"] == "NO_GTIN_EXPOSED_BY_CAPTURE"
+        assert q["gtin_data_quality"]["gtin_unavailable_in_capture"] == 2
+        assert q["gtin_data_quality"]["gtin_found_in_capture"] == 0
+        assert q["items"][0]["gtin_source_state"] == "NOT_AVAILABLE_IN_API_CAPTURE"
+        assert "NO" in q["gtin_data_quality"]["meaning"]
+
+        stage = db.scalar(select(CatalogSnapshot).where(
+            CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
+        ))
+        changed = deepcopy(stage.payload)
+        changed[0]["items"][0]["variants"][0]["barcode"] = "7791234567895"
+        stage.payload = changed
+        db.commit()
+        updated = build_queue(db)
+        assert updated["gtin_data_quality"]["gtin_found_in_capture"] == 1
+        assert updated["gtin_data_quality"]["gtin_unavailable_in_capture"] == 1
+        assert updated["gtin_data_quality"]["status"] == "PARTIAL_OR_COMPLETE_COVERAGE"
+        assert updated["summary"]["missing_gtin"] == 1
