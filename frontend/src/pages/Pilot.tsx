@@ -213,7 +213,7 @@ export function Pilot(){
           Mostrando página {catalog.page}, hasta {catalog.page_size} resultados. Solo fuente {catalog.source}.</p>
         <div className="kiki-api-table-wrap">
           <table className="kiki-api-table">
-            <thead><tr><th>ID Ecomm</th><th>SKU</th><th>Producto</th><th>Combo</th><th>GTIN</th><th>Stock capturado</th><th>Consulta puntual</th></tr></thead>
+            <thead><tr><th>ID Ecomm</th><th>SKU</th><th>Producto</th><th>Combo</th><th>GTIN</th><th>Stock capturado</th><th>Acciones</th></tr></thead>
             <tbody>{catalog.items.map((row,i)=><tr key={(row.ecomm_id||'sin-id')+'-'+i}>
               <td>{fmt(row.ecomm_id)}</td>
               <td><strong>{fmt(row.sku)}</strong></td>
@@ -221,7 +221,8 @@ export function Pilot(){
               <td>{row.is_combo===null?'Sin dato':row.is_combo?'Sí':'No'}</td>
               <td>{fmt(row.gtin)}</td>
               <td>{fmt(row.stock_at_capture)}</td>
-              <td><button type="button" disabled={!row.sku||liveBusy}
+              <td><Link to={'/workspace?id='+encodeURIComponent(row.ecomm_id||'')} className="kiki-case-internal-link">Mejorar ficha</Link>
+                <button type="button" disabled={!row.sku||liveBusy}
                 onClick={()=>void checkSku(row)}>Consultar API</button></td>
             </tr>)}</tbody>
           </table>

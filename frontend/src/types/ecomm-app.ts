@@ -639,3 +639,38 @@ export interface EcommMlCases {
   };
   warning:string;
 }
+
+export type EcommEditStatus = 'DRAFT' | 'READY_FOR_REVIEW';
+export interface EcommEditableFields {
+  brand:string; title:string; description:string; proposed_gtin:string; note:string;
+}
+export interface EcommApiProductEdit {
+  available:boolean;
+  ecomm_id:string;
+  source:{
+    ecomm_id:string; sku:string; product_name:string;
+    variant_description:string|null; is_combo:boolean|null;
+    gtin:string|null; stock_at_capture:number|string|null; captured_at:string|null;
+  };
+  source_sku_changed:boolean;
+  status:EcommEditStatus|'NOT_STARTED';
+  version:number;
+  fields:EcommEditableFields;
+  history:{
+    at:string; version:number; previous_status:string; new_status:string;
+    changes:Record<string,{before:string;after:string}>;
+    source:string;external_writes:false;
+  }[];
+  created_at:string|null;
+  updated_at:string|null;
+  saved_in:'KIKI_POSTGRESQL_INTERNAL_ONLY';
+  external_writes_enabled:false;
+}
+export interface EcommSavedEdits {
+  total:number; page:number;limit:number;
+  summary:{total_saved:number;drafts:number;ready_for_review:number};
+  items:{ecomm_id:string;sku:string;product_name:string|null;
+    title:string;brand:string;status:EcommEditStatus;version:number;updated_at:string}[];
+  saved_in:'KIKI_POSTGRESQL_INTERNAL_ONLY';
+  external_writes_enabled:false;
+}

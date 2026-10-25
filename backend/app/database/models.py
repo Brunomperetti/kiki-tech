@@ -313,3 +313,26 @@ class KikiAiEditorialDraft(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EcommApiProductEdit(Base):
+    """Internal editorial overlay bound to one stable Ecomm-App API variant ID.
+
+    Never mutates Ecomm API capture, external stores, or legacy decisions.
+    A new dedicated table is created by Base.metadata.create_all on startup.
+    """
+    __tablename__ = "ecomm_api_product_edits"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ecomm_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    source_sku: Mapped[str] = mapped_column(String(160))
+    source_snapshot: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    fields: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="DRAFT", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    history: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
