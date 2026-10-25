@@ -130,3 +130,10 @@
 .kiki-workspace-brand-row strong{font-size:16px;color:#1e4b33}
 .kiki-workspace-brand-row button{border:1px solid #9ac5a8;background:#ecf8f0;
   color:#255f3e;font-size:12px;font-weight:750;padding:10px 13px;border-radius:8px}
+
+.kiki-workspace-ai-safety{display:flex;align-items:flex-start;gap:10px;
+  border:1px solid #e3c48d;background:#fff6e5;color:#805722;
+  border-radius:10px;padding:13px;font-size:12px;line-height:1.55}
+.kiki-workspace-ai-safety svg{flex:none;margin-top:2px}
+.kiki-workspace-ai-safety strong{display:block;margin-bottom:6px}
+.kiki-workspace-ai-safety ul{padding-left:18px;margin:0;display:grid;gap:5px}
