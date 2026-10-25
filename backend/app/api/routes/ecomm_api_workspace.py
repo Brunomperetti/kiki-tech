@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
+from ...services.ecomm_ai_editor_service import EcommAiEditor
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -26,6 +27,38 @@ class SaveProductEdit(BaseModel):
     expected_version: int = Field(ge=0)
     status: Literal["DRAFT", "READY_FOR_REVIEW"]
     fields: EditableFields
+
+
+class GenerateAiSuggestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+
+
+@router.get("/ai/{ecomm_id}/latest")
+def latest_ai_suggestion(
+    ecomm_id: str,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return EcommAiEditor(db).latest(ecomm_id)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/ai/{ecomm_id}/suggest")
+def generate_ai_suggestion(
+    ecomm_id: str,
+    body: GenerateAiSuggestion,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    try:
+        return EcommAiEditor(db).suggest(ecomm_id, body.expected_version)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from None
 
 
 @router.get("/saved")
