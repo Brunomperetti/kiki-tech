@@ -260,7 +260,7 @@ export function EnrichmentQueue(){
         <div className="kiki-queue-ai-shortcuts">
           <button type="button" className="kiki-queue-ai-shortcut"
             onClick={()=>{setInput('');setQuery('');changeFilter('ai_eligible')}}>
-            <KikiIcon name="list-filter" size={16}/>
+            <KikiIcon name="layers" size={16}/>
             Ver solo productos simples aptos para IA
           </button>
           <button type="button" className="kiki-queue-ai-shortcut"
