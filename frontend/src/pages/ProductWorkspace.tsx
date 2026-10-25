@@ -30,10 +30,17 @@ export function ProductWorkspace(){
   const [liveCheck,setLiveCheck]=useState('');
   const [checkingLive,setCheckingLive]=useState(false);
   const [filterSaved,setFilterSaved]=useState(false);
+  const [savedQuery,setSavedQuery]=useState('');
+  const [savedSearch,setSavedSearch]=useState('');
+  const [savedStatus,setSavedStatus]=useState('');
+  const [savedPage,setSavedPage]=useState(1);
+  const [savedLoading,setSavedLoading]=useState(false);
 
-  async function loadSaved(){
-    try{setSaved(await api.ecommSavedEdits());}
-    catch(e){setError(fail(e))}
+  async function loadSaved(search=savedSearch,filter=savedStatus,page=savedPage){
+    setSavedLoading(true);
+    try{setSaved(await api.ecommSavedEdits(search,filter,page,25));}
+    catch(e){setSaved(null);setError(fail(e))}
+    finally{setSavedLoading(false)}
   }
   async function loadCatalog(search:string,page:number){
     setLoading(true);setError('');
@@ -41,7 +48,8 @@ export function ProductWorkspace(){
     catch(e){setCatalog(null);setError(fail(e));}
     finally{setLoading(false)}
   }
-  useEffect(()=>{void loadSaved();void loadCatalog('',1)},[]);
+  useEffect(()=>{void loadCatalog('',1)},[]);
+  useEffect(()=>{void loadSaved(savedSearch,savedStatus,savedPage)},[savedSearch,savedStatus,savedPage]);
   useEffect(()=>{
     if(!targetId){setEdit(null);setFields({...blank});setMessage('');setLiveCheck('');return}
     let active=true;setLoadingEdit(true);setMessage('');setError('');setLiveCheck('');
@@ -56,7 +64,11 @@ export function ProductWorkspace(){
     return ()=>{active=false};
   },[targetId]);
 
-  function open(id:string){setParams({id});}
+  function open(id:string){
+    if(id===targetId||saving)return;
+    if(dirty&&!window.confirm('Tenés cambios sin guardar. ¿Querés descartarlos y abrir otra ficha?'))return;
+    setParams({id});
+  }
   function search(e:FormEvent){e.preventDefault();void loadCatalog(query.trim(),1)}
   function change<K extends keyof EcommEditableFields>(key:K,value:EcommEditableFields[K]){
     setMessage('');setFields(x=>({...x,[key]:value}))
@@ -90,6 +102,31 @@ export function ProductWorkspace(){
   }
   const dirty=!!edit&&(JSON.stringify({...blank,...edit.fields})!==JSON.stringify(fields)
     || (edit.status!=='NOT_STARTED'&&status!==edit.status));
+  useEffect(()=>{
+    if(!dirty)return;
+    const beforeUnload=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};
+    // Warn before leaving the workspace through the main SPA navigation, too.
+    const interceptLink=(e:MouseEvent)=>{
+      if(!(e.target instanceof Element))return;
+      const anchor=e.target.closest('a[href]');
+      if(!(anchor instanceof HTMLAnchorElement))return;
+      const url=new URL(anchor.href);
+      if(url.origin!==window.location.origin||(
+        url.pathname===window.location.pathname&&url.search===window.location.search
+      ))return;
+      if(!window.confirm('Tenés cambios sin guardar. ¿Querés descartarlos y salir de la ficha?')){
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('beforeunload',beforeUnload);
+    document.addEventListener('click',interceptLink,true);
+    return ()=>{
+      window.removeEventListener('beforeunload',beforeUnload);
+      document.removeEventListener('click',interceptLink,true);
+    };
+  },[dirty]);
+  function applySavedSearch(e:FormEvent){e.preventDefault();setSavedPage(1);setSavedSearch(savedQuery.trim());}
   return <div className="kiki-workspace">
     <header className="kiki-home-header">
       <div>
@@ -153,6 +190,26 @@ export function ProductWorkspace(){
           </div>
         </>}
         {filterSaved&&<>
+          <form className="kiki-workspace-search" onSubmit={applySavedSearch}>
+            <label htmlFor="kiki-saved-search">Buscar entre las fichas guardadas</label>
+            <div>
+              <input id="kiki-saved-search" value={savedQuery} maxLength={80}
+                onChange={e=>setSavedQuery(e.target.value)}
+                placeholder="SKU, marca, ID o título"/>
+              <button type="submit" disabled={savedLoading} aria-label="Buscar fichas guardadas">
+                <KikiIcon name="search"/>
+              </button>
+            </div>
+          </form>
+          <label className="kiki-workspace-filter-label" htmlFor="kiki-saved-status">Estado de revisión
+            <select id="kiki-saved-status" value={savedStatus}
+              onChange={e=>{setSavedStatus(e.target.value);setSavedPage(1)}}>
+              <option value="">Todos los estados</option>
+              <option value="DRAFT">Borradores</option>
+              <option value="READY_FOR_REVIEW">Listas para revisión interna</option>
+            </select>
+          </label>
+          {savedLoading&&<p className="kiki-workspace-small" role="status">Cargando fichas guardadas…</p>}
           {saved?.items.map(row=><button type="button" key={row.ecomm_id}
             className={'kiki-workspace-product '+(targetId===row.ecomm_id?'selected':'')}
             onClick={()=>open(row.ecomm_id)}>
@@ -160,10 +217,16 @@ export function ProductWorkspace(){
             <span>{row.title||row.product_name}</span>
             <KikiIcon name="arrow-right" size={15}/>
           </button>)}
-          {!saved?.items.length&&<p className="kiki-workspace-empty">Todavía no hay fichas guardadas. Buscá un producto del catálogo API y empezá a mejorarlo.</p>}
-          {saved&&saved.total>saved.items.length&&<p className="kiki-workspace-small">
-            Se muestran las primeras {saved.items.length} fichas. Próximamente agregaremos filtros avanzados.
+          {!savedLoading&&saved?.total===0&&<p className="kiki-workspace-empty">
+            No hay fichas para este filtro. Probá otro SKU o elegí «Todos los estados».
           </p>}
+          {saved&&<div className="kiki-workspace-pages">
+            <button type="button" disabled={savedLoading||savedPage===1}
+              onClick={()=>setSavedPage(page=>Math.max(1,page-1))}>Anterior</button>
+            <span>Página {savedPage} · {saved.total.toLocaleString('es-AR')} fichas</span>
+            <button type="button" disabled={savedLoading||savedPage*25>=saved.total}
+              onClick={()=>setSavedPage(page=>page+1)}>Siguiente</button>
+          </div>}
         </>}
       </section>
       <section className="kiki-workspace-editor">
@@ -219,7 +282,10 @@ export function ProductWorkspace(){
               onClick={()=>void persist('READY_FOR_REVIEW')}>
               {saving?'Guardando…':'Enviar a revisión interna'}</button>
           </div>
-          {dirty&&<p className="kiki-workspace-small">Tenés cambios en el formulario. Guardalos antes de abrir otro producto.</p>}
+          {dirty&&<p role="status" className="kiki-workspace-unsaved">
+            <KikiIcon name="alert" size={16}/> Tenés cambios sin guardar.
+            Guardalos antes de salir o abrir otro producto.
+          </p>}
           <button type="button" className="kiki-workspace-history-toggle" onClick={()=>setShowHistory(!showHistory)}>
             <KikiIcon name="clock" size={17}/>{showHistory?'Ocultar historial':'Ver historial de ediciones'} ({edit.history.length})
           </button>
