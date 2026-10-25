@@ -10,6 +10,7 @@ from ...database.session import get_db
 from ...services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
 from ...services.ecomm_ai_editor_service import EcommAiEditor
 from ...services.ecomm_api_brand_hints_service import EcommApiBrandHints
+from ...services.ecomm_api_work_queue_service import build_queue
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -71,6 +72,22 @@ def brand_hints(
     """No-cost secondary evidence, never an authoritative brand or API write."""
     try:
         return EcommApiBrandHints(db).get(ecomm_id)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/queue")
+def work_queue(
+    q: str = Query(default="", max_length=80),
+    filter: str = Query(default="all", max_length=35),
+    page: int = Query(default=1, ge=1, le=100000),
+    limit: int = Query(default=25, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """API-only prioritized editorial queue; no AI calls, external writes or approvals."""
+    try:
+        return build_queue(db, query=q, filter_name=filter, page=page, limit=limit)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
