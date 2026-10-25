@@ -682,6 +682,7 @@ export interface EcommAiSuggestion {
   title:string;
   description:string;
   questions:string[];
+  warnings:string[];
   evidence:{field:string;value:string|number|boolean|null;source:string}[];
   model:string;
   source_current:boolean;
