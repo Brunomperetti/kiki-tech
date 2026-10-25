@@ -78,7 +78,9 @@ def test_editing_operator_fields_invalidates_ai_proposal(tmp_path):
     engine = seeded(tmp_path)
     with Session(engine) as db:
         with patch("app.services.ecomm_ai_editor_service.get_settings", return_value=Settings()):
-            with patch("app.services.ecomm_ai_editor_service.urlopen", return_value=FakeResponse()):
+            with patch("app.services.ecomm_ai_editor_service.urlopen", return_value=FakeResponse(
+                title="Pack x2 Magnesio con Potasio 60 cápsulas"
+            )):
                 result = EcommAiEditor(db).suggest("102", 0)
         assert result["source_current"]
         EcommApiProductWorkspace(db).save(
