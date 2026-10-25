@@ -674,3 +674,28 @@ export interface EcommSavedEdits {
   saved_in:'KIKI_POSTGRESQL_INTERNAL_ONLY';
   external_writes_enabled:false;
 }
+
+export interface EcommAiSuggestion {
+  available:true;
+  draft_id:number;
+  ecomm_id:string;
+  title:string;
+  description:string;
+  questions:string[];
+  evidence:{field:string;value:string|number|boolean|null;source:string}[];
+  model:string;
+  source_current:boolean;
+  review_status:'PENDING_HUMAN_REVIEW';
+  external_writes_enabled:false;
+  saved_to_product_fields:false;
+  created_at:string|null;
+  remaining_today:number|null;
+  reused:boolean;
+  policy:string;
+}
+export interface EcommAiLatest {
+  available:boolean;
+  draft:EcommAiSuggestion|null;
+  remaining_today:number;
+  enabled:boolean;
+}

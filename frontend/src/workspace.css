@@ -79,3 +79,39 @@
 .kiki-workspace-unsaved svg{flex:none}
 .kiki-workspace-footer{position:sticky;bottom:0;background:rgba(255,255,255,.98);
   padding:14px 4px;z-index:2;box-shadow:0 -7px 15px rgba(18,60,35,.045)}
+
+/* Reusable AI assistant: designed for decision support, not auto-publication. */
+.kiki-workspace-ai{display:grid;gap:14px;padding:18px;border:1px solid #c8dcce;
+  border-radius:14px;background:linear-gradient(155deg,#f0f8f2,#fff)}
+.kiki-workspace-ai-head{display:flex;align-items:flex-start;gap:11px}
+.kiki-workspace-ai-icon{width:38px;height:38px;border-radius:11px;flex:none;display:grid;
+  place-items:center;background:#dff0e5;color:#276146}
+.kiki-workspace-ai-head h3{font-size:17px;margin:0 0 6px;color:#214b32}
+.kiki-workspace-ai-head p{font-size:12px;line-height:1.5;color:#597b67}
+.kiki-workspace-ai-tools{display:flex;align-items:center;flex-wrap:wrap;gap:11px}
+.kiki-workspace-ai-run{border:0;border-radius:9px;background:#21553b;color:white;
+  padding:12px 15px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:750}
+.kiki-workspace-ai-run:disabled{opacity:.5;cursor:not-allowed}
+.kiki-workspace-ai-tools span,.kiki-workspace-ai-note{font-size:11px;line-height:1.5;color:#698271}
+.kiki-workspace-ai-success{font-size:12px;color:#276d45;background:#e2f5e8;
+  border-radius:8px;padding:9px 11px}
+.kiki-workspace-ai-result{display:grid;gap:11px}
+.kiki-workspace-ai-result-head{display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:6px;padding:10px 0;border-bottom:1px solid #d7e7d9}
+.kiki-workspace-ai-result-head strong{font-size:13px}
+.kiki-workspace-ai-result-head span{font-size:11px;color:#647e6b}
+.kiki-workspace-ai-field{display:grid;grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;gap:7px 12px;border:1px solid #deeadf;background:#fff;
+  border-radius:11px;padding:13px}
+.kiki-workspace-ai-field small{font-size:11px;font-weight:750;color:#538269;grid-column:1/3}
+.kiki-workspace-ai-field p{font-size:13px;line-height:1.65;white-space:pre-wrap;color:#2b4c39}
+.kiki-workspace-ai-field button{border:1px solid #94c3a3;background:#ecf7ef;
+  color:#245c3f;border-radius:7px;font-size:11px;font-weight:750;padding:9px 11px}
+.kiki-workspace-ai-field button:disabled{opacity:.5}
+.kiki-workspace-ai-questions,.kiki-workspace-ai-evidence{border-radius:9px;background:#f8fbf8;
+  border:1px solid #e1eae2;padding:12px 14px;font-size:12px;line-height:1.6;color:#44624e}
+.kiki-workspace-ai-questions ul,.kiki-workspace-ai-evidence ul{padding-left:20px;margin:8px 0 0;display:grid;gap:5px}
+.kiki-workspace-ai-evidence summary{cursor:pointer;font-weight:750}
+.kiki-workspace-ai-evidence small{color:#728574}
+@media(max-width:650px){.kiki-workspace-ai{padding:13px}.kiki-workspace-ai-field{grid-template-columns:1fr}
+.kiki-workspace-ai-field small{grid-column:1}.kiki-workspace-ai-field button{justify-self:start}}

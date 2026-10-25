@@ -1,7 +1,7 @@
 import type {BulkGtinNotApplicablePayload, BulkGtinNotApplicableResult, CatalogContinuityDecision, CatalogContinuityItem, CatalogContinuityReport, EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
-import type {EcommApiProductEdit,EcommSavedEdits,EcommEditableFields,EcommEditStatus,EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommApiCatalog,EcommMlPreview,EcommMlCases,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence,EcommMlBrandEvidence} from '../types/ecomm-app';
+import type {EcommApiProductEdit,EcommSavedEdits,EcommEditableFields,EcommEditStatus,EcommAiSuggestion,EcommAiLatest,EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommApiCatalog,EcommMlPreview,EcommMlCases,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence,EcommMlBrandEvidence} from '../types/ecomm-app';
 
 const base = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || 'http://localhost:8000')
@@ -220,6 +220,13 @@ export const api = {
     request<EcommSavedEdits>(`/api/ecomm-app/workspace/saved?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`),
   ecommGetEdit: (id:string) =>
     request<EcommApiProductEdit>('/api/ecomm-app/workspace/'+encodeURIComponent(id)),
+  ecommAiLatest: (id:string) =>
+    request<EcommAiLatest>('/api/ecomm-app/workspace/ai/'+encodeURIComponent(id)+'/latest'),
+  ecommAiSuggest: (id:string,expectedVersion:number) =>
+    request<EcommAiSuggestion>('/api/ecomm-app/workspace/ai/'+encodeURIComponent(id)+'/suggest',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({expected_version:expectedVersion}),
+    }),
   ecommSaveEdit: (id:string,fields:EcommEditableFields,status:EcommEditStatus,expected_version:number) =>
     request<EcommApiProductEdit>('/api/ecomm-app/workspace/'+encodeURIComponent(id),{
       method:'POST',headers:{'Content-Type':'application/json'},
