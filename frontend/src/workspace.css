@@ -115,3 +115,18 @@
 .kiki-workspace-ai-evidence small{color:#728574}
 @media(max-width:650px){.kiki-workspace-ai{padding:13px}.kiki-workspace-ai-field{grid-template-columns:1fr}
 .kiki-workspace-ai-field small{grid-column:1}.kiki-workspace-ai-field button{justify-self:start}}
+
+.kiki-workspace-brand-hints{display:grid;gap:12px;padding:17px;border:1px solid #d9e4dd;
+  border-radius:13px;background:#f8faf8}
+.kiki-workspace-brand-title{display:flex;align-items:flex-start;gap:11px;color:#276045}
+.kiki-workspace-brand-title svg{flex:none;margin-top:3px}
+.kiki-workspace-brand-title h3{margin:0 0 5px;font-size:15px}
+.kiki-workspace-brand-title p{color:#688172;font-size:12px;line-height:1.5}
+.kiki-workspace-brand-reason{font-size:12px;color:#586d5f;line-height:1.6}
+.kiki-workspace-brand-row{border:1px solid #badac5;background:#fff;
+  padding:12px;border-radius:10px;display:flex;align-items:center;gap:12px;justify-content:space-between}
+.kiki-workspace-brand-row>div{display:grid;gap:6px}
+.kiki-workspace-brand-row small{font-size:10px;color:#61816c}
+.kiki-workspace-brand-row strong{font-size:16px;color:#1e4b33}
+.kiki-workspace-brand-row button{border:1px solid #9ac5a8;background:#ecf8f0;
+  color:#255f3e;font-size:12px;font-weight:750;padding:10px 13px;border-radius:8px}
