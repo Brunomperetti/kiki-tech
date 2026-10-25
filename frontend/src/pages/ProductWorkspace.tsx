@@ -2,7 +2,7 @@ import {FormEvent,useEffect,useState} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {api} from '../services/api';
 import {KikiIcon} from '../components/KikiIcon';
-import type {EcommApiCatalog,EcommApiProductEdit,EcommEditableFields,EcommEditStatus,EcommSavedEdits} from '../types/ecomm-app';
+import type {EcommApiCatalog,EcommApiProductEdit,EcommEditableFields,EcommEditStatus,EcommSavedEdits,EcommAiLatest,EcommAiSuggestion} from '../types/ecomm-app';
 import '../workspace.css';
 
 const blank:EcommEditableFields={brand:'',title:'',description:'',proposed_gtin:'',note:''};
@@ -35,6 +35,11 @@ export function ProductWorkspace(){
   const [savedStatus,setSavedStatus]=useState('');
   const [savedPage,setSavedPage]=useState(1);
   const [savedLoading,setSavedLoading]=useState(false);
+  const [aiInfo,setAiInfo]=useState<EcommAiLatest|null>(null);
+  const [aiBusy,setAiBusy]=useState(false);
+  const [aiError,setAiError]=useState('');
+  const [aiMessage,setAiMessage]=useState('');
+
 
   async function loadSaved(search=savedSearch,filter=savedStatus,page=savedPage){
     setSavedLoading(true);
@@ -50,6 +55,15 @@ export function ProductWorkspace(){
   }
   useEffect(()=>{void loadCatalog('',1)},[]);
   useEffect(()=>{void loadSaved(savedSearch,savedStatus,savedPage)},[savedSearch,savedStatus,savedPage]);
+  useEffect(()=>{
+    let active=true;
+    setAiInfo(null);setAiError('');setAiMessage('');
+    if(targetId){
+      api.ecommAiLatest(targetId).then(info=>{if(active)setAiInfo(info)})
+        .catch(e=>{if(active)setAiError(fail(e))});
+    }
+    return ()=>{active=false};
+  },[targetId]);
   useEffect(()=>{
     if(!targetId){setEdit(null);setFields({...blank});setMessage('');setLiveCheck('');return}
     let active=true;setLoadingEdit(true);setMessage('');setError('');setLiveCheck('');
@@ -81,8 +95,33 @@ export function ProductWorkspace(){
       setEdit(next);setFields({...blank,...next.fields});setStatus(next.status==='READY_FOR_REVIEW'?'READY_FOR_REVIEW':'DRAFT');
       setMessage('Guardado en KIKI Tech. La ficha permanece disponible cuando vuelvas a entrar.');
       await loadSaved();
+      const updatedAi=await api.ecommAiLatest(next.ecomm_id).catch(()=>null);
+      if(updatedAi)setAiInfo(updatedAi);
     }catch(e){setError(fail(e));}
     finally{setSaving(false)}
+  }
+  async function askAi(){
+    if(!edit||aiBusy||saving||dirty||edit.source_sku_changed)return;
+    setAiBusy(true);setAiError('');setAiMessage('');
+    try{
+      const draft=await api.ecommAiSuggest(edit.ecomm_id,edit.version);
+      setAiInfo(current=>({
+        enabled:current?.enabled??true,
+        available:true,draft,remaining_today:draft.remaining_today??0,
+      }));
+      setAiMessage(draft.reused
+        ?'KIKI reutilizó la propuesta anterior sin una nueva llamada paga.'
+        :'La IA preparó una propuesta. Revisala antes de copiarla al formulario.');
+    }catch(e){setAiError(fail(e));}
+    finally{setAiBusy(false)}
+  }
+  function applyAi(field:'title'|'description',proposal:EcommAiSuggestion){
+    if(!edit||!proposal.source_current||!proposal[field])return;
+    if(fields[field].trim()&&fields[field].trim()!==proposal[field].trim()
+      &&!window.confirm('Este campo ya tiene contenido. ¿Querés reemplazarlo por la propuesta IA?'))return;
+    setFields(current=>({...current,[field]:proposal[field]}));
+    setAiMessage('Sugerencia colocada en el formulario. Revisala y presioná Guardar borrador para conservarla en KIKI.');
+    setMessage('');
   }
   async function verifyLive(){
     if(!edit?.source.sku)return;
@@ -253,6 +292,64 @@ export function ProductWorkspace(){
           {edit.source_sku_changed&&<p className="kiki-workspace-alert" role="alert">
             Este ID tenía otro SKU cuando guardaron la ficha. Para evitar aplicar cambios al producto equivocado,
             el guardado quedó bloqueado hasta revisar la identidad con Ecomm-App.</p>}
+          <section className="kiki-workspace-ai" aria-label="Asistente de inteligencia artificial">
+            <div className="kiki-workspace-ai-head">
+              <span className="kiki-workspace-ai-icon"><KikiIcon name="sparkles" size={21}/></span>
+              <div><h3>KIKI AI · Asistente de fichas</h3>
+                <p>Generá propuestas de título y descripción a partir de los datos disponibles,
+                  sin cargar todo a mano.</p>
+              </div>
+            </div>
+            <div className="kiki-workspace-ai-tools">
+              <button type="button" className="kiki-workspace-ai-run"
+                disabled={aiBusy||saving||dirty||edit.source_sku_changed||!aiInfo?.enabled
+                  ||(aiInfo?.remaining_today===0&&!aiInfo?.draft?.source_current)}
+                onClick={()=>void askAi()}>
+                <KikiIcon name="sparkles" size={16}/>
+                {aiBusy?'Generando propuesta…':'Sugerir con IA'}
+              </button>
+              <span>{aiInfo
+                ?aiInfo.enabled?('Solicitudes disponibles hoy: '+aiInfo.remaining_today+' de 10')
+                  :'IA no habilitada en el servidor'
+                :'Consultando estado IA…'}</span>
+            </div>
+            {dirty&&<p className="kiki-workspace-ai-note">Guardá primero tus cambios manuales para
+              que la IA utilice la versión actual de esta ficha.</p>}
+            {aiError&&<p className="kiki-workspace-alert" role="alert">{aiError}</p>}
+            {aiMessage&&<p role="status" className="kiki-workspace-ai-success">{aiMessage}</p>}
+            {aiInfo?.draft&&<div className="kiki-workspace-ai-result">
+              <div className="kiki-workspace-ai-result-head">
+                <strong>Propuesta IA #{aiInfo.draft.draft_id}</strong>
+                <span>{aiInfo.draft.source_current?'Basada en esta versión de la ficha':'Propuesta desactualizada · solo consulta'}</span>
+              </div>
+              <div className="kiki-workspace-ai-field">
+                <small>Título sugerido</small>
+                <p>{aiInfo.draft.title}</p>
+                <button type="button" disabled={!aiInfo.draft.source_current}
+                  onClick={()=>applyAi('title',aiInfo.draft!)}>Usar este título</button>
+              </div>
+              <div className="kiki-workspace-ai-field">
+                <small>Descripción sugerida</small>
+                <p>{aiInfo.draft.description||'La IA no encontró evidencia suficiente para redactarla.'}</p>
+                <button type="button" disabled={!aiInfo.draft.source_current||!aiInfo.draft.description}
+                  onClick={()=>applyAi('description',aiInfo.draft!)}>Usar esta descripción</button>
+              </div>
+              {aiInfo.draft.questions.length>0&&<div className="kiki-workspace-ai-questions">
+                <strong>Qué falta verificar</strong>
+                <ul>{aiInfo.draft.questions.map((q,i)=><li key={i}>{q}</li>)}</ul>
+              </div>}
+              <details className="kiki-workspace-ai-evidence">
+                <summary>Ver datos utilizados por la IA</summary>
+                <ul>{aiInfo.draft.evidence.filter(f=>f.value!==null&&f.value!=='').map(f=>
+                  <li key={f.field}><strong>{f.field}:</strong> {String(f.value)}
+                    <small>{f.source==='KIKI_EDITOR_UNVERIFIED'
+                      ?' · dato interno no verificado':' · copia API / referencia interna'}</small>
+                  </li>)}</ul>
+              </details>
+              <p className="kiki-workspace-ai-note">Sugerencia no verificada. Copiarla no guarda,
+                aprueba ni publica el producto. No propone GTIN ni composición de combos.</p>
+            </div>}
+          </section>
           <div className="kiki-workspace-form">
             <label>Marca comercial
               <input value={fields.brand} onChange={e=>change('brand',e.target.value)} maxLength={120}
