@@ -62,3 +62,6 @@
 .kiki-workspace-history li small{display:block;color:#819486;padding-top:4px}
 @media(max-width:1120px){.kiki-workspace-grid{grid-template-columns:1fr}}
 @media(max-width:650px){.kiki-workspace-kpis{grid-template-columns:1fr 1fr}.kiki-workspace-directory,.kiki-workspace-editor{padding:14px}.kiki-workspace-footer>div{flex-basis:100%}.kiki-workspace-footer button{flex:1}}
+
+.kiki-workspace-live{display:inline-flex;align-items:center;gap:7px;border:1px solid #9ccab0;border-radius:8px;background:#fff;padding:9px 12px;color:#235b40;font-weight:750;font-size:11px;margin-top:10px}
+.kiki-workspace-live:disabled{opacity:.55}
