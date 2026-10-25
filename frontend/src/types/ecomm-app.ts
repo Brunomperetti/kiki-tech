@@ -715,3 +715,39 @@ export interface EcommApiBrandHints {
   }[];
   external_writes_enabled:false;
 }
+
+export type EcommQueueFilter =
+  'all'|'identity'|'draft'|'ready'|'untouched'|'pack'|
+  'missing_title'|'missing_brand'|'missing_description'|'missing_gtin';
+export interface EcommQueueRow {
+  ecomm_id:string;
+  sku:string;
+  product_name:string;
+  source_gtin_present:boolean;
+  is_combo:boolean;
+  captured_at:string|null;
+  status:'NOT_STARTED'|'DRAFT'|'READY_FOR_REVIEW';
+  edit_version:number;
+  proposed_brand:string;
+  proposed_title:string;
+  flags:EcommQueueFilter[];
+  identity_issue:boolean;
+  priority:number;
+  reason:string;
+  last_edited_at:string|null;
+}
+export interface EcommWorkQueue {
+  source:'ECOMM_APP_API_STAGE';
+  source_snapshot_at:string|null;
+  generated_at:string;
+  mode:'KIKI_INTERNAL_READ_ONLY_TRIAGE';
+  external_writes_enabled:false;
+  total:number;
+  page:number;
+  limit:number;
+  filter:EcommQueueFilter;
+  query:string;
+  summary:Record<string,number>;
+  items:EcommQueueRow[];
+  policy:string;
+}

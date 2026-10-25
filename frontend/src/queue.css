@@ -1,0 +1,106 @@
+
+.kiki-queue{max-width:1450px;color:#173e2a;display:grid;gap:20px}
+.kiki-queue .kiki-home-header{align-items:center}
+.kiki-queue-refresh{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;
+ border:1px solid #c9ded0;border-radius:10px;background:#fff;padding:12px 15px;
+ color:#23573c;font:inherit;font-weight:750;font-size:12px}
+.kiki-queue-refresh:disabled{opacity:.55}
+.kiki-queue-notice{display:flex;gap:13px;align-items:flex-start;padding:16px 19px;
+ border-radius:13px;background:#ecf6ef;border:1px solid #b9ddc3;color:#295c40}
+.kiki-queue-notice svg{flex:none;margin-top:2px}
+.kiki-queue-notice strong{font-size:13px}
+.kiki-queue-notice p{font-size:12px;line-height:1.6;margin-top:5px;color:#577761}
+.kiki-queue-error{padding:13px;border:1px solid #e9b7ae;border-radius:10px;
+ color:#99423e;background:#fff2ee;font-size:13px}
+.kiki-queue-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kiki-queue-stats>div{display:flex;flex-direction:column;gap:7px;background:#fff;
+ border:1px solid #dbe8df;padding:20px;border-radius:14px}
+.kiki-queue-stats span{font-size:12px;color:#5e7767;font-weight:650}
+.kiki-queue-stats strong{font-size:30px;letter-spacing:-.04em;line-height:1.15}
+.kiki-queue-stats small{font-size:11px;color:#829385}
+.kiki-queue-browser{display:grid;gap:18px;background:#fff;border:1px solid #dae6dc;
+ border-radius:17px;padding:26px}
+.kiki-queue-head{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.kiki-queue-head h2{font-size:22px;margin:5px 0;color:#204934}
+.kiki-queue-head p:not(.eyebrow){font-size:12px;color:#78907e}
+.kiki-queue-head .eyebrow{font-size:10px;color:#52886a;letter-spacing:.14em;font-weight:750}
+.kiki-queue-head>span{color:#78907e;text-align:right;font-size:11px}
+.kiki-queue-chips{display:flex;flex-wrap:wrap;gap:8px}
+.kiki-queue-chip{display:inline-flex;align-items:center;gap:8px;border-radius:9px;
+ padding:10px 12px;background:#f6faf7;color:#335945;border:1px solid #dbe7dd;
+ font-size:12px;font-weight:650;cursor:pointer}
+.kiki-queue-chip b{font-size:11px;font-variant-numeric:tabular-nums;
+ background:#e7f1e8;border-radius:6px;padding:3px 6px}
+.kiki-queue-chip.active{background:#20553b;color:#fff;border-color:#20553b}
+.kiki-queue-chip.active b{background:#3d7855;color:#fff}
+.kiki-queue-help{display:flex;align-items:flex-start;gap:8px;color:#6e8575;
+ border-radius:10px;background:#f4f8f4;padding:11px 13px;font-size:11px;line-height:1.6}
+.kiki-queue-help svg{flex:none}
+.kiki-queue-search{display:grid;gap:9px}
+.kiki-queue-search label{font-size:12px;font-weight:700}
+.kiki-queue-search>div{display:flex;gap:9px}
+.kiki-queue-search input{flex:1;min-width:0;padding:13px;border:1px solid #cdded2;
+ color:#183c2b;border-radius:9px;font:inherit;font-size:13px}
+.kiki-queue-search button{display:inline-flex;align-items:center;gap:8px;border:0;
+ color:#fff;background:#20553b;font-size:12px;font-weight:750;padding:12px 17px;border-radius:9px}
+.kiki-queue-search button:disabled{opacity:.55}
+.kiki-queue-selection{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+ padding:12px 15px;border:1px solid #cfe4d3;border-radius:10px;background:#f3faf4}
+.kiki-queue-selection label{display:flex;align-items:center;gap:8px;flex:1;
+ font-size:12px;font-weight:650;color:#2b5b3f}
+.kiki-queue-selection input,.kiki-queue-checkbox input{width:16px;height:16px;
+ accent-color:#286d48;cursor:pointer}
+.kiki-queue-selection>span{font-size:11px;color:#657c6b}
+.kiki-queue-selection button{border:1px solid #99c8a9;background:#fff;
+ border-radius:8px;padding:10px;display:flex;align-items:center;gap:7px;
+ font-weight:750;font-size:11px;color:#245d40}
+.kiki-queue-selection button:disabled{opacity:.5}
+.kiki-queue-list{display:grid;gap:10px}
+.kiki-queue-item{display:grid;grid-template-columns:26px minmax(0,1fr) 140px;
+ align-items:start;gap:12px;min-width:0;border:1px solid #e0eae2;border-radius:12px;
+ padding:17px;background:#fff}
+.kiki-queue-item.identity{border-color:#eed9b8;background:#fffdf8}
+.kiki-queue-checkbox{padding-top:3px}
+.kiki-queue-item-body{display:grid;gap:8px;min-width:0}
+.kiki-queue-item-top{display:flex;justify-content:space-between;gap:12px;align-items:center;
+ flex-wrap:wrap}
+.kiki-queue-sku{font-size:11px;color:#61836b;font-weight:750}
+.kiki-queue-tag{font-size:10px;background:#ecf6ef;color:#306346;padding:6px 8px;
+ border-radius:7px;font-weight:750}
+.kiki-queue-tag.caution{background:#fff2df;color:#926827}
+.kiki-queue-tag.review{background:#f0effb;color:#665d9e}
+.kiki-queue-item h3{font-size:14px;margin:0;color:#224831;line-height:1.5}
+.kiki-queue-proposed{font-size:12px;color:#52735b}
+.kiki-queue-explain{font-size:12px;color:#6b806f;line-height:1.5}
+.kiki-queue-tags{display:flex;flex-wrap:wrap;gap:5px}
+.kiki-queue-tags span{border-radius:6px;border:1px solid #e0e9e1;background:#f8faf8;
+ color:#647c68;padding:5px 7px;font-size:10px}
+.kiki-queue-item-action{display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.kiki-queue-item-action a{white-space:nowrap;display:flex;align-items:center;gap:7px;
+ color:#fff;background:#225b3e;border-radius:9px;padding:11px;
+ font-size:11px;font-weight:750;text-decoration:none}
+.kiki-queue-item-action small{font-size:11px;color:#78917f}
+.kiki-queue-placeholder{text-align:center;background:#f6faf6;color:#6a7c70;
+ padding:26px;border-radius:10px;font-size:13px}
+.kiki-queue-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;
+ font-size:12px;color:#63806b}
+.kiki-queue-pagination button{border:1px solid #c4dbca;background:#f7faf8;
+ color:#285b40;font:inherit;border-radius:8px;padding:10px 15px;font-size:12px}
+.kiki-queue-pagination button:disabled{opacity:.5}
+@media(max-width:1000px){
+ .kiki-queue-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .kiki-queue-item{grid-template-columns:26px minmax(0,1fr)}
+ .kiki-queue-item-action{grid-column:2;align-items:flex-start;flex-direction:row;justify-content:space-between}
+}
+@media(max-width:640px){
+ .kiki-queue-browser{padding:15px}
+ .kiki-queue-stats>div{padding:14px}
+ .kiki-queue-stats strong{font-size:23px}
+ .kiki-queue-search>div{flex-direction:column}
+ .kiki-queue-head{flex-direction:column;align-items:flex-start}
+ .kiki-queue-head>span{text-align:left}
+ .kiki-queue-item{padding:12px;gap:7px}
+ .kiki-queue-item-action{flex-direction:column;align-items:flex-start}
+ .kiki-queue-selection{align-items:flex-start}
+ .kiki-queue-selection label{flex-basis:100%}
+}
