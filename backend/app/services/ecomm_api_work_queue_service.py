@@ -66,6 +66,8 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     return {
         "ecomm_id": id_value, "sku": sku, "product_name": product_name,
         "source_gtin_present": bool(_value(source_gtin)),
+        "gtin_source_state": "AVAILABLE_IN_API_CAPTURE" if _value(source_gtin)
+        else "NOT_AVAILABLE_IN_API_CAPTURE",
         "is_combo": bool(is_combo),
         "captured_at": captured_at,
         "status": status, "edit_version": edit.version if saved else 0,
@@ -119,6 +121,10 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
                     bool(sku and sku_owners[sku.casefold()] > 1),
                 )
                 counts["total"] += 1
+                counts["gtin_in_api_capture"] += int(item["source_gtin_present"])
+                counts["gtin_unavailable_in_api_capture"] += int(
+                    not item["source_gtin_present"]
+                )
                 for flag in item["flags"]:
                     counts[flag] += 1
                 if term and not any(term in _value(field).casefold()
@@ -141,12 +147,31 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
         "external_writes_enabled": False,
         "total": len(rows), "page": page, "limit": limit,
         "filter": filter_name, "query": query.strip(),
-        "summary": {key:counts[key] for key in sorted(FILTERS - {"all"})} | {"total": counts["total"]},
+        "summary": {key:counts[key] for key in sorted(FILTERS - {"all"})} | {
+            "total": counts["total"],
+            "gtin_in_api_capture": counts["gtin_in_api_capture"],
+            "gtin_unavailable_in_api_capture": counts["gtin_unavailable_in_api_capture"],
+        },
+        "gtin_data_quality": {
+            "gtin_found_in_capture": counts["gtin_in_api_capture"],
+            "gtin_unavailable_in_capture": counts["gtin_unavailable_in_api_capture"],
+            "status": "NO_GTIN_EXPOSED_BY_CAPTURE"
+            if counts["gtin_in_api_capture"] == 0 else "PARTIAL_OR_COMPLETE_COVERAGE",
+            "meaning": (
+                "Estos campos NO llegaron en la copia API. No se puede concluir "
+                "que los productos carezcan de EAN ni iniciar una corrección masiva."
+                if counts["gtin_in_api_capture"] == 0 else
+                "La presencia de GTIN corresponde a la copia API, no equivale "
+                "a validación de códigos originales de producto."
+            ),
+        },
         "items": rows[offset:offset + limit],
         "policy": (
             "La cola se deriva exclusivamente de la copia Ecomm-App por API y "
-            "de fichas guardadas en KIKI PostgreSQL. La falta de GTIN o marca "
-            "no supone que el dato deba inventarse. Los packs y SKUs ambiguos "
+            "de fichas guardadas en KIKI PostgreSQL. Un GTIN que no aparece en "
+            "la captura NO es evidencia de ausencia de EAN original. "
+            "La falta de marca en KIKI no prueba falta de marca del fabricante. "
+            "Los packs y SKUs ambiguos "
             "requieren revisión. No escribe en Ecomm, ML ni Tiendanube."
         ),
     }
