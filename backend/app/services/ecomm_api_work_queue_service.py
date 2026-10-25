@@ -141,7 +141,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
         "external_writes_enabled": False,
         "total": len(rows), "page": page, "limit": limit,
         "filter": filter_name, "query": query.strip(),
-        "summary": dict(counts),
+        "summary": {key:counts[key] for key in sorted(FILTERS - {"all"})} | {"total": counts["total"]},
         "items": rows[offset:offset + limit],
         "policy": (
             "La cola se deriva exclusivamente de la copia Ecomm-App por API y "
