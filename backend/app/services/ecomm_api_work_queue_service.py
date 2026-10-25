@@ -12,7 +12,7 @@ from ..database.models import CatalogSnapshot, EcommApiProductEdit
 from ..integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
 
 FILTERS = {
-    "all", "identity", "draft", "ready", "untouched", "pack",
+    "all", "ai_eligible", "identity", "draft", "ready", "untouched", "pack",
     "missing_title", "missing_brand", "missing_description", "missing_gtin"
 }
 
@@ -47,6 +47,11 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
         flags.append("pack")
     if identity_issue:
         flags.append("identity")
+    # Matches the guards in the batch AI preview: a unique, stable, 
+    # API-identified non-combo variant. This is NOT a factual verification
+    # of ingredients, GTIN, price or commercial publication readiness.
+    if not is_combo and not identity_issue:
+        flags.append("ai_eligible")
     flags.append("untouched" if not saved else "draft" if status == "DRAFT" else "ready")
     if identity_issue:
         priority = 0
@@ -136,6 +141,8 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
                 if filter_name != "all" and filter_name not in item["flags"]:
                     continue
                 rows.append(item)
+    # Existing triage priorities remain intact; ai_eligible bypasses the 
+    # initial list of packs and exposes simple variants immediately.
     # Identity safety first; saved drafts next; packs before untouched simples.
     rows.sort(key=lambda x: (x["priority"], x["sku"].casefold(), x["ecomm_id"]))
     offset = (page - 1) * limit
