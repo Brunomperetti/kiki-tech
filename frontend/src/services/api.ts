@@ -1,7 +1,7 @@
 import type {BulkGtinNotApplicablePayload, BulkGtinNotApplicableResult, CatalogContinuityDecision, CatalogContinuityItem, CatalogContinuityReport, EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
-import type {EcommApiProductEdit,EcommSavedEdits,EcommEditableFields,EcommEditStatus,EcommAiSuggestion,EcommAiLatest,EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommApiCatalog,EcommMlPreview,EcommMlCases,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence,EcommMlBrandEvidence} from '../types/ecomm-app';
+import type {EcommApiProductEdit,EcommSavedEdits,EcommEditableFields,EcommEditStatus,EcommAiSuggestion,EcommAiLatest,EcommApiBrandHints,EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommApiCatalog,EcommMlPreview,EcommMlCases,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence,EcommMlBrandEvidence} from '../types/ecomm-app';
 
 const base = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || 'http://localhost:8000')
@@ -220,6 +220,8 @@ export const api = {
     request<EcommSavedEdits>(`/api/ecomm-app/workspace/saved?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`),
   ecommGetEdit: (id:string) =>
     request<EcommApiProductEdit>('/api/ecomm-app/workspace/'+encodeURIComponent(id)),
+  ecommBrandHints: (id:string) =>
+    request<EcommApiBrandHints>('/api/ecomm-app/workspace/brand-hints/'+encodeURIComponent(id)),
   ecommAiLatest: (id:string) =>
     request<EcommAiLatest>('/api/ecomm-app/workspace/ai/'+encodeURIComponent(id)+'/latest'),
   ecommAiSuggest: (id:string,expectedVersion:number) =>

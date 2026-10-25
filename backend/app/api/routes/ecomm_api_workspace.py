@@ -9,6 +9,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
 from ...services.ecomm_ai_editor_service import EcommAiEditor
+from ...services.ecomm_api_brand_hints_service import EcommApiBrandHints
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -59,6 +60,19 @@ def generate_ai_suggestion(
         raise HTTPException(409, str(exc)) from None
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from None
+
+
+@router.get("/brand-hints/{ecomm_id}")
+def brand_hints(
+    ecomm_id: str,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """No-cost secondary evidence, never an authoritative brand or API write."""
+    try:
+        return EcommApiBrandHints(db).get(ecomm_id)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get("/saved")

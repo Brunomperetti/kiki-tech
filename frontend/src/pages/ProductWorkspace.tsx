@@ -2,7 +2,7 @@ import {FormEvent,useEffect,useState} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {api} from '../services/api';
 import {KikiIcon} from '../components/KikiIcon';
-import type {EcommApiCatalog,EcommApiProductEdit,EcommEditableFields,EcommEditStatus,EcommSavedEdits,EcommAiLatest,EcommAiSuggestion} from '../types/ecomm-app';
+import type {EcommApiCatalog,EcommApiProductEdit,EcommEditableFields,EcommEditStatus,EcommSavedEdits,EcommAiLatest,EcommAiSuggestion,EcommApiBrandHints} from '../types/ecomm-app';
 import '../workspace.css';
 
 const blank:EcommEditableFields={brand:'',title:'',description:'',proposed_gtin:'',note:''};
@@ -39,6 +39,9 @@ export function ProductWorkspace(){
   const [aiBusy,setAiBusy]=useState(false);
   const [aiError,setAiError]=useState('');
   const [aiMessage,setAiMessage]=useState('');
+  const [brandHints,setBrandHints]=useState<EcommApiBrandHints|null>(null);
+  const [brandHintsError,setBrandHintsError]=useState('');
+
 
 
   async function loadSaved(search=savedSearch,filter=savedStatus,page=savedPage){
@@ -55,6 +58,15 @@ export function ProductWorkspace(){
   }
   useEffect(()=>{void loadCatalog('',1)},[]);
   useEffect(()=>{void loadSaved(savedSearch,savedStatus,savedPage)},[savedSearch,savedStatus,savedPage]);
+  useEffect(()=>{
+    let active=true;
+    setBrandHints(null);setBrandHintsError('');
+    if(targetId){
+      api.ecommBrandHints(targetId).then(value=>{if(active)setBrandHints(value)})
+        .catch(e=>{if(active)setBrandHintsError(fail(e))});
+    }
+    return ()=>{active=false};
+  },[targetId]);
   useEffect(()=>{
     let active=true;
     setAiInfo(null);setAiError('');setAiMessage('');
@@ -99,6 +111,13 @@ export function ProductWorkspace(){
       if(updatedAi)setAiInfo(updatedAi);
     }catch(e){setError(fail(e));}
     finally{setSaving(false)}
+  }
+  function useBrandHint(){
+    if(!brandHints?.brand||brandHints.status!=='EVIDENCE_FOUND')return;
+    if(fields.brand.trim()&&fields.brand.trim().toLocaleLowerCase()!==brandHints.brand.toLocaleLowerCase()
+      &&!window.confirm('Ya hay una marca cargada. ¿Querés reemplazarla por la sugerencia de otra fuente?'))return;
+    change('brand',brandHints.brand);
+    setAiMessage('Marca sugerida colocada en el formulario. Verificá el envase y guardá manualmente la ficha.');
   }
   async function askAi(){
     if(!edit||aiBusy||saving||dirty||edit.source_sku_changed)return;
@@ -292,6 +311,38 @@ export function ProductWorkspace(){
           {edit.source_sku_changed&&<p className="kiki-workspace-alert" role="alert">
             Este ID tenía otro SKU cuando guardaron la ficha. Para evitar aplicar cambios al producto equivocado,
             el guardado quedó bloqueado hasta revisar la identidad con Ecomm-App.</p>}
+          <section className="kiki-workspace-brand-hints" aria-label="Marcas sugeridas por evidencia de canales">
+            <div className="kiki-workspace-brand-title">
+              <KikiIcon name="search" size={21}/>
+              <div><h3>Marca sugerida por evidencia</h3>
+                <p>Sin IA paga: buscamos el mismo SKU exacto en los datos guardados
+                  de Tiendanube y Mercado Libre.</p></div>
+            </div>
+            {brandHintsError&&<p role="alert" className="kiki-workspace-ai-note">
+              No se pudieron consultar las marcas: {brandHintsError}</p>}
+            {!brandHints&&!brandHintsError&&<p className="kiki-workspace-ai-note">
+              Buscando coincidencias verificables…</p>}
+            {brandHints&&<>
+              <p className="kiki-workspace-brand-reason">{brandHints.reason}</p>
+              {brandHints.status==='EVIDENCE_FOUND'&&brandHints.brand&&
+                <div className="kiki-workspace-brand-row">
+                  <div><small>MARCA DECLARADA POR OTRO CANAL</small><strong>{brandHints.brand}</strong></div>
+                  <button type="button" onClick={useBrandHint}>Usar marca</button>
+                </div>}
+              {brandHints.evidence.length>0&&<details className="kiki-workspace-ai-evidence">
+                <summary>Ver {brandHints.evidence.length} fuente(s) y fechas</summary>
+                <ul>{brandHints.evidence.map((e,i)=><li key={e.channel+e.source_id+i}>
+                  <strong>{e.channel==='TIENDANUBE_CSV'?'Tiendanube CSV':'Mercado Libre API'}:</strong>
+                  {' '}{e.brand} · {e.title||e.source_id}
+                  <small> · Captura: {e.snapshot_at?date(e.snapshot_at):'Sin fecha'}</small>
+                </li>)}</ul>
+              </details>}
+              <p className="kiki-workspace-ai-note">
+                Esta coincidencia no verifica al fabricante. Si hay varias marcas o SKUs ambiguos,
+                KIKI no completa el campo automáticamente.
+              </p>
+            </>}
+          </section>
           <section className="kiki-workspace-ai" aria-label="Asistente de inteligencia artificial">
             <div className="kiki-workspace-ai-head">
               <span className="kiki-workspace-ai-icon"><KikiIcon name="sparkles" size={21}/></span>
