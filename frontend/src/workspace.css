@@ -65,3 +65,17 @@
 
 .kiki-workspace-live{display:inline-flex;align-items:center;gap:7px;border:1px solid #9ccab0;border-radius:8px;background:#fff;padding:9px 12px;color:#235b40;font-weight:750;font-size:11px;margin-top:10px}
 .kiki-workspace-live:disabled{opacity:.55}
+
+/* Daily operations: keep the product chooser in view while editing long forms. */
+@media(min-width:1121px){
+  .kiki-workspace-directory{position:sticky;top:16px;max-height:calc(100vh - 35px);overflow:auto}
+}
+.kiki-workspace-filter-label{display:grid;gap:8px;font-size:12px;font-weight:750;color:#264c36}
+.kiki-workspace-filter-label select{border:1px solid #cbdcd0;background:#fff;color:#274b36;
+  border-radius:9px;padding:10px 12px;font:inherit;font-weight:500;width:100%}
+.kiki-workspace-unsaved{display:flex;align-items:center;gap:8px;background:#fff6e6;
+  border:1px solid #eddaaf;border-radius:9px;padding:12px;color:#865c2a;
+  font-size:12px;line-height:1.5}
+.kiki-workspace-unsaved svg{flex:none}
+.kiki-workspace-footer{position:sticky;bottom:0;background:rgba(255,255,255,.98);
+  padding:14px 4px;z-index:2;box-shadow:0 -7px 15px rgba(18,60,35,.045)}
