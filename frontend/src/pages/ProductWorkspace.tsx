@@ -27,6 +27,8 @@ export function ProductWorkspace(){
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
   const [showHistory,setShowHistory]=useState(false);
+  const [liveCheck,setLiveCheck]=useState('');
+  const [checkingLive,setCheckingLive]=useState(false);
   const [filterSaved,setFilterSaved]=useState(false);
 
   async function loadSaved(){
@@ -41,8 +43,8 @@ export function ProductWorkspace(){
   }
   useEffect(()=>{void loadSaved();void loadCatalog('',1)},[]);
   useEffect(()=>{
-    if(!targetId){setEdit(null);setFields({...blank});setMessage('');return}
-    let active=true;setLoadingEdit(true);setMessage('');setError('');
+    if(!targetId){setEdit(null);setFields({...blank});setMessage('');setLiveCheck('');return}
+    let active=true;setLoadingEdit(true);setMessage('');setError('');setLiveCheck('');
     api.ecommGetEdit(targetId).then(data=>{
       if(!active)return;
       setEdit(data);
@@ -69,6 +71,22 @@ export function ProductWorkspace(){
       await loadSaved();
     }catch(e){setError(fail(e));}
     finally{setSaving(false)}
+  }
+  async function verifyLive(){
+    if(!edit?.source.sku)return;
+    setCheckingLive(true);setLiveCheck('');
+    try{
+      const answer=await api.ecommAppLookup([edit.source.sku]);
+      const response=answer.sku_diagnosis.requested[0];
+      if(response?.status==='EXACT_SINGLE'&&response.matches.length===1
+        &&String(response.matches[0].variant_id)===edit.ecomm_id){
+        setLiveCheck('Ecomm-App confirma el SKU y el mismo ID de variante. Stock informado: '+
+          text(response.matches[0].total_stock)+'. Esta consulta no actualiza otros sistemas.');
+      }else{
+        setLiveCheck('La API no confirmó el mismo SKU e ID único. Revisá la identidad antes de aplicar propuestas.');
+      }
+    }catch(e){setLiveCheck('No fue posible verificar en vivo: '+fail(e));}
+    finally{setCheckingLive(false)}
   }
   const dirty=!!edit&&(JSON.stringify({...blank,...edit.fields})!==JSON.stringify(fields)
     || (edit.status!=='NOT_STARTED'&&status!==edit.status));
@@ -163,6 +181,11 @@ export function ProductWorkspace(){
           <div className="kiki-workspace-source"><strong><KikiIcon name="link" size={15}/> Referencia Ecomm-App API (sin modificar)</strong>
             <p>GTIN original: {text(edit.source.gtin)} · Stock capturado: {text(edit.source.stock_at_capture)}
               · Captura: {date(edit.source.captured_at)}</p>
+            <button className="kiki-workspace-live" type="button" disabled={checkingLive}
+              onClick={()=>void verifyLive()}>
+              <KikiIcon name="refresh" size={15}/>{checkingLive?'Verificando…':'Verificar este SKU en Ecomm-App ahora'}
+            </button>
+            {liveCheck&&<p role="status">{liveCheck}</p>}
           </div>
           {edit.source_sku_changed&&<p className="kiki-workspace-alert" role="alert">
             Este ID tenía otro SKU cuando guardaron la ficha. Para evitar aplicar cambios al producto equivocado,
