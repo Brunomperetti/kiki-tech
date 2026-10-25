@@ -373,6 +373,12 @@ export function ProductWorkspace(){
                 <strong>Propuesta IA #{aiInfo.draft.draft_id}</strong>
                 <span>{aiInfo.draft.source_current?'Basada en esta versión de la ficha':'Propuesta desactualizada · solo consulta'}</span>
               </div>
+              {aiInfo.draft.warnings?.length>0&&<div className="kiki-workspace-ai-safety" role="alert">
+                <KikiIcon name="alert" size={18}/>
+                <div><strong>Control de calidad de KIKI</strong>
+                  <ul>{aiInfo.draft.warnings.map((w,i)=><li key={i}>{w}</li>)}</ul>
+                </div>
+              </div>}
               <div className="kiki-workspace-ai-field">
                 <small>Título sugerido</small>
                 <p>{aiInfo.draft.title}</p>
@@ -381,7 +387,7 @@ export function ProductWorkspace(){
               </div>
               <div className="kiki-workspace-ai-field">
                 <small>Descripción sugerida</small>
-                <p>{aiInfo.draft.description||'La IA no encontró evidencia suficiente para redactarla.'}</p>
+                <p>{aiInfo.draft.description||'Descripción no disponible: falta evidencia comercial suficiente. No uses una descripción de pack sin corroborar su contenido.'}</p>
                 <button type="button" disabled={!aiInfo.draft.source_current||!aiInfo.draft.description}
                   onClick={()=>applyAi('description',aiInfo.draft!)}>Usar esta descripción</button>
               </div>
