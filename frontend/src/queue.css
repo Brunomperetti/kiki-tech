@@ -137,3 +137,11 @@
 .kiki-queue-ai-result a{display:flex;align-items:center;gap:6px;font-size:11px;
  color:#286649;font-weight:700;text-decoration:none}
 @media(max-width:640px){.kiki-queue-ai-batch{padding:14px}}
+
+.kiki-queue-ai-shortcuts{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
+.kiki-queue-ai-shortcut{display:inline-flex;align-items:center;gap:7px;
+ border:1px solid #a8ccb3;border-radius:9px;padding:11px 13px;
+ background:#fff;color:#285f43;font:inherit;font-size:12px;
+ font-weight:750;cursor:pointer}
+.kiki-queue-ai-shortcut:hover{background:#e8f5ec;border-color:#75ae88}
+.kiki-queue-ai-shortcut:disabled{opacity:.45;cursor:not-allowed}
