@@ -724,6 +724,7 @@ export interface EcommQueueRow {
   sku:string;
   product_name:string;
   source_gtin_present:boolean;
+  gtin_source_state:'AVAILABLE_IN_API_CAPTURE'|'NOT_AVAILABLE_IN_API_CAPTURE';
   is_combo:boolean;
   captured_at:string|null;
   status:'NOT_STARTED'|'DRAFT'|'READY_FOR_REVIEW';
@@ -748,6 +749,12 @@ export interface EcommWorkQueue {
   filter:EcommQueueFilter;
   query:string;
   summary:Record<string,number>;
+  gtin_data_quality:{
+    gtin_found_in_capture:number;
+    gtin_unavailable_in_capture:number;
+    status:'NO_GTIN_EXPOSED_BY_CAPTURE'|'PARTIAL_OR_COMPLETE_COVERAGE';
+    meaning:string;
+  };
   items:EcommQueueRow[];
   policy:string;
 }
