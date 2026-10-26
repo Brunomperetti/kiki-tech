@@ -234,6 +234,16 @@ export const api = {
     request<EcommWorkQueue>(
       `/api/ecomm-app/workspace/queue?filter=${encodeURIComponent(filter)}&q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`
     ),
+  ecommEanEvidence: (id:string) =>
+    request<{ecomm_id:string;sku:string;status:string;candidate_ean:string|null;
+      can_use:boolean;reason:string;legacy_snapshot_at:string|null;
+      evidence_source:string;kiki_saved_gtin:string;matches:number}>(
+      '/api/ecomm-app/workspace/ean-evidence/'+encodeURIComponent(id)),
+  ecommEanSummary: () =>
+    request<{possible_candidates:number;api_variants:number;legacy_available:boolean;
+      legacy_snapshot_at:string|null;pack_review_required:number;
+      ambiguities:number;status_counts:Record<string,number>}>(
+      '/api/ecomm-app/workspace/ean-evidence/summary'),
   ecommTaxonomy: () =>
     request<{source:string;categories:{
       name:string;count:number;subcategories:{name:string;count:number}[];
