@@ -736,6 +736,35 @@ export type EcommQueueFilter =
   'all'|'ai_eligible'|'identity'|'draft'|'ready'|'untouched'|'pack'|
   'missing_title'|'missing_brand'|'missing_description'|'missing_gtin'|'missing_source_name'|
   'ready_for_channels'|'needs_completion'|'review_due';
+export type KikiChannelEvidenceStatus =
+  'UNAVAILABLE'|'AMBIGUOUS_API_SKU'|'NO_EXACT_SKU_IN_SNAPSHOT'|
+  'MULTIPLE_SKU_ROWS'|'SKU_CANDIDATE'|'PACK_REVIEW'|
+  'PRESENTATION_CONFLICT'|'GTIN_CONFLICT';
+export interface KikiChannelEvidence {
+  source:string;snapshot_available:boolean;snapshot_at:string|null;
+  status:KikiChannelEvidenceStatus;matching_rows:number;listing_ids:string[];
+  candidate_name:string|null;note:string;confirmed_listing:false;
+  candidate_quality:{title_present:boolean;brand_present:boolean;
+    description_present:boolean;ean_present:boolean};
+  listing_statuses?:string[];
+}
+export interface KikiChannelCoverage {
+  ecomm_id:string;sku:string;ml:KikiChannelEvidence;tn:KikiChannelEvidence;
+  combined:string;review_required:boolean;never_confirmed_by_sku_alone:true;
+}
+export interface KikiCoverageOverview {
+  summary:{
+    api_variants:number;ml:Record<KikiChannelEvidenceStatus,number>;
+    tn:Record<KikiChannelEvidenceStatus,number>;
+    combined:Record<string,number>;ml_rows_unmatchable_variation_sku:number;
+  };
+  sources:{
+    ecomm:string;
+    ml:{name:string;available:boolean;updated_at:string|null;rows:number};
+    tn:{name:string;available:boolean;updated_at:string|null;rows:number};
+  };
+  policy:string;
+}
 export interface EcommQueueRow {
   ecomm_id:string;
   sku:string;
@@ -748,6 +777,7 @@ export interface EcommQueueRow {
   edit_version:number;
   proposed_brand:string;
   proposed_title:string;
+  channel_coverage:KikiChannelCoverage;
   flags:EcommQueueFilter[];
   identity_issue:boolean;
   priority:number;
@@ -766,6 +796,7 @@ export interface EcommWorkQueue {
   filter:EcommQueueFilter;
   query:string;
   summary:Record<string,number>;
+  channel_coverage:KikiCoverageOverview;
   gtin_data_quality:{
     gtin_found_in_capture:number;
     gtin_unavailable_in_capture:number;
