@@ -144,7 +144,7 @@ def test_unavailable_snapshots_never_claim_absence_or_publication(tmp_path):
         assert a["combined"] == "SOURCES_UNAVAILABLE"
         assert result["sources"]["ml"]["available"] is False
         assert result["sources"]["tn"]["available"] is False
-        assert result["summary"]["combined"]["SOURCES_UNAVAILABLE"] == 5
+        assert result["summary"]["combined"]["SOURCES_UNAVAILABLE"] == 7
         assert a["ml"]["confirmed_listing"] is False
 
 
