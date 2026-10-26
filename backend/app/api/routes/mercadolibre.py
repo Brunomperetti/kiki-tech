@@ -31,7 +31,7 @@ def auth_url(db: Session = Depends(get_db), _session=Depends(require_csrf)):
 def callback(code: str, state: str, db: Session = Depends(get_db)):
     try:
         MercadoLibreService(db).connect(code, state)
-        return RedirectResponse(f"{get_settings().frontend_url.rstrip('/')}/?mercadolibre=connected")
+        return RedirectResponse(f"{get_settings().frontend_url.rstrip('/')}/channels?mercadolibre=connected", status_code=303)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except MercadoLibreHTTPError as exc:
