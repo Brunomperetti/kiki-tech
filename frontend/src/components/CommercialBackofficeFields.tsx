@@ -1,6 +1,24 @@
 import type {EcommEditableFields,KikiAttribute,KikiMedia,KikiSource,KikiReadiness} from '../types/ecomm-app';
 import '../commercial-backoffice.css';
 
+export function assessCommercialReadiness(fields:EcommEditableFields):KikiReadiness{
+  const keys:Array<keyof EcommEditableFields>= [
+    'brand','title','short_title','short_description','description',
+    'category','subcategory','presentation','seo_title','seo_description',
+  ];
+  const missing=keys.filter(k=>!String(fields[k]||'').trim()) as string[];
+  if(!fields.attributes.some(x=>x.name.trim()&&x.value.trim()))missing.push('attributes');
+  if(!fields.media.some(x=>x.kind==='IMAGE'&&x.url.startsWith('https://')))missing.push('images');
+  if(!fields.sources.some(x=>x.kind==='FABRICANTE'||x.kind==='ETIQUETA'))missing.push('primary_source');
+  if(!fields.seo_keywords.trim())missing.push('seo_keywords');
+  const total=14;
+  return {
+    missing,ready:missing.length===0,completed:total-missing.length,
+    total,percent:Math.round(100*(total-missing.length)/total),
+    policy:'Completitud documental interna; las fuentes deben comprobarse y nada se publica.',
+  };
+}
+
 type Props={
   fields:EcommEditableFields;
   onChange:<K extends keyof EcommEditableFields>(field:K,value:EcommEditableFields[K])=>void;
