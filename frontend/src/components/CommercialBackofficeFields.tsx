@@ -9,7 +9,7 @@ export function assessCommercialReadiness(fields:EcommEditableFields):KikiReadin
   const missing=keys.filter(k=>!String(fields[k]||'').trim()) as string[];
   if(!fields.attributes.some(x=>x.name.trim()&&x.value.trim()))missing.push('attributes');
   if(!fields.media.some(x=>x.kind==='IMAGE'&&x.url.startsWith('https://')))missing.push('images');
-  if(!fields.sources.some(x=>x.kind==='FABRICANTE'||x.kind==='ETIQUETA'))missing.push('primary_source');
+  if(!fields.sources.some(x=>(x.kind==='FABRICANTE'||x.kind==='ETIQUETA')&&x.verified&&x.note.trim().length>=12))missing.push('primary_source');
   if(!fields.seo_keywords.trim())missing.push('seo_keywords');
   const total=14;
   return {
@@ -44,6 +44,9 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
   };
   const editSource=(idx:number,key:keyof KikiSource,value:string)=>{
     onChange('sources',fields.sources.map((a,i)=>i===idx?{...a,[key]:value}:a) as KikiSource[]);
+  };
+  const verifySource=(idx:number,value:boolean)=>{
+    onChange('sources',fields.sources.map((a,i)=>i===idx?{...a,verified:value}:a));
   };
   return <div className="kiki-commercial">
     <div className="kiki-commercial-overview" role="status">
@@ -174,8 +177,8 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
     </section>
 
     <section className="kiki-commercial-section">
-      <div className="kiki-commercial-section-head"><span>06</span><div><h3>Fuentes y control editorial</h3>
-        <p>Registrá fabricante, ficha oficial, etiqueta o documentación concreta. Un EAN no garantiza que el contenido público coincida con esta variante.</p></div></div>
+      <div className="kiki-commercial-section-head"><span>06</span><div><h3>Fuentes verificadas y control editorial</h3>
+        <p>Registrá fabricante, ficha oficial o etiqueta. Confirmá explícitamente qué verificaste y que corresponde a esta variante. Un EAN solo no alcanza.</p></div></div>
       <div className="kiki-commercial-list">
         {fields.sources.map((src,i)=><div className="kiki-commercial-array kiki-commercial-media" key={'source'+i}>
           <label>Tipo de evidencia
@@ -192,12 +195,16 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
           <label>Verificación, fecha o evidencia en envase
             <textarea rows={2} maxLength={500} placeholder="Qué dato se verificó y cómo" value={src.note}
               onChange={e=>editSource(i,'note',e.target.value)}/></label>
+          <label className="kiki-commercial-attestation">
+            <input type="checkbox" checked={src.verified} onChange={e=>verifySource(i,e.target.checked)}/>
+            <span>Verifiqué esta fuente y comprobé que corresponde a la presentación exacta del producto.</span>
+          </label>
           <button type="button" onClick={()=>onChange('sources',fields.sources.filter((_,n)=>n!==i))}
             aria-label={'Quitar fuente '+(i+1)}>Quitar</button>
           {src.url.startsWith('https://')&&<a href={src.url} target="_blank" rel="noopener noreferrer">Abrir fuente</a>}
         </div>)}
         {fields.sources.length<20&&<button type="button" className="kiki-commercial-add"
-          onClick={()=>onChange('sources',[...fields.sources,{kind:'FABRICANTE',name:'',url:'',note:''}])}>+ Registrar fuente verificable</button>}
+          onClick={()=>onChange('sources',[...fields.sources,{kind:'FABRICANTE',name:'',url:'',note:'',verified:false}])}>+ Registrar fuente verificable</button>}
       </div>
       <label className="kiki-commercial-note">Observaciones y pendientes
         <textarea maxLength={1800} rows={3} value={fields.note}
