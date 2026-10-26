@@ -5,7 +5,7 @@ never historical XLSX. The proposed commercial fields are an INTERNAL OVERLAY:
 no Ecomm-App, Mercado Libre, Tiendanube, stock, or price writes.
 """
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -181,6 +181,30 @@ def _validate(fields: dict, status: str):
             )
 
 
+def review_schedule(edit: EcommApiProductEdit | None) -> dict:
+    """A signed-off catalog record must be revisited at least every 30 days."""
+    if not edit or edit.status != "READY_FOR_CHANNELS":
+        return {"last_review_at": None, "next_review_at": None, "review_due": False}
+    reviewed = []
+    for event in edit.history or []:
+        if event.get("new_status") == "READY_FOR_CHANNELS":
+            try:
+                reviewed.append(datetime.fromisoformat(event["at"]))
+            except (ValueError, TypeError, KeyError):
+                continue
+    if not reviewed:
+        return {"last_review_at": None, "next_review_at": None, "review_due": True}
+    last = max(reviewed)
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    due_at = last + timedelta(days=30)
+    return {
+        "last_review_at": last.isoformat(),
+        "next_review_at": due_at.isoformat(),
+        "review_due": _now() >= due_at,
+    }
+
+
 class EcommApiProductWorkspace:
     def __init__(self, db: Session):
         self.db = db
@@ -233,6 +257,7 @@ class EcommApiProductWorkspace:
             "version": edit.version if edit else 0,
             "fields": {**blank_fields(), **dict(edit.fields or {})} if edit else blank_fields(),
             "readiness": _readiness({**blank_fields(), **dict(edit.fields or {})} if edit else blank_fields()),
+            "review_schedule": review_schedule(edit),
             "history": list(edit.history or []) if edit else [],
             "created_at": edit.created_at.isoformat() if edit else None,
             "updated_at": edit.updated_at.isoformat() if edit else None,
@@ -310,6 +335,36 @@ class EcommApiProductWorkspace:
         self.db.refresh(edit)
         return self._serialize(edit, source)
 
+
+    def confirm_monthly_review(self, ecomm_id: str, expected_version: int) -> dict:
+        """Record explicit source re-verification, without changing any product data."""
+        source = self._source(ecomm_id)
+        edit = self.db.scalar(
+            select(EcommApiProductEdit)
+            .where(EcommApiProductEdit.ecomm_id == ecomm_id)
+            .with_for_update()
+        )
+        if not edit or edit.version != expected_version:
+            raise ValueError("La versión de la ficha cambió. Abrila de nuevo antes de confirmar.")
+        if edit.status != "READY_FOR_CHANNELS" or not _readiness(
+            {**blank_fields(), **(edit.fields or {})}
+        )["ready"]:
+            raise ValueError("La ficha necesita estar completa y lista para canales.")
+        if edit.source_sku != source["sku"]:
+            raise ValueError("El SKU cambió. Verificá la identidad de la variante.")
+        now = _now()
+        event = {
+            "at": now.isoformat(), "version": edit.version + 1,
+            "previous_status": edit.status, "new_status": edit.status,
+            "action": "REVIEW_CONFIRMED", "changes": {},
+            "source": STAGE_SOURCE, "external_writes": False,
+        }
+        edit.version += 1
+        edit.history = list(edit.history or []) + [event]
+        edit.updated_at = now
+        self.db.commit()
+        self.db.refresh(edit)
+        return self._serialize(edit, source)
 
     def taxonomy(self) -> dict:
         """Existing internal taxonomy; suggest consistent naming, never invent external IDs."""
@@ -405,7 +460,8 @@ class EcommApiProductWorkspace:
             "summary": {"total_saved": len(all_edits),
                         "drafts": totals["DRAFT"],
                         "ready_for_review": totals["READY_FOR_REVIEW"],
-                        "ready_for_channels": totals["READY_FOR_CHANNELS"]},
+                        "ready_for_channels": totals["READY_FOR_CHANNELS"],
+                        "review_due": sum(review_schedule(x)["review_due"] for x in all_edits)},
             "items": [{
                 "ecomm_id": x.ecomm_id,
                 "sku": x.source_sku,
@@ -415,6 +471,8 @@ class EcommApiProductWorkspace:
                 "status": x.status, "version": x.version,
                 "category": (x.fields or {}).get("category") or "",
                 "subcategory": (x.fields or {}).get("subcategory") or "",
+                "review_due": review_schedule(x)["review_due"],
+                "next_review_at": review_schedule(x)["next_review_at"],
                 "updated_at": x.updated_at.isoformat(),
             } for x in filtered[offset:offset + limit]],
             "saved_in": "KIKI_POSTGRESQL_INTERNAL_ONLY",
