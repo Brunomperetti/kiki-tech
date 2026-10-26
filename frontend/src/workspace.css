@@ -159,3 +159,17 @@
 .kiki-workspace-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
 @media(max-width:990px){.kiki-workspace-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:570px){.kiki-workspace-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Historic EAN is an explicit, non-authoritative lookup, never a catalog overwrite. */
+.kiki-workspace-ean-evidence{display:grid;gap:10px;background:#f8f4e9;
+  border:1px solid #dfca99;border-radius:12px;padding:15px 17px}
+.kiki-workspace-ean-evidence>div>strong{display:flex;align-items:center;gap:8px;color:#755321;font-size:13px}
+.kiki-workspace-ean-evidence p,.kiki-workspace-ean-evidence small{font-size:11px;
+  line-height:1.65;color:#80663f;margin:5px 0}
+.kiki-workspace-ean-status{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.kiki-workspace-ean-status>div{display:grid;gap:3px;margin-right:auto}
+.kiki-workspace-ean-status>div>strong{font-size:19px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+.kiki-workspace-ean-status>button{background:#204d34;border:1px solid #204d34;color:#fff;
+  font-weight:750;font-size:12px;border-radius:9px;padding:10px 13px;cursor:pointer}
+.kiki-workspace-ean-status>button:disabled{opacity:.5;cursor:not-allowed}
+.kiki-workspace-ean-status>p{width:100%;flex-basis:100%}
