@@ -12,13 +12,18 @@ const reason=(flag:EcommQueueFilter)=>({
   untouched:'Sin trabajar',pack:'Packs / combos',
   ready_for_channels:'Listas para canales',needs_completion:'Ficha por completar',
   review_due:'Revisión mensual pendiente',
-  missing_title:'Sin título propuesto',missing_brand:'Sin marca en KIKI',
-  missing_description:'Sin descripción propuesta',missing_gtin:'GTIN no disponible en copia API',
+  missing_source_name:'Nombre ausente en API',
+  missing_title:'Fichas iniciadas sin título comercial',
+  missing_brand:'Fichas iniciadas sin marca confirmada',
+  missing_description:'Fichas iniciadas sin descripción comercial',
+  missing_gtin:'GTIN pendiente de verificar',
 }[flag]);
-const filters:EcommQueueFilter[]=[
+const mainFilters:EcommQueueFilter[]=[
   'all','ai_eligible','identity','draft','untouched','pack','ready',
-  'ready_for_channels','review_due','needs_completion','missing_brand',
-  'missing_title','missing_description','missing_gtin',
+  'ready_for_channels','review_due','needs_completion','missing_source_name',
+];
+const startedEditFilters:EcommQueueFilter[]=[
+  'missing_brand','missing_title','missing_description',
 ];
 const tag=(row:EcommQueueRow)=>row.identity_issue?'Identidad a revisar':
   row.flags.includes('review_due')?'Revisión mensual pendiente':
@@ -237,17 +242,39 @@ export function EnrichmentQueue(){
         </div>
         <span>{data?'Captura: '+day(data.source_snapshot_at):'Comprobando fuente API…'}</span>
       </div>
+      <div className="kiki-queue-source-health">
+        <div><strong>{fmt(summary?.source_name_present)} de {fmt(summary?.total)}</strong>
+          <span>variantes con nombre original en Ecomm-App API</span></div>
+        <div><strong>{fmt(summary?.editorial_started)}</strong>
+          <span>fichas comerciales iniciadas dentro de KIKI</span></div>
+        <p>Los productos no están vacíos: KIKI conserva el nombre del origen.
+          Los campos para enriquecer no son faltantes del proveedor.
+          Las fichas sin empezar se muestran una sola vez como «Sin trabajar».</p>
+      </div>
       <div className="kiki-queue-chips">
-        {filters.map(f=><button type="button" key={f}
+        {mainFilters.map(f=><button type="button" key={f}
           className={'kiki-queue-chip '+(filter===f?'active':'')}
           aria-pressed={filter===f} onClick={()=>changeFilter(f)}>
           {reason(f)}<b>{fmt(f==='all'?summary?.total:summary?.[f])}</b>
         </button>)}
       </div>
+      <details className="kiki-queue-editorial-filters" open={startedEditFilters.includes(filter)}>
+        <summary>Ver controles editoriales de fichas ya iniciadas</summary>
+        <p>Estos contadores solo consideran productos que alguien empezó a editar
+          dentro de KIKI. No confunden ausencia de mejoras con ausencia del dato en la API.</p>
+        <div className="kiki-queue-chips">
+          {startedEditFilters.map(f=><button type="button" key={f}
+            className={'kiki-queue-chip '+(filter===f?'active':'')}
+            aria-pressed={filter===f} onClick={()=>changeFilter(f)}>
+            {reason(f)}<b>{fmt(summary?.[f])}</b>
+          </button>)}
+        </div>
+      </details>
       <div className="kiki-queue-help"><KikiIcon name="help" size={16}/>
-        <span>Los indicadores de motivos se superponen: una ficha puede ser un pack,
-          no tener GTIN disponible en la copia y también necesitar título. «Sin marca» significa
-          que KIKI todavía no tiene una marca propuesta, no que el fabricante carezca de ella.</span>
+        <span>Una ficha puede necesitar completar varios campos.
+          La API identifica productos y aporta nombres; las propuestas comerciales
+          se elaboran y guardan por separado en KIKI. El estado de GTIN de la copia
+          se muestra arriba como calidad de la fuente, no como una tarea falsa por producto.</span>
       </div>
       <form onSubmit={submit} className="kiki-queue-search">
         <label htmlFor="queue-search">Buscá por SKU, ID, nombre o propuesta guardada</label>
