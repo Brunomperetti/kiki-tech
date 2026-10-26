@@ -75,7 +75,10 @@ export function Dashboard(){
         <KikiIcon name={mlConnected?'link':'clock'} size={15}/>
         {mlConnected?'ML conectado':'ML pendiente de conexión'}
       </span>
-      <span className="kiki-status-caption">Consultas de solo lectura · No hay publicaciones automáticas</span>
+      {!mlConnected&&<Link to="/channels#mercado-libre" className="kiki-ml-shortcut">
+        <KikiIcon name="link" size={15}/> Conectar Mercado Libre (titular)
+      </Link>}
+      <span className="kiki-status-caption">Fichas internas editables · Publicación externa todavía no habilitada</span>
     </div>
     {errors.length>0&&<div role="alert" className="kiki-client-alert">
       <KikiIcon name="alert"/><span>Algunos datos no están disponibles. No se interpretan como cero:
@@ -147,6 +150,12 @@ export function Dashboard(){
           <span><strong>Analizar Mercado Libre</strong><small>Abrí casos reales, buscá publicaciones y compará sus fichas.</small></span>
           <KikiIcon name="arrow-right"/>
         </Link>
+        <Link to="/channels#mercado-libre" className="kiki-client-action">
+          <span className="kiki-action-icon"><KikiIcon name="link" size={25}/></span>
+          <span><strong>Conectar Mercado Libre</strong>
+            <small>El titular autoriza su cuenta y actualiza las publicaciones por API, sin publicar ni modificar productos.</small></span>
+          <KikiIcon name="arrow-right"/>
+        </Link>
         <Link to="/channels" className="kiki-client-action">
           <span className="kiki-action-icon"><KikiIcon name="store" size={25}/></span>
           <span><strong>Ver canales de venta</strong><small>Consultá el estado de Mercado Libre y Tiendanube.</small></span>
@@ -186,8 +195,9 @@ export function Dashboard(){
       </p>}
     </section>
 
-    <p className="kiki-home-footnote">La próxima conexión de Mercado Libre debe autorizarla el titular.
-      Mientras tanto, KIKI presenta la última copia API de ML como histórica.
-      No se modifica inventario, publicaciones ni decisiones guardadas desde estas pantallas.</p>
+    <p className="kiki-home-footnote">La cuenta de Mercado Libre debe autorizarla el titular desde
+      <Link to="/channels#mercado-libre"> Canales de venta → Conectar Mercado Libre</Link>.
+      Las mejoras guardadas dentro de KIKI siguen separadas de las modificaciones de tiendas.
+      La próxima captura ML se actualiza manualmente por API, no en tiempo real.</p>
   </div>;
 }
