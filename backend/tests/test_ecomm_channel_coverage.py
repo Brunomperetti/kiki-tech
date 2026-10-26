@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from app.database.models import Base, CatalogSnapshot, EcommApiProductEdit
 from app.services.ecomm_channel_coverage_service import build_channel_coverage
 from app.services.ecomm_api_work_queue_service import build_queue
-from test_ecomm_api_product_workspace import payload
 
 
 def sample():
