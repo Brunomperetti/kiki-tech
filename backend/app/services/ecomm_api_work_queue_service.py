@@ -18,7 +18,7 @@ FILTERS = {
     "missing_title", "missing_brand", "missing_description", "missing_gtin",
     "ready_for_channels", "needs_completion", "review_due", "missing_source_name",
     "ml_candidate", "tn_candidate", "ml_no_exact", "tn_no_exact",
-    "both_candidates", "channel_review"
+    "both_candidates", "channel_review", "neither_sku_in_snapshots"
 }
 
 
@@ -86,6 +86,8 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
         flags.append("both_candidates")
     if (coverage or {}).get("review_required"):
         flags.append("channel_review")
+    if (coverage or {}).get("combined") == "NO_EXACT_EVIDENCE_IN_BOTH_SNAPSHOTS":
+        flags.append("neither_sku_in_snapshots")
     if review_schedule(edit)["review_due"]:
         flags.append("review_due")
     if identity_issue:
