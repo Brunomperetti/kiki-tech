@@ -2,7 +2,7 @@
 
 This router cannot modify remote inventory or local catalog snapshots.
 """
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from secrets import compare_digest
 from datetime import datetime, timezone
@@ -14,6 +14,10 @@ from sqlalchemy.orm import Session
 from ...integrations.ecomm_app.api_catalog_browser import api_catalog_rows
 from ...integrations.ecomm_app.api_ml_reconciliation_preview import api_ml_reconciliation_preview
 from ...integrations.ecomm_app.catalog_stage import EcommAppStageService, REFRESH_SOURCE
+from ...services.ecomm_api_refresh_job_service import (
+    job_status, start_job, reset_stage, require_active, note_step, fail_job,
+    run_manual_refresh,
+)
 from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
 from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
 from ...integrations.ecomm_app.live_stock_check import EcommLiveStockService
@@ -112,14 +116,17 @@ def ecomm_app_auto_status(
 ):
     current = EcommAppStageService(db, None).status()
     refresh = EcommAppStageService(db, None, REFRESH_SOURCE).status()
+    job = job_status(db)
+    is_running = bool(job and job["status"] == "RUNNING")
     return {
-        "mode": "SCHEDULED_API_ONLY",
+        "mode": "SCHEDULED_AND_MANUAL_API_ONLY",
         "configured": bool(get_settings().kiki_refresh_token.strip()),
         "last_successful_capture_at": current["last_page_at"],
         "last_successful_pages": current["pages_saved"],
         "last_successful_variants": current["quality"]["variants"],
         "last_successful_complete": current["complete"],
-        "refresh_in_progress": refresh["exists"] and not refresh["complete"],
+        "refresh_in_progress": is_running,
+        "refresh_job": job,
         "refresh_pages_saved": refresh["pages_saved"],
         "refresh_pages_expected": refresh["expected_pages"],
         "refresh_last_page_at": refresh["last_page_at"],
@@ -136,9 +143,14 @@ def ecomm_app_auto_start(
     db: Session = Depends(get_db),
     _token=Depends(require_refresh_token),
 ):
-    """Reset only isolated scratch snapshot; keep last good catalog intact."""
-    from ...repositories.catalog_repository import CatalogRepository
-    CatalogRepository(db).save_snapshot(REFRESH_SOURCE, [])
+    """Cron and UI share one database-backed lock; no concurrent refresh."""
+    owner = start_job(db, "SCHEDULED")
+    try:
+        reset_stage(db, owner)
+    except Exception:
+        db.rollback()
+        fail_job(db, owner, "No fue posible iniciar la captura programada.")
+        raise
     return {
         "started_at": datetime.now(timezone.utc).isoformat(),
         "status": "STARTED",
@@ -153,14 +165,21 @@ def ecomm_app_auto_step(
     _token=Depends(require_refresh_token),
 ):
     """Fetch at most three pages; promote all atomically only once completed."""
+    owner = require_active(db, origin="SCHEDULED")
+    db.rollback()  # release job lock before external API calls
     snapshot = db.scalar(select(CatalogSnapshot).where(
         CatalogSnapshot.source == REFRESH_SOURCE
     ))
     if snapshot is None:
+        db.rollback()
+        fail_job(db, owner, "Falta la captura temporal de Ecomm-App.")
         raise HTTPException(409, "Primero iniciá la captura programada.")
     try:
         result = EcommAppStageService(db, _client(), REFRESH_SOURCE).next_batch()
+        note_step(db, owner, result)
     except (EcommAppApiError, ValueError) as exc:
+        db.rollback()
+        fail_job(db, owner, "La captura programada no se completó; se conservó la anterior.")
         _raise_safe(exc)
     return {
         "complete": result["complete"],
@@ -169,6 +188,28 @@ def ecomm_app_auto_step(
         "variants": result["quality"]["variants"],
         "last_page_at": result["last_page_at"],
         "promoted": result["complete"],
+        "external_writes_enabled": False,
+    }
+
+
+@router.post("/stage/manual/start")
+def ecomm_app_manual_refresh_start(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    """Authenticated operator starts a safe API refresh without GitHub access.
+
+    Runs in the backend, so the browser can close while the work continues.
+    Concurrent manual or scheduled captures are rejected.
+    """
+    if not get_settings().ecomm_app_api_token.strip():
+        raise HTTPException(503, "Falta configurar la lectura de Ecomm-App API.")
+    owner = start_job(db, "MANUAL")
+    background_tasks.add_task(run_manual_refresh, owner)
+    return {
+        "status": "RUNNING",
+        "message": "Iniciamos la actualización del catálogo. Podés salir y volver.",
         "external_writes_enabled": False,
     }
 
