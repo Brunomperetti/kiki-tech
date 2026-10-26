@@ -112,3 +112,22 @@ def test_stale_job_can_be_restarted_without_accepting_old_worker(sessions):
         assert new_owner != old_owner
         with pytest.raises(HTTPException):
             jobs.require_active(db, owner=old_owner)
+
+
+def test_scheduled_workflow_still_uses_shared_lock_and_finishes(sessions):
+    from app.api.routes import ecomm_app as routes
+    with sessions() as db:
+        started = routes.ecomm_app_auto_start(db=db, _token=None)
+        assert started["status"] == "STARTED"
+        assert jobs.job_status(db)["origin"] == "SCHEDULED"
+        with pytest.raises(HTTPException) as error:
+            jobs.start_job(db, "MANUAL")
+        assert error.value.status_code == 409
+        with patch.object(routes, "_client", return_value=StubClient(total=201)):
+            first = routes.ecomm_app_auto_step(db=db, _token=None)
+            assert not first["complete"]
+            second = routes.ecomm_app_auto_step(db=db, _token=None)
+        assert second["complete"] and second["promoted"]
+        assert jobs.job_status(db)["status"] == "SUCCESS"
+        assert jobs.job_status(db)["pages_saved"] == 5
+        assert db.scalar(select(EcommApiProductEdit)).fields["title"] == "Guardado antes de actualizar"
