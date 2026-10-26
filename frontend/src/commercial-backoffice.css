@@ -30,3 +30,9 @@
 .kiki-commercial-checklist li{font-size:11px;padding:6px 9px;border-radius:7px;background:#fff;color:#7a562b;border:1px solid #e7d8bd}
 .kiki-commercial-note{margin-top:10px}
 @media(max-width:750px){.kiki-commercial-grid,.kiki-commercial-array,.kiki-commercial-array.kiki-commercial-media{grid-template-columns:1fr}.kiki-commercial-grid label.wide{grid-column:1}.kiki-commercial-section{padding:13px}.kiki-commercial-score strong{font-size:20px}}
+
+.kiki-commercial-hint{font-size:11px;color:#647d6b;line-height:1.55;margin:0}
+.kiki-commercial-array label.kiki-commercial-attestation{grid-column:1/-1;display:flex;align-items:flex-start;gap:10px;
+  background:#eaf5ed;border:1px solid #cee4d3;border-radius:9px;padding:11px;font-size:12px;color:#254c35;cursor:pointer}
+.kiki-commercial-attestation input[type="checkbox"]{width:auto;flex:none;accent-color:#236244;margin-top:3px}
+.kiki-commercial-array label.kiki-commercial-attestation span{line-height:1.5}
