@@ -146,6 +146,31 @@ def work_queue(
         raise HTTPException(409, str(exc)) from None
 
 
+@router.get("/taxonomy")
+def internal_taxonomy(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Saved category and subcategory names, to avoid inconsistent re-entry."""
+    try:
+        return EcommApiProductWorkspace(db).taxonomy()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/master-export")
+def internal_master_export(
+    status: str = Query(default="", max_length=32),
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Authenticated full JSON export for continuity and future ML/TN adapters."""
+    try:
+        return EcommApiProductWorkspace(db).export_master(status)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
 @router.get("/saved")
 def list_saved(
     q: str = Query(default="", max_length=80),
