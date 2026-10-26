@@ -669,6 +669,7 @@ export interface EcommApiProductEdit {
   version:number;
   fields:EcommEditableFields;
   readiness:KikiReadiness;
+  review_schedule:{last_review_at:string|null;next_review_at:string|null;review_due:boolean};
   history:{
     at:string; version:number; previous_status:string; new_status:string;
     changes:Record<string,{before:unknown;after:unknown}>;
@@ -681,10 +682,11 @@ export interface EcommApiProductEdit {
 }
 export interface EcommSavedEdits {
   total:number; page:number;limit:number;
-  summary:{total_saved:number;drafts:number;ready_for_review:number;ready_for_channels:number};
+  summary:{total_saved:number;drafts:number;ready_for_review:number;ready_for_channels:number;review_due:number};
   items:{ecomm_id:string;sku:string;product_name:string|null;
     title:string;brand:string;category:string;subcategory:string;
-    status:EcommEditStatus;version:number;updated_at:string}[];
+    status:EcommEditStatus;version:number;updated_at:string;
+    review_due:boolean;next_review_at:string|null}[];
   saved_in:'KIKI_POSTGRESQL_INTERNAL_ONLY';
   external_writes_enabled:false;
 }
@@ -733,7 +735,7 @@ export interface EcommApiBrandHints {
 export type EcommQueueFilter =
   'all'|'ai_eligible'|'identity'|'draft'|'ready'|'untouched'|'pack'|
   'missing_title'|'missing_brand'|'missing_description'|'missing_gtin'|
-  'ready_for_channels'|'needs_completion';
+  'ready_for_channels'|'needs_completion'|'review_due';
 export interface EcommQueueRow {
   ecomm_id:string;
   sku:string;

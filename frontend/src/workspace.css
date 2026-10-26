@@ -147,3 +147,15 @@
 .kiki-workspace-ai-fill:disabled{opacity:.5}
 .kiki-workspace-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:750px){.kiki-workspace-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.kiki-workspace-monthly{display:flex;justify-content:space-between;align-items:center;gap:12px;
+ padding:16px;border:1px solid #c5dccd;border-radius:12px;background:#eff7f1;flex-wrap:wrap}
+.kiki-workspace-monthly>div{flex:1 1 280px}
+.kiki-workspace-monthly strong{font-size:13px;color:#21523a}
+.kiki-workspace-monthly p{font-size:11px;color:#586f60;line-height:1.6;margin:5px 0}
+.kiki-workspace-monthly button{border:1px solid #28674a;background:#28674a;color:#fff;border-radius:9px;
+ font-size:12px;font-weight:750;padding:12px;cursor:pointer}
+.kiki-workspace-monthly button:disabled{opacity:.5;cursor:not-allowed}
+.kiki-workspace-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:990px){.kiki-workspace-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:570px){.kiki-workspace-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
