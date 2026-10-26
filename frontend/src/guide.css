@@ -93,3 +93,54 @@
   .kiki-help-button{right:12px;bottom:12px}
   .kiki-help-popup{right:12px;bottom:70px;width:calc(100vw - 24px)}
 }
+
+.kiki-inbox{max-width:1280px;display:grid;gap:20px;color:#1c432e}
+.kiki-inbox .kiki-home-header{align-items:center}
+.kiki-inbox-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.kiki-inbox-kpis article{display:grid;gap:7px;border:1px solid #d8e7dd;
+ background:#fff;border-radius:12px;padding:18px}
+.kiki-inbox-kpis span{font-size:12px;color:#668273}
+.kiki-inbox-kpis strong{font-size:29px;font-weight:750;letter-spacing:-.045em;color:#214c33}
+.kiki-inbox-panel{display:grid;gap:15px;background:#fff;border:1px solid #d8e7dd;
+ border-radius:16px;padding:22px}
+.kiki-inbox-panel h2{font-size:21px;margin:0 0 5px}
+.kiki-inbox-panel>div>p:not(.eyebrow){font-size:12px;color:#6f8477}
+.kiki-inbox-filters{display:flex;flex-wrap:wrap;gap:9px}
+.kiki-inbox-filters button{padding:11px 12px;border:1px solid #cce0d0;
+ border-radius:8px;background:#f5faf6;color:#346246;font-size:11px}
+.kiki-inbox-filters button.active{background:#225b40;color:#fff}
+.kiki-inbox-search{display:grid;gap:8px}
+.kiki-inbox-search label{font-size:12px;font-weight:750}
+.kiki-inbox-search>div{display:flex;gap:9px}
+.kiki-inbox-search input{flex:1;min-width:0;padding:12px;border:1px solid #cce0d0;
+ border-radius:8px;color:#244d37;font:inherit;font-size:13px}
+.kiki-inbox-search button{display:flex;gap:8px;align-items:center;padding:11px 15px;
+ font-size:12px;border-radius:8px}
+.kiki-inbox-row{display:grid;grid-template-columns:37px minmax(0,1fr) auto;
+ gap:13px;align-items:center;border:1px solid #dceadf;border-radius:12px;padding:16px}
+.kiki-inbox-row-icon{display:grid;place-items:center;width:37px;height:37px;
+ border-radius:10px;color:#2a6948;background:#e6f4e8}
+.kiki-inbox-row-main{display:grid;gap:6px;min-width:0}
+.kiki-inbox-row-main>span{font-size:11px;color:#4b7860;font-weight:700}
+.kiki-inbox-row-main h3{font-size:14px;line-height:1.5;margin:0;color:#244a35}
+.kiki-inbox-row-main p{font-size:11px;color:#789180}
+.kiki-inbox-row-main small{font-size:11px;color:#687e6c;line-height:1.5}
+.kiki-inbox-row a{display:flex;gap:8px;align-items:center;white-space:nowrap;
+ background:#255e42;color:#fff;border-radius:9px;text-decoration:none;
+ padding:11px;font-size:11px;font-weight:750}
+.kiki-inbox-pages{display:flex;justify-content:space-between;align-items:center;gap:9px;
+ font-size:12px;color:#738b7b}
+.kiki-inbox-pages button{border:1px solid #d0e1d4;background:#f7faf7;color:#285b3f;
+ border-radius:8px;padding:10px;font-size:11px}
+.kiki-inbox-pages button:disabled{opacity:.5}
+.kiki-inbox-empty{border-radius:10px;padding:24px;text-align:center;
+ background:#f7faf8;color:#6b8573;font-size:13px}
+.kiki-inbox-error{padding:14px;background:#fff2ef;color:#a34b41;
+ border:1px solid #efc0b7;border-radius:9px;font-size:12px}
+@media(max-width:780px){.kiki-inbox-kpis{grid-template-columns:1fr 1fr}
+ .kiki-inbox-panel{padding:15px}
+ .kiki-inbox-row{grid-template-columns:37px 1fr}
+ .kiki-inbox-row a{grid-column:2;justify-self:start}
+ .kiki-inbox-search>div{flex-direction:column}
+}
+@media(max-width:560px){.kiki-inbox-kpis{grid-template-columns:1fr}}
