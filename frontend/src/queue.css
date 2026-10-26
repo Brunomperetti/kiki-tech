@@ -167,3 +167,31 @@
 .kiki-queue-editorial-filters .kiki-queue-chips{margin-top:10px}
 @media(max-width:560px){.kiki-queue-source-health{grid-template-columns:1fr}
 .kiki-queue-source-health p{grid-column:1}}
+
+/* Product-first coverage across the Ecomm API, ML API and imported TN snapshot. */
+.kiki-queue-channel-matrix{background:#f1f8f3;border:1px solid #b9d9c5;
+  border-radius:15px;padding:19px;display:grid;gap:15px}
+.kiki-queue-channel-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.kiki-queue-channel-head h2{font-size:18px;font-weight:800;margin:5px 0;color:#1a4830}
+.kiki-queue-channel-head p:not(.eyebrow){font-size:12px;line-height:1.6;color:#53715e;margin-top:7px;max-width:680px}
+.kiki-queue-channel-head a{display:flex;align-items:center;gap:6px;color:#245e3d;
+  font-size:11px;font-weight:750;text-decoration:none;white-space:nowrap}
+.kiki-queue-channel-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.kiki-queue-channel-stats div{display:grid;gap:6px;background:#fff;border:1px solid #d4e6d9;
+  padding:13px;border-radius:10px}
+.kiki-queue-channel-stats strong{color:#1d5135;font-size:23px;font-weight:850;font-variant-numeric:tabular-nums}
+.kiki-queue-channel-stats span{font-size:11px;line-height:1.5;color:#64806b}
+.kiki-queue-channel-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.kiki-queue-channel-sources div{display:grid;gap:3px;font-size:11px;background:#e4f1e7;border-radius:8px;padding:10px}
+.kiki-queue-channel-sources b{color:#23573a}
+.kiki-queue-channel-sources span{color:#5b7464;line-height:1.5}
+.kiki-queue-channel-caution{color:#796138;background:#fff8e7;
+  border:1px solid #ead7a7;padding:10px 12px;border-radius:9px;font-size:11px;line-height:1.6}
+.kiki-queue-channel-tags{display:flex;gap:6px;flex-wrap:wrap}
+.kiki-queue-channel-tags span{font-size:11px;color:#356047;background:#ecf6ef;
+  border:1px solid #d3e5d7;border-radius:6px;padding:6px 9px;line-height:1.5}
+.kiki-queue-item-body>small{font-size:11px;color:#6b816e;line-height:1.5}
+@media(max-width:1000px){.kiki-queue-channel-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.kiki-queue-channel-matrix{padding:13px}
+ .kiki-queue-channel-head{flex-direction:column}
+ .kiki-queue-channel-sources{grid-template-columns:1fr}}
