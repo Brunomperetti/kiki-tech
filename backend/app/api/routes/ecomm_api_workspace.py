@@ -9,6 +9,7 @@ from ...core.security import require_csrf, require_session
 from ...database.session import get_db
 from ...services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
 from ...services.ecomm_ai_editor_service import EcommAiEditor
+from ...services.ecomm_ai_proposal_inbox_service import list_ecomm_ai_proposals
 from ...services.ecomm_api_brand_hints_service import EcommApiBrandHints
 from ...services.ecomm_api_work_queue_service import build_queue
 
@@ -34,6 +35,24 @@ class SaveProductEdit(BaseModel):
 class GenerateAiSuggestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=0)
+
+
+@router.get("/ai-proposals")
+def ai_proposals(
+    q: str = Query(default="", max_length=80),
+    saved: str = Query(default="all", max_length=20),
+    page: int = Query(default=1, ge=1, le=100000),
+    limit: int = Query(default=25, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Recover generated Ecomm AI suggestions; does not apply or approve them."""
+    try:
+        return list_ecomm_ai_proposals(
+            db, query=q, saved_filter=saved, page=page, limit=limit
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get("/ai/{ecomm_id}/latest")
