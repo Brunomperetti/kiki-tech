@@ -102,3 +102,17 @@
 .kiki-ml-shortcut{display:inline-flex;gap:7px;align-items:center;font-size:12px;font-weight:700;text-decoration:none;border:1px solid #a9d2ba;border-radius:18px;padding:7px 11px;color:#1e593c;background:#f0fbf2}
 .kiki-ml-shortcut:hover{background:#e3f4e7}
 @media(max-width:680px){.kiki-ml-connect-panel .kiki-channel-actions button{width:100%}.kiki-ml-connect-panel{padding:13px}}
+
+/* Operational product master: everyday commercial progress, not a demo. */
+.kiki-master-home{border:1px solid #c0dac6;border-radius:16px;background:linear-gradient(125deg,#e9f4ec,#fff);
+  padding:22px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,1fr);gap:24px;align-items:center}
+.kiki-master-home h2{color:#19412d;font-size:22px;margin:5px 0 8px}
+.kiki-master-home-copy>p:not(.eyebrow){font-size:13px;line-height:1.7;color:#597462;margin:0 0 16px}
+.kiki-master-primary{display:inline-flex;align-items:center;gap:9px;color:white;background:#20553a;
+  border:1px solid #20553a;border-radius:9px;padding:12px 15px;font-size:12px;font-weight:800;text-decoration:none}
+.kiki-master-home-numbers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kiki-master-home-numbers>div{border:1px solid #d5e6d7;border-radius:11px;background:#fff;padding:15px;display:grid;gap:6px}
+.kiki-master-home-numbers strong{font-size:26px;font-weight:800;color:#214b36;font-variant-numeric:tabular-nums}
+.kiki-master-home-numbers span{font-size:11px;color:#557361}
+@media(max-width:920px){.kiki-master-home{grid-template-columns:1fr}}
+@media(max-width:520px){.kiki-master-home{padding:15px}.kiki-master-home-numbers{grid-template-columns:1fr 1fr}}
