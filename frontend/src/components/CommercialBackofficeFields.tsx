@@ -59,7 +59,12 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       </div>
     </div>
 
-    <section className="kiki-commercial-section">
+    <nav className="kiki-commercial-jump" aria-label="Secciones de la ficha comercial">
+      <a href="#kiki-identidad">Identidad</a><a href="#kiki-contenido">Descripciones</a>
+      <a href="#kiki-seo">Categorías y SEO</a><a href="#kiki-atributos">Características</a>
+      <a href="#kiki-multimedia">Fotos y videos</a><a href="#kiki-fuentes">Fuentes verificadas</a>
+    </nav>
+    <section className="kiki-commercial-section" id="kiki-identidad">
       <div className="kiki-commercial-section-head"><span>01</span><div><h3>Identidad y presentación</h3>
         <p>Nombre comercial y presentación exacta. No se infiere la composición de packs por familia SKU.</p></div></div>
       <div className="kiki-commercial-grid">
@@ -84,7 +89,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       </div>
     </section>
 
-    <section className="kiki-commercial-section">
+    <section className="kiki-commercial-section" id="kiki-contenido">
       <div className="kiki-commercial-section-head"><span>02</span><div><h3>Contenido comercial y detalles</h3>
         <p>Textos expresivos, específicos y sustentados en documentación. Sin atributos inventados ni promesas médicas.</p></div></div>
       <div className="kiki-commercial-grid">
@@ -100,7 +105,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       </div>
     </section>
 
-    <section className="kiki-commercial-section">
+    <section className="kiki-commercial-section" id="kiki-seo">
       <div className="kiki-commercial-section-head"><span>03</span><div><h3>Categorías y posicionamiento SEO</h3>
         <p>Organización interna maestra. Las categorías específicas de cada canal se mapearán al publicar.</p></div></div>
       <div className="kiki-commercial-grid">
@@ -127,7 +132,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       <p className="kiki-commercial-hint">Se sugieren categorías que ya existen en KIKI para mantener nombres consistentes. Podés crear una nueva escribiéndola.</p>
     </section>
 
-    <section className="kiki-commercial-section">
+    <section className="kiki-commercial-section" id="kiki-atributos">
       <div className="kiki-commercial-section-head"><span>04</span><div><h3>Características y especificaciones</h3>
         <p>Agregá pares atributo/valor (por ejemplo contenido neto, sabor, formato) únicamente con respaldo documental.</p></div></div>
       <div className="kiki-commercial-list">
@@ -146,7 +151,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       </div>
     </section>
 
-    <section className="kiki-commercial-section">
+    <section className="kiki-commercial-section" id="kiki-multimedia">
       <div className="kiki-commercial-section-head"><span>05</span><div><h3>Fotografías, gráficas y videos</h3>
         <p>Biblioteca de enlaces multimedia HTTPS con origen y descripción. No se descargan ni suben archivos al servidor.</p></div></div>
       <div className="kiki-commercial-list">
@@ -176,7 +181,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       </div>
     </section>
 
-    <section className="kiki-commercial-section">
+    <section className="kiki-commercial-section" id="kiki-fuentes">
       <div className="kiki-commercial-section-head"><span>06</span><div><h3>Fuentes verificadas y control editorial</h3>
         <p>Registrá fabricante, ficha oficial o etiqueta. Confirmá explícitamente qué verificaste y que corresponde a esta variante. Un EAN solo no alcanza.</p></div></div>
       <div className="kiki-commercial-list">
