@@ -456,8 +456,12 @@ export function EnrichmentQueue(){
               <span>{chanStatus(row.channel_coverage.tn.status,'TN')}</span>
             </div>
             <p className="kiki-queue-explain">{row.reason}</p>
+            {row.channel_coverage.ml.matching_rows>1&&
+              <small>La copia ML contiene {row.channel_coverage.ml.matching_rows} filas con este mismo SKU. Pueden ser publicaciones distintas: verificar titulo, presentacion y variaciones antes de vincular.</small>}
             {row.channel_coverage.ml.listing_ids.length>0&&
               <small>Identificadores ML candidatos: {row.channel_coverage.ml.listing_ids.join(', ')}</small>}
+            {row.channel_coverage.tn.candidate_name&&
+              <small>Tiendanube, candidato por SKU: {row.channel_coverage.tn.candidate_name}. Verificar que coincidan producto y presentacion.</small>}
             {row.channel_coverage.ml.status==='SKU_CANDIDATE'&&
               <small>Compará el título y la presentación antes de aceptar la vinculación.</small>}
             <div className="kiki-queue-tags">
@@ -470,7 +474,7 @@ export function EnrichmentQueue(){
               Abrir ficha <KikiIcon name="arrow-right" size={16}/></Link>
               :<span>Sin ID para editar</span>}
             <small>Prioridad {row.priority===0?'Alta':row.priority===1?'Continuar':
-              row.priority===2?'Revisar pack':'Normal'}</small>
+              row.priority===2?(row.is_combo?'Revisar pack':'Revisar canales'):'Normal'}</small>
           </div>
         </article>)}
         {!loading&&data?.total===0&&<p className="kiki-queue-placeholder">
