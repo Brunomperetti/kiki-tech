@@ -83,20 +83,13 @@ export function Layout(){
       <details className="advanced-nav kiki-advanced-nav" key={activeAdvanced?'opened':'closed'}
         open={activeAdvanced?true:undefined}>
         <summary><KikiIcon name="archive" size={17}/> Herramientas y datos históricos</summary>
-        <p className="kiki-nav-note">Estas pantallas todavía usan datos importados y no equivalen al catálogo API.</p>
+        <p className="kiki-nav-note">Herramientas auxiliares y archivos de otros canales. Ecomm-App se trabaja exclusivamente por API.</p>
         <nav aria-label="Herramientas avanzadas y datos históricos">
-          <NavLink to="/products">Productos históricos (Excel)</NavLink>
-          <NavLink to="/work">Tareas históricas (Excel)</NavLink>
-          <NavLink to="/work/details">Revisión detallada histórica</NavLink>
-          <NavLink to="/readiness">Vinculación histórica ML</NavLink>
-          <NavLink to="/prepublication">Preparación histórica ML</NavLink>
+
           <NavLink to="/tiendanube">Tiendanube (CSV)</NavLink>
-          <NavLink to="/enrichment">Marcas y datos históricos</NavLink>
           <NavLink to="/external-research">Investigación externa</NavLink>
           <NavLink to="/images">Imágenes</NavLink>
           <NavLink to="/metadata">Categorías y atributos</NavLink>
-          <NavLink to="/review">Coincidencias históricas</NavLink>
-          <NavLink to="/duplicate-review">Duplicados históricos</NavLink>
           <NavLink to="/imports">Importaciones y diagnóstico</NavLink>
         </nav>
       </details>
