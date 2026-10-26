@@ -193,14 +193,20 @@ export function CaseExplorer(){
                 to={'/pilot?sku='+encodeURIComponent(current.api_sku)+'#catalogo'}>
                 <KikiIcon name="search" size={17}/> Consultar en Ecomm API
               </Link>}
+              {current.api_ecomm_id&&<Link className="kiki-case-primary"
+                to={'/workspace?id='+encodeURIComponent(current.api_ecomm_id)}>
+                <KikiIcon name="check" size={17}/> Revisar y mejorar ficha candidata en KIKI
+              </Link>}
               <button type="button" onClick={()=>void copy()}>
                 <KikiIcon name="layers" size={17}/> Copiar resumen del caso
               </button>
             </div>
             {copyStatus&&<p role="status" className="kiki-cases-copy">{copyStatus}</p>}
             <p className="kiki-cases-disclaimer"><KikiIcon name="shield" size={16}/>
-              Este diagnóstico no aprueba vínculos, GTIN, presentaciones, composición ni stock.
-              Los datos de ML pertenecen a una copia histórica.
+              Abrir una ficha candidata no confirma la identidad entre ML y Ecomm-App.
+              Verificá SKU, presentación y composición antes de guardar. Los cambios se
+              conservan solo dentro de KIKI: no corrigen automáticamente una publicación
+              de Mercado Libre ni modifican Ecomm-App, GTIN, precios o stock.
             </p>
           </div>:<div className="kiki-cases-empty">
             <KikiIcon name="search" size={28}/><p>Elegí un caso para ver las fichas lado a lado.</p>

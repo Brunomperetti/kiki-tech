@@ -83,3 +83,22 @@
  .kiki-pilot-jump{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.kiki-client-action{transition:none}.kiki-client-action:hover{transform:none}}
+
+/* Clear, operator-facing Mercado Libre account authorization and snapshot refresh. */
+.kiki-ml-connect-panel{display:grid;gap:10px;background:#f1f8f3;border:1px solid #c7dfcc;border-radius:13px;padding:15px 16px;margin:10px 0}
+.kiki-ml-connect-panel>strong{display:flex;align-items:center;gap:8px;color:#17472e;font-size:15px}
+.kiki-ml-connect-panel p{margin:0;color:#395f49;line-height:1.55}
+.kiki-ml-connect-panel small{color:#5d7767;line-height:1.55}
+.kiki-ml-connect-panel .kiki-channel-actions{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap}
+.kiki-ml-connect-panel button{font:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;min-height:43px;padding:10px 13px;font-size:13px;font-weight:650}
+.kiki-ml-connect-panel button:disabled{opacity:.55;cursor:not-allowed}
+.kiki-ml-connect-panel .kiki-main-action{border:1px solid #1b5437;background:#1b5437;color:white}
+.kiki-ml-connect-panel .secondary-link{background:white;border:1px solid #a0bea8;color:#1b5437}
+.kiki-ml-connect-panel .secondary-link:hover:not(:disabled){border-color:#235d3d;background:#f8fdf9}
+.kiki-ml-connect-panel .kiki-ml-error{border-radius:8px;background:#fff3ec;border:1px solid #e7ad83;color:#9b4427;padding:10px 12px;font-weight:600}
+.kiki-ml-connect-panel .kiki-ml-success{border-radius:8px;background:#e5f4e8;border:1px solid #a6d1b1;color:#245b35;padding:10px 12px;font-weight:600}
+.kiki-ml-feedback{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;background:#eaf6ed;border:1px solid #afd3b9;color:#1e5b39;border-radius:12px;font-size:13px;line-height:1.5}
+.kiki-ml-feedback svg{flex:none}
+.kiki-ml-shortcut{display:inline-flex;gap:7px;align-items:center;font-size:12px;font-weight:700;text-decoration:none;border:1px solid #a9d2ba;border-radius:18px;padding:7px 11px;color:#1e593c;background:#f0fbf2}
+.kiki-ml-shortcut:hover{background:#e3f4e7}
+@media(max-width:680px){.kiki-ml-connect-panel .kiki-channel-actions button{width:100%}.kiki-ml-connect-panel{padding:13px}}
