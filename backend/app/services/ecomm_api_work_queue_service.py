@@ -15,7 +15,7 @@ from .ecomm_api_product_workspace_service import _readiness, blank_fields, revie
 FILTERS = {
     "all", "ai_eligible", "identity", "draft", "ready", "untouched", "pack",
     "missing_title", "missing_brand", "missing_description", "missing_gtin",
-    "ready_for_channels", "needs_completion", "review_due"
+    "ready_for_channels", "needs_completion", "review_due", "missing_source_name"
 }
 
 
@@ -37,11 +37,20 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     status = edit.status if saved else "NOT_STARTED"
     # For some products an own GTIN may not exist; missing does not
     # automatically mean noncompliant or that a GTIN should be invented.
+    # Pending editorial fields are meaningful ONLY in fichas that someone
+    # already started. Untouched API products are not "missing" three times:
+    # they already have source names, but no commercial overlay in KIKI.
+    # They are counted once under "untouched" and "needs_completion".
     missing = {
-        "missing_brand": not bool(_value(fields.get("brand"))),
-        "missing_title": not bool(_value(fields.get("title"))),
-        "missing_description": not bool(_value(fields.get("description"))),
-        "missing_gtin": not bool(_value(source_gtin) or _value(fields.get("proposed_gtin"))),
+        "missing_source_name": not bool(_value(product_name)),
+        "missing_brand": saved and not bool(_value(fields.get("brand"))),
+        "missing_title": saved and not bool(_value(fields.get("title"))),
+        "missing_description": saved and not bool(_value(fields.get("description"))),
+        # GTIN absent from the API is a source-coverage issue (shown separately).
+        # Only started, incomplete fichas receive a GTIN documentation flag.
+        "missing_gtin": saved and not bool(
+            _value(source_gtin) or _value(fields.get("proposed_gtin"))
+        ),
     }
     identity_issue = duplicate_sku or source_sku_changed or not id_value or not sku
     flags = [k for k, enabled in missing.items() if enabled]
@@ -52,7 +61,7 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     # Matches the guards in the batch AI preview: a unique, stable, 
     # API-identified non-combo variant. This is NOT a factual verification
     # of ingredients, GTIN, price or commercial publication readiness.
-    if not is_combo and not identity_issue:
+    if not is_combo and not identity_issue and _value(product_name):
         flags.append("ai_eligible")
     flags.append("untouched" if not saved else "draft" if status == "DRAFT"
                  else "ready_for_channels" if status == "READY_FOR_CHANNELS" else "ready")
@@ -63,6 +72,9 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     if identity_issue:
         priority = 0
         reason = "Identidad SKU ambigua, incompleta o modificada; revisar antes de editar."
+    elif missing["missing_source_name"]:
+        priority = 1
+        reason = "La API no informó un nombre para esta variante: verificar antes de redactar."
     elif status == "DRAFT":
         priority = 1
         reason = "Borrador guardado pendiente de continuar o revisar."
@@ -91,6 +103,8 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
         "status": status, "edit_version": edit.version if saved else 0,
         "proposed_brand": _value(fields.get("brand")),
         "proposed_title": _value(fields.get("title")),
+        "source_name_present": bool(_value(product_name)),
+        "commercial_edit_started": saved,
         "flags": flags, "identity_issue": identity_issue,
         "priority": priority, "reason": reason,
         "last_edited_at": _date(edit.updated_at) if saved else None,
@@ -139,6 +153,15 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
                     bool(sku and sku_owners[sku.casefold()] > 1),
                 )
                 counts["total"] += 1
+                counts["source_name_present"] += int(item["source_name_present"])
+                counts["source_name_missing"] += int(not item["source_name_present"])
+                counts["editorial_started"] += int(item["commercial_edit_started"])
+                counts["editorial_brand_saved"] += int(bool(item["proposed_brand"]))
+                counts["editorial_title_saved"] += int(bool(item["proposed_title"]))
+                counts["editorial_description_saved"] += int(
+                    bool(_value((edits.get(ecomm_id).fields or {}).get("description")))
+                    if edits.get(ecomm_id) else False
+                )
                 counts["gtin_in_api_capture"] += int(item["source_gtin_present"])
                 counts["gtin_unavailable_in_api_capture"] += int(
                     not item["source_gtin_present"]
@@ -169,6 +192,12 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
         "filter": filter_name, "query": query.strip(),
         "summary": {key:counts[key] for key in sorted(FILTERS - {"all"})} | {
             "total": counts["total"],
+            "source_name_present": counts["source_name_present"],
+            "source_name_missing": counts["source_name_missing"],
+            "editorial_started": counts["editorial_started"],
+            "editorial_brand_saved": counts["editorial_brand_saved"],
+            "editorial_title_saved": counts["editorial_title_saved"],
+            "editorial_description_saved": counts["editorial_description_saved"],
             "gtin_in_api_capture": counts["gtin_in_api_capture"],
             "gtin_unavailable_in_api_capture": counts["gtin_unavailable_in_api_capture"],
         },
@@ -190,6 +219,9 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
             "La cola se deriva exclusivamente de la copia Ecomm-App por API y "
             "de fichas guardadas en KIKI PostgreSQL. Un GTIN que no aparece en "
             "la captura NO es evidencia de ausencia de EAN original. "
+            "Los nombres ya presentes en la API no son títulos faltantes. "
+            "Las alertas de marca, título y descripción se refieren SOLO a fichas "
+            "que el equipo comenzó a editar y todavía no completó. "
             "La falta de marca en KIKI no prueba falta de marca del fabricante. "
             "Los packs y SKUs ambiguos "
             "requieren revisión. No escribe en Ecomm, ML ni Tiendanube."

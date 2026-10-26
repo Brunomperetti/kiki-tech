@@ -734,7 +734,7 @@ export interface EcommApiBrandHints {
 
 export type EcommQueueFilter =
   'all'|'ai_eligible'|'identity'|'draft'|'ready'|'untouched'|'pack'|
-  'missing_title'|'missing_brand'|'missing_description'|'missing_gtin'|
+  'missing_title'|'missing_brand'|'missing_description'|'missing_gtin'|'missing_source_name'|
   'ready_for_channels'|'needs_completion'|'review_due';
 export interface EcommQueueRow {
   ecomm_id:string;
