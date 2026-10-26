@@ -44,6 +44,8 @@ export function ProductWorkspace(){
   const [aiError,setAiError]=useState('');
   const [aiMessage,setAiMessage]=useState('');
   const [brandHints,setBrandHints]=useState<EcommApiBrandHints|null>(null);
+  const [eanEvidence,setEanEvidence]=useState<Awaited<ReturnType<typeof api.ecommEanEvidence>>|null>(null);
+  const [eanEvidenceError,setEanEvidenceError]=useState('');
   const [brandHintsError,setBrandHintsError]=useState('');
   const [taxonomy,setTaxonomy]=useState<Awaited<ReturnType<typeof api.ecommTaxonomy>>|null>(null);
   const [exportBusy,setExportBusy]=useState(false);
@@ -64,6 +66,17 @@ export function ProductWorkspace(){
   }
   useEffect(()=>{void loadCatalog('',1);void api.ecommTaxonomy().then(setTaxonomy).catch(()=>{});},[]);
   useEffect(()=>{void loadSaved(savedSearch,savedStatus,savedPage)},[savedSearch,savedStatus,savedPage]);
+  useEffect(()=>{
+    let active=true;
+    setEanEvidence(null);setEanEvidenceError('');
+    if(targetId){
+      api.ecommEanEvidence(targetId)
+        .then(result=>{if(active)setEanEvidence(result)})
+        .catch(e=>{if(active)setEanEvidenceError(fail(e))});
+    }
+    return ()=>{active=false};
+  },[targetId]);
+
   useEffect(()=>{
     let active=true;
     setBrandHints(null);setBrandHintsError('');
@@ -119,6 +132,16 @@ export function ProductWorkspace(){
     }catch(e){setError(fail(e));}
     finally{setSaving(false)}
   }
+  function useEanEvidence(){
+    if(!eanEvidence?.can_use||!eanEvidence.candidate_ean||!edit||
+      edit.source_sku_changed||eanEvidence.sku!==edit.source.sku)return;
+    const suggested=eanEvidence.candidate_ean;
+    if(fields.proposed_gtin&&fields.proposed_gtin!==suggested
+      &&!window.confirm('La ficha ya tiene otro GTIN propuesto. ¿Querés reemplazarlo por un código del archivo histórico?'))return;
+    change('proposed_gtin',suggested);
+    setMessage('EAN histórico sugerido copiado al formulario. Verificá el envase y guardá la ficha para conservarlo en KIKI; no está confirmado por la API.');
+  }
+
   function useBrandHint(){
     if(!brandHints?.brand||brandHints.status!=='EVIDENCE_FOUND')return;
     if(fields.brand.trim()&&fields.brand.trim().toLocaleLowerCase()!==brandHints.brand.toLocaleLowerCase()
@@ -356,6 +379,29 @@ export function ProductWorkspace(){
             <p>GTIN original: {text(edit.source.gtin)} · Stock de referencia: {text(edit.source.stock_at_capture)}
               · Captura API: {date(edit.source.captured_at)}. La actualización periódica no modifica las fichas comerciales.</p>
           </div>
+          <section className="kiki-workspace-ean-evidence" aria-label="EAN histórico como fuente complementaria">
+            <div>
+              <strong><KikiIcon name="search" size={16}/> EAN de referencia histórica</strong>
+              <p>KIKI consulta solo el campo EAN conservado del archivo anterior.
+                La identidad y el stock siguen siendo exclusivamente de Ecomm-App API.
+                El EAN histórico nunca se considera certificado automáticamente.</p>
+            </div>
+            {eanEvidenceError&&<p role="alert">No se pudo revisar la evidencia histórica: {eanEvidenceError}</p>}
+            {!eanEvidence&&!eanEvidenceError&&<p>Revisando coincidencias exactas…</p>}
+            {eanEvidence&&<div className="kiki-workspace-ean-status">
+              {eanEvidence.can_use&&eanEvidence.candidate_ean?<><div>
+                <small>EAN CANDIDATO (EXCEL HISTÓRICO)</small>
+                <strong>{eanEvidence.candidate_ean}</strong>
+                <small>{eanEvidence.matches} registro(s) coincidentes · {date(eanEvidence.legacy_snapshot_at)}</small>
+              </div>
+              <button type="button" disabled={saving||edit.source_sku_changed}
+                onClick={useEanEvidence}>Usar candidato en ficha</button></>:
+              <strong>No hay un EAN histórico suficientemente seguro para sugerir.</strong>}
+              <p>{eanEvidence.reason}</p>
+            </div>}
+            <small>Un EAN sugerido solo queda en el catálogo maestro cuando guardás la ficha.
+              Verificá la etiqueta original antes de considerar el código apto para publicar.</small>
+          </section>
           {edit.source_sku_changed&&<p className="kiki-workspace-alert" role="alert">
             Este ID tenía otro SKU cuando guardaron la ficha. Para evitar aplicar cambios al producto equivocado,
             el guardado quedó bloqueado hasta revisar la identidad con Ecomm-App.</p>}
