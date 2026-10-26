@@ -28,6 +28,14 @@ El usuario no necesita pulsar «Consultar API» por cada variante. La fuente
 - En «Catálogo por API» se muestra fecha de captura, si hay una nueva
   captura en curso y si la programación está configurada. Desaparece
   el botón individual «Consultar API» del listado operativo.
+- El operador autenticado puede usar «Actualizar catálogo ahora» (con CSRF
+  y confirmación). La tarea continúa en el backend y la UI lee el progreso
+  guardado en PostgreSQL, aun si se cierra la pestaña.
+- Actualización manual y programada comparten un bloqueo persistente.
+  La nueva captura sustituye la vigente solamente después de validarse
+  completa. Las fichas y borradores editoriales permanecen separados.
+  Ante un fallo o reinicio del proceso, se mantiene la última copia válida;
+  una tarea interrumpida puede reiniciarse pasados 45 minutos.
 
 ## Configuración obligatoria (no incluida automáticamente en el despliegue)
 1. Crear **una clave aleatoria de al menos 32 caracteres**, diferente del
@@ -62,3 +70,17 @@ El usuario no necesita pulsar «Consultar API» por cada variante. La fuente
   Ecomm-App, Mercado Libre ni Tiendanube.
 - **Frecuencia**: respetar cuota del proveedor y coste/ejecuciones antes
   de subir a capturas horarias; hoy se limita a dos por día.
+
+## Actualización manual desde la interfaz
+1. En `/pilot` pulsar **Actualizar catálogo ahora** y confirmar.
+2. El backend crea un trabajo registrado en PostgreSQL; obtiene tres páginas
+   por lote y publica la copia únicamente al completar todas las páginas.
+3. El navegador consulta periódicamente `/api/ecomm-app/stage/auto/status`,
+   mostrando páginas y resultado. Salir de la página no cancela el trabajo
+   mientras el proceso backend siga en ejecución.
+4. Si hay otra captura en curso (manual o programada), el servidor responde
+   HTTP 409 y NO inicia una segunda copia.
+5. Si el backend se reinicia, la tarea puede quedar interrumpida. La copia
+   anterior no se reemplaza. Luego del plazo de seguridad se puede reintentar.
+6. Verificar la fecha y cantidad de variantes, y corroborar que el borrador
+   guardado continúa intacto. No modifica Ecomm, Mercado Libre ni Tiendanube.
