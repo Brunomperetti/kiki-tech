@@ -45,6 +45,8 @@ export function ProductWorkspace(){
   const [aiMessage,setAiMessage]=useState('');
   const [brandHints,setBrandHints]=useState<EcommApiBrandHints|null>(null);
   const [brandHintsError,setBrandHintsError]=useState('');
+  const [taxonomy,setTaxonomy]=useState<Awaited<ReturnType<typeof api.ecommTaxonomy>>|null>(null);
+  const [exportBusy,setExportBusy]=useState(false);
 
 
 
@@ -60,7 +62,7 @@ export function ProductWorkspace(){
     catch(e){setCatalog(null);setError(fail(e));}
     finally{setLoading(false)}
   }
-  useEffect(()=>{void loadCatalog('',1)},[]);
+  useEffect(()=>{void loadCatalog('',1);void api.ecommTaxonomy().then(setTaxonomy).catch(()=>{});},[]);
   useEffect(()=>{void loadSaved(savedSearch,savedStatus,savedPage)},[savedSearch,savedStatus,savedPage]);
   useEffect(()=>{
     let active=true;
@@ -111,6 +113,7 @@ export function ProductWorkspace(){
       setEdit(next);setFields({...blank,...next.fields});setStatus(next.status==='READY_FOR_REVIEW'?'READY_FOR_REVIEW':next.status==='READY_FOR_CHANNELS'?'READY_FOR_CHANNELS':'DRAFT');
       setMessage('Guardado en KIKI Tech. La ficha permanece disponible cuando vuelvas a entrar.');
       await loadSaved();
+      void api.ecommTaxonomy().then(setTaxonomy).catch(()=>{});
       const updatedAi=await api.ecommAiLatest(next.ecomm_id).catch(()=>null);
       if(updatedAi)setAiInfo(updatedAi);
     }catch(e){setError(fail(e));}
@@ -172,6 +175,22 @@ export function ProductWorkspace(){
       document.removeEventListener('click',interceptLink,true);
     };
   },[dirty]);
+  async function exportMaster(){
+    if(exportBusy)return;
+    setExportBusy(true);setError('');
+    try{
+      const snapshot=await api.ecommMasterExport();
+      const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      link.href=url;
+      link.download='KIKI-catalogo-maestro-'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.appendChild(link);link.click();link.remove();
+      URL.revokeObjectURL(url);
+      setMessage('Se descargó una copia de los campos comerciales e historial de KIKI. Los datos originales permanecen guardados en PostgreSQL.');
+    }catch(e){setError(fail(e));}finally{setExportBusy(false)}
+  }
+
   function applySavedSearch(e:FormEvent){e.preventDefault();setSavedPage(1);setSavedSearch(savedQuery.trim());}
   return <div className="kiki-workspace">
     <header className="kiki-home-header">
@@ -185,6 +204,10 @@ export function ProductWorkspace(){
         <Link className="kiki-workspace-back" to="/queue"><KikiIcon name="chart" size={17}/> Volver a cola de mejoras</Link>
         <Link className="kiki-workspace-back" to="/propuestas-ia"><KikiIcon name="sparkles" size={17}/> Propuestas IA guardadas</Link>
         <Link className="kiki-workspace-back" to="/guia"><KikiIcon name="help" size={17}/> Cómo guardar</Link>
+        <button type="button" className="kiki-workspace-back" disabled={exportBusy}
+          onClick={()=>void exportMaster()}>
+          <KikiIcon name="archive" size={17}/>{exportBusy?'Generando copia…':'Descargar catálogo maestro KIKI'}
+        </button>
         </div>
     </header>
 
@@ -398,7 +421,7 @@ export function ProductWorkspace(){
             </div>}
           </section>
           <CommercialBackofficeFields fields={fields} onChange={change}
-            readiness={assessCommercialReadiness(fields)}/>
+            readiness={assessCommercialReadiness(fields)} categories={taxonomy?.categories||[]}/>
           <div className="kiki-workspace-footer">
             <div><strong>Estado: {label(edit.status)}</strong><small>
               {edit.available?'Última edición: '+date(edit.updated_at):'Primera edición · todavía no guardada'}
