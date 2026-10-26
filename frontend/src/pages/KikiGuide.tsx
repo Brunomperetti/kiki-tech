@@ -13,13 +13,14 @@ const steps:JourneyStep[]=[
     heading:'Entendé desde dónde lee KIKI',icon:'home',
     intro:'La fuente principal de identidad es una copia completa obtenida por API de Ecomm-App. La copia muestra la fecha de captura, no stock en vivo.',
     directions:[
-      'Ingresá a Inicio y mirá el estado de Ecomm-App API y la fecha de captura.',
-      'Los indicadores de Mercado Libre corresponden a una copia anterior mientras el titular no autorice una nueva conexión.',
+      'Ingresá a Catálogo por API y mirá la fecha de la última captura completa de Ecomm-App.',
+      'Si necesitás datos recientes, elegí «Actualizar catálogo ahora», confirmá y observá el progreso; no hace falta abrir GitHub.',
+      'La renovación automática está prevista dos veces por día. Mercado Libre y Tiendanube se actualizan por separado.',
       'Si un dato no figura en la copia API, no asumas que falta en el producto real.'
     ],
     check:'Puedo identificar qué dato proviene de la API y qué dato es histórico.',
-    caution:'No uses el stock capturado como confirmación de inventario actual.',
-    action:'Ir a Inicio',to:'/'
+    caution:'El botón actualiza solamente la copia Ecomm-App en KIKI, nunca productos del proveedor. El stock no es en tiempo real.',
+    action:'Abrir Catálogo por API',to:'/pilot'
   },
   {
     heading:'Encontrá qué productos necesitan trabajo',icon:'chart',
