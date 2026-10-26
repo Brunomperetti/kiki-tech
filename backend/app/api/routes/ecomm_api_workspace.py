@@ -12,6 +12,7 @@ from ...services.ecomm_ai_editor_service import EcommAiEditor
 from ...services.ecomm_ai_proposal_inbox_service import list_ecomm_ai_proposals
 from ...services.ecomm_api_brand_hints_service import EcommApiBrandHints
 from ...services.ecomm_api_work_queue_service import build_queue
+from ...services.ecomm_secondary_ean_evidence import EcommLegacyEanEvidence
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -143,6 +144,31 @@ def work_queue(
     """API-only prioritized editorial queue; no AI calls, external writes or approvals."""
     try:
         return build_queue(db, query=q, filter_name=filter, page=page, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/ean-evidence/summary")
+def legacy_ean_summary(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Only conservative EAN suggestions; Ecomm catalog identity stays API-only."""
+    try:
+        return EcommLegacyEanEvidence(db).summary()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/ean-evidence/{ecomm_id}")
+def legacy_ean_candidate(
+    ecomm_id: str,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Never approve or write EAN automatically from old XLSX records."""
+    try:
+        return EcommLegacyEanEvidence(db).get(ecomm_id)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
