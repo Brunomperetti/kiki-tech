@@ -175,6 +175,27 @@ export function ProductWorkspace(){
       document.removeEventListener('click',interceptLink,true);
     };
   },[dirty]);
+  function applyAiToMaster(proposal:EcommAiSuggestion){
+    if(!edit||!proposal.source_current||!proposal.title)return;
+    if((fields.title||fields.description)&&!window.confirm(
+      'KIKI completará únicamente los campos vacíos de la ficha a partir del borrador IA. Las fuentes y atributos seguirán pendientes. ¿Continuar?'))return;
+    const title=proposal.title.trim();
+    const description=proposal.description.trim();
+    const shortTitle=title.length<=100?title:'';
+    const firstSentence=description.match(/^.{1,490}?[.!?](?=\s|$)/)?.[0]||'';
+    const next={...fields,
+      title:fields.title||title,
+      short_title:fields.short_title||shortTitle,
+      seo_title:fields.seo_title||title,
+      description:fields.description||description,
+      short_description:fields.short_description||firstSentence,
+      seo_description:fields.seo_description||(firstSentence.length<=320?firstSentence:''),
+    };
+    setFields(next);
+    setAiMessage('Se copiaron a campos vacíos textos de la propuesta IA. Revisá cada frase, completá fuentes y guardá la ficha. Nada se publica.');
+    setMessage('');
+  }
+
   async function exportMaster(){
     if(exportBusy)return;
     setExportBusy(true);setError('');
@@ -404,6 +425,11 @@ export function ProductWorkspace(){
                 <button type="button" disabled={!aiInfo.draft.source_current||!aiInfo.draft.description}
                   onClick={()=>applyAi('description',aiInfo.draft!)}>Usar esta descripción</button>
               </div>
+              <button type="button" className="kiki-workspace-ai-fill" 
+                disabled={!aiInfo.draft.source_current||!aiInfo.draft.title}
+                onClick={()=>applyAiToMaster(aiInfo.draft!)}>
+                <KikiIcon name="check" size={16}/> Completar campos vacíos desde esta propuesta
+              </button>
               {aiInfo.draft.questions.length>0&&<div className="kiki-workspace-ai-questions">
                 <strong>Qué falta verificar</strong>
                 <ul>{aiInfo.draft.questions.map((q,i)=><li key={i}>{q}</li>)}</ul>
