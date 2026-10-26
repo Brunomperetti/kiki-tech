@@ -1,4 +1,4 @@
-# KIKI Tech — Guía interactiva para Guillermo y Mercedes
+# KIKI Tech — Guía interactiva para operadores del catálogo
 
 ## Para qué sirve
 La aplicación ya permite consultar las 3.127 variantes Ecomm-App por API,
