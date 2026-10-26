@@ -1,0 +1,81 @@
+name: Ecomm-App — renovación automática del catálogo API
+
+on:
+  schedule:
+    # Dos capturas diarias: 08:25 y 16:25 hora argentina (UTC-3).
+    - cron: "25 11,19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kiki-ecomm-api-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KIKI_REFRESH_TOKEN: ${{ secrets.KIKI_REFRESH_TOKEN }}
+      KIKI_API_URL: https://kiki-tech-api.onrender.com
+    steps:
+      - name: Capturar catálogo desde API y promoverlo sólo al completar
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          secret = os.environ.get("KIKI_REFRESH_TOKEN", "").strip()
+          if len(secret) < 32:
+              raise SystemExit(
+                  "Configuración pendiente: establecer KIKI_REFRESH_TOKEN "
+                  "en los Secrets de GitHub Actions y en Render con el mismo valor."
+              )
+
+          base = os.environ["KIKI_API_URL"].rstrip("/")
+          def post(path):
+              request = Request(
+                  base + path, data=b"{}", method="POST",
+                  headers={
+                      "Authorization": "Bearer " + secret,
+                      "Content-Type": "application/json",
+                  },
+              )
+              for attempt in range(3):
+                  try:
+                      with urlopen(request, timeout=110) as response:
+                          if response.status != 200:
+                              raise RuntimeError("HTTP inesperado " + str(response.status))
+                          return json.load(response)
+                  except HTTPError as exc:
+                      # A 429 or application-level validation error must stop the
+                      # refresh, not hammer the API or replace the last good copy.
+                      print("Error HTTP:", exc.code, path)
+                      if exc.code not in (502, 503, 504) or attempt == 2:
+                          raise
+                  except (URLError, TimeoutError):
+                      if attempt == 2:
+                          raise
+                  time.sleep(8 * (attempt + 1))
+
+          began = post("/api/ecomm-app/stage/auto/start")
+          print("Nuevo catálogo aislado iniciado:", began["status"])
+          for i in range(110):
+              step = post("/api/ecomm-app/stage/auto/step")
+              print("Bloque", i+1, "páginas", step["pages_saved"], "/",
+                    step["expected_pages"] or "?")
+              if step["complete"]:
+                  if not step["promoted"] or not step["variants"]:
+                      raise SystemExit("No se validó promoción de captura completa.")
+                  print("Catálogo API actualizado:", step["variants"],
+                        "variantes. No se editaron fichas comerciales.")
+                  break
+          else:
+              raise SystemExit("Demasiados bloques: captura incompleta; catálogo previo intacto.")
+          PY

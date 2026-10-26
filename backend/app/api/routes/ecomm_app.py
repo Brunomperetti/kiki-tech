@@ -2,8 +2,10 @@
 
 This router cannot modify remote inventory or local catalog snapshots.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from secrets import compare_digest
+from datetime import datetime, timezone
 
 from ...core.config import get_settings
 from ...core.security import require_csrf, require_session
@@ -11,7 +13,7 @@ from ...database.session import get_db
 from sqlalchemy.orm import Session
 from ...integrations.ecomm_app.api_catalog_browser import api_catalog_rows
 from ...integrations.ecomm_app.api_ml_reconciliation_preview import api_ml_reconciliation_preview
-from ...integrations.ecomm_app.catalog_stage import EcommAppStageService
+from ...integrations.ecomm_app.catalog_stage import EcommAppStageService, REFRESH_SOURCE
 from ...integrations.ecomm_app.catalog_comparison import EcommAppStageComparisonService
 from ...integrations.ecomm_app.catalog_hybrid_preview import EcommHybridCatalogService
 from ...integrations.ecomm_app.live_stock_check import EcommLiveStockService
@@ -91,6 +93,84 @@ def ecomm_app_catalog_audit(body: CatalogAuditRequest, _session=Depends(require_
         return _client().catalog_audit(body.start_page)
     except (EcommAppApiError, ValueError) as exc:
         _raise_safe(exc)
+
+
+def require_refresh_token(authorization: str = Header(default="")):
+    """Separate machine credential for scheduled jobs, never a user session."""
+    token = get_settings().kiki_refresh_token.strip()
+    if not token:
+        raise HTTPException(503, "La actualización programada aún no está configurada.")
+    supplied = authorization.removeprefix("Bearer ").strip()
+    if not supplied or not compare_digest(supplied, token):
+        raise HTTPException(403, "Credencial de sincronización inválida.")
+
+
+@router.get("/stage/auto/status")
+def ecomm_app_auto_status(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    current = EcommAppStageService(db, None).status()
+    refresh = EcommAppStageService(db, None, REFRESH_SOURCE).status()
+    return {
+        "mode": "SCHEDULED_API_ONLY",
+        "configured": bool(get_settings().kiki_refresh_token.strip()),
+        "last_successful_capture_at": current["last_page_at"],
+        "last_successful_pages": current["pages_saved"],
+        "last_successful_variants": current["quality"]["variants"],
+        "last_successful_complete": current["complete"],
+        "refresh_in_progress": refresh["exists"] and not refresh["complete"],
+        "refresh_pages_saved": refresh["pages_saved"],
+        "refresh_pages_expected": refresh["expected_pages"],
+        "refresh_last_page_at": refresh["last_page_at"],
+        "external_writes_enabled": False,
+        "warning": (
+            "La API Ecomm-App se captura por lotes; no es inventario en tiempo real. "
+            "Los borradores y propuestas comerciales permanecen separados."
+        ),
+    }
+
+
+@router.post("/stage/auto/start")
+def ecomm_app_auto_start(
+    db: Session = Depends(get_db),
+    _token=Depends(require_refresh_token),
+):
+    """Reset only isolated scratch snapshot; keep last good catalog intact."""
+    from ...repositories.catalog_repository import CatalogRepository
+    CatalogRepository(db).save_snapshot(REFRESH_SOURCE, [])
+    return {
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "status": "STARTED",
+        "source": REFRESH_SOURCE,
+        "current_catalog_unchanged": True,
+    }
+
+
+@router.post("/stage/auto/step")
+def ecomm_app_auto_step(
+    db: Session = Depends(get_db),
+    _token=Depends(require_refresh_token),
+):
+    """Fetch at most three pages; promote all atomically only once completed."""
+    snapshot = db.scalar(select(CatalogSnapshot).where(
+        CatalogSnapshot.source == REFRESH_SOURCE
+    ))
+    if snapshot is None:
+        raise HTTPException(409, "Primero iniciá la captura programada.")
+    try:
+        result = EcommAppStageService(db, _client(), REFRESH_SOURCE).next_batch()
+    except (EcommAppApiError, ValueError) as exc:
+        _raise_safe(exc)
+    return {
+        "complete": result["complete"],
+        "pages_saved": result["pages_saved"],
+        "expected_pages": result["expected_pages"],
+        "variants": result["quality"]["variants"],
+        "last_page_at": result["last_page_at"],
+        "promoted": result["complete"],
+        "external_writes_enabled": False,
+    }
 
 
 @router.get("/stage/status")

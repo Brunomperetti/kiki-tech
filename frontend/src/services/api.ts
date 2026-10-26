@@ -216,6 +216,20 @@ export const api = {
   ecommAppLookup: (skus:string[]) => request<EcommAppLookup>('/api/ecomm-app/lookup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skus})}),
   ecommAppCatalogAudit: (startPage:number) => request<EcommCatalogAudit>('/api/ecomm-app/catalog-audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start_page:startPage})}),
   ecommStageStatus: () => request<EcommStageStatus>('/api/ecomm-app/stage/status'),
+  ecommAutoStatus: () => request<{
+    mode:'SCHEDULED_API_ONLY';
+    configured:boolean;
+    last_successful_capture_at:string|null;
+    last_successful_pages:number;
+    last_successful_variants:number;
+    last_successful_complete:boolean;
+    refresh_in_progress:boolean;
+    refresh_pages_saved:number;
+    refresh_pages_expected:number|null;
+    refresh_last_page_at:string|null;
+    external_writes_enabled:false;
+    warning:string;
+  }>('/api/ecomm-app/stage/auto/status'),
   ecommWorkQueue: (filter:EcommQueueFilter='all',q='',page=1,limit=25) =>
     request<EcommWorkQueue>(
       `/api/ecomm-app/workspace/queue?filter=${encodeURIComponent(filter)}&q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`

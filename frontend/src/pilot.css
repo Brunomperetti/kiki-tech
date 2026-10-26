@@ -51,3 +51,11 @@
 .kiki-api-preview-reasons strong{white-space:nowrap}
 @media(max-width:730px){.kiki-api-preview-summary,.kiki-api-preview-reasons{grid-template-columns:1fr 1fr}}
 @media(max-width:480px){.kiki-api-preview-summary,.kiki-api-preview-reasons{grid-template-columns:1fr}}
+
+.kiki-pilot-auto-status{
+  display:flex;align-items:flex-start;gap:11px;padding:14px 16px;margin:0 0 20px;
+  background:#edf6ef;border:1px solid #b7d8c2;border-radius:11px;color:#204d35;
+}
+.kiki-pilot-auto-status svg{flex:none;margin-top:2px}
+.kiki-pilot-auto-status strong{font-size:13px;font-weight:750}
+.kiki-pilot-auto-status p{font-size:12px;color:#4e7560;margin-top:5px;line-height:1.6}
