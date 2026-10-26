@@ -758,3 +758,33 @@ export interface EcommWorkQueue {
   items:EcommQueueRow[];
   policy:string;
 }
+
+export interface EcommAiProposalInboxRow {
+  ecomm_id:string;
+  sku:string;
+  product_name:string;
+  latest_draft_id:number;
+  created_at:string|null;
+  has_saved_product_edit:boolean;
+  product_edit_status:'DRAFT'|'READY_FOR_REVIEW'|null;
+  proposal_review_status:'REVIEW_IN_PRODUCT_EDITOR';
+  source_freshness:'VERIFY_ON_OPEN';
+}
+export type EcommAiInboxFilter='all'|'with_edit'|'without_edit';
+export interface EcommAiProposalInbox {
+  total:number;
+  page:number;
+  limit:number;
+  query:string;
+  filter:EcommAiInboxFilter;
+  summary:{
+    products_with_ai_proposals:number;
+    products_with_saved_edits:number;
+    products_without_saved_edits:number;
+  };
+  items:EcommAiProposalInboxRow[];
+  generated_at:string;
+  mode:'INTERNAL_GENERATED_AI_PROPOSALS_READ_ONLY';
+  external_writes_enabled:false;
+  policy:string;
+}
