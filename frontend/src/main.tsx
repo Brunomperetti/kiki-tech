@@ -7,6 +7,7 @@ import {Pilot} from './pages/Pilot';
 import {CaseExplorer} from './pages/CaseExplorer';
 import {ProductWorkspace} from './pages/ProductWorkspace';
 import {EnrichmentQueue} from './pages/EnrichmentQueue';
+import {KikiGuide} from './pages/KikiGuide';
 import {Channels} from './pages/Channels';
 import {WorkQueue} from './pages/WorkQueue';
 import {TaskCenter} from './pages/TaskCenter';
@@ -49,7 +50,7 @@ function App() {
   useEffect(() => { api.me().then(() => setState('authenticated')).catch(() => setState('anonymous')); }, []);
   if (state === 'loading') return <div className="auth-loading">Verificando sesión…</div>;
   if (state === 'anonymous') return <Login onLogin={() => setState('authenticated')} />;
-  return <BrowserRouter><Routes><Route element={<Layout/>}><Route path="/" element={<Dashboard/>}/><Route path="/pilot" element={<Pilot/>}/><Route path="/cases" element={<CaseExplorer/>}/><Route path="/workspace" element={<ProductWorkspace/>}/><Route path="/queue" element={<EnrichmentQueue/>}/><Route path="/work" element={<TaskCenter/>}/><Route path="/work/details" element={<WorkQueue/>}/><Route path="/channels" element={<Channels/>}/><Route path="/products" element={<Products/>}/><Route path="/readiness" element={<Readiness/>}/><Route path="/enrichment" element={<Enrichment/>}/><Route path="/external-research" element={<ExternalResearch/>}/><Route path="/prepublication" element={<Prepublication/>}/><Route path="/images" element={<ImageReview/>}/><Route path="/metadata" element={<MetadataReview/>}/><Route path="/review" element={<Review/>}/><Route path="/duplicate-review" element={<DuplicateReview/>}/><Route path="/tiendanube" element={<Imports mode="tiendanube"/>}/><Route path="/imports" element={<Imports/>}/></Route></Routes></BrowserRouter>;
+  return <BrowserRouter><Routes><Route element={<Layout/>}><Route path="/" element={<Dashboard/>}/><Route path="/pilot" element={<Pilot/>}/><Route path="/cases" element={<CaseExplorer/>}/><Route path="/workspace" element={<ProductWorkspace/>}/><Route path="/queue" element={<EnrichmentQueue/>}/><Route path="/guia" element={<KikiGuide/>}/><Route path="/work" element={<TaskCenter/>}/><Route path="/work/details" element={<WorkQueue/>}/><Route path="/channels" element={<Channels/>}/><Route path="/products" element={<Products/>}/><Route path="/readiness" element={<Readiness/>}/><Route path="/enrichment" element={<Enrichment/>}/><Route path="/external-research" element={<ExternalResearch/>}/><Route path="/prepublication" element={<Prepublication/>}/><Route path="/images" element={<ImageReview/>}/><Route path="/metadata" element={<MetadataReview/>}/><Route path="/review" element={<Review/>}/><Route path="/duplicate-review" element={<DuplicateReview/>}/><Route path="/tiendanube" element={<Imports mode="tiendanube"/>}/><Route path="/imports" element={<Imports/>}/></Route></Routes></BrowserRouter>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
