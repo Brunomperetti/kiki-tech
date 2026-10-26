@@ -23,11 +23,11 @@ const contextHelp=(pathname:string):ContextHelp=>{
   if(pathname==='/queue')return {
     title:'Cola de mejoras · cómo empezar',
     steps:[
-      'Elegí el filtro «Simples aptos para IA» o «Borradores».',
-      'Marcá hasta tres variantes simples y prepará la selección gratis.',
-      'Generá IA solo si aceptás consumir solicitudes; luego revisá cada propuesta y guardá la ficha.'
+      'Filtrá «Candidatos en TN», «Candidatos en ML» o «Conflictos de canales para verificar».',
+      'Buscá un SKU, compará el producto y sus presentaciones: una coincidencia no confirma publicación.',
+      'Abrí la ficha para mejorarla y guardá un borrador; la IA por lotes es opcional.'
     ],
-    reminder:'Seleccionar o generar IA no equivale a guardar la ficha comercial.'
+    reminder:'Sin SKU exacto en una captura no significa sin publicar. Las ediciones solo quedan conservadas cuando guardás.'
   };
   if(pathname==='/pilot')return {
     title:'Catálogo por API · qué muestra',
@@ -37,9 +37,9 @@ const contextHelp=(pathname:string):ContextHelp=>{
   };
   if(pathname==='/cases'||pathname==='/channels')return {
     title:'Canales · cómo interpretarlos',
-    steps:['Ecomm-App es la fuente principal de identidad por API.',
-      'Mercado Libre usa su última captura mientras no se reautorice la cuenta.',
-      'Tiendanube conserva datos CSV importados.'],
+    steps:['Ecomm-App API es la fuente operativa del catálogo. Verificá la fecha de su captura.',
+      'Mercado Libre usa su última copia API: solo el titular puede reconectar y actualizar la cuenta.',
+      'Tiendanube usa CSV importado; compará las fechas antes de concluir que una publicación falta.'],
     reminder:'Ni las coincidencias ni los borradores confirman una publicación o modifican los canales.'
   };
   return {
