@@ -4,7 +4,7 @@ import {KikiIcon} from '../components/KikiIcon';
 import '../client-ux.css';
 import {api} from '../services/api';
 import type {MercadoLibreStatus} from '../types/catalog';
-import type {EcommApiCatalog,EcommApiCatalogRow,EcommAppLookup,EcommMlPreview,EcommMlPreviewStatus,EcommStageStatus} from '../types/ecomm-app';
+import type {EcommApiCatalog,EcommMlPreview,EcommMlPreviewStatus,EcommStageStatus} from '../types/ecomm-app';
 import '../pilot.css';
 
 type TnReport=Awaited<ReturnType<typeof api.tiendanubeReport>>;
@@ -29,10 +29,7 @@ export function Pilot(){
   const [page,setPage]=useState(1);
   const [catalogBusy,setCatalogBusy]=useState(false);
   const [catalogError,setCatalogError]=useState('');
-  const [live,setLive]=useState<EcommAppLookup|null>(null);
-  const [selected,setSelected]=useState<EcommApiCatalogRow|null>(null);
-  const [liveBusy,setLiveBusy]=useState(false);
-  const [liveError,setLiveError]=useState('');
+  const [autoStatus,setAutoStatus]=useState<Awaited<ReturnType<typeof api.ecommAutoStatus>>|null>(null);
   const [preview,setPreview]=useState<EcommMlPreview|null>(null);
   const [previewBusy,setPreviewBusy]=useState(false);
   const [previewError,setPreviewError]=useState('');
@@ -46,14 +43,16 @@ export function Pilot(){
       api.ecommApiCatalog(activeQuery,page),
       api.mlStatus(),
       api.tiendanubeReport(),
+      api.ecommAutoStatus(),
     ] as const);
-    const [stageResponse,catalogResponse,mlResponse,tnResponse]=responses;
+    const [stageResponse,catalogResponse,mlResponse,tnResponse,autoResponse]=responses;
+    setAutoStatus(autoResponse.status==='fulfilled'?autoResponse.value:null);
     setStage(stageResponse.status==='fulfilled'?stageResponse.value:null);
     setCatalog(catalogResponse.status==='fulfilled'?catalogResponse.value:null);
     setMl(mlResponse.status==='fulfilled'?mlResponse.value:null);
     setTn(tnResponse.status==='fulfilled'?tnResponse.value:null);
     setErrors(responses.flatMap((r,i)=>r.status==='rejected'?
-      [(['Copia API Ecomm','Catálogo API Ecomm','Mercado Libre','Tiendanube'][i])+': '+errorMessage(r.reason)]:[]));
+      [(['Copia API Ecomm','Catálogo API Ecomm','Mercado Libre','Tiendanube','Sincronización automática'][i])+': '+errorMessage(r.reason)]:[]));
     setLoading(false);
   }
   useEffect(()=>{void refresh()},[]);
@@ -81,8 +80,6 @@ export function Pilot(){
   async function search(q:string,nextPage:number){
     setCatalogBusy(true);
     setCatalogError('');
-    setLive(null);
-    setSelected(null);
     try{
       const result=await api.ecommApiCatalog(q,nextPage);
       setCatalog(result);
@@ -96,13 +93,6 @@ export function Pilot(){
   function submit(event:FormEvent){
     event.preventDefault();
     void search(searchInput.trim(),1);
-  }
-  async function checkSku(row:EcommApiCatalogRow){
-    if(!row.sku)return;
-    setLiveBusy(true);setLive(null);setLiveError('');setSelected(row);
-    try{setLive(await api.ecommAppLookup([row.sku]));}
-    catch(e){setLiveError(errorMessage(e));}
-    finally{setLiveBusy(false)}
   }
   async function runPreview(){
     setPreviewBusy(true);setPreview(null);setPreviewError('');setShowPreviewExamples(false);
@@ -126,9 +116,6 @@ export function Pilot(){
     NO_ML_SKU:'Publicación simple sin SKU',
   };
   const reportStatuses=Object.keys(reportStatusLabels) as EcommMlPreviewStatus[];
-  const result=live?.sku_diagnosis?.requested?.[0];
-  const exact=result?.status==='EXACT_SINGLE' && result.matches.length===1;
-  const verified=exact && String(result.matches[0]?.variant_id)===selected?.ecomm_id;
   const more=catalog?catalog.page*catalog.page_size<catalog.total_matches:false;
 
   return <div className="kiki-pilot">
@@ -140,9 +127,23 @@ export function Pilot(){
           No se leen productos del Excel histórico, no se mezclan identidades y no se publica nada.</p>
       </div>
       <button type="button" className="kiki-refresh" onClick={()=>void refresh()} disabled={loading}>
-        {loading?'Consultando…':'↻ Verificar fuentes'}
+        {loading?'Actualizando vista…':'↻ Actualizar vista'}
       </button>
     </header>
+
+    <section className="kiki-pilot-auto-status" role="status" aria-label="Estado de la actualización automática">
+      <KikiIcon name="refresh" size={19}/>
+      <div><strong>{autoStatus?.configured?'Actualización automática por API configurada':'Actualización automática pendiente de configurar'}</strong>
+        <p>Última captura completa: {dateLabel(autoStatus?.last_successful_capture_at||stage?.last_page_at)}.
+          {autoStatus?.refresh_in_progress?' Nueva captura en curso; se conserva la última copia válida.':
+            autoStatus?.configured?' Frecuencia programada: dos veces por día.':
+              ' Falta configurar la misma credencial de automatización en Render y GitHub Actions.'}
+          {autoStatus?.last_successful_capture_at &&
+          (Date.now()-new Date(autoStatus.last_successful_capture_at).getTime())>24*60*60*1000
+            ?' Atención: la captura tiene más de 24 horas.':''}
+          {' '}Los datos son una captura API, no stock en tiempo real.</p>
+      </div>
+    </section>
 
     <nav className="kiki-pilot-jump" aria-label="Ir a un área del centro API">
       <a href="#fuentes"><KikiIcon name="shield"/>Ver fuentes</a>
@@ -205,7 +206,7 @@ export function Pilot(){
         <label htmlFor="api-sku-query">SKU, ID o producto</label>
         <input id="api-sku-query" value={searchInput} onChange={e=>setSearchInput(e.target.value)}
           maxLength={80} placeholder="Ej.: 2500400" />
-        <button type="submit" disabled={catalogBusy||loading}>{catalogBusy?'Buscando…':'Buscar en API'}</button>
+        <button type="submit" disabled={catalogBusy||loading}>{catalogBusy?'Buscando…':'Buscar productos'}</button>
       </form>
       {catalogError&&<p className="kiki-pilot-warning" role="alert">{catalogError}</p>}
       {catalog&&<>
@@ -221,9 +222,7 @@ export function Pilot(){
               <td>{row.is_combo===null?'Sin dato':row.is_combo?'Sí':'No'}</td>
               <td>{fmt(row.gtin)}</td>
               <td>{fmt(row.stock_at_capture)}</td>
-              <td><Link to={'/workspace?id='+encodeURIComponent(row.ecomm_id||'')} className="kiki-case-internal-link">Mejorar ficha</Link>
-                <button type="button" disabled={!row.sku||liveBusy}
-                onClick={()=>void checkSku(row)}>Consultar API</button></td>
+              <td><Link to={'/workspace?id='+encodeURIComponent(row.ecomm_id||'')} className="kiki-case-internal-link">Mejorar ficha</Link></td>
             </tr>)}</tbody>
           </table>
         </div>
@@ -233,17 +232,7 @@ export function Pilot(){
           <button type="button" disabled={catalogBusy||!more} onClick={()=>void search(activeQuery,catalog.page+1)}>Siguiente →</button>
         </div>
       </>}
-      {liveBusy&&<p>Consultando el SKU directamente en Ecomm-App…</p>}
-      {liveError&&<p className="kiki-pilot-warning" role="alert">La consulta directa falló: {liveError}</p>}
-      {selected&&live&&<div className="kiki-api-live-result" role="status">
-        <h3>Resultado de Ecomm-App para SKU {fmt(selected.sku)}</h3>
-        <p>Estado: <strong>{result?.status||'Sin respuesta identificable'}</strong>.
-          ID esperado: {fmt(selected.ecomm_id)}.
-          {verified?' La API devolvió una coincidencia exacta con el mismo ID.':
-            ' No está verificada la correspondencia exacta de SKU e ID; no aplicar cambios.'}</p>
-        {verified&&<p>Stock informado ahora por Ecomm-App: <strong>{fmt(result?.matches[0]?.total_stock)}</strong>.
-          Es una lectura puntual; no actualiza stock de KIKI ni de los canales.</p>}
-      </div>}
+
     </section>
 
     <section className="kiki-pilot-steps" id="comparacion">
