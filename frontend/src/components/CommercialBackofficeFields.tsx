@@ -23,6 +23,7 @@ type Props={
   fields:EcommEditableFields;
   onChange:<K extends keyof EcommEditableFields>(field:K,value:EcommEditableFields[K])=>void;
   readiness:KikiReadiness;
+  categories:{name:string;count:number;subcategories:{name:string;count:number}[]}[];
 };
 
 const fieldNames:Record<string,string>={
@@ -34,7 +35,7 @@ const fieldNames:Record<string,string>={
   seo_title:'Título SEO',seo_description:'Metadescripción SEO',
   seo_keywords:'Palabras clave',
 };
-export function CommercialBackofficeFields({fields,onChange,readiness}:Props){
+export function CommercialBackofficeFields({fields,onChange,readiness,categories}:Props){
   const editAttribute=(idx:number,key:keyof KikiAttribute,value:string)=>{
     onChange('attributes',fields.attributes.map((a,i)=>i===idx?{...a,[key]:value}:a));
   };
@@ -101,10 +102,10 @@ export function CommercialBackofficeFields({fields,onChange,readiness}:Props){
         <p>Organización interna maestra. Las categorías específicas de cada canal se mapearán al publicar.</p></div></div>
       <div className="kiki-commercial-grid">
         <label>Categoría principal
-          <input maxLength={160} placeholder="Ej.: Alimentos y bebidas" value={fields.category}
+          <input maxLength={160} list="kiki-category-options" placeholder="Ej.: Alimentos y bebidas" value={fields.category}
             onChange={e=>onChange('category',e.target.value)}/></label>
         <label>Subcategoría
-          <input maxLength={160} placeholder="Ej.: Aderezos y salsas" value={fields.subcategory}
+          <input maxLength={160} list="kiki-subcategory-options" placeholder="Ej.: Aderezos y salsas" value={fields.subcategory}
             onChange={e=>onChange('subcategory',e.target.value)}/></label>
         <label className="wide">Título SEO
           <input maxLength={180} placeholder="Búsqueda natural + producto + presentación verificada"
@@ -116,6 +117,11 @@ export function CommercialBackofficeFields({fields,onChange,readiness}:Props){
           <input maxLength={1000} placeholder="Separá términos con comas, sin repetir palabras"
             value={fields.seo_keywords} onChange={e=>onChange('seo_keywords',e.target.value)}/></label>
       </div>
+      <datalist id="kiki-category-options">{categories.map(cat=><option key={cat.name} value={cat.name}/>)}</datalist>
+      <datalist id="kiki-subcategory-options">{categories
+        .filter(cat=>cat.name.toLocaleLowerCase()===fields.category.toLocaleLowerCase())
+        .flatMap(cat=>cat.subcategories).map(sub=><option key={sub.name} value={sub.name}/>)}</datalist>
+      <p className="kiki-commercial-hint">Se sugieren categorías que ya existen en KIKI para mantener nombres consistentes. Podés crear una nueva escribiéndola.</p>
     </section>
 
     <section className="kiki-commercial-section">
