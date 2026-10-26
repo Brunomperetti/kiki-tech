@@ -703,3 +703,6 @@
 .tn-table-wrap table{min-width:1080px}
 .tn-table-wrap th,.tn-table-wrap td{vertical-align:top}
 .tn-table-wrap td:first-child{min-width:160px}
+
+/* Deep-linked report from Canales: leave room above the expanded panel. */
+#comparar-precios{scroll-margin-top:24px}

@@ -50,7 +50,10 @@ export function Channels(){
         <p>Contrastá productos y revisá las sugerencias de títulos y descripciones de KIKI AI.</p>
         <div className="kiki-channel-metric">{tn?.available?count(tn.summary.products):'—'} <small>productos del CSV importado</small></div>
         <div className="kiki-channel-actions">
-          <Link className="kiki-main-action" to="/tiendanube">Revisar Tiendanube <span aria-hidden="true">→</span></Link>
+          <Link className="kiki-main-action" to="/tiendanube?control=precios#comparar-precios">
+            <KikiIcon name="chart" size={16}/> Comparar precios y stock <span aria-hidden="true">→</span>
+          </Link>
+          <Link className="secondary-link" to="/tiendanube">Otras herramientas de Tiendanube</Link>
         </div>
         <small>Se trabaja sobre datos importados; no se actualiza la tienda automáticamente.</small>
       </article>
