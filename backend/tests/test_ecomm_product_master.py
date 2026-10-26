@@ -1,11 +1,12 @@
 """Full commercial product master is durable and never changes vendor catalog."""
 import copy
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.database.models import Base, CatalogSnapshot
+from app.database.models import Base, CatalogSnapshot, EcommApiProductEdit
 from app.services.ecomm_api_product_workspace_service import (
     EcommApiProductWorkspace, _canonical_fields, _readiness,
 )
@@ -187,3 +188,38 @@ def test_source_attestation_requires_specific_evidence_note():
     payload["sources"][0]["note"] = "Ok"
     with pytest.raises(ValueError, match="verificó"):
         _canonical_fields(payload)
+
+
+def test_monthly_product_review_does_not_change_commercial_fields_or_vendor_capture(engine):
+    before = snapshot()
+    with Session(engine) as db:
+        svc = EcommApiProductWorkspace(db)
+        saved = svc.save("45", master(), "READY_FOR_CHANNELS", 0)
+        assert saved["review_schedule"]["review_due"] is False
+        first_due = saved["review_schedule"]["next_review_at"]
+        # Simulate the previous documented verification occurring 31 days ago.
+        edit = db.scalar(select(EcommApiProductEdit))
+        event = dict(edit.history[0])
+        event["at"] = (datetime.now(timezone.utc)-timedelta(days=31)).isoformat()
+        edit.history = [event]
+        db.commit()
+        due = svc.get("45")
+        assert due["review_schedule"]["review_due"] is True
+        confirmed = svc.confirm_monthly_review("45", 1)
+        assert confirmed["status"] == "READY_FOR_CHANNELS"
+        assert confirmed["version"] == 2
+        assert confirmed["review_schedule"]["review_due"] is False
+        assert confirmed["review_schedule"]["next_review_at"] != first_due
+        assert confirmed["fields"] == saved["fields"]
+        assert confirmed["history"][-1]["action"] == "REVIEW_CONFIRMED"
+        assert db.scalar(select(CatalogSnapshot)).payload == before
+        with pytest.raises(ValueError, match="versión"):
+            svc.confirm_monthly_review("45", 1)
+
+
+def test_monthly_review_cannot_approve_incomplete_draft(engine):
+    with Session(engine) as db:
+        svc=EcommApiProductWorkspace(db)
+        svc.save("45", {"title": "Salsa de soja Sol"}, "DRAFT", 0)
+        with pytest.raises(ValueError,match="completa"):
+            svc.confirm_monthly_review("45", 1)
