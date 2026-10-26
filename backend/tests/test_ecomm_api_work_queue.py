@@ -32,9 +32,18 @@ def test_untouched_editorial_queue_sorted_and_read_only(tmp_path):
         assert view["mode"] == "KIKI_INTERNAL_READ_ONLY_TRIAGE"
         assert view["summary"]["total"] == 2
         assert view["summary"]["untouched"] == 2
-        assert view["summary"]["missing_brand"] == 2
-        assert view["summary"]["missing_description"] == 2
-        assert view["summary"]["missing_gtin"] == 2
+        assert view["summary"]["source_name_present"] == 2
+        assert view["summary"]["source_name_missing"] == 0
+        assert view["summary"]["missing_source_name"] == 0
+        assert view["summary"]["editorial_started"] == 0
+        assert view["summary"]["editorial_title_saved"] == 0
+        # Source API names exist, so zero products should appear as "without title".
+        assert all("missing_title" not in x["flags"] for x in view["items"])
+        assert all("missing_brand" not in x["flags"] for x in view["items"])
+        assert all("missing_description" not in x["flags"] for x in view["items"])
+        assert view["summary"]["missing_brand"] == 0
+        assert view["summary"]["missing_description"] == 0
+        assert view["summary"]["missing_gtin"] == 0
         assert view["summary"]["pack"] == 1
         assert view["items"][0]["ecomm_id"] == "102"  # pack priority before simple
         assert view["items"][0]["is_combo"]
@@ -50,6 +59,10 @@ def test_saved_draft_and_ready_status_filters_preserve_origins(tmp_path):
         workspace.save("101", payload(title="Simple confirmed"), "READY_FOR_REVIEW", 0)
         view = build_queue(db)
         assert view["summary"]["draft"] == 1
+        assert view["summary"]["editorial_started"] == 2
+        assert view["summary"]["editorial_brand_saved"] == 2
+        assert view["summary"]["editorial_title_saved"] == 2
+        assert view["summary"]["editorial_description_saved"] == 2
         assert view["summary"]["ready"] == 1
         assert view["summary"]["missing_brand"] == 0
         assert view["summary"]["missing_title"] == 0
@@ -141,7 +154,7 @@ def test_gtin_missing_from_api_is_not_treated_as_confirmed_missing_ean(tmp_path)
         assert updated["gtin_data_quality"]["gtin_found_in_capture"] == 1
         assert updated["gtin_data_quality"]["gtin_unavailable_in_capture"] == 1
         assert updated["gtin_data_quality"]["status"] == "PARTIAL_OR_COMPLETE_COVERAGE"
-        assert updated["summary"]["missing_gtin"] == 1
+        assert updated["summary"]["missing_gtin"] == 0
 
 
 def test_ai_eligible_filter_returns_only_simple_unique_api_variants(tmp_path):
@@ -182,3 +195,49 @@ def test_ai_eligible_rejects_identity_ambiguous_and_sku_drift(tmp_path):
         db.commit()
         assert build_queue(db, filter_name="ai_eligible")["total"] == 0
         assert build_queue(db)["summary"]["identity"] == 2
+
+
+def test_started_editorial_gaps_do_not_count_untouched_api_products(tmp_path):
+    engine=db_fixture(tmp_path)
+    with Session(engine) as db:
+        editor=EcommApiProductWorkspace(db)
+        editor.save("101", {"note": "Falta revisar marca y textos."}, "DRAFT", 0)
+        view=build_queue(db)
+        assert view["summary"]["total"] == 2
+        assert view["summary"]["untouched"] == 1
+        assert view["summary"]["editorial_started"] == 1
+        assert view["summary"]["missing_brand"] == 1
+        assert view["summary"]["missing_title"] == 1
+        assert view["summary"]["missing_description"] == 1
+        assert view["summary"]["missing_gtin"] == 1
+        assert view["summary"]["source_name_present"] == 2
+        assert view["summary"]["missing_source_name"] == 0
+        matched=build_queue(db,filter_name="missing_title")
+        assert matched["total"] == 1
+        assert matched["items"][0]["ecomm_id"] == "101"
+        assert matched["items"][0]["product_name"].startswith("Magnesio")
+        untouched=build_queue(db,filter_name="untouched")
+        assert untouched["total"] == 1
+        assert untouched["items"][0]["ecomm_id"] == "102"
+
+
+def test_missing_source_name_is_real_gap_not_missing_optimized_title(tmp_path):
+    engine=db_fixture(tmp_path)
+    with Session(engine) as db:
+        stage=db.scalar(select(CatalogSnapshot).where(
+            CatalogSnapshot.source=="ECOMM_APP_API_STAGE"))
+        changed=deepcopy(stage.payload)
+        changed[0]["items"][0]["description"]=""
+        stage.payload=changed
+        db.commit()
+        view=build_queue(db)
+        assert view["summary"]["source_name_present"] == 1
+        assert view["summary"]["source_name_missing"] == 1
+        assert view["summary"]["missing_source_name"] == 1
+        row=build_queue(db,filter_name="missing_source_name")["items"][0]
+        assert row["ecomm_id"] == "101"
+        assert row["priority"] == 1
+        assert "verificar" in row["reason"]
+        # No trustworthy name means no automated AI proposal.
+        assert build_queue(db,filter_name="ai_eligible")["total"] == 0
+        assert view["summary"]["missing_title"] == 0
