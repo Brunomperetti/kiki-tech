@@ -245,6 +245,10 @@ export const api = {
     }>('/api/ecomm-app/workspace/master-export?status='+encodeURIComponent(status)),
   ecommSavedEdits: (q='',status='',page=1,limit=25) =>
     request<EcommSavedEdits>(`/api/ecomm-app/workspace/saved?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`),
+  ecommConfirmMonthlyReview: (id:string,expectedVersion:number) =>
+    request<EcommApiProductEdit>('/api/ecomm-app/workspace/'+encodeURIComponent(id)+'/confirm-review',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expected_version:expectedVersion}),
+    }),
   ecommGetEdit: (id:string) =>
     request<EcommApiProductEdit>('/api/ecomm-app/workspace/'+encodeURIComponent(id)),
   ecommBrandHints: (id:string) =>
