@@ -79,7 +79,12 @@ def _canonical_fields(fields: dict) -> dict:
                 if not isinstance(item, str) or len(item.strip()) > limit:
                     raise ValueError("Campo no válido de " + key + ": " + name)
                 row[name] = item.strip()
-            if not any(row.values()):
+            if (
+                (key == "media" and not row["url"] and not row["alt"] and not row["source_url"])
+                or (key == "sources" and not row["name"] and not row["url"] and not row["note"])
+                or (key == "attributes" and not any(row.values()))
+            ):
+                # An untouched newly-added editor row is not a saved resource.
                 continue
             if key == "attributes" and not (row["name"] and row["value"]):
                 raise ValueError("Cada característica necesita nombre y valor.")
