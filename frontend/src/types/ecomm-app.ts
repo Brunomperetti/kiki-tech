@@ -640,9 +640,21 @@ export interface EcommMlCases {
   warning:string;
 }
 
-export type EcommEditStatus = 'DRAFT' | 'READY_FOR_REVIEW';
+export type EcommEditStatus = 'DRAFT' | 'READY_FOR_REVIEW' | 'READY_FOR_CHANNELS';
+export type KikiSourceKind = 'FABRICANTE'|'ETIQUETA'|'DISTRIBUIDOR'|'OTRO';
+export interface KikiAttribute {name:string;value:string}
+export interface KikiMedia {kind:'IMAGE'|'VIDEO';url:string;alt:string;source_url:string}
+export interface KikiSource {kind:KikiSourceKind;name:string;url:string;note:string}
 export interface EcommEditableFields {
-  brand:string; title:string; description:string; proposed_gtin:string; note:string;
+  brand:string;manufacturer:string;title:string;short_title:string;
+  short_description:string;description:string;details:string;
+  presentation:string;category:string;subcategory:string;
+  seo_title:string;seo_description:string;seo_keywords:string;
+  proposed_gtin:string;note:string;
+  attributes:KikiAttribute[];media:KikiMedia[];sources:KikiSource[];
+}
+export interface KikiReadiness {
+  missing:string[];ready:boolean;completed:number;total:number;percent:number;policy:string;
 }
 export interface EcommApiProductEdit {
   available:boolean;
@@ -656,9 +668,10 @@ export interface EcommApiProductEdit {
   status:EcommEditStatus|'NOT_STARTED';
   version:number;
   fields:EcommEditableFields;
+  readiness:KikiReadiness;
   history:{
     at:string; version:number; previous_status:string; new_status:string;
-    changes:Record<string,{before:string;after:string}>;
+    changes:Record<string,{before:unknown;after:unknown}>;
     source:string;external_writes:false;
   }[];
   created_at:string|null;
@@ -668,9 +681,10 @@ export interface EcommApiProductEdit {
 }
 export interface EcommSavedEdits {
   total:number; page:number;limit:number;
-  summary:{total_saved:number;drafts:number;ready_for_review:number};
+  summary:{total_saved:number;drafts:number;ready_for_review:number;ready_for_channels:number};
   items:{ecomm_id:string;sku:string;product_name:string|null;
-    title:string;brand:string;status:EcommEditStatus;version:number;updated_at:string}[];
+    title:string;brand:string;category:string;subcategory:string;
+    status:EcommEditStatus;version:number;updated_at:string}[];
   saved_in:'KIKI_POSTGRESQL_INTERNAL_ONLY';
   external_writes_enabled:false;
 }
