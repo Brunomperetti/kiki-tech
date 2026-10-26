@@ -36,6 +36,7 @@ class CommercialSource(BaseModel):
     name: str = Field(max_length=180)
     url: str = Field(default="", max_length=1000)
     note: str = Field(default="", max_length=500)
+    verified: bool = False
 
 
 class EditableFields(BaseModel):
