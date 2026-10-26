@@ -732,7 +732,8 @@ export interface EcommApiBrandHints {
 
 export type EcommQueueFilter =
   'all'|'ai_eligible'|'identity'|'draft'|'ready'|'untouched'|'pack'|
-  'missing_title'|'missing_brand'|'missing_description'|'missing_gtin';
+  'missing_title'|'missing_brand'|'missing_description'|'missing_gtin'|
+  'ready_for_channels'|'needs_completion';
 export interface EcommQueueRow {
   ecomm_id:string;
   sku:string;
@@ -741,7 +742,7 @@ export interface EcommQueueRow {
   gtin_source_state:'AVAILABLE_IN_API_CAPTURE'|'NOT_AVAILABLE_IN_API_CAPTURE';
   is_combo:boolean;
   captured_at:string|null;
-  status:'NOT_STARTED'|'DRAFT'|'READY_FOR_REVIEW';
+  status:'NOT_STARTED'|'DRAFT'|'READY_FOR_REVIEW'|'READY_FOR_CHANNELS';
   edit_version:number;
   proposed_brand:string;
   proposed_title:string;
