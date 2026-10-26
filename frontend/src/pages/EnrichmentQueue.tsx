@@ -29,6 +29,7 @@ const reason=(flag:EcommQueueFilter)=>({
   ml_no_exact:'Sin SKU exacto en copia ML',tn_no_exact:'Sin SKU exacto en copia TN',
   both_candidates:'Candidatos en ambos canales',
   channel_review:'Conflictos de canales para verificar',
+  neither_sku_in_snapshots:'Sin SKU exacto en ambas copias',
   missing_source_name:'Nombre ausente en API',
   missing_title:'Fichas iniciadas sin título comercial',
   missing_brand:'Fichas iniciadas sin marca confirmada',
@@ -36,7 +37,10 @@ const reason=(flag:EcommQueueFilter)=>({
   missing_gtin:'Fichas iniciadas: GTIN sin documentar',
 }[flag]);
 const mainFilters:EcommQueueFilter[]=[
-  'all','channel_review','ml_candidate','tn_candidate','both_candidates',
+  'all','channel_review','both_candidates','neither_sku_in_snapshots',
+  'ml_candidate','tn_candidate',
+];
+const secondaryFilters:EcommQueueFilter[]=[
   'ml_no_exact','tn_no_exact','identity','draft','ready','ready_for_channels',
   'review_due','untouched','ai_eligible','pack',
 ];
@@ -309,6 +313,16 @@ export function EnrichmentQueue(){
           {reason(f)}<b>{fmt(f==='all'?summary?.total:summary?.[f])}</b>
         </button>)}
       </div>
+      <details className="kiki-queue-editorial-filters" open={secondaryFilters.includes(filter)}>
+        <summary>Más filtros: estados de KIKI y revisión por canal</summary>
+        <div className="kiki-queue-chips">
+          {secondaryFilters.map(f=><button type="button" key={f}
+            className={'kiki-queue-chip '+(filter===f?'active':'')}
+            aria-pressed={filter===f} onClick={()=>changeFilter(f)}>
+            {reason(f)}<b>{fmt(summary?.[f])}</b>
+          </button>)}
+        </div>
+      </details>
       <details className="kiki-queue-editorial-filters" open={startedEditFilters.includes(filter)}>
         <summary>Ver controles editoriales de fichas ya iniciadas</summary>
         <p>Estos contadores solo consideran productos que alguien empezó a editar
