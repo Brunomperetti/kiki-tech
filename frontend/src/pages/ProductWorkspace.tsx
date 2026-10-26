@@ -195,6 +195,7 @@ export function ProductWorkspace(){
       </div>
       <div className="kiki-workspace-shortcuts">
         <Link className="kiki-workspace-back" to="/queue"><KikiIcon name="chart" size={17}/> Volver a cola de mejoras</Link>
+        <Link className="kiki-workspace-back" to="/propuestas-ia"><KikiIcon name="sparkles" size={17}/> Propuestas IA guardadas</Link>
         <Link className="kiki-workspace-back" to="/guia"><KikiIcon name="help" size={17}/> Cómo guardar</Link>
         </div>
     </header>
