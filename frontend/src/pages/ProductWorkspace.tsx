@@ -2,11 +2,17 @@ import {FormEvent,useEffect,useState} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {api} from '../services/api';
 import {KikiIcon} from '../components/KikiIcon';
+import {CommercialBackofficeFields,assessCommercialReadiness} from '../components/CommercialBackofficeFields';
 import type {EcommApiCatalog,EcommApiProductEdit,EcommEditableFields,EcommEditStatus,EcommSavedEdits,EcommAiLatest,EcommAiSuggestion,EcommApiBrandHints} from '../types/ecomm-app';
 import '../workspace.css';
 
-const blank:EcommEditableFields={brand:'',title:'',description:'',proposed_gtin:'',note:''};
-const label=(status:string)=>status==='READY_FOR_REVIEW'?'Lista para revisión':status==='DRAFT'?'Borrador guardado':'Sin editar';
+const blank:EcommEditableFields={
+  brand:'',manufacturer:'',title:'',short_title:'',short_description:'',
+  description:'',details:'',presentation:'',category:'',subcategory:'',
+  seo_title:'',seo_description:'',seo_keywords:'',proposed_gtin:'',note:'',
+  attributes:[],media:[],sources:[],
+};
+const label=(status:string)=>status==='READY_FOR_CHANNELS'?'Lista para canales (interno)':status==='READY_FOR_REVIEW'?'Lista para revisión':status==='DRAFT'?'Borrador guardado':'Sin editar';
 const fail=(e:unknown)=>e instanceof Error?e.message:'No se pudo completar la consulta.';
 const date=(v:string|null)=>v?new Date(v).toLocaleString('es-AR'):'Sin fecha';
 const text=(v:string|null|number|undefined)=>v===null||v===undefined||v===''?'No informado':String(v);
@@ -27,8 +33,6 @@ export function ProductWorkspace(){
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
   const [showHistory,setShowHistory]=useState(false);
-  const [liveCheck,setLiveCheck]=useState('');
-  const [checkingLive,setCheckingLive]=useState(false);
   const [filterSaved,setFilterSaved]=useState(false);
   const [savedQuery,setSavedQuery]=useState('');
   const [savedSearch,setSavedSearch]=useState('');
@@ -77,13 +81,13 @@ export function ProductWorkspace(){
     return ()=>{active=false};
   },[targetId]);
   useEffect(()=>{
-    if(!targetId){setEdit(null);setFields({...blank});setMessage('');setLiveCheck('');return}
-    let active=true;setLoadingEdit(true);setMessage('');setError('');setLiveCheck('');
+    if(!targetId){setEdit(null);setFields({...blank});setMessage('');return}
+    let active=true;setLoadingEdit(true);setMessage('');setError('');
     api.ecommGetEdit(targetId).then(data=>{
       if(!active)return;
       setEdit(data);
       setFields({...blank,...data.fields});
-      setStatus(data.status==='READY_FOR_REVIEW'?'READY_FOR_REVIEW':'DRAFT');
+      setStatus(data.status==='READY_FOR_REVIEW'?'READY_FOR_REVIEW':data.status==='READY_FOR_CHANNELS'?'READY_FOR_CHANNELS':'DRAFT');
       setShowHistory(false);
     }).catch(e=>{if(active){setEdit(null);setError(fail(e))}})
       .finally(()=>{if(active)setLoadingEdit(false)});
@@ -104,7 +108,7 @@ export function ProductWorkspace(){
     setSaving(true);setError('');setMessage('');
     try{
       const next=await api.ecommSaveEdit(edit.ecomm_id,fields,nextStatus,edit.version);
-      setEdit(next);setFields({...blank,...next.fields});setStatus(next.status==='READY_FOR_REVIEW'?'READY_FOR_REVIEW':'DRAFT');
+      setEdit(next);setFields({...blank,...next.fields});setStatus(next.status==='READY_FOR_REVIEW'?'READY_FOR_REVIEW':next.status==='READY_FOR_CHANNELS'?'READY_FOR_CHANNELS':'DRAFT');
       setMessage('Guardado en KIKI Tech. La ficha permanece disponible cuando vuelvas a entrar.');
       await loadSaved();
       const updatedAi=await api.ecommAiLatest(next.ecomm_id).catch(()=>null);
@@ -142,22 +146,6 @@ export function ProductWorkspace(){
     setAiMessage('Sugerencia colocada en el formulario. Revisala y presioná Guardar borrador para conservarla en KIKI.');
     setMessage('');
   }
-  async function verifyLive(){
-    if(!edit?.source.sku)return;
-    setCheckingLive(true);setLiveCheck('');
-    try{
-      const answer=await api.ecommAppLookup([edit.source.sku]);
-      const response=answer.sku_diagnosis.requested[0];
-      if(response?.status==='EXACT_SINGLE'&&response.matches.length===1
-        &&String(response.matches[0].variant_id)===edit.ecomm_id){
-        setLiveCheck('Ecomm-App confirma el SKU y el mismo ID de variante. Stock informado: '+
-          text(response.matches[0].total_stock)+'. Esta consulta no actualiza otros sistemas.');
-      }else{
-        setLiveCheck('La API no confirmó el mismo SKU e ID único. Revisá la identidad antes de aplicar propuestas.');
-      }
-    }catch(e){setLiveCheck('No fue posible verificar en vivo: '+fail(e));}
-    finally{setCheckingLive(false)}
-  }
   const dirty=!!edit&&(JSON.stringify({...blank,...edit.fields})!==JSON.stringify(fields)
     || (edit.status!=='NOT_STARTED'&&status!==edit.status));
   useEffect(()=>{
@@ -189,9 +177,9 @@ export function ProductWorkspace(){
     <header className="kiki-home-header">
       <div>
         <p className="eyebrow">KIKI TECH · TRABAJO DIARIO</p>
-        <h1>Mejorar productos</h1>
-        <p>Buscá productos de la API Ecomm-App, completá sus datos comerciales y guardá las mejoras
-          en KIKI Tech. Los cambios quedan registrados con historial y no modifican las tiendas.</p>
+        <h1>Backoffice comercial de productos</h1>
+        <p>Armá fichas comerciales completas, categorías, SEO, fotografías, videos y fuentes verificables.
+          Todo queda guardado en KIKI con historial para preparar futuras publicaciones masivas.</p>
       </div>
       <div className="kiki-workspace-shortcuts">
         <Link className="kiki-workspace-back" to="/queue"><KikiIcon name="chart" size={17}/> Volver a cola de mejoras</Link>
@@ -201,7 +189,7 @@ export function ProductWorkspace(){
     </header>
 
     <div className="kiki-workspace-policy" role="note"><KikiIcon name="shield" size={20}/>
-      <span><strong>Las ediciones se guardan en PostgreSQL de KIKI.</strong>
+      <span><strong>Todo el contenido editado se conserva en PostgreSQL de KIKI.</strong>
         Ecomm-App aporta la identidad del producto por API de lectura.
         Mercado Libre, Tiendanube y el stock no se modifican automáticamente.</span>
     </div>
@@ -211,6 +199,7 @@ export function ProductWorkspace(){
       <div><strong>{saved?.summary.total_saved.toLocaleString('es-AR')??'—'}</strong><span>Fichas guardadas</span></div>
       <div><strong>{saved?.summary.drafts.toLocaleString('es-AR')??'—'}</strong><span>Borradores</span></div>
       <div><strong>{saved?.summary.ready_for_review.toLocaleString('es-AR')??'—'}</strong><span>Preparadas para revisión</span></div>
+      <div><strong>{saved?.summary.ready_for_channels.toLocaleString('es-AR')??'—'}</strong><span>Listas para canales (internas)</span></div>
     </div>
     <div className="kiki-workspace-grid">
       <section className="kiki-workspace-directory">
@@ -269,6 +258,7 @@ export function ProductWorkspace(){
               <option value="">Todos los estados</option>
               <option value="DRAFT">Borradores</option>
               <option value="READY_FOR_REVIEW">Listas para revisión interna</option>
+              <option value="READY_FOR_CHANNELS">Listas para canales</option>
             </select>
           </label>
           {savedLoading&&<p className="kiki-workspace-small" role="status">Cargando fichas guardadas…</p>}
@@ -302,15 +292,11 @@ export function ProductWorkspace(){
             <h2>{edit.source.product_name}</h2>
             <div className="kiki-workspace-badges"><span>ID Ecomm: {edit.ecomm_id}</span>
               <span>SKU: {edit.source.sku}</span><span>{edit.source.is_combo?'Combo / pack':'Producto / variante'}</span></div>
+            <p className="kiki-workspace-small">Completá el contenido abajo. Para registrar una fuente oficial, abrí «Fuentes y control editorial».</p>
           </div>
           <div className="kiki-workspace-source"><strong><KikiIcon name="link" size={15}/> Referencia Ecomm-App API (sin modificar)</strong>
-            <p>GTIN original: {text(edit.source.gtin)} · Stock capturado: {text(edit.source.stock_at_capture)}
-              · Captura: {date(edit.source.captured_at)}</p>
-            <button className="kiki-workspace-live" type="button" disabled={checkingLive}
-              onClick={()=>void verifyLive()}>
-              <KikiIcon name="refresh" size={15}/>{checkingLive?'Verificando…':'Verificar este SKU en Ecomm-App ahora'}
-            </button>
-            {liveCheck&&<p role="status">{liveCheck}</p>}
+            <p>GTIN original: {text(edit.source.gtin)} · Stock de referencia: {text(edit.source.stock_at_capture)}
+              · Captura API: {date(edit.source.captured_at)}. La actualización periódica no modifica las fichas comerciales.</p>
           </div>
           {edit.source_sku_changed&&<p className="kiki-workspace-alert" role="alert">
             Este ID tenía otro SKU cuando guardaron la ficha. Para evitar aplicar cambios al producto equivocado,
@@ -411,34 +397,20 @@ export function ProductWorkspace(){
                 aprueba ni publica el producto. No propone GTIN ni composición de combos.</p>
             </div>}
           </section>
-          <div className="kiki-workspace-form">
-            <label>Marca comercial
-              <input value={fields.brand} onChange={e=>change('brand',e.target.value)} maxLength={120}
-                placeholder="Ej.: Vitamin Way"/></label>
-            <label>Título mejorado para el catálogo
-              <input value={fields.title} onChange={e=>change('title',e.target.value)} maxLength={180}
-                placeholder="Título claro con marca, producto y presentación"/></label>
-            <label>Descripción comercial
-              <textarea value={fields.description} onChange={e=>change('description',e.target.value)}
-                maxLength={3000} rows={5} placeholder="Redactá la descripción verificada del producto"/></label>
-            <label>GTIN propuesto (opcional)
-              <input value={fields.proposed_gtin} onChange={e=>change('proposed_gtin',e.target.value)}
-                maxLength={14} inputMode="numeric" placeholder="8, 12, 13 o 14 dígitos"/></label>
-            <p className="kiki-workspace-small">El GTIN es una propuesta interna, no reemplaza el código original de la API.
-              Se valida el dígito verificador al guardar y se debe contrastar con el envase.</p>
-            <label>Observaciones y evidencia
-              <textarea value={fields.note} onChange={e=>change('note',e.target.value)}
-                maxLength={1200} rows={3} placeholder="Qué revisaron, de dónde salió la información o qué falta confirmar"/></label>
-          </div>
+          <CommercialBackofficeFields fields={fields} onChange={change}
+            readiness={assessCommercialReadiness(fields)}/>
           <div className="kiki-workspace-footer">
             <div><strong>Estado: {label(edit.status)}</strong><small>
               {edit.available?'Última edición: '+date(edit.updated_at):'Primera edición · todavía no guardada'}
             </small></div>
             <button type="button" disabled={saving||edit.source_sku_changed} onClick={()=>void persist('DRAFT')}>
               {saving?'Guardando…':'Guardar borrador'}</button>
-            <button type="button" disabled={saving||edit.source_sku_changed} className="primary"
+            <button type="button" disabled={saving||edit.source_sku_changed}
               onClick={()=>void persist('READY_FOR_REVIEW')}>
               {saving?'Guardando…':'Enviar a revisión interna'}</button>
+            <button type="button" disabled={saving||edit.source_sku_changed||!assessCommercialReadiness(fields).ready}
+              className="primary" onClick={()=>void persist('READY_FOR_CHANNELS')}>
+              {saving?'Guardando…':'Dejar lista para canales'}</button>
           </div>
           {dirty&&<p role="status" className="kiki-workspace-unsaved">
             <KikiIcon name="alert" size={16}/> Tenés cambios sin guardar.
