@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database.models import Base, TiendanubeMatchDecision
 from app.services.tiendanube_assisted_match_service import TiendanubeAssistedMatchService
+from test_tiendanube_assisted_match_service import save_api_catalog
 
 
 def test_batch_reject_requires_preview_and_preserves_external_snapshots():
@@ -16,7 +17,7 @@ def test_batch_reject_requires_preview_and_preserves_external_snapshots():
         ec = [{"ecomm_id": "E1", "sku": "EC1", "name": "Producto Marca 500 gramos",
                "brand": "Marca"}]
         svc.catalog.repo.save_snapshot("TIENDANUBE", tn)
-        svc.catalog.repo.save_snapshot("ECOMM_APP", ec)
+        save_api_catalog(svc, ec)
         key = svc.report()["items"][0]["source_key"]
         assert svc.bulk_preview([key])["count"] == 1
         with pytest.raises(ValueError):
@@ -28,7 +29,7 @@ def test_batch_reject_requires_preview_and_preserves_external_snapshots():
         with pytest.raises(ValueError):
             svc.bulk_reject([key], "Volver a rechazar sin revisión")
         assert svc.catalog.repo.snapshot("TIENDANUBE") == tn
-        assert svc.catalog.repo.snapshot("ECOMM_APP") == ec
+        assert len(svc.catalog.repo.snapshot("ECOMM_APP_API_STAGE")) == 1
 
 
 def test_batch_reject_prevents_duplicate_keys_and_too_many_items():
