@@ -71,7 +71,8 @@ def _canonical_fields(fields: dict) -> dict:
             raise ValueError("Hay demasiados elementos en " + key + ".")
         cleaned = []
         for value in values:
-            if not isinstance(value, dict) or set(value) - set(specs[key]):
+            allowed = set(specs[key]) | ({"verified"} if key == "sources" else set())
+            if not isinstance(value, dict) or set(value) - allowed:
                 raise ValueError("Formato de " + key + " no válido.")
             row = {}
             for name, limit in specs[key].items():
@@ -79,6 +80,11 @@ def _canonical_fields(fields: dict) -> dict:
                 if not isinstance(item, str) or len(item.strip()) > limit:
                     raise ValueError("Campo no válido de " + key + ": " + name)
                 row[name] = item.strip()
+            if key == "sources":
+                checked = value.get("verified", False)
+                if not isinstance(checked, bool):
+                    raise ValueError("La comprobación documental debe ser un valor booleano.")
+                row["verified"] = checked
             if (
                 (key == "media" and not row["url"] and not row["alt"] and not row["source_url"])
                 or (key == "sources" and not row["name"] and not row["url"] and not row["note"])
@@ -102,6 +108,10 @@ def _canonical_fields(fields: dict) -> dict:
                     raise ValueError("Las fuentes web deben incluir el enlace original.")
                 if row["kind"] == "ETIQUETA" and not (row["url"] or row["note"]):
                     raise ValueError("Describí la etiqueta o agregá el enlace a su imagen.")
+                if row["verified"] and len(row["note"]) < 12:
+                    raise ValueError(
+                        "Para confirmar una fuente, detallá en la nota qué información se verificó."
+                    )
             cleaned.append(row)
         normalized[key] = cleaned
     return normalized
@@ -114,7 +124,10 @@ def _readiness(fields: dict) -> dict:
     if not any(m.get("kind") == "IMAGE" for m in fields.get("media") or []):
         missing.append("images")
     sources = fields.get("sources") or []
-    if not any(s.get("kind") in ("FABRICANTE", "ETIQUETA") for s in sources):
+    if not any(
+        s.get("kind") in ("FABRICANTE", "ETIQUETA") and s.get("verified") is True
+        for s in sources
+    ):
         missing.append("primary_source")
     if fields.get("category") and not fields.get("subcategory"):
         # Covered above but make category hierarchy explicit.
