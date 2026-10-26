@@ -87,11 +87,11 @@ const steps:JourneyStep[]=[
     directions:[
       'En Mejorar productos, seleccioná «Fichas guardadas» y filtrá por SKU, nombre o estado.',
       'En Cola de mejoras, usá «Borradores» para continuar el trabajo.',
-      'Si ya generaste IA pero todavía no guardaste la ficha, buscá de nuevo el SKU y revisá la propuesta IA antes de usarla.'
+      'Si ya generaste IA pero todavía no guardaste la ficha, abrí «Propuestas IA guardadas» y recuperala sin consumir otra solicitud.'
     ],
     check:'Puedo reabrir una ficha guardada y encontrar el texto y el historial.',
     caution:'Las propuestas IA pendientes no aparecen como «borradores» hasta que se copian, revisan y guarda la ficha.',
-    action:'Buscar fichas guardadas',to:'/workspace'
+    action:'Recuperar propuestas IA generadas',to:'/propuestas-ia'
   },
   {
     heading:'Consultá canales sin confundir estados',icon:'store',
@@ -112,6 +112,7 @@ const glossary=[
   ['Cola de mejoras','Ordenar pendientes, buscar, filtrar y seleccionar. El CSV es una lista de seguimiento, no una carga masiva.','/queue'],
   ['Mejorar productos','Cambiar datos editoriales dentro de KIKI, guardar borradores y consultar el historial.','/workspace'],
   ['KIKI AI','Proponer títulos/descripciones. Una propuesta queda almacenada, pero no modifica la ficha hasta que la revisás y guardás.','/workspace'],
+  ['Propuestas IA guardadas','Bandeja para recuperar lo generado, aunque hayas salido del lote. Entrá al editor para revisar y guardar los campos.','/propuestas-ia'],
   ['Casos para revisar','Diagnóstico entre capturas de Ecomm y Mercado Libre; no confirma vínculos ni publicaciones.','/cases'],
   ['Canales de venta','Ver fuentes de ML/Tiendanube. El CSV de TN y la copia ML no equivalen a sincronización en vivo.','/channels'],
   ['Herramientas y datos históricos','Módulos del sistema anterior basados en Excel/CSV. Mantenerlos separados del nuevo trabajo de Ecomm por API.','/']

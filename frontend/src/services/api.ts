@@ -1,7 +1,7 @@
 import type {BulkGtinNotApplicablePayload, BulkGtinNotApplicableResult, CatalogContinuityDecision, CatalogContinuityItem, CatalogContinuityReport, EnrichmentReport, EnrichmentReviewItem, EnrichmentReviewQueue, EnrichmentReviewStatus, ExternalResearchItem, ExternalResearchPayload, ExternalResearchQueue, FinalPublicationQueueItem, FinalPublicationQueueReport, ImportJob, InventoryLinkageCandidateResponse, InventoryLinkageItem, InventoryLinkageReport, MercadoLibreStatus, MetadataBatchResult, PrepublicationImageItem, PrepublicationImagePayload, PrepublicationImageQueue, PrepublicationMetadataItem, PrepublicationMetadataPayload, PrepublicationMetadataQueue, PrepublicationReport, ReadinessReport, Result, Summary} from '../types/catalog';
 import type {ReconciliationReviewDecision, ReconciliationReviewItem, ReconciliationReviewQueue} from '../types/reconciliation-review';
 import type {DuplicateReviewDecision, DuplicateReviewGroup, DuplicateReviewQueue} from '../types/duplicate-review';
-import type {EcommApiProductEdit,EcommSavedEdits,EcommEditableFields,EcommEditStatus,EcommAiSuggestion,EcommAiLatest,EcommApiBrandHints,EcommWorkQueue,EcommQueueFilter,EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommApiCatalog,EcommMlPreview,EcommMlCases,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence,EcommMlBrandEvidence} from '../types/ecomm-app';
+import type {EcommApiProductEdit,EcommSavedEdits,EcommEditableFields,EcommEditStatus,EcommAiSuggestion,EcommAiLatest,EcommAiProposalInbox,EcommAiInboxFilter,EcommApiBrandHints,EcommWorkQueue,EcommQueueFilter,EcommAppStatus,EcommAppPreview,EcommAppLookup,EcommCatalogAudit,EcommStageStatus,EcommApiCatalog,EcommMlPreview,EcommMlCases,EcommStageComparison,EcommHybridPreview,EcommLiveStockCheck,EcommCommercialAudit,EcommTnBrandEvidence,EcommMlBrandEvidence} from '../types/ecomm-app';
 
 const base = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || 'http://localhost:8000')
@@ -226,6 +226,10 @@ export const api = {
     request<EcommApiProductEdit>('/api/ecomm-app/workspace/'+encodeURIComponent(id)),
   ecommBrandHints: (id:string) =>
     request<EcommApiBrandHints>('/api/ecomm-app/workspace/brand-hints/'+encodeURIComponent(id)),
+  ecommAiProposals: (q='',saved:EcommAiInboxFilter='all',page=1,limit=25) =>
+    request<EcommAiProposalInbox>(
+      `/api/ecomm-app/workspace/ai-proposals?q=${encodeURIComponent(q)}&saved=${encodeURIComponent(saved)}&page=${page}&limit=${limit}`
+    ),
   ecommAiLatest: (id:string) =>
     request<EcommAiLatest>('/api/ecomm-app/workspace/ai/'+encodeURIComponent(id)+'/latest'),
   ecommAiSuggest: (id:string,expectedVersion:number) =>

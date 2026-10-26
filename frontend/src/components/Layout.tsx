@@ -75,6 +75,7 @@ export function Layout(){
         <NavLink to="/pilot"><span className="kiki-nav-icon"><KikiIcon name="layers"/></span>Catálogo por API</NavLink>
         <NavLink to="/workspace"><span className="kiki-nav-icon"><KikiIcon name="check"/></span>Mejorar productos</NavLink>
         <NavLink to="/queue"><span className="kiki-nav-icon"><KikiIcon name="chart"/></span>Cola de mejoras</NavLink>
+        <NavLink to="/propuestas-ia"><span className="kiki-nav-icon"><KikiIcon name="sparkles"/></span>Propuestas IA guardadas</NavLink>
         <NavLink to="/cases"><span className="kiki-nav-icon"><KikiIcon name="search"/></span>Casos para revisar</NavLink>
         <NavLink to="/channels"><span className="kiki-nav-icon"><KikiIcon name="store"/></span>Canales de venta</NavLink>
         <NavLink to="/guia"><span className="kiki-nav-icon"><KikiIcon name="help"/></span>Guía para usar KIKI</NavLink>

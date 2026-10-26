@@ -113,6 +113,12 @@ export function Dashboard(){
       <div className="kiki-client-section-title"><p className="eyebrow">EMPEZÁ POR ACÁ</p>
         <h2>¿Qué querés hacer?</h2></div>
       <div className="kiki-client-actions">
+        <Link to="/propuestas-ia" className="kiki-client-action">
+          <span className="kiki-action-icon"><KikiIcon name="sparkles" size={25}/></span>
+          <span><strong>Recuperar propuestas IA guardadas</strong>
+            <small>Encontrá los textos generados y revisá cuáles todavía no tienen una ficha comercial guardada.</small></span>
+          <KikiIcon name="arrow-right"/>
+        </Link>
         <Link to="/guia" className="kiki-client-action">
           <span className="kiki-action-icon"><KikiIcon name="help" size={25}/></span>
           <span><strong>Aprender a usar KIKI · Guía interactiva</strong>

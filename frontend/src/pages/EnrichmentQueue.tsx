@@ -251,6 +251,11 @@ export function EnrichmentQueue(){
           disabled={!selectedRows.length}><KikiIcon name="archive" size={16}/> Exportar selección CSV</button>
       </div>
       <section className="kiki-queue-ai-batch" aria-label="Piloto de IA por lotes">
+        <div className="kiki-queue-inbox-shortcut">
+          <KikiIcon name="clock" size={18}/>
+          <span>¿Ya generaste propuestas? Se conservan aunque salgas de esta página.</span>
+          <Link to="/propuestas-ia">Ver propuestas IA guardadas <KikiIcon name="arrow-right" size={15}/></Link>
+        </div>
         <div className="kiki-queue-ai-header">
           <span className="kiki-queue-ai-symbol"><KikiIcon name="sparkles" size={23}/></span>
           <div><h3>Preparar propuestas IA para varios productos</h3>
