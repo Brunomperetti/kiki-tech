@@ -45,7 +45,7 @@ def master():
                    "alt": "Etiqueta frontal", "source_url": "https://marca.example/soja"}],
         "sources": [{"kind": "FABRICANTE", "name": "Catálogo oficial Sol",
                      "url": "https://marca.example/soja",
-                     "note": "Presentación corroborada en ficha fabricante"}],
+                     "note": "Presentación corroborada en ficha fabricante", "verified": True}],
     }
 
 
@@ -169,3 +169,21 @@ def test_master_export_contains_all_fields_versions_history_and_existing_taxonom
         assert record["fields"]["media"][0]["url"].startswith("https://")
         assert len(record["history"]) == 1
         assert svc.export_master("DRAFT")["total"] == 0
+
+
+def test_unverified_source_cannot_make_product_channel_ready(engine):
+    payload = master()
+    payload["sources"][0]["verified"] = False
+    with Session(engine) as db:
+        svc = EcommApiProductWorkspace(db)
+        with pytest.raises(ValueError, match="fuentes|fuente|faltan"):
+            svc.save("45", payload, "READY_FOR_CHANNELS", 0)
+        draft = svc.save("45", payload, "DRAFT", 0)
+        assert "primary_source" in draft["readiness"]["missing"]
+
+
+def test_source_attestation_requires_specific_evidence_note():
+    payload = master()
+    payload["sources"][0]["note"] = "Ok"
+    with pytest.raises(ValueError, match="verificó"):
+        _canonical_fields(payload)
