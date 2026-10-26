@@ -1,0 +1,95 @@
+
+.kiki-guide{max-width:1320px;display:grid;gap:21px;color:#1e4531}
+.kiki-guide .kiki-home-header{align-items:center}
+.kiki-guide-home-link{display:flex;align-items:center;gap:8px;text-decoration:none;
+  padding:12px 14px;background:#fff;border-radius:10px;border:1px solid #cdded1;
+  color:#285c3f;font-weight:750;font-size:12px;white-space:nowrap}
+.kiki-guide-essential{background:#eaf6ee;border:1px solid #b2dbc2;display:flex;
+  gap:14px;align-items:flex-start;padding:18px 20px;border-radius:13px}
+.kiki-guide-essential svg{flex:none;color:#2d7650}
+.kiki-guide-essential strong{font-size:14px}
+.kiki-guide-essential p{font-size:12px;color:#557563;line-height:1.7;margin-top:7px}
+.kiki-guide-wizard,.kiki-guide-reference{border:1px solid #d8e8dd;background:#fff;
+  border-radius:16px;padding:24px;display:grid;gap:17px}
+.kiki-guide-step-heading{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.kiki-guide-step-heading .eyebrow,.kiki-guide-reference .eyebrow{font-size:10px;color:#51846a}
+.kiki-guide-step-heading h2,.kiki-guide-reference h2{font-size:22px;margin:2px 0 4px}
+.kiki-guide-step-heading p:not(.eyebrow),.kiki-guide-reference>div>p:not(.eyebrow){font-size:12px;color:#6c8575}
+.kiki-guide-step-heading>span{font-size:12px;color:#587c62;font-weight:750}
+.kiki-guide-stepper{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.kiki-guide-stepper button{display:flex;align-items:center;gap:9px;text-align:left;
+  padding:11px 12px;border:1px solid #e1eae2;border-radius:9px;
+  background:#f5f9f6;color:#41634d;font-size:11px;font-weight:650;line-height:1.45}
+.kiki-guide-stepper button span{width:23px;height:23px;flex:none;display:grid;
+  place-items:center;border-radius:50%;background:#e0ede3;color:#2c6142;font-weight:800}
+.kiki-guide-stepper button.active{background:#225b3e;border-color:#225b3e;color:#fff}
+.kiki-guide-stepper button.active span{background:#cce6d4;color:#23533b}
+.kiki-guide-current{display:grid;gap:16px;border:1px solid #d3e5d7;border-radius:13px;
+  background:#fbfdfb;padding:21px}
+.kiki-guide-current-title{display:flex;align-items:center;gap:12px}
+.kiki-guide-current-icon{display:grid;place-items:center;border-radius:10px;
+  background:#e1f2e5;color:#2b6d4a;width:45px;height:45px}
+.kiki-guide-current-title p{color:#548062;font-weight:750;font-size:10px;letter-spacing:.13em}
+.kiki-guide-current-title h3{font-size:19px;margin:3px 0 0;color:#214b35}
+.kiki-guide-intro{font-size:13px;color:#506c58;line-height:1.65}
+.kiki-guide-current ol{padding-left:23px;margin:0;display:grid;gap:10px}
+.kiki-guide-current li{font-size:13px;line-height:1.65;color:#2c4f38;padding-left:2px}
+.kiki-guide-verify,.kiki-guide-warning{display:flex;gap:10px;align-items:flex-start;
+  padding:13px 14px;border:1px solid #c5e3ce;background:#ecf8ef;border-radius:9px;color:#286f47}
+.kiki-guide-warning{background:#fff8eb;border-color:#ebd4a7;color:#936422}
+.kiki-guide-verify svg,.kiki-guide-warning svg{flex:none}
+.kiki-guide-verify strong,.kiki-guide-warning strong{font-size:12px}
+.kiki-guide-verify p,.kiki-guide-warning p{color:inherit;font-size:12px;margin-top:4px;line-height:1.55}
+.kiki-guide-step-actions{display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:11px;border-top:1px solid #deebdf;padding-top:16px}
+.kiki-guide-step-open{display:flex;align-items:center;gap:8px;padding:12px 16px;
+  background:#20583b;border-radius:9px;text-decoration:none;color:#fff;font-size:12px;font-weight:750}
+.kiki-guide-step-actions>div{display:flex;gap:8px}
+.kiki-guide-step-actions button{background:#fff;border:1px solid #b5d1bc;color:#245c3f;
+  border-radius:9px;padding:11px 14px;font-size:12px;font-weight:750}
+.kiki-guide-step-actions button:disabled{opacity:.4}
+.kiki-guide-disclaimer{font-size:10px;color:#849589}
+.kiki-guide-reference-list{display:grid;gap:8px}
+.kiki-guide-reference details{border-radius:10px;border:1px solid #deeade;background:#fafcfa;padding:13px 15px}
+.kiki-guide-reference summary{cursor:pointer;color:#284e36;font-weight:750;font-size:13px}
+.kiki-guide-reference details p{font-size:12px;color:#638070;margin:10px 0;line-height:1.6}
+.kiki-guide-reference details a{display:inline-flex;align-items:center;gap:7px;
+  color:#2d6548;text-decoration:none;font-size:12px;font-weight:750}
+.kiki-guide-finish{display:flex;gap:13px;align-items:center;border:1px solid #b9dbc2;
+  border-radius:14px;background:#ebf6eb;padding:20px}
+.kiki-guide-finish>svg{flex:none;color:#286d48}
+.kiki-guide-finish h2{font-size:16px;margin:0 0 6px}
+.kiki-guide-finish p{font-size:12px;line-height:1.6}
+.kiki-guide-finish a{margin-left:auto;display:flex;align-items:center;gap:6px;
+  color:#fff;background:#225940;padding:11px 12px;border-radius:9px;text-decoration:none;
+  font-size:11px;font-weight:750;white-space:nowrap}
+.kiki-help-button{position:fixed;right:24px;bottom:22px;z-index:35;display:flex;
+  gap:9px;align-items:center;background:#245d42;color:#fff;border:1px solid #b8d8c2;
+  box-shadow:0 8px 28px #1639272e;border-radius:35px;padding:13px 17px;font-size:13px}
+.kiki-help-popup{position:fixed;right:24px;bottom:82px;z-index:35;width:min(380px,calc(100vw - 40px));
+  background:#fff;border:1px solid #c8dfcf;border-radius:14px;
+  padding:19px;display:grid;gap:11px;box-shadow:0 14px 45px #0d332033}
+.kiki-help-popup h2{font-size:17px;margin:0;color:#245039}
+.kiki-help-popup p{font-size:12px;color:#668173;line-height:1.65}
+.kiki-help-popup ul{display:grid;gap:8px;padding-left:19px;margin:2px 0}
+.kiki-help-popup li{font-size:12px;color:#385844;line-height:1.5}
+.kiki-help-popup a{display:inline-flex;align-items:center;gap:7px;
+  background:#e6f3e9;border-radius:8px;color:#245c3d;text-decoration:none;
+  font-weight:750;font-size:12px;padding:11px}
+.kiki-help-popup header{display:flex;align-items:center;gap:8px;margin:0;justify-content:space-between}
+.kiki-help-popup header button{background:#f2f7f2;color:#27583c;border:0;
+  border-radius:8px;padding:7px;line-height:0}
+.kiki-help-popup-badge{background:#fff5e5;border-radius:8px;padding:10px;color:#7d5b2a;
+  font-size:11px;line-height:1.6}
+@media(max-width:1050px){.kiki-guide-stepper{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:690px){
+  .kiki-guide-wizard,.kiki-guide-reference{padding:14px}
+  .kiki-guide-stepper{grid-template-columns:1fr 1fr}
+  .kiki-guide-stepper button{padding:9px;font-size:10px}
+  .kiki-guide-current{padding:13px}
+  .kiki-guide-step-actions,.kiki-guide-finish{align-items:stretch;flex-direction:column}
+  .kiki-guide-step-actions>div{justify-content:space-between}
+  .kiki-guide-finish a{margin:0;justify-content:center}
+  .kiki-help-button{right:12px;bottom:12px}
+  .kiki-help-popup{right:12px;bottom:70px;width:calc(100vw - 24px)}
+}
