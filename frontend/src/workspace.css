@@ -137,3 +137,6 @@
 .kiki-workspace-ai-safety svg{flex:none;margin-top:2px}
 .kiki-workspace-ai-safety strong{display:block;margin-bottom:6px}
 .kiki-workspace-ai-safety ul{padding-left:18px;margin:0;display:grid;gap:5px}
+
+.kiki-workspace-shortcuts{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+@media(max-width:650px){.kiki-workspace-shortcuts{width:100%}}
