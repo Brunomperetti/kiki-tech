@@ -16,14 +16,14 @@ const reason=(flag:EcommQueueFilter)=>({
   missing_title:'Fichas iniciadas sin título comercial',
   missing_brand:'Fichas iniciadas sin marca confirmada',
   missing_description:'Fichas iniciadas sin descripción comercial',
-  missing_gtin:'GTIN pendiente de verificar',
+  missing_gtin:'Fichas iniciadas: GTIN sin documentar',
 }[flag]);
 const mainFilters:EcommQueueFilter[]=[
   'all','ai_eligible','identity','draft','untouched','pack','ready',
   'ready_for_channels','review_due','needs_completion','missing_source_name',
 ];
 const startedEditFilters:EcommQueueFilter[]=[
-  'missing_brand','missing_title','missing_description',
+  'missing_brand','missing_title','missing_description','missing_gtin',
 ];
 const tag=(row:EcommQueueRow)=>row.identity_issue?'Identidad a revisar':
   row.flags.includes('review_due')?'Revisión mensual pendiente':
@@ -41,7 +41,7 @@ function safeCell(value:string|number|boolean|null|undefined){
 function exportQueue(rows:EcommQueueRow[]){
   if(!rows.length)return;
   const header=['ID Ecomm API','SKU','Producto Ecomm API','Estado KIKI',
-    'Tipo','Prioridad','Motivo','Campos pendientes en KIKI','Marca propuesta',
+    'Tipo','Prioridad','Motivo','Observaciones de origen y edición','Marca propuesta',
     'Título propuesto','Última edición','Fecha de captura Ecomm API'];
   const lines=[header,...rows.map(row=>[
     row.ecomm_id,row.sku,row.product_name,row.status,row.is_combo?'Combo / pack':'Variante',
@@ -213,7 +213,7 @@ export function EnrichmentQueue(){
     {data?.gtin_data_quality.status==='NO_GTIN_EXPOSED_BY_CAPTURE'&&
       <div className="kiki-queue-quality" role="status">
         <KikiIcon name="alert" size={20}/>
-        <div><strong>Atención: la copia API no contiene GTIN para las
+        <div><strong>Cobertura de la API: no se recibieron GTIN para las
           {fmt(data.gtin_data_quality.gtin_unavailable_in_capture)} variantes.</strong>
           <p>La API utilizada no expuso códigos de barras; esto no significa que
             los productos no tengan EAN. KIKI conserva posibles códigos del Excel histórico
@@ -385,7 +385,7 @@ export function EnrichmentQueue(){
             {row.proposed_title&&<p className="kiki-queue-proposed">Título KIKI: {row.proposed_title}</p>}
             <p className="kiki-queue-explain">{row.reason}</p>
             <div className="kiki-queue-tags">
-              {row.flags.filter(f=>f!=='untouched'&&f!=='draft'&&f!=='ready'&&f!=='identity').slice(0,5)
+              {row.flags.filter(f=>f!=='untouched'&&f!=='draft'&&f!=='ready'&&f!=='identity'&&f!=='missing_gtin').slice(0,5)
                 .map(flag=><span key={flag}>{reason(flag)}</span>)}
             </div>
           </div>
