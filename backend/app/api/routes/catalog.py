@@ -21,6 +21,7 @@ from ...services.tiendanube_ai_pilot_service import TiendanubeAiPilotService
 from ...services.tiendanube_image_audit_service import TiendanubeImageAuditService
 from ...services.tiendanube_quality_audit_service import TiendanubeQualityAuditService
 from ...services.tiendanube_price_stock_service import TiendanubePriceStockService
+from ...services.tiendanube_api_catalog_service import TiendanubeApiCatalogService
 from ...services.tiendanube_assisted_match_service import TiendanubeAssistedMatchService
 from ...services.gtin_batch_pilot_service import GtinBatchPilotService
 from ...services.external_gtin_candidate_service import ExternalGtinCandidateService
@@ -311,7 +312,8 @@ def tiendanube_reconciliation(
     db: Session = Depends(get_db),
     _session=Depends(require_session),
 ):
-    return TiendanubeCsvService(db).report()
+    """TN CSV matched ONLY to completed Ecomm-App API capture."""
+    return TiendanubeApiCatalogService(db).report()
 
 
 @router.post("/imports/{source}", status_code=201)
@@ -322,8 +324,13 @@ async def import_catalog(
     _session=Depends(require_csrf),
 ):
     source = source.upper()
+    if source == "ECOMM_APP":
+        raise HTTPException(
+            410,
+            "La importación de Excel Ecomm-App está retirada. "
+            "Utilizá exclusivamente la API pública de Ecomm-App."
+        )
     if source not in {
-        "ECOMM_APP",
         "MERCADOLIBRE",
         "EDIMA_LINKAGE",
         "OFFLINE_LINKAGE_EVIDENCE",
