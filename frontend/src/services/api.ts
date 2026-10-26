@@ -217,7 +217,7 @@ export const api = {
   ecommAppCatalogAudit: (startPage:number) => request<EcommCatalogAudit>('/api/ecomm-app/catalog-audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start_page:startPage})}),
   ecommStageStatus: () => request<EcommStageStatus>('/api/ecomm-app/stage/status'),
   ecommAutoStatus: () => request<{
-    mode:'SCHEDULED_API_ONLY';
+    mode:'SCHEDULED_AND_MANUAL_API_ONLY'|'SCHEDULED_API_ONLY';
     configured:boolean;
     last_successful_capture_at:string|null;
     last_successful_pages:number;
@@ -227,9 +227,19 @@ export const api = {
     refresh_pages_saved:number;
     refresh_pages_expected:number|null;
     refresh_last_page_at:string|null;
+    refresh_job: null | {
+      origin:'MANUAL'|'SCHEDULED';
+      status:'RUNNING'|'SUCCESS'|'FAILED'|'INTERRUPTED';
+      started_at:string; heartbeat_at:string; finished_at:string|null;
+      pages_saved:number;expected_pages:number|null;
+      variants:number|null;message:string;
+    };
     external_writes_enabled:false;
     warning:string;
   }>('/api/ecomm-app/stage/auto/status'),
+  ecommManualRefreshStart: () => request<{status:'RUNNING';message:string;external_writes_enabled:false}>(
+    '/api/ecomm-app/stage/manual/start',{method:'POST'}
+  ),
   ecommWorkQueue: (filter:EcommQueueFilter='all',q='',page=1,limit=25) =>
     request<EcommWorkQueue>(
       `/api/ecomm-app/workspace/queue?filter=${encodeURIComponent(filter)}&q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`
