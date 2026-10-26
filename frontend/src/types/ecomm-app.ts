@@ -737,7 +737,7 @@ export type EcommQueueFilter =
   'missing_title'|'missing_brand'|'missing_description'|'missing_gtin'|'missing_source_name'|
   'ready_for_channels'|'needs_completion'|'review_due'|
   'ml_candidate'|'tn_candidate'|'ml_no_exact'|'tn_no_exact'|
-  'both_candidates'|'channel_review';
+  'both_candidates'|'channel_review'|'neither_sku_in_snapshots';
 export type KikiChannelEvidenceStatus =
   'UNAVAILABLE'|'AMBIGUOUS_API_SKU'|'NO_EXACT_SKU_IN_SNAPSHOT'|
   'MULTIPLE_SKU_ROWS'|'SKU_CANDIDATE'|'PACK_REVIEW'|
