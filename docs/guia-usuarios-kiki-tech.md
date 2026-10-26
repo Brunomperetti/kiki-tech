@@ -14,9 +14,18 @@ de sincronización con ML/TN.
   las indicaciones de la pantalla en uso, sin obligar a abandonar el editor.
 - Dentro de **Mejorar productos**: «Volver a cola de mejoras» y «Cómo guardar».
 
+## Primera prueba para el cliente (3 acciones)
+1. **Canales**: comprobar estado y fecha de Ecomm-App API, Mercado Libre API y Tiendanube CSV.
+2. **Cola**: filtrar candidatos en ML/TN o conflictos, revisar SKU, presentación y fuente.
+3. **Backoffice**: elegir una ficha, completar información comprobada, guardar borrador,
+   salir y regresar para corroborar historial y persistencia.
+
+La guía muestra arriba tres accesos directos para esta prueba sin gasto de IA ni escritura externa.
+La IA por lotes es opcional y no reemplaza la revisión humana.
+
 ## Recorrido de ocho etapas
 1. Entender la copia API y fechas de captura.
-2. Buscar y priorizar productos en Cola de mejoras.
+2. Buscar, interpretar cobertura por canales y priorizar productos en Cola de mejoras.
 3. Preparar la selección para IA sin consumo.
 4. Generar propuestas IA conscientemente (máx. 10 intentos/día UTC).
 5. Revisar cada campo en Mejorar productos y registrar evidencia.
@@ -54,3 +63,10 @@ El progreso visual de la guía NO representa guardados reales.
   de salir, incluso mediante los nuevos enlaces.
 - No hay llamadas a OpenAI por abrir la guía.
 - Verificar que los borradores previos permanecen inalterados.
+
+## Reglas para la entrega piloto
+- Todas las variantes pueden tener nombre de origen aunque su ficha comercial en KIKI no esté iniciada.
+- Candidatos ML/TN por SKU NO confirman publicación; faltantes en una copia NO confirman ausencia real.
+- La conexión ML requiere autorización del titular y renovación del snapshot; TN usa el CSV disponible.
+- Cada modificación editorial debe guardarse de forma explícita y verificarse después de recargar.
+- El piloto no publica ni escribe en Ecomm-App, Mercado Libre o Tiendanube.
