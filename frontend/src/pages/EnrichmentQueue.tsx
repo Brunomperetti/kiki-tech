@@ -60,6 +60,7 @@ type BatchResult={ecomm_id:string;sku:string;result:'REUSED'|'CREATED'|'FAILED';
 
 export function EnrichmentQueue(){
   const [data,setData]=useState<EcommWorkQueue|null>(null);
+  const [eanSummary,setEanSummary]=useState<Awaited<ReturnType<typeof api.ecommEanSummary>>|null>(null);
   const [filter,setFilter]=useState<EcommQueueFilter>('all');
   const [input,setInput]=useState('');
   const [query,setQuery]=useState('');
@@ -86,6 +87,7 @@ export function EnrichmentQueue(){
     finally{setLoading(false);}
   }
   useEffect(()=>{void load(filter,query,page);},[filter,query,page]);
+  useEffect(()=>{void api.ecommEanSummary().then(setEanSummary).catch(()=>{});},[]);
   useEffect(()=>{setSelected([])},[filter,query,page]);
   useEffect(()=>{
     // A plan must never silently apply to a new page, filter, or selection.
@@ -208,9 +210,15 @@ export function EnrichmentQueue(){
         <KikiIcon name="alert" size={20}/>
         <div><strong>Atención: la copia API no contiene GTIN para las
           {fmt(data.gtin_data_quality.gtin_unavailable_in_capture)} variantes.</strong>
-          <p>Esto no demuestra que falten códigos EAN en Ecomm-App.
-          No creamos tareas para inventarlos ni asumimos que los productos incumplen.
-          Debemos verificar con el proveedor qué campo o endpoint los expone.</p>
+          <p>La API utilizada no expuso códigos de barras; esto no significa que
+            los productos no tengan EAN. KIKI conserva posibles códigos del Excel histórico
+            como <strong>evidencia secundaria</strong>, nunca como datos certificados de la API.
+            {eanSummary?.legacy_available
+              ?' Candidatos por SKU único y validación formal: '+fmt(eanSummary.possible_candidates)+
+                 '. Packs y coincidencias ambiguas quedan excluidos.'
+              :' No hay una fuente histórica disponible para obtener candidatos.'}
+            {' '}Abrí una ficha en Backoffice para ver la evidencia, verificarla y guardarla si corresponde.
+            También conviene solicitar al proveedor el endpoint oficial de GTIN.</p>
         </div>
       </div>}
 
