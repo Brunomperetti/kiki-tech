@@ -14,6 +14,7 @@ from ...database.models import CatalogSnapshot
 from .public_api import API_PREFIX, EcommAppApiError
 
 STAGE_SOURCE = "ECOMM_APP_API_STAGE"
+REFRESH_SOURCE = "ECOMM_APP_API_REFRESH"
 PAGE_SIZE = 50
 PAGES_PER_BATCH = 3
 STAGE_VERSION = 1
@@ -225,19 +226,22 @@ def _extend(pages: list[dict], raw_pages: list[object]) -> list[dict]:
 
 
 class EcommAppStageService:
-    def __init__(self, db, client):
+    def __init__(self, db, client, source: str = STAGE_SOURCE):
+        if source not in (STAGE_SOURCE, REFRESH_SOURCE):
+            raise ValueError("Fuente de captura Ecomm-App no permitida.")
         self.db = db
         self.client = client
+        self.source = source
 
     def status(self) -> dict:
         item = self.db.scalar(
-            select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE)
+            select(CatalogSnapshot).where(CatalogSnapshot.source == self.source)
         )
         return stage_status(item.payload if item else [])
 
     def next_batch(self) -> dict:
         current = self.db.scalar(
-            select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE)
+            select(CatalogSnapshot).where(CatalogSnapshot.source == self.source)
         )
         original_pages = current.payload if current else []
         state = stage_status(original_pages)
@@ -273,7 +277,7 @@ class EcommAppStageService:
         # Lock and recheck so two sessions can't both append the same pages.
         locked = self.db.scalar(
             select(CatalogSnapshot)
-            .where(CatalogSnapshot.source == STAGE_SOURCE)
+            .where(CatalogSnapshot.source == self.source)
             .with_for_update()
         )
         latest = locked.payload if locked else []
@@ -283,11 +287,33 @@ class EcommAppStageService:
                 409, "COPIA_AVANZO", "Otra solicitud avanzó la copia. Consultá el estado actualizado."
             )
         staged = _extend(latest, raw_pages)
+        # Complete refreshes are promoted atomically: never expose a
+        # partially updated catalog to browsers, AI or editorial saves.
+        if self.source == REFRESH_SOURCE and stage_status(staged)["complete"]:
+            quality = stage_status(staged)["quality"]
+            if any(quality[key] for key in (
+                "invalid_variants", "without_variant_id", "duplicate_variant_ids"
+            )):
+                self.db.rollback()
+                raise EcommAppApiError(
+                    409, "CALIDAD_INVENTARIO",
+                    "La copia nueva tiene variantes sin identidad segura. Se conservó la última copia completa.",
+                )
+            live = self.db.scalar(
+                select(CatalogSnapshot)
+                .where(CatalogSnapshot.source == STAGE_SOURCE)
+                .with_for_update()
+            )
+            if live:
+                live.payload = staged
+                live.updated_at = datetime.now(timezone.utc)
+            else:
+                self.db.add(CatalogSnapshot(source=STAGE_SOURCE, payload=staged))
         if locked:
             locked.payload = staged
             locked.updated_at = datetime.now(timezone.utc)
         else:
-            self.db.add(CatalogSnapshot(source=STAGE_SOURCE, payload=staged))
+            self.db.add(CatalogSnapshot(source=self.source, payload=staged))
         try:
             self.db.commit()
         except IntegrityError:
