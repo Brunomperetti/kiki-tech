@@ -31,8 +31,9 @@ const contextHelp=(pathname:string):ContextHelp=>{
   };
   if(pathname==='/pilot')return {
     title:'Catálogo por API · qué muestra',
-    steps:['Buscá SKU, ID o nombre del producto.','Comprobá cuándo fue capturado el catálogo.',
-      'El catálogo se renueva por la tarea API programada cuando esté configurada; verificá la fecha de captura.'],
+    steps:['Buscá SKU, ID o nombre del producto y verificá la fecha de la copia.',
+      'Si necesitás información reciente, pulsá «Actualizar catálogo ahora» y confirmá.',
+      'La renovación corre en el servidor; podés volver a esta pantalla para ver el progreso.'],
     reminder:'La copia API no es un inventario sincronizado en tiempo real.'
   };
   if(pathname==='/cases'||pathname==='/channels')return {

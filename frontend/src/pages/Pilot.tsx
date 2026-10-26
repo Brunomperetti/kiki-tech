@@ -30,6 +30,9 @@ export function Pilot(){
   const [catalogBusy,setCatalogBusy]=useState(false);
   const [catalogError,setCatalogError]=useState('');
   const [autoStatus,setAutoStatus]=useState<Awaited<ReturnType<typeof api.ecommAutoStatus>>|null>(null);
+  const [manualBusy,setManualBusy]=useState(false);
+  const [manualError,setManualError]=useState('');
+  const [manualNotice,setManualNotice]=useState('');
   const [preview,setPreview]=useState<EcommMlPreview|null>(null);
   const [previewBusy,setPreviewBusy]=useState(false);
   const [previewError,setPreviewError]=useState('');
@@ -56,6 +59,39 @@ export function Pilot(){
     setLoading(false);
   }
   useEffect(()=>{void refresh()},[]);
+  // The job runs on the server; polling can resume after navigating away.
+  useEffect(()=>{
+    if(autoStatus?.refresh_job?.status!=='RUNNING')return;
+    const timer=window.setInterval(()=>{
+      void api.ecommAutoStatus().then(status=>{
+        setAutoStatus(status);
+        if(status.refresh_job?.status==='SUCCESS'){
+          setManualNotice('Catálogo Ecomm-App actualizado correctamente. Las fichas internas se conservaron.');
+          void refresh();
+        }else if(status.refresh_job?.status==='FAILED' || status.refresh_job?.status==='INTERRUPTED'){
+          setManualError(status.refresh_job.message);
+        }
+      }).catch(()=>{
+        setManualError('No se pudo comprobar el avance. El proceso puede continuar en el servidor; actualizá la vista.');
+      });
+    },3500);
+    return ()=>window.clearInterval(timer);
+  },[autoStatus?.refresh_job?.status]);
+
+  async function updateCatalog(){
+    if(manualBusy||loading||autoStatus?.refresh_in_progress)return;
+    if(!window.confirm('KIKI descargará nuevamente el catálogo completo de Ecomm-App. '+
+      'Puede tardar un poco y no modifica productos en Ecomm-App ni borra fichas guardadas. ¿Actualizar ahora?'))return;
+    setManualBusy(true);setManualError('');setManualNotice('');
+    try{
+      await api.ecommManualRefreshStart();
+      setManualNotice('Actualización iniciada en el servidor. Podés salir y volver a consultar el estado.');
+      setAutoStatus(await api.ecommAutoStatus());
+    }catch(e){
+      setManualError(errorMessage(e));
+      try{setAutoStatus(await api.ecommAutoStatus());}catch{/* Keep original error */}
+    }finally{setManualBusy(false);}
+  }
   // A case opened from the ML comparison points to its exact Ecomm SKU.
   // It is a fresh query against the captured Ecomm API; never historical XLSX.
   useEffect(()=>{
@@ -131,17 +167,33 @@ export function Pilot(){
       </button>
     </header>
 
-    <section className="kiki-pilot-auto-status" role="status" aria-label="Estado de la actualización automática">
+    <section className="kiki-pilot-auto-status" aria-label="Actualización del catálogo API">
       <KikiIcon name="refresh" size={19}/>
-      <div><strong>{autoStatus?.configured?'Actualización API: servidor preparado (verificar tarea programada)':'Actualización automática pendiente de configurar'}</strong>
+      <div className="kiki-pilot-auto-copy">
+        <strong>Catálogo Ecomm-App · Actualización por API</strong>
         <p>Última captura completa: {dateLabel(autoStatus?.last_successful_capture_at||catalog?.capture_last_at)}.
-          {autoStatus?.refresh_in_progress?' Nueva captura en curso; se conserva la última copia válida.':
-            autoStatus?.configured?' Frecuencia prevista: dos veces por día; verificar ejecuciones en GitHub Actions.':
-              ' Falta configurar la misma credencial de automatización en Render y GitHub Actions.'}
-          {autoStatus?.last_successful_capture_at &&
-          (Date.now()-new Date(autoStatus.last_successful_capture_at).getTime())>24*60*60*1000
-            ?' Atención: la captura tiene más de 24 horas.':''}
-          {' '}Los datos son una captura API, no stock en tiempo real.</p>
+          {autoStatus?.configured?' Programación prevista: 08:25 y 16:25 (Argentina, horarios aproximados).':
+            ' La programación automática requiere configuración.'}
+          {' '}La búsqueda utiliza la última copia válida; el stock no es en tiempo real.</p>
+        {autoStatus?.refresh_in_progress&&autoStatus.refresh_job&&
+          <div className="kiki-pilot-auto-progress" role="status">
+            <strong>{autoStatus.refresh_job.origin==='MANUAL'?'Actualización manual':'Actualización programada'} en curso</strong>
+            <span>{autoStatus.refresh_job.pages_saved} de {autoStatus.refresh_job.expected_pages??'?'} páginas capturadas. Podés salir de la página; el servidor continúa.</span>
+            {autoStatus.refresh_job.expected_pages!==null&&autoStatus.refresh_job.expected_pages>0&&
+              <progress value={autoStatus.refresh_job.pages_saved} max={autoStatus.refresh_job.expected_pages}/>}
+          </div>}
+        {!autoStatus?.refresh_in_progress&&autoStatus?.refresh_job?.status==='FAILED'&&
+          <p className="kiki-pilot-auto-error" role="alert">La última renovación falló: {autoStatus.refresh_job.message}. La copia anterior sigue disponible.</p>}
+        {manualError&&<p className="kiki-pilot-auto-error" role="alert">{manualError}</p>}
+        {manualNotice&&<p className="kiki-pilot-auto-success" role="status">{manualNotice}</p>}
+      </div>
+      <div className="kiki-pilot-auto-actions">
+        <button type="button" onClick={()=>void updateCatalog()}
+          disabled={manualBusy||loading||!autoStatus||autoStatus.refresh_in_progress}>
+          <KikiIcon name="refresh" size={16}/>
+          {manualBusy?'Iniciando…':autoStatus?.refresh_in_progress?'Actualizando catálogo…':'Actualizar catálogo ahora'}
+        </button>
+        <small>Lee Ecomm-App · no publica ni modifica productos</small>
       </div>
     </section>
 
