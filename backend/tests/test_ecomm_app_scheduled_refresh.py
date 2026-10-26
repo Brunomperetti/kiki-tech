@@ -11,7 +11,7 @@ from app.integrations.ecomm_app.catalog_stage import (
 from app.integrations.ecomm_app.public_api import EcommAppApiError
 from app.api.routes.ecomm_app import require_refresh_token
 from fastapi import HTTPException
-from test_ecomm_app_catalog_stage import StubClient, fake_page
+from test_ecomm_app_catalog_stage import StubClient
 
 
 def old_capture():
