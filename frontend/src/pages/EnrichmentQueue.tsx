@@ -7,11 +7,28 @@ import '../queue.css';
 
 const fmt=(value:number|undefined)=>value===undefined?'—':value.toLocaleString('es-AR');
 const day=(raw:string|null)=>raw?new Date(raw).toLocaleString('es-AR'):'Sin fecha';
+const chanStatus=(status:string,source:string)=>{
+  switch(status){
+    case 'SKU_CANDIDATE':return source+': SKU candidato · verificar';
+    case 'PACK_REVIEW':return source+': pack por verificar';
+    case 'PRESENTATION_CONFLICT':return source+': presentación diferente';
+    case 'GTIN_CONFLICT':return source+': códigos en conflicto';
+    case 'MULTIPLE_SKU_ROWS':return source+': SKU repetido en canal';
+    case 'AMBIGUOUS_API_SKU':return source+': SKU Ecomm ambiguo';
+    case 'NO_EXACT_SKU_IN_SNAPSHOT':return source+': sin SKU exacto en copia';
+    default:return source+': fuente no disponible';
+  }
+};
+
 const reason=(flag:EcommQueueFilter)=>({
   all:'Todas',ai_eligible:'Simples aptos para IA',identity:'Identidad a revisar',draft:'Borradores',ready:'En revisión interna',
   untouched:'Sin trabajar',pack:'Packs / combos',
-  ready_for_channels:'Listas para canales',needs_completion:'Ficha por completar',
+  ready_for_channels:'Listas para canales',needs_completion:'Fichas iniciadas por completar',
   review_due:'Revisión mensual pendiente',
+  ml_candidate:'Candidatos en ML',tn_candidate:'Candidatos en TN',
+  ml_no_exact:'Sin SKU exacto en copia ML',tn_no_exact:'Sin SKU exacto en copia TN',
+  both_candidates:'Candidatos en ambos canales',
+  channel_review:'Conflictos de canales para verificar',
   missing_source_name:'Nombre ausente en API',
   missing_title:'Fichas iniciadas sin título comercial',
   missing_brand:'Fichas iniciadas sin marca confirmada',
@@ -19,13 +36,16 @@ const reason=(flag:EcommQueueFilter)=>({
   missing_gtin:'Fichas iniciadas: GTIN sin documentar',
 }[flag]);
 const mainFilters:EcommQueueFilter[]=[
-  'all','ai_eligible','identity','draft','untouched','pack','ready',
-  'ready_for_channels','review_due','needs_completion','missing_source_name',
+  'all','channel_review','ml_candidate','tn_candidate','both_candidates',
+  'ml_no_exact','tn_no_exact','identity','draft','ready','ready_for_channels',
+  'review_due','untouched','ai_eligible','pack',
 ];
 const startedEditFilters:EcommQueueFilter[]=[
+  'needs_completion','missing_source_name',
   'missing_brand','missing_title','missing_description','missing_gtin',
 ];
 const tag=(row:EcommQueueRow)=>row.identity_issue?'Identidad a revisar':
+  row.flags.includes('channel_review')?'Verificar coincidencias de canales':
   row.flags.includes('review_due')?'Revisión mensual pendiente':
   row.status==='READY_FOR_CHANNELS'?'Completa y guardada para canales':
   row.status==='READY_FOR_REVIEW'?'Lista para revisión interna':
@@ -41,11 +61,15 @@ function safeCell(value:string|number|boolean|null|undefined){
 function exportQueue(rows:EcommQueueRow[]){
   if(!rows.length)return;
   const header=['ID Ecomm API','SKU','Producto Ecomm API','Estado KIKI',
-    'Tipo','Prioridad','Motivo','Observaciones de origen y edición','Marca propuesta',
+    'Tipo','Prioridad','Motivo','Estado ML en snapshot','Estado TN en CSV',
+    'IDs candidatos ML','Producto candidato TN',
+    'Observaciones de origen y edición','Marca propuesta',
     'Título propuesto','Última edición','Fecha de captura Ecomm API'];
   const lines=[header,...rows.map(row=>[
     row.ecomm_id,row.sku,row.product_name,row.status,row.is_combo?'Combo / pack':'Variante',
-    row.priority,row.reason,row.flags.filter(f=>f.startsWith('missing_')).map(reason).join(' | '),
+    row.priority,row.reason,row.channel_coverage.ml.status,row.channel_coverage.tn.status,
+    row.channel_coverage.ml.listing_ids.join(' | '),row.channel_coverage.tn.candidate_name||'',
+    row.flags.filter(f=>f.startsWith('missing_')).map(reason).join(' | '),
     row.proposed_brand,row.proposed_title,row.last_edited_at||'',row.captured_at||''
   ])];
   const csv='\uFEFF'+lines.map(cells=>cells.map(safeCell).join(';')).join('\r\n');
@@ -235,6 +259,33 @@ export function EnrichmentQueue(){
       <div><span>Listas para canales</span><strong>{fmt(summary?.ready_for_channels)}</strong><small>Fichas comerciales completas en KIKI</small></div>
     </div>
 
+    {data?.channel_coverage&&<section className="kiki-queue-channel-matrix" aria-label="Cobertura por canal y fuentes">
+      <div className="kiki-queue-channel-head">
+        <div><p className="eyebrow">ECOMM-APP API + MERCADO LIBRE API + TIENDANUBE CSV</p>
+          <h2>¿Qué productos tienen coincidencias en los canales?</h2>
+          <p>El cruce se hace por variante y SKU único. Las coincidencias son candidatos
+            para verificar: no se marcan como publicaciones correctas automáticamente.</p></div>
+        <Link to="/channels">Ver fuentes de canales <KikiIcon name="arrow-right" size={15}/></Link>
+      </div>
+      <div className="kiki-queue-channel-stats">
+        <div><strong>{fmt(summary?.ml_candidate)}</strong><span>SKU candidatos en Mercado Libre</span></div>
+        <div><strong>{fmt(summary?.tn_candidate)}</strong><span>SKU candidatos en Tiendanube</span></div>
+        <div><strong>{fmt(summary?.both_candidates)}</strong><span>Candidatos en ambos canales</span></div>
+        <div><strong>{fmt(summary?.channel_review)}</strong><span>Variantes con conflictos o packs por revisar</span></div>
+      </div>
+      <div className="kiki-queue-channel-sources">
+        <div><b>Mercado Libre</b><span>{data.channel_coverage.sources.ml.available
+          ?fmt(data.channel_coverage.sources.ml.rows)+' filas del snapshot API · '+day(data.channel_coverage.sources.ml.updated_at)
+          :'Copia API no disponible; no se puede concluir si hay publicaciones'}</span></div>
+        <div><b>Tiendanube</b><span>{data.channel_coverage.sources.tn.available
+          ?fmt(data.channel_coverage.sources.tn.rows)+' filas del CSV · '+day(data.channel_coverage.sources.tn.updated_at)
+          :'CSV no disponible; no se puede concluir si hay publicaciones'}</span></div>
+      </div>
+      <p className="kiki-queue-channel-caution">«Sin SKU exacto en copia» NO significa
+        «no publicado». Primero hay que actualizar las fuentes y verificar identidad,
+        presentación, variaciones y packs. Ninguna coincidencia habilita publicación automática.</p>
+    </section>}
+
     <section className="kiki-queue-browser">
       <div className="kiki-queue-head">
         <div><p className="eyebrow">PRIORIDADES DE TRABAJO</p><h2>Qué necesita atención</h2>
@@ -271,7 +322,10 @@ export function EnrichmentQueue(){
         </div>
       </details>
       <div className="kiki-queue-help"><KikiIcon name="help" size={16}/>
-        <span>Una ficha puede necesitar completar varios campos.
+        <span>La columna editorial de KIKI y la cobertura de canales son distintas.
+          Una ficha que aún no se preparó en KIKI puede tener un candidato publicado
+          en Mercado Libre o Tiendanube. Nunca duplicamos una publicación sobre esta evidencia.
+          Una ficha puede necesitar completar varios campos.
           La API identifica productos y aporta nombres; las propuestas comerciales
           se elaboran y guardan por separado en KIKI. El estado de GTIN de la copia
           se muestra arriba como calidad de la fuente, no como una tarea falsa por producto.</span>
@@ -383,7 +437,15 @@ export function EnrichmentQueue(){
             </div>
             <h3>{row.product_name||'Producto sin nombre'}</h3>
             {row.proposed_title&&<p className="kiki-queue-proposed">Título KIKI: {row.proposed_title}</p>}
+            <div className="kiki-queue-channel-tags">
+              <span>{chanStatus(row.channel_coverage.ml.status,'ML')}</span>
+              <span>{chanStatus(row.channel_coverage.tn.status,'TN')}</span>
+            </div>
             <p className="kiki-queue-explain">{row.reason}</p>
+            {row.channel_coverage.ml.listing_ids.length>0&&
+              <small>Identificadores ML candidatos: {row.channel_coverage.ml.listing_ids.join(', ')}</small>}
+            {row.channel_coverage.ml.status==='SKU_CANDIDATE'&&
+              <small>Compará el título y la presentación antes de aceptar la vinculación.</small>}
             <div className="kiki-queue-tags">
               {row.flags.filter(f=>f!=='untouched'&&f!=='draft'&&f!=='ready'&&f!=='identity'&&f!=='missing_gtin').slice(0,5)
                 .map(flag=><span key={flag}>{reason(flag)}</span>)}
