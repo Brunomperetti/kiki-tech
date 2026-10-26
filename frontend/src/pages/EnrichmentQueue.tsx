@@ -11,15 +11,17 @@ const reason=(flag:EcommQueueFilter)=>({
   all:'Todas',ai_eligible:'Simples aptos para IA',identity:'Identidad a revisar',draft:'Borradores',ready:'En revisión interna',
   untouched:'Sin trabajar',pack:'Packs / combos',
   ready_for_channels:'Listas para canales',needs_completion:'Ficha por completar',
+  review_due:'Revisión mensual pendiente',
   missing_title:'Sin título propuesto',missing_brand:'Sin marca en KIKI',
   missing_description:'Sin descripción propuesta',missing_gtin:'GTIN no disponible en copia API',
 }[flag]);
 const filters:EcommQueueFilter[]=[
   'all','ai_eligible','identity','draft','untouched','pack','ready',
-  'ready_for_channels','needs_completion','missing_brand',
+  'ready_for_channels','review_due','needs_completion','missing_brand',
   'missing_title','missing_description','missing_gtin',
 ];
 const tag=(row:EcommQueueRow)=>row.identity_issue?'Identidad a revisar':
+  row.flags.includes('review_due')?'Revisión mensual pendiente':
   row.status==='READY_FOR_CHANNELS'?'Completa y guardada para canales':
   row.status==='READY_FOR_REVIEW'?'Lista para revisión interna':
   row.status==='DRAFT'?'Borrador guardado':
