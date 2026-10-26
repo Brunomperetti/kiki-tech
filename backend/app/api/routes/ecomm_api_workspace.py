@@ -187,6 +187,22 @@ def list_saved(
         raise HTTPException(409, str(exc)) from None
 
 
+@router.post("/{ecomm_id}/confirm-review")
+def confirm_monthly_review(
+    ecomm_id: str,
+    body: GenerateAiSuggestion,
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    """Audit a verified monthly refresh without modifying source or channel."""
+    try:
+        return EcommApiProductWorkspace(db).confirm_monthly_review(
+            ecomm_id, body.expected_version
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
 @router.get("/{ecomm_id}")
 def get_edit(
     ecomm_id: str,
