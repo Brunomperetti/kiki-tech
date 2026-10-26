@@ -193,7 +193,10 @@ export function ProductWorkspace(){
         <p>Buscá productos de la API Ecomm-App, completá sus datos comerciales y guardá las mejoras
           en KIKI Tech. Los cambios quedan registrados con historial y no modifican las tiendas.</p>
       </div>
-      <Link className="kiki-workspace-back" to="/"><KikiIcon name="home" size={17}/> Inicio</Link>
+      <div className="kiki-workspace-shortcuts">
+        <Link className="kiki-workspace-back" to="/queue"><KikiIcon name="chart" size={17}/> Volver a cola de mejoras</Link>
+        <Link className="kiki-workspace-back" to="/guia"><KikiIcon name="help" size={17}/> Cómo guardar</Link>
+        </div>
     </header>
 
     <div className="kiki-workspace-policy" role="note"><KikiIcon name="shield" size={20}/>
