@@ -297,6 +297,71 @@ class EcommApiProductWorkspace:
         self.db.refresh(edit)
         return self._serialize(edit, source)
 
+
+    def taxonomy(self) -> dict:
+        """Existing internal taxonomy; suggest consistent naming, never invent external IDs."""
+        self._source_pages()
+        from collections import defaultdict
+        hierarchy = defaultdict(lambda: {"name": "", "count": 0, "children": {}})
+        edits = self.db.scalars(select(EcommApiProductEdit)).all()
+        for edit in edits:
+            fields = edit.fields or {}
+            category = str(fields.get("category") or "").strip()
+            subcategory = str(fields.get("subcategory") or "").strip()
+            if not category:
+                continue
+            key = category.casefold()
+            item = hierarchy[key]
+            if not item["name"]:
+                item["name"] = category
+            item["count"] += 1
+            if subcategory:
+                subkey = subcategory.casefold()
+                child = item["children"].setdefault(subkey, {"name": subcategory, "count": 0})
+                child["count"] += 1
+        return {
+            "source": "KIKI_POSTGRESQL_INTERNAL_ONLY",
+            "categories": [
+                {"name": value["name"], "count": value["count"],
+                 "subcategories": sorted(value["children"].values(), key=lambda x: x["name"].casefold())}
+                for value in sorted(hierarchy.values(), key=lambda x: x["name"].casefold())
+            ],
+        }
+
+    def export_master(self, status: str = "") -> dict:
+        """Reversible copy of every editorial field for future channel adapters."""
+        if status and status not in STATES:
+            raise ValueError("Filtro de exportación no permitido.")
+        self._source_pages()
+        edits = self.db.scalars(
+            select(EcommApiProductEdit).order_by(EcommApiProductEdit.ecomm_id)
+        ).all()
+        selected = [edit for edit in edits if not status or edit.status == status]
+        return {
+            "format": "KIKI_COMMERCIAL_MASTER_V1",
+            "exported_at": _now().isoformat(),
+            "source": "KIKI_POSTGRESQL_INTERNAL_ONLY",
+            "external_writes_enabled": False,
+            "filter": status or "ALL",
+            "total": len(selected),
+            "records": [{
+                "ecomm_id": edit.ecomm_id,
+                "source_sku_at_first_edit": edit.source_sku,
+                "source_snapshot_at_first_edit": edit.source_snapshot,
+                "status": edit.status,
+                "version": edit.version,
+                "fields": {**blank_fields(), **(edit.fields or {})},
+                "readiness": _readiness({**blank_fields(), **(edit.fields or {})}),
+                "history": edit.history or [],
+                "created_at": edit.created_at.isoformat() if edit.created_at else None,
+                "updated_at": edit.updated_at.isoformat() if edit.updated_at else None,
+            } for edit in selected],
+            "policy": (
+                "Copia íntegra de datos comerciales guardados en KIKI. "
+                "No modifica inventario ni publica en Mercado Libre/Tiendanube."
+            ),
+        }
+
     def list_saved(self, query: str = "", status: str = "", page: int = 1,
                    limit: int = 25) -> dict:
         if page < 1 or page > 100000 or limit < 1 or limit > 50 or len(query) > 80:
