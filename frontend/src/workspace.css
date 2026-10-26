@@ -140,3 +140,10 @@
 
 .kiki-workspace-shortcuts{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 @media(max-width:650px){.kiki-workspace-shortcuts{width:100%}}
+
+.kiki-workspace-ai-fill{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1px solid #a5c8b0;background:#eaf6ee;color:#205a3b;border-radius:8px;
+  padding:11px 13px;font-size:12px;font-weight:800}
+.kiki-workspace-ai-fill:disabled{opacity:.5}
+.kiki-workspace-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:750px){.kiki-workspace-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
