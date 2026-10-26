@@ -3,7 +3,7 @@ import {Link} from 'react-router-dom';
 import {api} from '../services/api';
 import {KikiIcon} from '../components/KikiIcon';
 import type {MercadoLibreStatus} from '../types/catalog';
-import type {EcommMlPreview,EcommStageStatus} from '../types/ecomm-app';
+import type {EcommMlPreview,EcommStageStatus,EcommSavedEdits} from '../types/ecomm-app';
 import '../client-ux.css';
 
 const n=(x:number|null|undefined)=>x==null?'—':x.toLocaleString('es-AR');
@@ -17,19 +17,21 @@ export function Dashboard(){
   const [ecomm,setEcomm]=useState<EcommStageStatus|null>(null);
   const [ml,setMl]=useState<MercadoLibreStatus|null>(null);
   const [preview,setPreview]=useState<EcommMlPreview|null>(null);
+  const [master,setMaster]=useState<EcommSavedEdits|null>(null);
   const [loading,setLoading]=useState(true);
   const [errors,setErrors]=useState<string[]>([]);
 
   async function load(){
     setLoading(true);setErrors([]);
     const results=await Promise.allSettled([
-      api.ecommStageStatus(),api.mlStatus(),api.ecommMlPreview(),
+      api.ecommStageStatus(),api.mlStatus(),api.ecommMlPreview(),api.ecommSavedEdits('', '',1,1),
     ] as const);
     setEcomm(results[0].status==='fulfilled'?results[0].value:null);
     setMl(results[1].status==='fulfilled'?results[1].value:null);
     setPreview(results[2].status==='fulfilled'?results[2].value:null);
+    setMaster(results[3].status==='fulfilled'?results[3].value:null);
     setErrors(results.flatMap((r,i)=>r.status==='rejected'
-      ?[(['Ecomm-App API','Conexión Mercado Libre','Comparación API'][i])+
+      ?[(['Ecomm-App API','Conexión Mercado Libre','Comparación API','Backoffice comercial'][i])+
         ': '+(r.reason instanceof Error?r.reason.message:'No respondió')]
       :[]));
     setLoading(false);
@@ -57,9 +59,9 @@ export function Dashboard(){
     <header className="kiki-home-header">
       <div>
         <p className="eyebrow">KIKI TECH · CENTRO DE CONTROL</p>
-        <h1>Tu catálogo, más claro.</h1>
-        <p>Explorá los productos de Ecomm-App por API y entendé qué pasa
-          con las publicaciones guardadas de Mercado Libre, sin tocar las tiendas.</p>
+        <h1>Tu centro de operaciones comerciales.</h1>
+        <p>Organizá, enriquecé y conservá las fichas completas del catálogo dentro de KIKI Tech.
+          Todo listo para preparar futuras publicaciones a Mercado Libre y Tiendanube.</p>
       </div>
       <button type="button" className="kiki-refresh" disabled={loading} onClick={()=>void load()}>
         <KikiIcon name="refresh" size={16}/> {loading?'Consultando…':'Actualizar'}
@@ -84,6 +86,25 @@ export function Dashboard(){
       <KikiIcon name="alert"/><span>Algunos datos no están disponibles. No se interpretan como cero:
         {errors.join(' · ')}</span>
     </div>}
+
+    <section className="kiki-master-home" aria-label="Estado de las fichas comerciales">
+      <div className="kiki-master-home-copy">
+        <p className="eyebrow">BACKOFFICE COMERCIAL</p>
+        <h2>Todo el trabajo queda en KIKI</h2>
+        <p>Creá fichas con títulos, descripciones, atributos, categorías, SEO,
+          fotos, videos y evidencia. Guardá avances y prepará el catálogo para conectar los canales.</p>
+        <Link className="kiki-master-primary" to="/workspace">
+          <KikiIcon name="check" size={18}/> Abrir backoffice de productos
+          <KikiIcon name="arrow-right" size={17}/>
+        </Link>
+      </div>
+      <div className="kiki-master-home-numbers">
+        <div><strong>{n(master?.summary.total_saved)}</strong><span>Fichas guardadas</span></div>
+        <div><strong>{n(master?.summary.drafts)}</strong><span>En edición</span></div>
+        <div><strong>{n(master?.summary.ready_for_review)}</strong><span>En revisión</span></div>
+        <div><strong>{n(master?.summary.ready_for_channels)}</strong><span>Listas para canales</span></div>
+      </div>
+    </section>
 
     <section aria-label="Indicadores desde la API" className="kiki-client-stats">
       <article className="kiki-client-stat">
@@ -137,7 +158,7 @@ export function Dashboard(){
         </Link>
         <Link to="/workspace" className="kiki-client-action">
           <span className="kiki-action-icon"><KikiIcon name="check" size={25}/></span>
-          <span><strong>Mejorar productos y guardar</strong><small>Editá fichas vinculadas a Ecomm-App API. Historial y borradores persistentes dentro de KIKI.</small></span>
+          <span><strong>Backoffice comercial completo</strong><small>Títulos, fichas, SEO, categorías, multimedia y fuentes; todo guardado con historial.</small></span>
           <KikiIcon name="arrow-right"/>
         </Link>
         <Link to="/pilot#catalogo" className="kiki-client-action">

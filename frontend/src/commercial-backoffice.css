@@ -1,0 +1,44 @@
+.kiki-commercial{display:grid;gap:18px;min-width:0;color:#183d2e}
+.kiki-commercial-overview{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:17px;border:1px solid #b9dac4;background:#ebf6ee;border-radius:14px}
+.kiki-commercial-overview strong{font-size:15px}.kiki-commercial-overview p{font-size:12px;color:#526a5d;line-height:1.6;margin:6px 0 0}
+.kiki-commercial-score{display:grid;text-align:right;gap:2px}.kiki-commercial-score strong{font-size:25px;font-variant-numeric:tabular-nums}.kiki-commercial-score span{font-size:10px;color:#526a5d}
+.kiki-commercial-meter{height:8px;background:#d1dfd6;border-radius:20px;overflow:hidden;grid-column:1/-1}
+.kiki-commercial-meter span{display:block;height:100%;border-radius:20px;background:#2b8052;transition:width .2s}
+.kiki-commercial-section{display:grid;gap:15px;padding:18px;border:1px solid #d8e5dc;border-radius:14px;background:#fff}
+.kiki-commercial-section-head{display:flex;align-items:flex-start;gap:12px}
+.kiki-commercial-section-head>span{display:inline-grid;place-items:center;width:33px;height:33px;border-radius:10px;color:#2b6545;background:#ecf5ee;font-weight:800;font-size:11px;flex:none}
+.kiki-commercial-section-head h3{margin:0 0 5px;font-size:17px;color:#193e2e;line-height:1.3}
+.kiki-commercial-section-head p{margin:0;font-size:12px;color:#688071;line-height:1.6}
+.kiki-commercial-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:13px}
+.kiki-commercial-grid label,.kiki-commercial-array label,.kiki-commercial-note{display:grid;gap:7px;font-size:12px;font-weight:750;color:#244b36}
+.kiki-commercial-grid label.wide{grid-column:1/-1}
+.kiki-commercial input,.kiki-commercial textarea,.kiki-commercial select{width:100%;min-width:0;box-sizing:border-box;font:inherit;font-size:13px;line-height:1.55;padding:11px 12px;background:#fff;color:#1a422f;border:1px solid #c8dace;border-radius:9px;outline-offset:2px}
+.kiki-commercial textarea{resize:vertical}
+.kiki-commercial input:focus,.kiki-commercial textarea:focus,.kiki-commercial select:focus{border-color:#308153;outline:2px solid #d5ebde}
+.kiki-commercial-list{display:grid;gap:12px}
+.kiki-commercial-array{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;padding:13px;background:#f7faf8;border:1px solid #d8e5dc;border-radius:10px}
+.kiki-commercial-array button{font-size:11px;color:#90573e;background:#fff;border:1px solid #decbbf;padding:11px;border-radius:9px;cursor:pointer}
+.kiki-commercial-array.kiki-commercial-media{grid-template-columns:1fr 1fr}
+.kiki-commercial-media>button{justify-self:start}
+.kiki-commercial-array a{color:#226a48;font-size:12px;word-break:break-all}
+.kiki-commercial-media-preview{grid-column:1/-1;display:grid;gap:8px;justify-items:start}
+.kiki-commercial-media-preview img{height:125px;max-width:100%;object-fit:contain;background:#fff;border:1px solid #e4e9e4;border-radius:10px}
+.kiki-commercial-add{justify-self:start;border:1px solid #a3ccb0;background:#f0f8f2;color:#206043;padding:10px 15px;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer}
+.kiki-commercial-checklist{border:1px solid #bdd6c2;background:#eff7f0;border-radius:12px;padding:15px}
+.kiki-commercial-checklist strong{font-size:14px}.kiki-commercial-checklist p{font-size:12px;line-height:1.6;margin:8px 0}
+.kiki-commercial-checklist ul{display:flex;flex-wrap:wrap;gap:7px;padding:0;list-style:none;margin:12px 0 0}
+.kiki-commercial-checklist li{font-size:11px;padding:6px 9px;border-radius:7px;background:#fff;color:#7a562b;border:1px solid #e7d8bd}
+.kiki-commercial-note{margin-top:10px}
+@media(max-width:750px){.kiki-commercial-grid,.kiki-commercial-array,.kiki-commercial-array.kiki-commercial-media{grid-template-columns:1fr}.kiki-commercial-grid label.wide{grid-column:1}.kiki-commercial-section{padding:13px}.kiki-commercial-score strong{font-size:20px}}
+
+.kiki-commercial-hint{font-size:11px;color:#647d6b;line-height:1.55;margin:0}
+.kiki-commercial-array label.kiki-commercial-attestation{grid-column:1/-1;display:flex;align-items:flex-start;gap:10px;
+  background:#eaf5ed;border:1px solid #cee4d3;border-radius:9px;padding:11px;font-size:12px;color:#254c35;cursor:pointer}
+.kiki-commercial-attestation input[type="checkbox"]{width:auto;flex:none;accent-color:#236244;margin-top:3px}
+.kiki-commercial-array label.kiki-commercial-attestation span{line-height:1.5}
+
+.kiki-commercial-jump{display:flex;flex-wrap:wrap;gap:8px}
+.kiki-commercial-jump a{display:inline-flex;align-items:center;border:1px solid #cadfce;background:#f2f8f3;
+  border-radius:8px;padding:8px 11px;font-size:11px;font-weight:750;color:#275b3f;text-decoration:none}
+.kiki-commercial-jump a:hover{background:#e6f4e9}
+.kiki-commercial-section{scroll-margin-top:85px}

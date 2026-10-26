@@ -35,7 +35,7 @@ const steps:JourneyStep[]=[
   },
   {
     heading:'Prepará un lote pequeño sin gastar IA',icon:'layers',
-    intro:'La primera etapa admite hasta tres productos simples por lote. Los packs y los casos de identidad ambigua se excluyen de este piloto.',
+    intro:'La primera etapa admite hasta tres productos simples por lote. Los packs y los casos de identidad ambigua requieren verificación específica antes de generar contenido.',
     directions:[
       'En Cola de mejoras elegí «Ver solo productos simples aptos para IA».',
       'Marcá entre uno y tres productos, o usá «Elegir 3 simples de esta página».',
@@ -59,11 +59,12 @@ const steps:JourneyStep[]=[
   },
   {
     heading:'Revisá y corregí la ficha del producto',icon:'check',
-    intro:'Mejorar productos permite editar marca, título, descripción, GTIN propuesto y observaciones. El ID y SKU de Ecomm-App permanecen como referencia.',
+    intro:'El Backoffice de productos guarda título completo y corto, descripciones, detalles, atributos, presentación, categorías, SEO, multimedia y fuentes originales. El ID y SKU de Ecomm-App quedan como referencia.',
     directions:[
-      'Abrí una ficha desde la cola o buscala por SKU/ID dentro de Mejorar productos.',
+      'Abrí una ficha desde la cola o buscala por SKU/ID dentro de Backoffice de productos.',
       'Revisá marca sugerida por evidencia y la propuesta KIKI AI. Usá cada título o descripción solo si coincide con datos verificables.',
-      'Dejá en «Observaciones y evidencia» lo que confirmaste y lo que falta comprobar.'
+      'Completá los seis bloques: identidad, contenido, posicionamiento, características, multimedia y fuentes.',
+      'Adjuntá los enlaces oficiales de fabricante o documentá la etiqueta comprobada; nunca inventes un EAN.'
     ],
     check:'Separé los datos corroborados de las sugerencias de IA.',
     caution:'Copiar el texto sugerido al formulario NO lo guarda. No inventes GTIN ni contenido de packs.',
@@ -71,14 +72,15 @@ const steps:JourneyStep[]=[
   },
   {
     heading:'Guardá de verdad y comprobá el historial',icon:'check',
-    intro:'Este es el paso más importante: los campos solo quedan persistidos en PostgreSQL al pulsar «Guardar borrador» o «Enviar a revisión interna».',
+    intro:'Todo el contenido de una ficha se conserva en PostgreSQL cuando guardás. También podés dejarla «Lista para canales» cuando se completen los requisitos documentales.',
     directions:[
       'Elegí «Guardar borrador» si necesitás continuar otro día.',
       'Usá «Enviar a revisión interna» solo cuando la ficha tenga suficiente evidencia y esté lista para que otra persona la controle.',
-      'Verificá el mensaje de guardado y el «Historial de ediciones». Podés cerrar, volver a entrar y recuperar los datos.'
+      'Cuando se completen los controles editoriales, usá «Dejar lista para canales». Esa condición sigue siendo interna.',
+      'Verificá el mensaje de guardado y el «Historial de ediciones». Podés cerrar y recuperar todos los campos.'
     ],
-    check:'Veo el estado «Borrador guardado» o «Lista para revisión» y una versión en el historial.',
-    caution:'«Lista para revisión» NO significa aprobada ni publicada. Si cerrás sin guardar, perderás los cambios recientes.',
+    check:'Veo el estado de la ficha, el porcentaje documental y una versión en su historial.',
+    caution:'«Lista para canales» no publica automáticamente; la veracidad de las fuentes sigue requiriendo comprobación humana. Los cambios sin guardar se pierden.',
     action:'Abrir mis fichas guardadas',to:'/workspace'
   },
   {
@@ -110,7 +112,7 @@ const steps:JourneyStep[]=[
 const glossary=[
   ['Catálogo por API','Consultar productos, SKU, ID y stock a la fecha de captura de Ecomm-App. No edita Ecomm-App.','/pilot'],
   ['Cola de mejoras','Ordenar pendientes, buscar, filtrar y seleccionar. El CSV es una lista de seguimiento, no una carga masiva.','/queue'],
-  ['Mejorar productos','Cambiar datos editoriales dentro de KIKI, guardar borradores y consultar el historial.','/workspace'],
+  ['Backoffice comercial de productos','Crear fichas maestras completas: textos, atributos, categorías, SEO, imágenes/videos por URL y fuentes; guardar e historizar.','/workspace'],
   ['KIKI AI','Proponer títulos/descripciones. Una propuesta queda almacenada, pero no modifica la ficha hasta que la revisás y guardás.','/workspace'],
   ['Propuestas IA guardadas','Bandeja para recuperar lo generado, aunque hayas salido del lote. Entrá al editor para revisar y guardar los campos.','/propuestas-ia'],
   ['Casos para revisar','Diagnóstico entre capturas de Ecomm y Mercado Libre; no confirma vínculos ni publicaciones.','/cases'],
@@ -136,7 +138,7 @@ export function KikiGuide(){
       <div><strong>Lo principal: el trabajo queda guardado cuando confirmás la ficha.</strong>
         <p>«Generar propuesta IA» guarda una propuesta interna; «Usar este título»
           solo la copia al formulario. <b>«Guardar borrador» o «Enviar a revisión interna»
-          son los botones que conservan los campos de la ficha en PostgreSQL.</b>
+          son los botones o «Dejar lista para canales» conservan los campos en PostgreSQL.</b>
           No se publica ni se modifica el inventario externo.</p>
       </div>
     </section>
@@ -193,8 +195,8 @@ export function KikiGuide(){
     <section className="kiki-guide-finish">
       <KikiIcon name="clock" size={24}/>
       <div><h2>Una forma simple de trabajar todos los días</h2>
-        <p>Buscar en la cola → verificar fuente → obtener sugerencias si sirven →
-          corregir → guardar borrador → comprobar historial → continuar otro día.
+        <p>Buscar en la cola → verificar fuentes → completar ficha y multimedia →
+          guardar borrador → controlar completitud → dejar lista para canales → consultar historial.
           No hace falta terminar todo el catálogo para empezar.</p></div>
       <Link to="/queue">Empezar a trabajar <KikiIcon name="arrow-right" size={15}/></Link>
     </section>

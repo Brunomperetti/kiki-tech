@@ -14,18 +14,138 @@ from sqlalchemy.orm import Session
 from ..database.models import CatalogSnapshot, EcommApiProductEdit
 from ..integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
 
-FIELDS = ("brand", "title", "description", "proposed_gtin", "note")
-STATES = ("DRAFT", "READY_FOR_REVIEW")
+# Every commercial edit is a separate PostgreSQL JSON overlay. The API catalog
+# is never modified and new fields do not require destructive migrations.
+TEXT_LIMITS = {
+    "brand": 120, "manufacturer": 120, "title": 180, "short_title": 100,
+    "short_description": 500, "description": 5000, "details": 5000,
+    "presentation": 750, "category": 160, "subcategory": 160,
+    "seo_title": 180, "seo_description": 320, "seo_keywords": 1000,
+    "proposed_gtin": 14, "note": 1800,
+}
+ARRAY_LIMITS = {"attributes": 40, "media": 30, "sources": 20}
+FIELDS = tuple(TEXT_LIMITS) + tuple(ARRAY_LIMITS)
+STATES = ("DRAFT", "READY_FOR_REVIEW", "READY_FOR_CHANNELS")
+SOURCE_KINDS = ("FABRICANTE", "ETIQUETA", "DISTRIBUIDOR", "OTRO")
+READY_REQUIRED = (
+    "brand", "title", "short_title", "short_description", "description",
+    "category", "subcategory", "presentation", "seo_title", "seo_description",
+)
 
 
 def _now():
     return datetime.now(timezone.utc)
 
 
+def blank_fields() -> dict:
+    return {**{key: "" for key in TEXT_LIMITS}, **{key: [] for key in ARRAY_LIMITS}}
+
+
+def _https_url(url: str) -> bool:
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    return (
+        parsed.scheme == "https" and bool(parsed.hostname)
+        and not parsed.username and not parsed.password
+        and parsed.hostname not in ("localhost", "127.0.0.1", "::1")
+    )
+
+
 def _canonical_fields(fields: dict) -> dict:
     if not isinstance(fields, dict) or any(key not in FIELDS for key in fields):
         raise ValueError("Los campos de la ficha no son válidos.")
-    return {name: str(fields.get(name) or "").strip() for name in FIELDS}
+    normalized = blank_fields()
+    for key in TEXT_LIMITS:
+        value = fields.get(key, "")
+        if not isinstance(value, str):
+            raise ValueError("El contenido del campo " + key + " no es válido.")
+        normalized[key] = value.strip()
+    specs = {
+        "attributes": {"name": 90, "value": 450},
+        "media": {"url": 1000, "alt": 180, "source_url": 1000, "kind": 5},
+        "sources": {"name": 180, "url": 1000, "note": 500, "kind": 20},
+    }
+    for key, max_items in ARRAY_LIMITS.items():
+        values = fields.get(key, [])
+        if not isinstance(values, list) or len(values) > max_items:
+            raise ValueError("Hay demasiados elementos en " + key + ".")
+        cleaned = []
+        for value in values:
+            allowed = set(specs[key]) | ({"verified"} if key == "sources" else set())
+            if not isinstance(value, dict) or set(value) - allowed:
+                raise ValueError("Formato de " + key + " no válido.")
+            row = {}
+            for name, limit in specs[key].items():
+                item = value.get(name, "")
+                if not isinstance(item, str) or len(item.strip()) > limit:
+                    raise ValueError("Campo no válido de " + key + ": " + name)
+                row[name] = item.strip()
+            if key == "sources":
+                checked = value.get("verified", False)
+                if not isinstance(checked, bool):
+                    raise ValueError("La comprobación documental debe ser un valor booleano.")
+                row["verified"] = checked
+            if (
+                (key == "media" and not row["url"] and not row["alt"] and not row["source_url"])
+                or (key == "sources" and not row["name"] and not row["url"] and not row["note"])
+                or (key == "attributes" and not any(row.values()))
+            ):
+                # An untouched newly-added editor row is not a saved resource.
+                continue
+            if key == "attributes" and not (row["name"] and row["value"]):
+                raise ValueError("Cada característica necesita nombre y valor.")
+            if key == "media":
+                if row["kind"] not in ("IMAGE", "VIDEO") or not _https_url(row["url"]):
+                    raise ValueError("Las imágenes y videos requieren enlaces HTTPS válidos.")
+                if row["source_url"] and not _https_url(row["source_url"]):
+                    raise ValueError("El origen multimedia debe tener una URL HTTPS válida.")
+            if key == "sources":
+                if row["kind"] not in SOURCE_KINDS or not row["name"]:
+                    raise ValueError("Cada fuente requiere un tipo y nombre.")
+                if row["url"] and not _https_url(row["url"]):
+                    raise ValueError("El enlace de la fuente debe ser HTTPS válido.")
+                if row["kind"] in ("FABRICANTE", "DISTRIBUIDOR") and not row["url"]:
+                    raise ValueError("Las fuentes web deben incluir el enlace original.")
+                if row["kind"] == "ETIQUETA" and not (row["url"] or row["note"]):
+                    raise ValueError("Describí la etiqueta o agregá el enlace a su imagen.")
+                if row["verified"] and len(row["note"]) < 12:
+                    raise ValueError(
+                        "Para confirmar una fuente, detallá en la nota qué información se verificó."
+                    )
+            cleaned.append(row)
+        normalized[key] = cleaned
+    return normalized
+
+
+def _readiness(fields: dict) -> dict:
+    missing = [name for name in READY_REQUIRED if not str(fields.get(name) or "").strip()]
+    if not fields.get("attributes"):
+        missing.append("attributes")
+    if not any(m.get("kind") == "IMAGE" for m in fields.get("media") or []):
+        missing.append("images")
+    sources = fields.get("sources") or []
+    if not any(
+        s.get("kind") in ("FABRICANTE", "ETIQUETA") and s.get("verified") is True
+        for s in sources
+    ):
+        missing.append("primary_source")
+    if fields.get("category") and not fields.get("subcategory"):
+        # Covered above but make category hierarchy explicit.
+        pass
+    if not fields.get("seo_keywords"):
+        missing.append("seo_keywords")
+    total = len(READY_REQUIRED) + 4
+    return {
+        "missing": missing,
+        "ready": not missing,
+        "completed": total - len(missing),
+        "total": total,
+        "percent": round(100 * (total - len(missing)) / total),
+        "policy": (
+            "Listo para canales significa ficha completa y fuente primaria registrada "
+            "por el operador; NO confirma automáticamente la autenticidad ni publica."
+        ),
+    }
 
 
 def _gtin_check_digit_valid(digits: str) -> bool:
@@ -46,15 +166,19 @@ def _validate(fields: dict, status: str):
         raise ValueError("Estado de revisión no permitido.")
     if not any(fields.values()):
         raise ValueError("Completá al menos un dato o una observación antes de guardar.")
-    bounds = {"brand": 120, "title": 180, "description": 3000,
-              "proposed_gtin": 14, "note": 1200}
-    for field, max_length in bounds.items():
+    for field, max_length in TEXT_LIMITS.items():
         if len(fields[field]) > max_length:
             raise ValueError(f"El campo {field} supera el máximo permitido.")
     if fields["proposed_gtin"] and not _gtin_check_digit_valid(fields["proposed_gtin"]):
         raise ValueError("El GTIN propuesto debe tener 8, 12, 13 o 14 dígitos y un verificador válido.")
     if status == "READY_FOR_REVIEW" and not (fields["title"] or fields["brand"] or fields["description"]):
         raise ValueError("Para enviar a revisión, completá título, marca o descripción.")
+    if status == "READY_FOR_CHANNELS":
+        readiness = _readiness(fields)
+        if not readiness["ready"]:
+            raise ValueError(
+                "Para dejarla lista para canales faltan: " + ", ".join(readiness["missing"])
+            )
 
 
 class EcommApiProductWorkspace:
@@ -107,7 +231,8 @@ class EcommApiProductWorkspace:
             "source_sku_changed": changed,
             "status": edit.status if edit else "NOT_STARTED",
             "version": edit.version if edit else 0,
-            "fields": dict(edit.fields or {}) if edit else {k: "" for k in FIELDS},
+            "fields": {**blank_fields(), **dict(edit.fields or {})} if edit else blank_fields(),
+            "readiness": _readiness({**blank_fields(), **dict(edit.fields or {})} if edit else blank_fields()),
             "history": list(edit.history or []) if edit else [],
             "created_at": edit.created_at.isoformat() if edit else None,
             "updated_at": edit.updated_at.isoformat() if edit else None,
@@ -185,6 +310,71 @@ class EcommApiProductWorkspace:
         self.db.refresh(edit)
         return self._serialize(edit, source)
 
+
+    def taxonomy(self) -> dict:
+        """Existing internal taxonomy; suggest consistent naming, never invent external IDs."""
+        self._source_pages()
+        from collections import defaultdict
+        hierarchy = defaultdict(lambda: {"name": "", "count": 0, "children": {}})
+        edits = self.db.scalars(select(EcommApiProductEdit)).all()
+        for edit in edits:
+            fields = edit.fields or {}
+            category = str(fields.get("category") or "").strip()
+            subcategory = str(fields.get("subcategory") or "").strip()
+            if not category:
+                continue
+            key = category.casefold()
+            item = hierarchy[key]
+            if not item["name"]:
+                item["name"] = category
+            item["count"] += 1
+            if subcategory:
+                subkey = subcategory.casefold()
+                child = item["children"].setdefault(subkey, {"name": subcategory, "count": 0})
+                child["count"] += 1
+        return {
+            "source": "KIKI_POSTGRESQL_INTERNAL_ONLY",
+            "categories": [
+                {"name": value["name"], "count": value["count"],
+                 "subcategories": sorted(value["children"].values(), key=lambda x: x["name"].casefold())}
+                for value in sorted(hierarchy.values(), key=lambda x: x["name"].casefold())
+            ],
+        }
+
+    def export_master(self, status: str = "") -> dict:
+        """Reversible copy of every editorial field for future channel adapters."""
+        if status and status not in STATES:
+            raise ValueError("Filtro de exportación no permitido.")
+        self._source_pages()
+        edits = self.db.scalars(
+            select(EcommApiProductEdit).order_by(EcommApiProductEdit.ecomm_id)
+        ).all()
+        selected = [edit for edit in edits if not status or edit.status == status]
+        return {
+            "format": "KIKI_COMMERCIAL_MASTER_V1",
+            "exported_at": _now().isoformat(),
+            "source": "KIKI_POSTGRESQL_INTERNAL_ONLY",
+            "external_writes_enabled": False,
+            "filter": status or "ALL",
+            "total": len(selected),
+            "records": [{
+                "ecomm_id": edit.ecomm_id,
+                "source_sku_at_first_edit": edit.source_sku,
+                "source_snapshot_at_first_edit": edit.source_snapshot,
+                "status": edit.status,
+                "version": edit.version,
+                "fields": {**blank_fields(), **(edit.fields or {})},
+                "readiness": _readiness({**blank_fields(), **(edit.fields or {})}),
+                "history": edit.history or [],
+                "created_at": edit.created_at.isoformat() if edit.created_at else None,
+                "updated_at": edit.updated_at.isoformat() if edit.updated_at else None,
+            } for edit in selected],
+            "policy": (
+                "Copia íntegra de datos comerciales guardados en KIKI. "
+                "No modifica inventario ni publica en Mercado Libre/Tiendanube."
+            ),
+        }
+
     def list_saved(self, query: str = "", status: str = "", page: int = 1,
                    limit: int = 25) -> dict:
         if page < 1 or page > 100000 or limit < 1 or limit > 50 or len(query) > 80:
@@ -214,7 +404,8 @@ class EcommApiProductWorkspace:
             "total": len(filtered), "page": page, "limit": limit,
             "summary": {"total_saved": len(all_edits),
                         "drafts": totals["DRAFT"],
-                        "ready_for_review": totals["READY_FOR_REVIEW"]},
+                        "ready_for_review": totals["READY_FOR_REVIEW"],
+                        "ready_for_channels": totals["READY_FOR_CHANNELS"]},
             "items": [{
                 "ecomm_id": x.ecomm_id,
                 "sku": x.source_sku,
@@ -222,6 +413,8 @@ class EcommApiProductWorkspace:
                 "title": (x.fields or {}).get("title") or "",
                 "brand": (x.fields or {}).get("brand") or "",
                 "status": x.status, "version": x.version,
+                "category": (x.fields or {}).get("category") or "",
+                "subcategory": (x.fields or {}).get("subcategory") or "",
                 "updated_at": x.updated_at.isoformat(),
             } for x in filtered[offset:offset + limit]],
             "saved_in": "KIKI_POSTGRESQL_INTERNAL_ONLY",

@@ -12,13 +12,13 @@ const advancedPaths = ['/products','/work','/work/details','/enrichment',
 type ContextHelp={title:string;steps:string[];reminder:string};
 const contextHelp=(pathname:string):ContextHelp=>{
   if(pathname==='/workspace')return {
-    title:'Mejorar productos · cómo guardar',
+    title:'Backoffice comercial · cómo trabajar',
     steps:[
       'Buscá el SKU o abrí una ficha guardada.',
-      'Revisá las sugerencias; «Usar este título» todavía NO guarda.',
-      'Pulsá «Guardar borrador» y comprobá el historial.'
+      'Completá títulos, descripciones, características, SEO, imágenes y fuentes.',
+      'Guardá borrador o enviá a revisión. Cuando esté completa, elegí «Dejar lista para canales».'
     ],
-    reminder:'Sin pulsar Guardar borrador o Enviar a revisión interna, la ficha no conserva los cambios nuevos.'
+    reminder:'Las mejoras solo permanecen cuando guardás la ficha. «Lista para canales» es un estado interno: no publica nada.'
   };
   if(pathname==='/queue')return {
     title:'Cola de mejoras · cómo empezar',
@@ -32,7 +32,7 @@ const contextHelp=(pathname:string):ContextHelp=>{
   if(pathname==='/pilot')return {
     title:'Catálogo por API · qué muestra',
     steps:['Buscá SKU, ID o nombre del producto.','Comprobá cuándo fue capturado el catálogo.',
-      'Podés consultar un SKU en vivo sin actualizar el stock guardado.'],
+      'El catálogo se renueva por la tarea API programada cuando esté configurada; verificá la fecha de captura.'],
     reminder:'La copia API no es un inventario sincronizado en tiempo real.'
   };
   if(pathname==='/cases'||pathname==='/channels')return {
@@ -73,7 +73,7 @@ export function Layout(){
       <nav className="primary-nav kiki-primary-nav" aria-label="Navegación principal">
         <NavLink to="/" end><span className="kiki-nav-icon"><KikiIcon name="home"/></span>Inicio</NavLink>
         <NavLink to="/pilot"><span className="kiki-nav-icon"><KikiIcon name="layers"/></span>Catálogo por API</NavLink>
-        <NavLink to="/workspace"><span className="kiki-nav-icon"><KikiIcon name="check"/></span>Mejorar productos</NavLink>
+        <NavLink to="/workspace"><span className="kiki-nav-icon"><KikiIcon name="check"/></span>Backoffice de productos</NavLink>
         <NavLink to="/queue"><span className="kiki-nav-icon"><KikiIcon name="chart"/></span>Cola de mejoras</NavLink>
         <NavLink to="/propuestas-ia"><span className="kiki-nav-icon"><KikiIcon name="sparkles"/></span>Propuestas IA guardadas</NavLink>
         <NavLink to="/cases"><span className="kiki-nav-icon"><KikiIcon name="search"/></span>Casos para revisar</NavLink>
@@ -94,8 +94,8 @@ export function Layout(){
         </nav>
       </details>
       <div className="kiki-sidebar-footer">
-        <div className="readonly"><KikiIcon name="shield" size={17}/> <strong>Modo de consulta</strong>
-          <small>KIKI no publica ni modifica stock de los canales desde las nuevas pantallas API.</small>
+        <div className="readonly"><KikiIcon name="shield" size={17}/> <strong>Edición interna segura</strong>
+          <small>Las fichas se editan y guardan en KIKI; Ecomm-App, ML y TN no se modifican.</small>
         </div>
         <button className="logout" onClick={logout}>Cerrar sesión</button>
       </div>

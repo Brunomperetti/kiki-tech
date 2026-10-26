@@ -10,10 +10,12 @@ from sqlalchemy import select
 
 from ..database.models import CatalogSnapshot, EcommApiProductEdit
 from ..integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
+from .ecomm_api_product_workspace_service import _readiness, blank_fields
 
 FILTERS = {
     "all", "ai_eligible", "identity", "draft", "ready", "untouched", "pack",
-    "missing_title", "missing_brand", "missing_description", "missing_gtin"
+    "missing_title", "missing_brand", "missing_description", "missing_gtin",
+    "ready_for_channels", "needs_completion"
 }
 
 
@@ -52,13 +54,19 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     # of ingredients, GTIN, price or commercial publication readiness.
     if not is_combo and not identity_issue:
         flags.append("ai_eligible")
-    flags.append("untouched" if not saved else "draft" if status == "DRAFT" else "ready")
+    flags.append("untouched" if not saved else "draft" if status == "DRAFT"
+                 else "ready_for_channels" if status == "READY_FOR_CHANNELS" else "ready")
+    if not saved or not _readiness({**blank_fields(), **fields})["ready"]:
+        flags.append("needs_completion")
     if identity_issue:
         priority = 0
         reason = "Identidad SKU ambigua, incompleta o modificada; revisar antes de editar."
     elif status == "DRAFT":
         priority = 1
         reason = "Borrador guardado pendiente de continuar o revisar."
+    elif status == "READY_FOR_CHANNELS":
+        priority = 5
+        reason = "Ficha comercial completa en KIKI, preparada para futura salida a canales."
     elif is_combo:
         priority = 2
         reason = "Pack/combos requieren verificación de presentación y composición."

@@ -10,14 +10,17 @@ const day=(raw:string|null)=>raw?new Date(raw).toLocaleString('es-AR'):'Sin fech
 const reason=(flag:EcommQueueFilter)=>({
   all:'Todas',ai_eligible:'Simples aptos para IA',identity:'Identidad a revisar',draft:'Borradores',ready:'En revisión interna',
   untouched:'Sin trabajar',pack:'Packs / combos',
+  ready_for_channels:'Listas para canales',needs_completion:'Ficha por completar',
   missing_title:'Sin título propuesto',missing_brand:'Sin marca en KIKI',
   missing_description:'Sin descripción propuesta',missing_gtin:'GTIN no disponible en copia API',
 }[flag]);
 const filters:EcommQueueFilter[]=[
-  'all','ai_eligible','identity','draft','untouched','pack','ready','missing_brand',
+  'all','ai_eligible','identity','draft','untouched','pack','ready',
+  'ready_for_channels','needs_completion','missing_brand',
   'missing_title','missing_description','missing_gtin',
 ];
 const tag=(row:EcommQueueRow)=>row.identity_issue?'Identidad a revisar':
+  row.status==='READY_FOR_CHANNELS'?'Completa y guardada para canales':
   row.status==='READY_FOR_REVIEW'?'Lista para revisión interna':
   row.status==='DRAFT'?'Borrador guardado':
   row.is_combo?'Pack por verificar':'Sin trabajar';
@@ -100,11 +103,11 @@ export function EnrichmentQueue(){
     setBatchPlan(null);setBatchResults([]);setBatchError('');setBatchProgress('');
     const picked=data.items.filter(row=>selected.includes(row.ecomm_id));
     if(!picked.length||picked.length>3){
-      setBatchError('Seleccioná entre 1 y 3 productos de esta página para preparar el piloto de IA.');
+      setBatchError('Seleccioná entre 1 y 3 productos de esta página para preparar las propuestas IA.');
       return;
     }
     if(picked.some(row=>row.identity_issue||row.is_combo||!row.ecomm_id||!row.sku)){
-      setBatchError('El piloto de IA por lotes solo admite productos simples, con ID/SKU únicos. Quitá packs y casos de identidad.');
+      setBatchError('La generación IA por lotes solo admite productos simples, con ID/SKU únicos. Quitá packs y casos de identidad.');
       return;
     }
     setBatchBusy(true);
@@ -213,7 +216,8 @@ export function EnrichmentQueue(){
       <div><span>Variantes API</span><strong>{fmt(summary?.total)}</strong><small>Captura Ecomm-App</small></div>
       <div><span>Sin trabajar</span><strong>{fmt(summary?.untouched)}</strong><small>Sin borrador KIKI</small></div>
       <div><span>En progreso</span><strong>{fmt(summary?.draft)}</strong><small>Con cambios guardados</small></div>
-      <div><span>Preparadas</span><strong>{fmt(summary?.ready)}</strong><small>Solo revisión interna</small></div>
+      <div><span>Para revisión</span><strong>{fmt(summary?.ready)}</strong><small>Control editorial interno</small></div>
+      <div><span>Listas para canales</span><strong>{fmt(summary?.ready_for_channels)}</strong><small>Fichas comerciales completas en KIKI</small></div>
     </div>
 
     <section className="kiki-queue-browser">
@@ -250,7 +254,7 @@ export function EnrichmentQueue(){
         <button type="button" onClick={()=>exportQueue(selectedRows)}
           disabled={!selectedRows.length}><KikiIcon name="archive" size={16}/> Exportar selección CSV</button>
       </div>
-      <section className="kiki-queue-ai-batch" aria-label="Piloto de IA por lotes">
+      <section className="kiki-queue-ai-batch" aria-label="Propuestas IA por lotes">
         <div className="kiki-queue-inbox-shortcut">
           <KikiIcon name="clock" size={18}/>
           <span>¿Ya generaste propuestas? Se conservan aunque salgas de esta página.</span>

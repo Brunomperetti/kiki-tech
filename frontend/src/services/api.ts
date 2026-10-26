@@ -234,6 +234,15 @@ export const api = {
     request<EcommWorkQueue>(
       `/api/ecomm-app/workspace/queue?filter=${encodeURIComponent(filter)}&q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`
     ),
+  ecommTaxonomy: () =>
+    request<{source:string;categories:{
+      name:string;count:number;subcategories:{name:string;count:number}[];
+    }[]}>('/api/ecomm-app/workspace/taxonomy'),
+  ecommMasterExport: (status='') =>
+    request<{
+      format:string;exported_at:string;source:string;external_writes_enabled:false;
+      filter:string;total:number;records:unknown[];policy:string;
+    }>('/api/ecomm-app/workspace/master-export?status='+encodeURIComponent(status)),
   ecommSavedEdits: (q='',status='',page=1,limit=25) =>
     request<EcommSavedEdits>(`/api/ecomm-app/workspace/saved?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`),
   ecommGetEdit: (id:string) =>
