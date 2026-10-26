@@ -6,13 +6,36 @@ from app.services.tiendanube_assisted_match_service import (
     TiendanubeAssistedMatchService, pack_units, variant_conflict,
 )
 
+def save_api_catalog(svc, records):
+    """Fixtures from the Public API captured stage; no Ecomm XLSX."""
+    parents = [
+        {
+            "code": row["sku"], "description": row["name"],
+            "is_combo": False,
+            "variants": [{
+                "id": row["ecomm_id"], "sku": row["sku"],
+                "total_stock": 3, "is_combo": False,
+                "gtin": None, "barcode": None,
+            }]
+        }
+        for row in records
+    ]
+    svc.catalog.repo.save_snapshot("ECOMM_APP_API_STAGE", [
+        {
+            "version": 1, "page": 1, "total": len(records),
+            "total_pages": 1, "per_page": 50,
+            "captured_at": "2026-10-26T12:00:00+00:00",
+            "items": parents,
+        }
+    ])
+
 
 def test_assisted_match_suggests_similar_without_writing_or_guessing_gtin():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         svc = TiendanubeAssistedMatchService(db)
-        svc.catalog.repo.save_snapshot("ECOMM_APP", [
+        save_api_catalog(svc, [
             {"ecomm_id": "17", "sku": "LOCAL-17", "name": "Avena tradicional Granix 400 gr", "brand": "Granix"},
             {"ecomm_id": "18", "sku": "LOCAL-18", "name": "Avena tradicional Granix 800 gr", "brand": "Granix"},
         ])
@@ -25,18 +48,18 @@ def test_assisted_match_suggests_similar_without_writing_or_guessing_gtin():
         matches = report["items"][0]["candidates"]
         assert len(matches) == 1
         assert matches[0]["ecomm_id"] == "17"
-        assert matches[0]["confidence"] == "HIGH"
+        assert matches[0]["confidence"] == "MEDIUM"  # API lacks verified brand, never invent one
         assert svc.catalog.repo.snapshot("TIENDANUBE")[0]["ean_raw"] == "7798010000000.0"
         assert "ean" not in matches[0]
 
 
-def test_assisted_match_rejects_brand_and_pack_conflicts():
+def test_assisted_match_rejects_conflicting_pack_sizes_without_inferred_brand():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         svc = TiendanubeAssistedMatchService(db)
-        svc.catalog.repo.save_snapshot("ECOMM_APP", [
-            {"ecomm_id": "1", "sku": "A", "name": "Crema facial Rosa 250 ml", "brand": "Otra"},
+        save_api_catalog(svc, [
+            {"ecomm_id": "1", "sku": "A", "name": "Crema facial Rosa 300 ml", "brand": "Otra"},
             {"ecomm_id": "2", "sku": "B", "name": "Crema facial Rosa 500 ml", "brand": "Rosa"},
         ])
         svc.catalog.repo.save_snapshot("TIENDANUBE", [

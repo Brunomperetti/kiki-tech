@@ -5,6 +5,7 @@ from app.database.models import Base
 from app.services.tiendanube_assisted_match_service import (
     TiendanubeAssistedMatchService, variant_conflict,
 )
+from test_tiendanube_assisted_match_service import save_api_catalog
 
 
 def test_variants_do_not_confuse_flavors_or_pack_units():
@@ -34,10 +35,10 @@ def test_only_vainilla_is_offered_as_match():
              "brand": "Natufarma"},
         ]
         svc.catalog.repo.save_snapshot("TIENDANUBE", tn)
-        svc.catalog.repo.save_snapshot("ECOMM_APP", ec)
+        save_api_catalog(svc, ec)
         report = svc.report()
         ids = [c["ecomm_id"] for c in report["items"][0]["candidates"]]
         assert "vainilla" in ids
         assert "chocolate" not in ids
         assert svc.catalog.repo.snapshot("TIENDANUBE") == tn
-        assert svc.catalog.repo.snapshot("ECOMM_APP") == ec
+        assert len(svc.catalog.repo.snapshot("ECOMM_APP_API_STAGE")) == 1
