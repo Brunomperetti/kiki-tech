@@ -186,15 +186,6 @@ export function Dashboard(){
       </p>}
     </section>
 
-    <section className="kiki-client-next">
-      <div className="kiki-client-next-icon"><KikiIcon name="shield" size={27}/></div>
-      <div><h2>Ya se puede explorar KIKI. La publicación sigue protegida.</h2>
-        <p>Guillermo y Mercedes pueden buscar productos, consultar la API y recorrer el diagnóstico.
-          Los módulos antiguos de Productos, Tareas y preparación siguen dependiendo de Excel;
-          los mantenemos separados hasta completar la migración.</p></div>
-      <Link to="/pilot" className="kiki-main-action">Abrir centro API <KikiIcon name="arrow-right" size={16}/></Link>
-    </section>
-
     <p className="kiki-home-footnote">La próxima conexión de Mercado Libre debe autorizarla el titular.
       Mientras tanto, KIKI presenta la última copia API de ML como histórica.
       No se modifica inventario, publicaciones ni decisiones guardadas desde estas pantallas.</p>
