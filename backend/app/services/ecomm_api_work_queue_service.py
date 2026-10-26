@@ -46,7 +46,11 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
         "missing_brand": saved and not bool(_value(fields.get("brand"))),
         "missing_title": saved and not bool(_value(fields.get("title"))),
         "missing_description": saved and not bool(_value(fields.get("description"))),
-        "missing_gtin": not bool(_value(source_gtin) or _value(fields.get("proposed_gtin"))),
+        # GTIN absent from the API is a source-coverage issue (shown separately).
+        # Only started, incomplete fichas receive a GTIN documentation flag.
+        "missing_gtin": saved and not bool(
+            _value(source_gtin) or _value(fields.get("proposed_gtin"))
+        ),
     }
     identity_issue = duplicate_sku or source_sku_changed or not id_value or not sku
     flags = [k for k, enabled in missing.items() if enabled]
@@ -57,7 +61,7 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     # Matches the guards in the batch AI preview: a unique, stable, 
     # API-identified non-combo variant. This is NOT a factual verification
     # of ingredients, GTIN, price or commercial publication readiness.
-    if not is_combo and not identity_issue:
+    if not is_combo and not identity_issue and _value(product_name):
         flags.append("ai_eligible")
     flags.append("untouched" if not saved else "draft" if status == "DRAFT"
                  else "ready_for_channels" if status == "READY_FOR_CHANNELS" else "ready")
@@ -68,6 +72,9 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     if identity_issue:
         priority = 0
         reason = "Identidad SKU ambigua, incompleta o modificada; revisar antes de editar."
+    elif missing["missing_source_name"]:
+        priority = 1
+        reason = "La API no informó un nombre para esta variante: verificar antes de redactar."
     elif status == "DRAFT":
         priority = 1
         reason = "Borrador guardado pendiente de continuar o revisar."
