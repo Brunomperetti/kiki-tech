@@ -11,11 +11,14 @@ from sqlalchemy import select
 from ..database.models import CatalogSnapshot, EcommApiProductEdit
 from ..integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
 from .ecomm_api_product_workspace_service import _readiness, blank_fields, review_schedule
+from .ecomm_channel_coverage_service import build_channel_coverage
 
 FILTERS = {
     "all", "ai_eligible", "identity", "draft", "ready", "untouched", "pack",
     "missing_title", "missing_brand", "missing_description", "missing_gtin",
-    "ready_for_channels", "needs_completion", "review_due", "missing_source_name"
+    "ready_for_channels", "needs_completion", "review_due", "missing_source_name",
+    "ml_candidate", "tn_candidate", "ml_no_exact", "tn_no_exact",
+    "both_candidates", "channel_review", "neither_sku_in_snapshots"
 }
 
 
@@ -30,7 +33,7 @@ def _date(raw):
 
 
 def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
-                edit, duplicate_sku):
+                edit, duplicate_sku, coverage):
     saved = bool(edit)
     fields = edit.fields or {} if saved else {}
     source_sku_changed = bool(saved and edit.source_sku != sku)
@@ -65,8 +68,26 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
         flags.append("ai_eligible")
     flags.append("untouched" if not saved else "draft" if status == "DRAFT"
                  else "ready_for_channels" if status == "READY_FOR_CHANNELS" else "ready")
-    if not saved or not _readiness({**blank_fields(), **fields})["ready"]:
+    # An untouched product is not an incomplete edited fiche. Separate
+    # commercial production from evidence of listings in both channels.
+    if saved and not _readiness({**blank_fields(), **fields})["ready"]:
         flags.append("needs_completion")
+    ml = (coverage or {}).get("ml") or {"status": "UNAVAILABLE"}
+    tn = (coverage or {}).get("tn") or {"status": "UNAVAILABLE"}
+    if ml["status"] == "SKU_CANDIDATE":
+        flags.append("ml_candidate")
+    if tn["status"] == "SKU_CANDIDATE":
+        flags.append("tn_candidate")
+    if ml["status"] == "NO_EXACT_SKU_IN_SNAPSHOT":
+        flags.append("ml_no_exact")
+    if tn["status"] == "NO_EXACT_SKU_IN_SNAPSHOT":
+        flags.append("tn_no_exact")
+    if ml["status"] == "SKU_CANDIDATE" and tn["status"] == "SKU_CANDIDATE":
+        flags.append("both_candidates")
+    if (coverage or {}).get("review_required"):
+        flags.append("channel_review")
+    if (coverage or {}).get("combined") == "NO_EXACT_EVIDENCE_IN_BOTH_SNAPSHOTS":
+        flags.append("neither_sku_in_snapshots")
     if review_schedule(edit)["review_due"]:
         flags.append("review_due")
     if identity_issue:
@@ -81,18 +102,33 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     elif review_schedule(edit)["review_due"]:
         priority = 1
         reason = "Venció la revisión mensual: volver a corroborar fuentes y presentación."
+    elif "channel_review" in flags:
+        priority = 2
+        reason = "La copia del canal tiene SKU repetidos, packs o conflictos. Verificar antes de vincular."
     elif status == "READY_FOR_CHANNELS":
-        priority = 5
-        reason = "Ficha comercial completa en KIKI, preparada para futura salida a canales."
+        priority = 6
+        reason = "Ficha comercial completa en KIKI; todavía falta verificar cada canal."
     elif is_combo:
         priority = 2
         reason = "Pack/combos requieren verificación de presentación y composición."
     elif status == "READY_FOR_REVIEW":
-        priority = 4
+        priority = 5
         reason = "Ficha preparada para revisión interna; no equivale a publicación."
-    else:
+    elif "ml_no_exact" in flags or "tn_no_exact" in flags:
         priority = 3
-        reason = "Falta preparar los campos comerciales dentro de KIKI."
+        reason = (
+            "No se encontró SKU exacto en la copia de uno o ambos canales. "
+            "Antes de crear publicaciones, verificar el catálogo actual."
+        )
+    elif "both_candidates" in flags:
+        priority = 5
+        reason = "Ambos canales tienen un candidato por SKU. Confirmar identidad antes de cambiar publicaciones."
+    elif "ml_candidate" in flags or "tn_candidate" in flags:
+        priority = 4
+        reason = "Hay al menos una coincidencia de SKU en un canal; verificar presentación y el otro canal."
+    else:
+        priority = 4
+        reason = "Organizar ficha comercial y comprobar el estado de los canales disponibles."
     return {
         "ecomm_id": id_value, "sku": sku, "product_name": product_name,
         "source_gtin_present": bool(_value(source_gtin)),
@@ -105,6 +141,11 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
         "proposed_title": _value(fields.get("title")),
         "source_name_present": bool(_value(product_name)),
         "commercial_edit_started": saved,
+        "channel_coverage": coverage or {
+            "ml": {"status": "UNAVAILABLE"},
+            "tn": {"status": "UNAVAILABLE"},
+            "combined": "SOURCES_UNAVAILABLE", "review_required": False,
+        },
         "flags": flags, "identity_issue": identity_issue,
         "priority": priority, "reason": reason,
         "last_edited_at": _date(edit.updated_at) if saved else None,
@@ -127,6 +168,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
     edits = {
         x.ecomm_id: x for x in db.scalars(select(EcommApiProductEdit)).all()
     }
+    channel_matrix = build_channel_coverage(db, pages)
     sku_owners = Counter(
         _value(v.get("sku")).casefold()
         for p in pages for parent in p.get("items") or []
@@ -148,9 +190,10 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
                 item = _queue_item(
                     ecomm_id, sku, _value(parent.get("description")),
                     variant.get("gtin") or variant.get("barcode"),
-                    variant.get("is_combo") is True,
+                    variant.get("is_combo") is True or parent.get("is_combo") is True,
                     p.get("captured_at"), edits.get(ecomm_id),
                     bool(sku and sku_owners[sku.casefold()] > 1),
+                    channel_matrix["items_by_id"].get(ecomm_id),
                 )
                 counts["total"] += 1
                 counts["source_name_present"] += int(item["source_name_present"])
@@ -201,6 +244,11 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
             "gtin_in_api_capture": counts["gtin_in_api_capture"],
             "gtin_unavailable_in_api_capture": counts["gtin_unavailable_in_api_capture"],
         },
+        "channel_coverage": {
+            "summary": channel_matrix["summary"],
+            "sources": channel_matrix["sources"],
+            "policy": channel_matrix["policy"],
+        },
         "gtin_data_quality": {
             "gtin_found_in_capture": counts["gtin_in_api_capture"],
             "gtin_unavailable_in_capture": counts["gtin_unavailable_in_api_capture"],
@@ -219,6 +267,9 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
             "La cola se deriva exclusivamente de la copia Ecomm-App por API y "
             "de fichas guardadas en KIKI PostgreSQL. Un GTIN que no aparece en "
             "la captura NO es evidencia de ausencia de EAN original. "
+            "Se cruzan los ID/SKU de Ecomm API con copias ML API y TN CSV. "
+            "Los cruces son candidatos, no publicaciones certificadas; un SKU "
+            "ausente en un snapshot no equivale a producto no publicado. "
             "Los nombres ya presentes en la API no son títulos faltantes. "
             "Las alertas de marca, título y descripción se refieren SOLO a fichas "
             "que el equipo comenzó a editar y todavía no completó. "
