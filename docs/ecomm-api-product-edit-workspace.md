@@ -57,7 +57,7 @@ su validez matemática **no** prueba correspondencia comercial.
   idempotente, credenciales autorizadas y pruebas de reversión.
 - Copias de seguridad de PostgreSQL tras la recuperación del plan Render.
 - Usuarios/permisos multioperador, reportes de revisión/exportación y
-  pruebas reales de extremo a extremo con Guillermo y Mercedes.
+  pruebas reales de extremo a extremo con el equipo operativo.
 
 ## Operación segura
 El alta de la nueva tabla es aditiva: `Base.metadata.create_all` al iniciar

@@ -125,7 +125,7 @@ export function KikiGuide(){
     <header className="kiki-home-header">
       <div><p className="eyebrow">KIKI TECH · GUÍA INTERACTIVA</p>
         <h1>Aprendé KIKI mientras trabajás</h1>
-        <p>Un recorrido sencillo para Guillermo y Mercedes: de encontrar un producto a
+        <p>Un recorrido práctico para usar KIKI: desde encontrar un producto hasta
           guardar las mejoras y recuperarlas otro día.</p>
       </div>
       <Link className="kiki-guide-home-link" to="/"><KikiIcon name="home" size={16}/> Ir a Inicio</Link>

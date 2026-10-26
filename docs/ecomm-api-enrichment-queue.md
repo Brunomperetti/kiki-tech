@@ -3,7 +3,7 @@
 ## Necesidad real
 El catálogo Ecomm-App registra más de 3.000 variantes. La ficha individual y el
 asistente IA ya funcionan, pero no son suficientes para entregar un proceso
-utilizable por Guillermo y Mercedes. Hace falta triage, prioridades y una manera
+utilizable por los operadores del catálogo. Hace falta triage, prioridades y una manera
 ordenada de seleccionar muchos productos para revisar.
 
 ## Fuente de verdad y límites
