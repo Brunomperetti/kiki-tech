@@ -7,7 +7,8 @@ from sqlalchemy import select
 
 from ..database.models import TiendanubeMatchDecision
 
-from .tiendanube_csv_service import TiendanubeCsvService
+from .tiendanube_api_catalog_service import TiendanubeApiCatalogService
+from ..integrations.ecomm_app.catalog_stage import STAGE_SOURCE
 
 
 def normalize(value):
@@ -77,13 +78,37 @@ def variant_conflict(source_name, source_sku, target_name, target_sku):
 
 class TiendanubeAssistedMatchService:
     def __init__(self, db):
-        self.catalog = TiendanubeCsvService(db)
+        self.catalog = TiendanubeApiCatalogService(db)
 
     def report(self):
         existing = self.catalog.report()
         if not existing["available"]:
             return {"available": False, "items": [], "summary": {}}
-        ecomm = self.catalog.repo.snapshot("ECOMM_APP")
+        # Only use variants of the completed API capture. No historical
+        # Ecomm Excel brands, aliases or parent SKU families are candidates.
+        api_pages = self.catalog.repo.snapshot(STAGE_SOURCE)
+        ecomm = []
+        used_skus = {}
+        for page in api_pages:
+            for parent in page.get("items") or []:
+                for variant in parent.get("variants") or []:
+                    if not isinstance(variant, dict) or variant.get("invalid"):
+                        continue
+                    if variant.get("is_combo") is True or parent.get("is_combo") is True:
+                        continue
+                    ident, sku = variant.get("id"), variant.get("sku")
+                    if ident is None or not isinstance(sku, str) or not sku.strip():
+                        continue
+                    name = str(parent.get("description") or variant.get("description") or "").strip()
+                    if not name:
+                        continue
+                    item = {"ecomm_id": str(ident), "sku": sku, "name": name,
+                            "brand": "", "source": STAGE_SOURCE}
+                    ecomm.append(item)
+                    used_skus[sku.casefold()] = used_skus.get(sku.casefold(), 0) + 1
+        # Ambiguous Ecomm SKUs cannot support recommendations.
+        ecomm = [item for item in ecomm
+                 if used_skus[item["sku"].casefold()] == 1]
         decisions = {row.source_key: row for row in self.catalog.repo.db.scalars(select(TiendanubeMatchDecision)).all()}
         candidates = []
         for item in existing["items"]:
@@ -140,7 +165,7 @@ class TiendanubeAssistedMatchService:
                 "without_proposals": sum(not x["candidates"] for x in candidates),
             },
             "items": candidates,
-            "policy": "Propuestas internas para revisión, sin vinculación ni publicación automática. No se infiere EAN.",
+            "policy": "Candidatos desde captura Ecomm-App API completa y Tiendanube CSV. Sin Excel Ecomm, sin marca inferida y sin aprobación automática. No se infiere EAN ni se publica.",
         }
 
     def decide(self, source_key: str, target_ecomm_id: str | None, status: str, note: str):
