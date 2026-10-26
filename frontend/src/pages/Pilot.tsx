@@ -133,10 +133,10 @@ export function Pilot(){
 
     <section className="kiki-pilot-auto-status" role="status" aria-label="Estado de la actualización automática">
       <KikiIcon name="refresh" size={19}/>
-      <div><strong>{autoStatus?.configured?'Actualización automática por API configurada':'Actualización automática pendiente de configurar'}</strong>
+      <div><strong>{autoStatus?.configured?'Actualización API: servidor preparado (verificar tarea programada)':'Actualización automática pendiente de configurar'}</strong>
         <p>Última captura completa: {dateLabel(autoStatus?.last_successful_capture_at||catalog?.capture_last_at)}.
           {autoStatus?.refresh_in_progress?' Nueva captura en curso; se conserva la última copia válida.':
-            autoStatus?.configured?' Frecuencia programada: dos veces por día.':
+            autoStatus?.configured?' Frecuencia prevista: dos veces por día; verificar ejecuciones en GitHub Actions.':
               ' Falta configurar la misma credencial de automatización en Render y GitHub Actions.'}
           {autoStatus?.last_successful_capture_at &&
           (Date.now()-new Date(autoStatus.last_successful_capture_at).getTime())>24*60*60*1000
