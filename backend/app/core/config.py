@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     auth_block_minutes: int = 15
     enable_api_docs: bool = False
     ecomm_app_api_token: str = ""
+    kiki_refresh_token: str = ""
     kiki_ai_api_key: str = ""
     kiki_ai_model: str = "gpt-4.1-mini"
     kiki_ai_enabled: bool = False
