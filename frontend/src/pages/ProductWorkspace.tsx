@@ -175,6 +175,19 @@ export function ProductWorkspace(){
       document.removeEventListener('click',interceptLink,true);
     };
   },[dirty]);
+  async function confirmReview(){
+    if(!edit||saving||dirty||edit.status!=='READY_FOR_CHANNELS')return;
+    if(!window.confirm('Confirmá esta revisión solo si volviste a contrastar la ficha, sus fuentes y presentación con la documentación original. KIKI registrará la fecha sin modificar tiendas. ¿Registrar revisión?'))return;
+    setSaving(true);setError('');setMessage('');
+    try{
+      const next=await api.ecommConfirmMonthlyReview(edit.ecomm_id,edit.version);
+      setEdit(next);
+      setMessage('Revisión mensual registrada en el historial de KIKI. Próxima revisión dentro de 30 días.');
+      await loadSaved();
+    }catch(e){setError(fail(e));}
+    finally{setSaving(false);}
+  }
+
   function applyAiToMaster(proposal:EcommAiSuggestion){
     if(!edit||!proposal.source_current||!proposal.title)return;
     if((fields.title||fields.description)&&!window.confirm(
@@ -244,6 +257,7 @@ export function ProductWorkspace(){
       <div><strong>{saved?.summary.drafts.toLocaleString('es-AR')??'—'}</strong><span>Borradores</span></div>
       <div><strong>{saved?.summary.ready_for_review.toLocaleString('es-AR')??'—'}</strong><span>Preparadas para revisión</span></div>
       <div><strong>{saved?.summary.ready_for_channels.toLocaleString('es-AR')??'—'}</strong><span>Listas para canales (internas)</span></div>
+      <div><strong>{saved?.summary.review_due.toLocaleString('es-AR')??'—'}</strong><span>Revisiones mensuales vencidas</span></div>
     </div>
     <div className="kiki-workspace-grid">
       <section className="kiki-workspace-directory">
@@ -310,7 +324,7 @@ export function ProductWorkspace(){
             className={'kiki-workspace-product '+(targetId===row.ecomm_id?'selected':'')}
             onClick={()=>open(row.ecomm_id)}>
             <span className="kiki-workspace-product-top"><strong>SKU {row.sku}</strong><small>{label(row.status)}</small></span>
-            <span>{row.title||row.product_name}</span>
+            <span>{row.title||row.product_name}{row.review_due?' · Revisión mensual pendiente':''}</span>
             <KikiIcon name="arrow-right" size={15}/>
           </button>)}
           {!savedLoading&&saved?.total===0&&<p className="kiki-workspace-empty">
@@ -465,6 +479,16 @@ export function ProductWorkspace(){
             <KikiIcon name="alert" size={16}/> Tenés cambios sin guardar.
             Guardalos antes de salir o abrir otro producto.
           </p>}
+          {edit.status==='READY_FOR_CHANNELS'&&<section className="kiki-workspace-monthly" aria-label="Control de revisión mensual">
+            <div>
+              <strong>{edit.review_schedule.review_due?'La revisión mensual está pendiente':'Revisión mensual del catálogo'}</strong>
+              <p>Última verificación: {date(edit.review_schedule.last_review_at)}.
+                Próxima revisión: {date(edit.review_schedule.next_review_at)}.</p>
+              <p>Consultá nuevamente las fuentes y el envase antes de renovar la vigencia documental.</p>
+            </div>
+            <button type="button" disabled={saving||dirty||edit.source_sku_changed}
+              onClick={()=>void confirmReview()}>{saving?'Registrando…':'Registrar verificación mensual'}</button>
+          </section>}
           <button type="button" className="kiki-workspace-history-toggle" onClick={()=>setShowHistory(!showHistory)}>
             <KikiIcon name="clock" size={17}/>{showHistory?'Ocultar historial':'Ver historial de ediciones'} ({edit.history.length})
           </button>
