@@ -644,7 +644,7 @@ export type EcommEditStatus = 'DRAFT' | 'READY_FOR_REVIEW' | 'READY_FOR_CHANNELS
 export type KikiSourceKind = 'FABRICANTE'|'ETIQUETA'|'DISTRIBUIDOR'|'OTRO';
 export interface KikiAttribute {name:string;value:string}
 export interface KikiMedia {kind:'IMAGE'|'VIDEO';url:string;alt:string;source_url:string}
-export interface KikiSource {kind:KikiSourceKind;name:string;url:string;note:string}
+export interface KikiSource {kind:KikiSourceKind;name:string;url:string;note:string;verified:boolean}
 export interface EcommEditableFields {
   brand:string;manufacturer:string;title:string;short_title:string;
   short_description:string;description:string;details:string;
