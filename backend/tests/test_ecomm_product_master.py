@@ -149,3 +149,23 @@ def test_media_not_alone_sufficient_as_authoritative_evidence():
     ready = _readiness(payload)
     assert not ready["ready"]
     assert "primary_source" in ready["missing"]
+
+
+def test_master_export_contains_all_fields_versions_history_and_existing_taxonomy(engine):
+    with Session(engine) as db:
+        svc = EcommApiProductWorkspace(db)
+        svc.save("45", master(), "READY_FOR_CHANNELS", 0)
+        tree = svc.taxonomy()
+        assert tree["categories"][0]["name"] == "Alimentos"
+        assert tree["categories"][0]["subcategories"][0]["name"] == "Salsas y aderezos"
+        exported = svc.export_master("READY_FOR_CHANNELS")
+        assert exported["format"] == "KIKI_COMMERCIAL_MASTER_V1"
+        assert exported["total"] == 1
+        assert exported["external_writes_enabled"] is False
+        record = exported["records"][0]
+        assert record["ecomm_id"] == "45"
+        assert record["version"] == 1
+        assert record["fields"]["seo_keywords"] == "salsa de soja, 500 ml"
+        assert record["fields"]["media"][0]["url"].startswith("https://")
+        assert len(record["history"]) == 1
+        assert svc.export_master("DRAFT")["total"] == 0
