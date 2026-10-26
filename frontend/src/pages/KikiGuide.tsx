@@ -95,13 +95,13 @@ const steps:JourneyStep[]=[
   },
   {
     heading:'Consultá canales sin confundir estados',icon:'store',
-    intro:'Canales de venta muestra la situación de Mercado Libre y Tiendanube. La integración de escritura masiva aún no está habilitada.',
+    intro:'El titular puede autorizar la cuenta de Mercado Libre y actualizar su copia API. La edición de publicaciones y la escritura masiva aún no están habilitadas.',
     directions:[
-      'En Canales de venta distinguí la copia API de ML de la información Tiendanube importada por CSV.',
-      'Los módulos de «Herramientas y datos históricos» siguen basados en importaciones antiguas y están separados del flujo nuevo por API.',
-      'La publicación y los cambios de stock/precio requerirán integraciones y autorizaciones adicionales.'
+      'Ingresá a «Canales de venta» y pulsá «Conectar Mercado Libre». La autorización debe realizarla el titular con la cuenta correcta.',
+      'Al volver desde Mercado Libre, comprobá la cuenta vinculada y pulsá «Actualizar publicaciones por API» para renovar la copia interna.',
+      'En Tiendanube usás su CSV; para Ecomm-App usás exclusivamente su captura API. Guardar una mejora en KIKI no cambia ningún canal externo.'
     ],
-    check:'Sé qué está preparado en KIKI y qué NO cambió en las tiendas.',
+    check:'Sé conectar ML, actualizar la copia y distinguir las fichas KIKI de las publicaciones reales.',
     caution:'No interpretes una coincidencia de SKU como publicación confirmada ni una propuesta de ficha como exportación lista.',
     action:'Abrir Canales de venta',to:'/channels'
   }
@@ -114,8 +114,8 @@ const glossary=[
   ['KIKI AI','Proponer títulos/descripciones. Una propuesta queda almacenada, pero no modifica la ficha hasta que la revisás y guardás.','/workspace'],
   ['Propuestas IA guardadas','Bandeja para recuperar lo generado, aunque hayas salido del lote. Entrá al editor para revisar y guardar los campos.','/propuestas-ia'],
   ['Casos para revisar','Diagnóstico entre capturas de Ecomm y Mercado Libre; no confirma vínculos ni publicaciones.','/cases'],
-  ['Canales de venta','Ver fuentes de ML/Tiendanube. El CSV de TN y la copia ML no equivalen a sincronización en vivo.','/channels'],
-  ['Herramientas y datos históricos','Módulos del sistema anterior basados en Excel/CSV. Mantenerlos separados del nuevo trabajo de Ecomm por API.','/']
+  ['Canales de venta','El titular conecta Mercado Libre, actualiza su copia API y consulta Tiendanube CSV. No se escribe a tiendas.','/channels#mercado-libre'],
+  ['Herramientas y datos históricos','Legado separado; Ecomm-App trabaja exclusivamente por API, sin recurrir al Excel anterior.','/']
 ];
 
 export function KikiGuide(){
