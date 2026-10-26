@@ -53,13 +53,13 @@ def test_assisted_match_suggests_similar_without_writing_or_guessing_gtin():
         assert "ean" not in matches[0]
 
 
-def test_assisted_match_rejects_brand_and_pack_conflicts():
+def test_assisted_match_rejects_conflicting_pack_sizes_without_inferred_brand():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         svc = TiendanubeAssistedMatchService(db)
         save_api_catalog(svc, [
-            {"ecomm_id": "1", "sku": "A", "name": "Crema facial Rosa 250 ml", "brand": "Otra"},
+            {"ecomm_id": "1", "sku": "A", "name": "Crema facial Rosa 300 ml", "brand": "Otra"},
             {"ecomm_id": "2", "sku": "B", "name": "Crema facial Rosa 500 ml", "brand": "Rosa"},
         ])
         svc.catalog.repo.save_snapshot("TIENDANUBE", [
