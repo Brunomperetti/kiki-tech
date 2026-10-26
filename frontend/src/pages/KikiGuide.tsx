@@ -23,14 +23,14 @@ const steps:JourneyStep[]=[
   },
   {
     heading:'Encontrá qué productos necesitan trabajo',icon:'chart',
-    intro:'Cola de mejoras organiza las variantes de Ecomm-App y las ediciones guardadas en KIKI. Es un diagnóstico: los motivos se pueden superponer.',
+    intro:'Cola de mejoras combina las variantes de Ecomm-App API con candidatos de Mercado Libre API y Tiendanube CSV. Las fichas comerciales que KIKI todavía no empezó NO están vacías.',
     directions:[
-      'Abrí Cola de mejoras y probá los filtros «Borradores» y «Simples aptos para IA».',
-      'Usá el buscador por SKU, ID Ecomm o nombre. Cada resultado muestra por qué fue incluido.',
-      'Podés seleccionar varios casos y exportar CSV para seguimiento; seleccionar NO guarda ni aprueba.'
+      'Abrí Cola de mejoras y probá «Candidatos en TN», «Candidatos en ML» y «Conflictos de canales para verificar».',
+      'Buscá por SKU, ID o nombre; mirá el motivo, cuántas filas comparten SKU y las referencias de cada canal.',
+      'Una coincidencia por SKU es un candidato: compará producto, presentación, combo y fuentes antes de considerarla válida.'
     ],
-    check:'Puedo localizar un producto o un borrador por SKU y abrir su ficha.',
-    caution:'«GTIN no disponible en copia API» NO significa que el artículo carezca de EAN.',
+    check:'Puedo encontrar un SKU y distinguir candidato, conflicto y falta de coincidencia en la copia.',
+    caution:'«Sin SKU exacto en copia» NO significa «no publicado»; las capturas pueden estar desactualizadas.',
     action:'Abrir Cola de mejoras',to:'/queue'
   },
   {
@@ -49,7 +49,7 @@ const steps:JourneyStep[]=[
     heading:'Generá propuestas IA (solo cuando haga falta)',icon:'sparkles',
     intro:'Cuando confirmás la generación, KIKI guarda propuestas de título y descripción. No las incorpora todavía a la ficha comercial.',
     directions:[
-      'Leé el costo estimado del lote y confirmá únicamente si querés consumir esas solicitudes.',
+      'Revisá cuántas solicitudes nuevas se harían y el cupo diario antes de confirmar el consumo de IA.',
       'La IA puede reutilizar una propuesta vigente sin volver a consumir una solicitud.',
       'Cuando finaliza, el resultado muestra un enlace «Revisar propuesta» para cada SKU.'
     ],
@@ -97,21 +97,21 @@ const steps:JourneyStep[]=[
   },
   {
     heading:'Consultá canales sin confundir estados',icon:'store',
-    intro:'El titular puede autorizar la cuenta de Mercado Libre y actualizar su copia API. La edición de publicaciones y la escritura masiva aún no están habilitadas.',
+    intro:'La cobertura cruza Ecomm-App API, la última copia de Mercado Libre API y el CSV importado de Tiendanube. Ninguna coincidencia confirma por sí sola una publicación.',
     directions:[
-      'Ingresá a «Canales de venta» y pulsá «Conectar Mercado Libre». La autorización debe realizarla el titular con la cuenta correcta.',
-      'Al volver desde Mercado Libre, comprobá la cuenta vinculada y pulsá «Actualizar publicaciones por API» para renovar la copia interna.',
-      'En Tiendanube usás su CSV; para Ecomm-App usás exclusivamente su captura API. Guardar una mejora en KIKI no cambia ningún canal externo.'
+      'Entrá a Canales de venta y revisá fechas y estado de las fuentes; una captura vieja sirve para investigar, no para confirmar ausencias actuales.',
+      'La autorización de Mercado Libre debe hacerla el titular. Cuando esté conectada, usá «Actualizar publicaciones por API» para renovar la copia.',
+      'Tiendanube usa el CSV importado y Ecomm-App únicamente su API. Guardar una ficha en KIKI no modifica los canales externos.'
     ],
-    check:'Sé conectar ML, actualizar la copia y distinguir las fichas KIKI de las publicaciones reales.',
-    caution:'No interpretes una coincidencia de SKU como publicación confirmada ni una propuesta de ficha como exportación lista.',
+    check:'Sé cuándo una comparación usa datos históricos y cuándo debo pedir una captura nueva.',
+    caution:'No se puede publicar, modificar stock o sincronizar fichas hacia los canales desde este piloto.',
     action:'Abrir Canales de venta',to:'/channels'
   }
 ];
 
 const glossary=[
   ['Catálogo por API','Consultar productos, SKU, ID y stock a la fecha de captura de Ecomm-App. No edita Ecomm-App.','/pilot'],
-  ['Cola de mejoras','Ordenar pendientes, buscar, filtrar y seleccionar. El CSV es una lista de seguimiento, no una carga masiva.','/queue'],
+  ['Cola de mejoras','Encontrar candidatos ML/TN, conflictos entre canales y fichas comerciales pendientes. Un SKU coincidente no es un vínculo aprobado; el CSV exportado sirve solo para seguimiento.','/queue'],
   ['Backoffice comercial de productos','Crear fichas maestras completas: textos, atributos, categorías, SEO, imágenes/videos por URL y fuentes; guardar e historizar.','/workspace'],
   ['KIKI AI','Proponer títulos/descripciones. Una propuesta queda almacenada, pero no modifica la ficha hasta que la revisás y guardás.','/workspace'],
   ['Propuestas IA guardadas','Bandeja para recuperar lo generado, aunque hayas salido del lote. Entrá al editor para revisar y guardar los campos.','/propuestas-ia'],
@@ -127,8 +127,8 @@ export function KikiGuide(){
     <header className="kiki-home-header">
       <div><p className="eyebrow">KIKI TECH · GUÍA INTERACTIVA</p>
         <h1>Aprendé KIKI mientras trabajás</h1>
-        <p>Un recorrido práctico para usar KIKI: desde encontrar un producto hasta
-          guardar las mejoras y recuperarlas otro día.</p>
+        <p>Empezá con los datos disponibles, verificá coincidencias entre canales y
+          guardá mejoras en KIKI. La generación con IA es opcional.</p>
       </div>
       <Link className="kiki-guide-home-link" to="/"><KikiIcon name="home" size={16}/> Ir a Inicio</Link>
     </header>
@@ -136,10 +136,35 @@ export function KikiGuide(){
     <section className="kiki-guide-essential">
       <KikiIcon name="shield" size={25}/>
       <div><strong>Lo principal: el trabajo queda guardado cuando confirmás la ficha.</strong>
-        <p>«Generar propuesta IA» guarda una propuesta interna; «Usar este título»
-          solo la copia al formulario. <b>«Guardar borrador» o «Enviar a revisión interna»
-          son los botones o «Dejar lista para canales» conservan los campos en PostgreSQL.</b>
-          No se publica ni se modifica el inventario externo.</p>
+        <p>«Generar propuesta IA» conserva una propuesta interna y «Usar este título» solo
+          la copia al formulario. <b>Para conservar los cambios de una ficha, pulsá
+          «Guardar borrador», «Enviar a revisión interna» o «Dejar lista para canales».</b>
+          Ninguna de estas acciones publica ni modifica el inventario externo.</p>
+      </div>
+    </section>
+
+    <section className="kiki-guide-start" aria-label="Primera prueba en tres pasos">
+      <div>
+        <p className="eyebrow">PRIMERA PRUEBA · SIN COSTO DE IA NI PUBLICACIONES</p>
+        <h2>Empezá por acá: tres acciones simples</h2>
+        <p>No hace falta revisar todo el catálogo. Probá un producto y comprobá cómo KIKI conserva el trabajo.</p>
+      </div>
+      <div className="kiki-guide-start-grid">
+        <Link to="/channels" className="kiki-guide-start-card">
+          <span>01 · FUENTES</span><strong>Revisá de dónde salen los datos</strong>
+          <small>Ecomm por API, última copia ML y CSV Tiendanube. Mirá las fechas.</small>
+          <KikiIcon name="arrow-right" size={16}/>
+        </Link>
+        <Link to="/queue" className="kiki-guide-start-card">
+          <span>02 · COINCIDENCIAS</span><strong>Elegí un caso real</strong>
+          <small>Filtrá candidatos o conflictos y verificá SKU, presentación y canal.</small>
+          <KikiIcon name="arrow-right" size={16}/>
+        </Link>
+        <Link to="/workspace" className="kiki-guide-start-card">
+          <span>03 · GUARDADO</span><strong>Completá y guardá una ficha</strong>
+          <small>Guardá un borrador, volvé a entrar y comprobá el historial.</small>
+          <KikiIcon name="arrow-right" size={16}/>
+        </Link>
       </div>
     </section>
 
