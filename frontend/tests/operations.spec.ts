@@ -23,6 +23,10 @@ const open = async (page: Page, id = "DEMO-1001") => {
   return page.getByRole("dialog");
 };
 async function tool(page: Page, name: string) {
+  if (!(await page.getByRole("button", { name, exact: true }).isVisible()))
+    await page
+      .getByRole("button", { name: "Más acciones del catálogo" })
+      .click();
   await page.getByRole("button", { name, exact: true }).click();
   return page.getByRole("region", { name, exact: true });
 }
@@ -282,11 +286,12 @@ test("filtros por conflicto y siguiente acción, conteos separados y prioridad",
   page,
 }) => {
   await expect(
-    page.getByRole("region", { name: "Progreso del catálogo" }),
-  ).toContainText("7 productos base · 8 variantes");
+    page.getByRole("region", { name: "Resumen del catálogo" }),
+  ).toContainText("7 productos · 8 variantes");
   await expect(page.locator(".d-table tbody tr").first()).toContainText(
-    "Conflicto",
+    "Resolver conflicto",
   );
+  await page.getByText("Más filtros y detalles", { exact: true }).click();
   await page.getByLabel("Conflicto", { exact: true }).selectOption("yes");
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await page
@@ -302,7 +307,7 @@ test("filtros por conflicto y siguiente acción, conteos separados y prioridad",
   await page
     .locator(".d-table tbody tr")
     .first()
-    .getByRole("button", { name: "Resolver tarea" })
+    .getByRole("button", { name: "Resolver conflicto" })
     .click();
   await expect(
     page.getByRole("tab", { name: "Evidencias", exact: true }),

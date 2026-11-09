@@ -59,9 +59,12 @@ test("combina filtros, restaura URL y muestra vacío recuperable", async ({
   await expect(
     page.getByRole("heading", { name: "No encontramos productos" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Ver todo el catálogo" }).click();
+  await page
+    .locator(".d-empty")
+    .getByRole("button", { name: "Ver todo el catálogo" })
+    .click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(8);
-  await page.getByRole("button", { name: /Conflictos 2 Necesitan/ }).click();
+  await page.getByRole("button", { name: /^Necesita atención 2/ }).click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await page.goBack();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(8);
@@ -127,7 +130,7 @@ test("requiere confirmación y bloquea preparación con conflictos", async ({
   await page.keyboard.press("Escape");
   await expect(
     page.locator(".d-table tbody tr").filter({ hasText: "DEMO-1006" }),
-  ).toContainText("Conflicto");
+  ).toContainText("Resolver conflicto");
 });
 
 test("no conexiones productivas: CSP, transportes, env heredado y backend bloqueados", async ({

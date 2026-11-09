@@ -4,6 +4,12 @@ import { KikiIcon as Icon } from "../components/KikiIcon";
 import { type Status } from "./data";
 import {
   candidateCount,
+  channelState,
+  inWorkState,
+  workLabels,
+  editorialState,
+  actionTab,
+  type WorkState,
   createCatalog,
   nextAction,
   type Item,
@@ -11,31 +17,11 @@ import {
 } from "./operations-model";
 import { OperationalPanel } from "./OperationalPanel";
 import { OperationsCenter } from "./OperationsCenter";
-import "./operations.css";
 import "./dashboard.css";
+import "./operations.css";
+import "./simple-dashboard.css";
+import { SettingsDialog } from "./SettingsDialog";
 const tabs = ["Ficha", "Evidencias", "IA", "Canales", "Historial"];
-const legacy = [
-  ["/pilot", "Catálogo por API"],
-  ["/workspace", "Backoffice de productos"],
-  ["/queue", "Cola de mejoras"],
-  ["/propuestas-ia", "Propuestas IA"],
-  ["/cases", "Casos"],
-  ["/channels", "Canales"],
-  ["/products", "Productos"],
-  ["/work", "Tareas"],
-  ["/work/details", "Detalle de tareas"],
-  ["/readiness", "Preparación"],
-  ["/enrichment", "Enriquecimiento"],
-  ["/external-research", "Investigación"],
-  ["/prepublication", "Prepublicación"],
-  ["/images", "Imágenes"],
-  ["/metadata", "Atributos"],
-  ["/review", "Revisión"],
-  ["/duplicate-review", "Duplicados"],
-  ["/tiendanube", "Tiendanube"],
-  ["/imports", "Importaciones"],
-  ["/guia", "Guía"],
-];
 const money = (n: number) =>
   new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -45,7 +31,7 @@ const money = (n: number) =>
 function Pill({ value }: { value: string }) {
   return (
     <span
-      className={`d-pill ${value === "Preparada" || value === "Verificada" ? "good" : value === "Conflicto" ? "bad" : "warm"}`}
+      className={`d-pill ${value === "Preparada" || value === "Verificada" || value === "Publicado" || value === "Ficha aprobada" ? "good" : value === "Conflicto" || value === "Revisión necesaria" || value === "Datos incompletos" ? "bad" : "warm"}`}
     >
       {value === "Verificada" ? "✓ " : value === "Conflicto" ? "! " : ""}
       {value}
@@ -60,7 +46,8 @@ export function PrototypeDashboard() {
   const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [notice, setNotice] = useState("");
+  const [advanced, setAdvanced] = useState(false);
+  const [showPrices, setShowPrices] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
   const originRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -73,7 +60,8 @@ export function PrototypeDashboard() {
     brand = params.get("brand") || "",
     channel = params.get("channel") || "",
     conflict = params.get("conflict") || "",
-    action = params.get("action") || "";
+    action = params.get("action") || "",
+    work = params.get("work") || "";
   function update(values: Record<string, string>) {
     const run = () =>
       setParams((previous) => {
@@ -143,6 +131,7 @@ export function PrototypeDashboard() {
           .includes(q.toLocaleLowerCase()) &&
         (!status ||
           (status === "Conflicto" ? p.conflict : p.status === status)) &&
+        inWorkState(p, work) &&
         (!brand || p.brand === brand) &&
         (!channel ||
           (channel === "candidate"
@@ -201,6 +190,12 @@ export function PrototypeDashboard() {
     };
   }, [dirty]);
 
+  useEffect(() => {
+    if (params.get("tools") === "1" || params.get("tool"))
+      document
+        .getElementById("catalog-operations")
+        ?.scrollIntoView({ block: "start" });
+  }, [params.get("tools"), params.get("tool")]);
   return (
     <div className="d-app">
       <aside className="d-sidebar">
@@ -217,49 +212,41 @@ export function PrototypeDashboard() {
           </div>
           <span>⌄</span>
         </div>
-        <small className="d-nav-label">GESTIÓN DEL CATÁLOGO</small>
+        <small className="d-nav-label">TU ESPACIO DE TRABAJO</small>
         <nav aria-label="Navegación del prototipo">
-          <Link className="d-active" to="/">
-            <Icon name="chart" /> Resumen general
-          </Link>
           <button
-            onClick={() => document.getElementById("catalog-search")?.focus()}
+            className="d-active"
+            onClick={() => {
+              document.getElementById("catalog-search")?.focus();
+              document
+                .getElementById("catalog")
+                ?.scrollIntoView({ block: "start" });
+            }}
           >
-            <Icon name="box" /> Catálogo central <span>8</span>
+            <Icon name="box" /> Mi catálogo
           </button>
-          <button onClick={() => update({ status: "Pendiente" })}>
-            <Icon name="clock" /> Pendientes <span>{count("Pendiente")}</span>
+          <button
+            onClick={() =>
+              update({ tool: "Trabajos y resultados", tools: "1" })
+            }
+          >
+            <Icon name="clock" /> Historial
           </button>
-          <button onClick={() => update({ status: "Conflicto" })}>
-            <Icon name="alert" /> Conflictos <span>{count("Conflicto")}</span>
-          </button>
-          <button onClick={() => update({ status: "Preparada" })}>
-            <Icon name="check" /> Fichas preparadas
+          <button onClick={() => update({ settings: "1" })}>
+            <Icon name="layers" /> Configuración
           </button>
         </nav>
-        <details className="d-legacy">
-          <summary>Herramientas anteriores</summary>
-          <p>
-            Rutas originales conservadas. Las solicitudes están bloqueadas en
-            este prototipo.
-          </p>
-          {legacy.map(([url, label]) => (
-            <Link key={url} to={url}>
-              {label}
-            </Link>
-          ))}
-        </details>
         <div className="d-sidebar-bottom">
           <Icon name="shield" />
           <strong>Tu catálogo, bajo control</strong>
           <p>Vos revisás y decidís cada cambio.</p>
-          <span>Etapa 1 · Prototipo visual</span>
+          <span>Etapa 1.2 · Demostración</span>
         </div>
       </aside>
       <div className="d-body">
         <header className="d-topbar">
           <span>
-            Espacio de trabajo <b>/</b> <strong>Resumen general</strong>
+            Espacio de trabajo <b>/</b> <strong>Mi catálogo</strong>
           </span>
           <div>
             <span className="d-demo-dot" /> Datos de demostración{" "}
@@ -280,9 +267,17 @@ export function PrototypeDashboard() {
             </div>
             <button
               className="d-primary"
-              onClick={() => update({ status: "Pendiente" })}
+              onClick={() =>
+                update({
+                  work: "attention",
+                  status: "",
+                  channel: "",
+                  conflict: "",
+                  action: "",
+                })
+              }
             >
-              Revisar pendientes <Icon name="arrow-right" size={17} />
+              Revisar productos <Icon name="arrow-right" size={17} />
             </button>
           </div>
           <div className="d-demo">
@@ -294,130 +289,95 @@ export function PrototypeDashboard() {
             <span className="d-demo-tag">ENTORNO AISLADO</span>
           </div>
           <section className="d-metrics" aria-label="Indicadores del catálogo">
-            {[
-              [
-                "Catálogo Ecomm-App",
-                rows.length,
-                "Variantes · fuente central",
-                "box",
-                "",
-              ],
-              [
-                "Mercado Libre",
-                rows.filter((p) => p.ml === "Verificada").length,
-                "Publicaciones verificadas",
-                "store",
-                "ml",
-              ],
-              [
-                "Tiendanube",
-                rows.filter((p) => p.tn === "Verificada").length,
-                "Publicaciones verificadas",
-                "store",
-                "tn",
-              ],
-              [
-                "Pendientes",
-                count("Pendiente"),
-                "Para completar o revisar",
-                "clock",
-                "Pendiente",
-              ],
-              [
-                "Conflictos",
-                count("Conflicto"),
-                "Necesitan tu atención",
-                "alert",
-                "Conflicto",
-              ],
-              [
-                "Fichas preparadas",
-                count("Preparada"),
-                "Listas para revisión interna",
-                "check",
-                "Preparada",
-              ],
-            ].map(([label, note, sub, icon, filter]) => (
+            {(
+              ["attention", "preparing", "ready", "published"] as WorkState[]
+            ).map((state) => (
               <button
-                key={label}
-                className={`d-metric ${filter === "Conflicto" ? "d-metric-conflict" : ""}`}
+                key={state}
+                aria-pressed={work === state}
+                className={`d-metric ${state === "attention" ? "d-metric-conflict" : ""}`}
                 onClick={() =>
                   update({
-                    status: ["ml", "tn"].includes(String(filter))
-                      ? ""
-                      : String(filter),
+                    work: work === state ? "" : state,
+                    status: "",
+                    channel: "",
                     conflict: "",
                     action: "",
                     brand: "",
-                    channel: ["ml", "tn"].includes(String(filter))
-                      ? String(filter)
-                      : "",
                   })
                 }
               >
                 <span>
-                  {label}
-                  <Icon name={icon as "box"} size={17} />
+                  {workLabels[state]}
+                  <Icon
+                    name={
+                      state === "attention"
+                        ? "alert"
+                        : state === "preparing"
+                          ? "clock"
+                          : state === "ready"
+                            ? "check"
+                            : "store"
+                    }
+                    size={18}
+                  />
                 </span>
-                <strong>{note}</strong>
-                <small>{sub}</small>
+                <strong>
+                  {rows.filter((p) => inWorkState(p, state)).length}
+                </strong>
+                <small>
+                  {state === "attention"
+                    ? "Resolver una revisión o bloqueo"
+                    : state === "preparing"
+                      ? "Completar o aprobar información"
+                      : state === "ready"
+                        ? "Preparación interna · revisar vigencia"
+                        : "Con evidencia en al menos un canal"}
+                </small>
               </button>
             ))}
           </section>
-          <section className="d-insight">
-            <span className="d-insight-icon">
-              <Icon name="sparkles" />
+          <p className="s-count-note">
+            Contamos variantes de producto. Una puede estar publicada en un
+            canal y necesitar trabajo en otro; los indicadores no se suman. Todo
+            es una demostración.
+          </p>
+          <div
+            className="s-toolbar"
+            role="region"
+            aria-label="Resumen del catálogo"
+          >
+            <span>
+              {new Set(rows.map((p) => p.family)).size} productos ·{" "}
+              {rows.length} variantes en Ecomm-App
             </span>
-            <div>
-              <strong>Un buen catálogo empieza por una ficha completa</strong>
-              <p>
-                Hay {count("Pendiente")} variantes para revisar. Resolvé sus
-                datos antes de prepararlos para los canales.
-              </p>
-            </div>
-            <button onClick={() => update({ status: "Pendiente" })}>
-              Ver productos <Icon name="arrow-right" size={15} />
-            </button>
-          </section>
-          <section className="o-progress" aria-label="Progreso del catálogo">
-            <h2>Progreso de preparación</h2>
-            <progress value={count("Preparada")} max={rows.length} />
-            <p>
-              {count("Preparada")} de {rows.length} variantes con ficha
-              preparada internamente · {new Set(rows.map((p) => p.family)).size}{" "}
-              productos base · {rows.length} variantes. No implica publicación.
-            </p>
             <button
               onClick={() =>
                 update({
-                  channel: "candidate",
-                  status: "",
-                  conflict: "",
-                  action: "",
-                  brand: "",
+                  tools: params.get("tools") === "1" ? "" : "1",
+                  tool: "",
                 })
               }
             >
-              {rows.reduce((total, p) => total + candidateCount(p), 0)}{" "}
-              coincidencias candidatas de canal · revisar
+              Más acciones del catálogo
             </button>
-            <small>
-              Un producto puede tener varias variantes y una variante varios
-              candidatos. No se suman a publicaciones verificadas.
-            </small>
-          </section>
-          <OperationsCenter
-            key={editorEpoch}
-            rows={rows}
-            active={params.get("tool") || ""}
-            onTool={(tool) => update({ tool })}
-            onChange={setRows}
-            onSelect={(product, tab) => update({ product, tab, tool: "" })}
-            jobs={jobs}
-            onJob={(job) => setJobs((old) => [...old, job])}
-            onDirty={setDirty}
-          />
-          <section className="d-catalog">
+            <button
+              onClick={() =>
+                update({
+                  q: "",
+                  work: "",
+                  status: "",
+                  brand: "",
+                  channel: "",
+                  conflict: "",
+                  action: "",
+                })
+              }
+            >
+              Ver todo el catálogo
+            </button>
+          </div>
+          <section className="d-catalog" id="catalog">
             <div className="d-section-head">
               <div>
                 <h2>
@@ -456,10 +416,10 @@ export function PrototypeDashboard() {
                 value={status}
                 onChange={(e) => update({ status: e.target.value })}
               >
-                <option value="">Todos los estados</option>
-                {["Pendiente", "Conflicto", "Preparada"].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
+                <option value="">Todas las fichas</option>
+                <option value="Pendiente">Borrador sin aprobar</option>
+                <option value="Conflicto">Revisión necesaria</option>
+                <option value="Preparada">Ficha aprobada</option>
               </select>
               <select
                 aria-label="Marca"
@@ -482,44 +442,70 @@ export function PrototypeDashboard() {
                 <option value="candidate">Coincidencias candidatas</option>
               </select>
             </div>
-            <div className="o-extra-filters">
-              <label>
-                Conflicto
-                <select
-                  aria-label="Conflicto"
-                  value={conflict}
-                  onChange={(e) => update({ conflict: e.target.value })}
-                >
-                  <option value="">Con y sin conflicto</option>
-                  <option value="yes">Con conflicto</option>
-                  <option value="no">Sin conflicto</option>
-                </select>
-              </label>
-              <label>
-                Siguiente acción
-                <select
-                  aria-label="Siguiente acción"
-                  value={action}
-                  onChange={(e) => update({ action: e.target.value })}
-                >
-                  <option value="">Todas las acciones</option>
-                  {[
-                    "Resolver conflicto",
-                    "Revisar IA",
-                    "Completar ficha",
-                    "Preparar canal",
-                  ].map((a) => (
-                    <option key={a}>{a}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            {(q || status || brand || channel || conflict || action) && (
+            <details className="s-advanced" open={advanced}>
+              <summary
+                onClick={(e) => {
+                  e.preventDefault();
+                  setAdvanced(!advanced);
+                }}
+              >
+                Más filtros y detalles
+              </summary>
+              <div className="o-extra-filters">
+                <label>
+                  Conflicto
+                  <select
+                    aria-label="Conflicto"
+                    value={conflict}
+                    onChange={(e) => update({ conflict: e.target.value })}
+                  >
+                    <option value="">Con y sin conflicto</option>
+                    <option value="yes">Con conflicto</option>
+                    <option value="no">Sin conflicto</option>
+                  </select>
+                </label>
+                <label>
+                  Siguiente acción
+                  <select
+                    aria-label="Siguiente acción"
+                    value={action}
+                    onChange={(e) => update({ action: e.target.value })}
+                  >
+                    <option value="">Todas las acciones</option>
+                    {[
+                      "Resolver conflicto",
+                      "Revisar IA",
+                      "Completar ficha",
+                      "Revisar ficha",
+                      "Verificar antes de publicar",
+                      "Revisar publicaciones",
+                      "Preparar canal",
+                    ].map((a) => (
+                      <option key={a}>{a}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="s-count-note">
+                {rows.reduce((n, p) => n + candidateCount(p), 0)} coincidencias
+                por revisar. No confirman publicación.
+              </p>
+            </details>
+            {(q ||
+              work ||
+              status ||
+              brand ||
+              channel ||
+              conflict ||
+              action) && (
               <div className="d-active-filters">
-                Filtros activos{" "}
+                {work
+                  ? workLabels[work as WorkState] || "Filtros activos"
+                  : "Filtros activos"}{" "}
                 <button
                   onClick={() =>
                     update({
+                      work: "",
                       q: "",
                       status: "",
                       brand: "",
@@ -539,10 +525,10 @@ export function PrototypeDashboard() {
                   <tr>
                     <th>Producto / Ecomm ID</th>
                     <th>SKU / Marca</th>
-                    <th>Precio / Stock</th>
+                    <th>{showPrices ? "Precio / Stock" : "Disponibilidad"}</th>
                     <th>Mercado Libre</th>
                     <th>Tiendanube</th>
-                    <th>Estado de ficha</th>
+                    <th>Ficha y siguiente paso</th>
                     <th>
                       <span className="d-sr">Acciones</span>
                     </th>
@@ -567,6 +553,10 @@ export function PrototypeDashboard() {
                           <span>
                             <strong>{p.name}</strong>
                             <small>{p.id}</small>
+                            <span className="s-mobile-channels">
+                              <span>ML · {channelState(p, "ml")}</span>
+                              <span>TN · {channelState(p, "tn")}</span>
+                            </span>
                           </span>
                         </button>
                       </td>
@@ -575,34 +565,50 @@ export function PrototypeDashboard() {
                         <small>{p.brand}</small>
                       </td>
                       <td>
-                        <strong>{money(p.price)}</strong>
+                        {showPrices && <strong>{money(p.price)}</strong>}
                         <small>{p.stock} disponibles</small>
                       </td>
                       <td>
-                        <Pill value={p.ml} />
+                        <Pill value={channelState(p, "ml")} />
+                        <small>
+                          {p.ml === "SKU coincidente"
+                            ? p.decisions.ml.state === "Rechazada"
+                              ? "Coincidencia descartada"
+                              : p.decisions.ml.state === "Aceptada"
+                                ? "Coincidencia revisada; no confirma publicación"
+                                : "Coincidencia por revisar"
+                            : p.ml === "Sin evidencia"
+                              ? "Falta evidencia; no implica ausencia"
+                              : "Evidencia de muestra"}
+                        </small>
                       </td>
                       <td>
-                        <Pill value={p.tn} />
+                        <Pill value={channelState(p, "tn")} />
+                        <small>
+                          {p.tn === "SKU coincidente"
+                            ? p.decisions.tn.state === "Rechazada"
+                              ? "Coincidencia descartada"
+                              : p.decisions.tn.state === "Aceptada"
+                                ? "Coincidencia revisada; no confirma publicación"
+                                : "Coincidencia por revisar"
+                            : p.tn === "Sin evidencia"
+                              ? "Falta evidencia; no implica ausencia"
+                              : "Evidencia de muestra"}
+                        </small>
                       </td>
                       <td>
-                        <Pill value={p.status} />
+                        <Pill value={editorialState(p)} />
                         <small>{nextAction(p)}</small>
                         <button
                           className="o-quick"
                           onClick={() =>
                             update({
                               product: p.id,
-                              tab: p.conflict
-                                ? "Evidencias"
-                                : p.ai?.state === "Pendiente"
-                                  ? "IA"
-                                  : p.status === "Preparada"
-                                    ? "Canales"
-                                    : "Ficha",
+                              tab: actionTab(p),
                             })
                           }
                         >
-                          Resolver tarea
+                          {nextAction(p)}
                         </button>
                       </td>
                       <td>
@@ -629,6 +635,7 @@ export function PrototypeDashboard() {
                 <button
                   onClick={() =>
                     update({
+                      work: "",
                       q: "",
                       status: "",
                       brand: "",
@@ -649,12 +656,33 @@ export function PrototypeDashboard() {
               <span>Identidad por Ecomm ID · nunca por SKU</span>
             </footer>
           </section>
+          {(params.get("tools") === "1" || params.get("tool")) && (
+            <div id="catalog-operations">
+              <button
+                className="s-return"
+                onClick={() => {
+                  document.getElementById("catalog")?.scrollIntoView();
+                  document.getElementById("catalog-search")?.focus();
+                }}
+              >
+                Volver a búsqueda y productos ↑
+              </button>
+              <OperationsCenter
+                key={editorEpoch}
+                rows={rows}
+                active={params.get("tool") || ""}
+                onTool={(tool) => update({ tool })}
+                onChange={setRows}
+                onSelect={(product, tab) => update({ product, tab, tool: "" })}
+                jobs={jobs}
+                onJob={(job) => setJobs((old) => [...old, job])}
+                onDirty={setDirty}
+              />
+            </div>
+          )}
           <p className="d-footnote">
             <Icon name="help" size={15} /> Un SKU coincidente es una pista. Solo
             una evidencia verificada confirma la publicación.
-          </p>
-          <p role="status" className="d-notice">
-            {notice}
           </p>
         </main>
       </div>
@@ -686,7 +714,7 @@ export function PrototypeDashboard() {
               </div>
             </div>
             <div className="d-drawer-status">
-              <Pill value={selected.status} />
+              <Pill value={editorialState(selected)} />
               <span>Catálogo central Ecomm-App</span>
             </div>
             <div
@@ -743,6 +771,15 @@ export function PrototypeDashboard() {
             </div>
           </section>
         </>
+      )}
+      {params.get("settings") === "1" && (
+        <SettingsDialog
+          advanced={advanced}
+          showPrices={showPrices}
+          onAdvanced={setAdvanced}
+          onPrices={setShowPrices}
+          onClose={() => update({ settings: "" })}
+        />
       )}
       {pending && (
         <div

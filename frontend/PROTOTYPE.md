@@ -1,3 +1,63 @@
+# KIKI Tech 2.0 · Etapa 1.2 — Mi catálogo
+
+Base verificada: `c2722cc3f6c4a32c3aed448bb14b2c7992b0e619`, rama `feature/kiki-tech-2-dashboard`, árbol limpio al comenzar. Se mejora el dashboard existente; no se crea una pantalla paralela.
+
+## Vista cotidiana
+
+- Una entrada principal: **Mi catálogo**. Historial abre los trabajos de esta sesión dentro del dashboard. Configuración abre un modal con preferencias locales de precios y detalles avanzados.
+- Cuatro indicadores que filtran en la misma URL: **Necesita atención**, **En preparación**, **Listo para publicar**, **Publicado**. Volver a pulsar el indicador activo quita ese filtro; «Ver todo el catálogo» recupera la tabla completa.
+- Búsqueda, marca, filtro editorial y canal disponibles junto a la tabla. Los filtros por conflicto y siguiente acción se conservan bajo «Más filtros y detalles».
+- Tabla completa con Ecomm ID inmutable, calidad editorial, estado de ML y TN por separado, y una acción prioritaria por variante. En celular los dos canales también aparecen junto al nombre.
+- Operaciones generales bajo «Más acciones del catálogo», después de la tabla. No redirigen a páginas anteriores. «Volver a búsqueda y productos» conserva filtros y da foco al buscador.
+- Todos los formularios y recorridos de etapa 1.1 se conservan: edición, imágenes, propuestas IA, evidencias, familias/duplicados, comparación de canales, lotes, actualización, diagnóstico e historial.
+
+## Significado de los indicadores
+
+Se cuentan variantes identificadas por Ecomm ID. Una variante puede aparecer en varios indicadores, porque los canales tienen estados independientes; los números **no se suman** para obtener un total. El total de referencia sigue siendo siete productos base y ocho variantes sintéticas.
+
+| Indicador | Regla |
+|---|---|
+| Necesita atención | Hay un conflicto de identidad o falta un dato indispensable. |
+| En preparación | Sin bloqueo, falta completar/aprobar la ficha o preparar un canal sin publicación verificada. |
+| Listo para publicar | Al menos un canal sin publicación verificada tiene preparación interna vigente, ficha aprobada y requisitos completos. Requiere revisar vigencia y evidencia antes de publicar. |
+| Publicado | Existe evidencia verificable de muestra para al menos un canal. No depende de que el texto editorial esté aprobado. |
+
+La ficha editorial usa Borrador, Ficha aprobada, Revisión necesaria o Datos incompletos. Cada canal muestra Publicado, Listo para publicar o Por verificar. **Por verificar no significa sin publicar.** Los candidatos aceptados o rechazados nunca se convierten automáticamente en publicaciones verificadas.
+
+Ejemplos de muestra:
+
+- DEMO-1005: ficha aprobada, ML publicado, TN por verificar; siguiente paso: preparar canal.
+- DEMO-1008: ficha aprobada, ML publicado, TN listo para publicar; siguiente paso: verificar antes de publicar.
+- DEMO-1002: conflicto de identidad y coincidencia candidata; no se cuenta como publicado.
+- Cambiar una ficha invalida sus preparaciones previas; si falta una imagen pasa a necesitar atención. La evidencia de publicación existente se conserva independientemente de esa edición.
+
+## Validación de etapa 1.2
+
+Desde `frontend/`: `npm run typecheck`, `npm run build`, `npm test`. La suite contiene 38 ejecuciones (19 escenarios en escritorio y celular), con comprobación adicional de tablet. Conserva las pruebas de etapa 1.1 y suma indicadores, cobertura mixta por canal, invalidez de preparación tras edición, menú simple, configuración e historial sin pérdida de búsqueda.
+
+Se mantiene el mismo aislamiento: solo fixtures en memoria, CSP y transportes bloqueados, servidor de assets sin proxy ni backend. Los tests compilan con un upstream heredado ficticio y bloquean cualquier intento de conexión externa. No se alteran integraciones, credenciales, Render, rutas antiguas ni PR #87. No se hace push ni despliegue.
+
+El build puede conservar el aviso por bundle >500 kB de los componentes antiguos retenidos. Borradores, decisiones y preferencias se reinician al recargar.
+
+| Capturas actualizadas | Escritorio | Celular |
+|---|---|---|
+| Mi catálogo | [Ver](artifacts/simple-dashboard-desktop.png) | [Ver](artifacts/simple-dashboard-mobile.png) |
+| Configuración | [Ver](artifacts/configuracion-desktop.png) | [Ver](artifacts/configuracion-mobile.png) |
+| Edición | [Ver](artifacts/edicion-desktop.png) | [Ver](artifacts/edicion-mobile.png) |
+| Evidencias | [Ver](artifacts/evidencias-desktop.png) | [Ver](artifacts/evidencias-mobile.png) |
+| IA | [Ver](artifacts/ia-desktop.png) | [Ver](artifacts/ia-mobile.png) |
+| Canales | [Ver](artifacts/canales-desktop.png) | [Ver](artifacts/canales-mobile.png) |
+| Historial | [Ver](artifacts/historial-desktop.png) | [Ver](artifacts/historial-mobile.png) |
+| Lotes | [Ver](artifacts/lotes-desktop.png) | [Ver](artifacts/lotes-mobile.png) |
+
+Archivos de etapa 1.2: `src/prototype/Dashboard.tsx`, `operations-model.ts`, `OperationalPanel.tsx`, `SettingsDialog.tsx`, `simple-dashboard.css`, las tres suites `tests/*.spec.ts`, este documento y `artifacts/*.png`.
+
+Pendiente de revisión. No avanzar a la etapa 2 ni publicar sin autorización.
+
+---
+
+La documentación siguiente conserva el detalle de los flujos operativos introducidos en etapa 1.1; el menú, indicadores y cifras de pruebas vigentes son los definidos arriba.
+
 # KIKI Tech 2.0 · Etapa 1.1 — Centro de operaciones
 
 Base verificada: `cff88e1a880567d5d304b88bb566d63583d3c00d`, rama `feature/kiki-tech-2-dashboard`, árbol limpio al comenzar. Este trabajo continúa en esa misma rama.

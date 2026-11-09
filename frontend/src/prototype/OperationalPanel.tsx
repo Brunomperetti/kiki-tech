@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   change,
+  channelState,
+  editorialState,
   requirements,
   snapshot,
   type Item,
@@ -399,6 +401,10 @@ export function OperationalPanel({
         <>
           <h3>Preparación por canal</h3>
           <p>
+            Ficha editorial: {editorialState(p)}. Este estado es independiente
+            de las publicaciones.
+          </p>
+          <p>
             Ecomm-App conserva la identidad {p.id}; las tareas de cada canal se
             revisan por separado.
           </p>
@@ -412,6 +418,12 @@ export function OperationalPanel({
           {(["ml", "tn"] as const).map((c) => (
             <article className="d-evidence" key={c}>
               <h4>{c === "ml" ? "Mercado Libre" : "Tiendanube"}</h4>
+              <p>
+                <strong>{channelState(p, c)}</strong>
+                {channelState(p, c) === "Listo para publicar"
+                  ? " · Preparación interna, sujeta a revisar vigencia y evidencia. No se publicó."
+                  : ""}
+              </p>
               <p>
                 Publicación:{" "}
                 {p[c] === "Verificada"

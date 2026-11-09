@@ -53,7 +53,10 @@ export function createCatalog(): Item[] {
         ml: { state: "Pendiente", reason: "" },
         tn: { state: "Pendiente", reason: "" },
       },
-      prepared: { ml: false, tn: false },
+      prepared: {
+        ml: p.status === "Preparada",
+        tn: p.status === "Preparada" && p.id !== "DEMO-1005",
+      },
       ai: null,
       history: [
         {
@@ -88,14 +91,78 @@ export function change(
     ],
   };
 }
-export function nextAction(p: Item) {
+export type WorkState = "attention" | "preparing" | "ready" | "published";
+export const workLabels: Record<WorkState, string> = {
+  attention: "Necesita atención",
+  preparing: "En preparación",
+  ready: "Listo para publicar",
+  published: "Publicado",
+};
+export function channelState(p: Item, c: "ml" | "tn") {
+  if (p[c] === "Verificada") return "Publicado";
+  if (
+    p.status === "Preparada" &&
+    p.prepared[c] &&
+    requirements(p).length === 0 &&
+    (c !== "tn" || p.seo.trim())
+  )
+    return "Listo para publicar";
+  return "Por verificar";
+}
+export function inWorkState(p: Item, state: string) {
+  const attention = p.conflict || requirements(p).length > 0;
+  if (state === "attention") return attention;
+  if (state === "published")
+    return p.ml === "Verificada" || p.tn === "Verificada";
+  if (state === "ready")
+    return (["ml", "tn"] as const).some(
+      (c) => channelState(p, c) === "Listo para publicar",
+    );
+  if (state === "preparing")
+    return (
+      !attention &&
+      (p.status !== "Preparada" ||
+        (["ml", "tn"] as const).some(
+          (c) =>
+            p[c] !== "Verificada" &&
+            channelState(p, c) !== "Listo para publicar",
+        ))
+    );
+  return true;
+}
+export function editorialState(p: Item) {
   return p.conflict
-    ? "Resolver conflicto"
-    : p.ai?.state === "Pendiente"
-      ? "Revisar IA"
+    ? "Revisión necesaria"
+    : requirements(p).length
+      ? "Datos incompletos"
       : p.status === "Preparada"
-        ? "Preparar canal"
-        : "Completar ficha";
+        ? "Ficha aprobada"
+        : "Borrador";
+}
+export function nextAction(p: Item) {
+  if (p.conflict) return "Resolver conflicto";
+  if (requirements(p).length) return "Completar ficha";
+  if (p.ai?.state === "Pendiente") return "Revisar IA";
+  if (p.status !== "Preparada") return "Revisar ficha";
+  if (
+    (["ml", "tn"] as const).some(
+      (c) =>
+        p[c] !== "Verificada" && channelState(p, c) !== "Listo para publicar",
+    )
+  )
+    return "Preparar canal";
+  if (inWorkState(p, "ready")) return "Verificar antes de publicar";
+  return "Revisar publicaciones";
+}
+export function actionTab(p: Item) {
+  const action = nextAction(p);
+  return p.conflict
+    ? "Evidencias"
+    : action === "Revisar IA"
+      ? "IA"
+      : ["Completar ficha", "Revisar ficha"].includes(action)
+        ? "Ficha"
+        : "Canales";
 }
 export function requirements(p: Item): string[] {
   return [

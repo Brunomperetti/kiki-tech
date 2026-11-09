@@ -1,0 +1,282 @@
+.d-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.d-metric {
+  min-height: 145px;
+  padding: 20px;
+}
+.d-metric > span {
+  font-size: 14px;
+  white-space: normal;
+  color: #43594b;
+  font-weight: 600;
+}
+.d-metric strong {
+  font-size: 34px;
+  margin: 17px 0 10px;
+}
+.d-metric small {
+  font-size: 12px;
+  color: #60715f;
+  line-height: 1.5;
+}
+.d-metric[aria-pressed="true"] {
+  outline: 2px solid #648457;
+  outline-offset: 2px;
+  background: #f1f6ec;
+}
+.d-sidebar nav button {
+  font-size: 14px;
+  min-height: 46px;
+}
+.d-heading h1 {
+  font-size: 30px;
+}
+.d-heading p,
+.d-section-head p {
+  font-size: 14px;
+  color: #65765f;
+}
+.s-count-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #65735e;
+  margin: 15px 0 20px;
+}
+.s-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 22px 0 16px;
+  color: #49613f;
+  font-size: 13px;
+}
+.s-toolbar > span {
+  margin-right: auto;
+}
+.s-toolbar button,
+.s-return {
+  font-size: 13px;
+  padding: 11px 14px;
+  border: 1px solid #cbdac3;
+  background: white;
+  color: #426236;
+  border-radius: 7px;
+  min-height: 44px;
+}
+.s-advanced {
+  padding: 0 22px 12px;
+}
+.s-advanced summary {
+  cursor: pointer;
+  color: #506b46;
+  font-size: 13px;
+  padding: 5px 0 12px;
+}
+.s-advanced .o-extra-filters {
+  padding: 6px 0;
+}
+.s-advanced .s-count-note {
+  margin: 0;
+}
+.d-table th {
+  font-size: 12px;
+  color: #667461;
+}
+.d-product strong {
+  font-size: 13px;
+}
+.d-table td small {
+  max-width: 160px;
+  white-space: normal;
+  line-height: 1.5;
+  color: #687861;
+}
+.d-table .d-pill {
+  font-size: 11px;
+  padding: 6px 8px;
+}
+.d-table td:nth-child(6) {
+  min-width: 155px;
+}
+.d-table td:nth-child(6) > small {
+  display: none;
+}
+.o-quick {
+  display: block;
+  font-size: 12px;
+  min-height: 40px;
+  margin-top: 9px;
+}
+.s-mobile-channels {
+  display: none;
+}
+.s-settings {
+  width: min(470px, calc(100% - 32px));
+  border: 1px solid #a9b99b;
+  border-radius: 14px;
+  padding: 26px;
+  color: #294735;
+}
+.s-settings::backdrop {
+  background: #1a382b88;
+  backdrop-filter: blur(2px);
+}
+.s-settings h2 {
+  font-size: 21px;
+}
+.s-settings p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.s-settings label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  margin: 20px 0;
+}
+.s-settings input {
+  height: 20px;
+  width: 20px;
+  accent-color: #496f3e;
+}
+.s-settings .d-primary {
+  font-size: 14px !important;
+  width: 100%;
+}
+.s-return {
+  margin-bottom: 16px;
+}
+#catalog {
+  scroll-margin-top: 20px;
+}
+#catalog-operations {
+  margin-top: 28px;
+}
+.d-table-scroll {
+  max-height: none;
+}
+.d-filters {
+  flex-wrap: wrap;
+}
+.d-search {
+  flex-basis: 45%;
+}
+.d-search input {
+  font-size: 13px;
+}
+.d-main {
+  overflow: visible;
+}
+.d-drawer-status {
+  color: #65775c;
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .d-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .d-metric {
+    min-height: 135px;
+  }
+  .d-search {
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 760px) {
+  .d-sidebar nav {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .d-sidebar nav button {
+    font-size: 12px;
+    padding: 9px 11px;
+  }
+  .d-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .d-metric {
+    padding: 14px;
+    min-height: 153px;
+  }
+  .d-metric > span {
+    font-size: 13px;
+  }
+  .d-metric small {
+    font-size: 11px;
+  }
+  .d-metric strong {
+    font-size: 30px;
+  }
+  .d-heading h1 {
+    font-size: 27px;
+  }
+  .d-heading p {
+    font-size: 13px;
+  }
+  .s-toolbar button {
+    flex: 1;
+  }
+  .s-toolbar > span {
+    flex-basis: 100%;
+    margin-bottom: 4px;
+  }
+  .s-mobile-channels {
+    display: grid;
+    gap: 4px;
+    margin-top: 7px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #526b43;
+  }
+  .d-product {
+    align-items: flex-start;
+  }
+  .d-product strong {
+    font-size: 13px;
+  }
+  .d-table td:nth-child(6) {
+    min-width: 125px;
+  }
+  .d-table .d-pill {
+    font-size: 10px;
+    white-space: normal;
+  }
+  .d-table th {
+    font-size: 10px;
+  }
+  .d-table td {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+  .o-quick {
+    font-size: 11px;
+    max-width: 125px;
+    padding: 8px;
+  }
+  .d-table-scroll {
+    max-height: none;
+  }
+  .s-advanced {
+    padding: 0 14px 12px;
+  }
+  .d-product small {
+    font-size: 10px;
+  }
+  .s-settings {
+    padding: 22px;
+  }
+  .d-filters select {
+    font-size: 12px;
+  }
+  .d-product .d-thumbnail {
+    display: none;
+  }
+  .d-main {
+    overflow: hidden;
+  }
+}
