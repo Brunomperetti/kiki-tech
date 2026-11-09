@@ -1,0 +1,78 @@
+name: kiki-tech-integration
+services:
+  postgres:
+    image: postgres:16.6-bookworm
+    pull_policy: never
+    network_mode: none
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    environment:
+      POSTGRES_PASSWORD: synthetic-bootstrap-only
+      POSTGRES_INITDB_ARGS: --auth-local=scram-sha-256
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: ""
+      no_proxy: ""
+    command: [postgres, -c, "listen_addresses=", -c, "unix_socket_permissions=0777"]
+    tmpfs:
+      - /var/lib/postgresql/data
+      - /tmp
+    volumes:
+      - pg_socket:/var/run/postgresql
+      - ./init.sql:/docker-entrypoint-initdb.d/10-synthetic.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "PGPASSWORD=kiki-synthetic-only psql -h /var/run/postgresql -U kiki_integration -d kiki_integration -Atc 'SELECT 1' | grep -qx 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  backend:
+    build:
+      context: ..
+      dockerfile: integration/Dockerfile
+      secrets: [proxy_ca]
+    image: kiki-tech-integration:local
+    pull_policy: never
+    network_mode: none
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      KIKI_INTEGRATION_MODE: local-synthetic
+      DATABASE_URL: postgresql+psycopg://kiki_integration:kiki-synthetic-only@/kiki_integration?host=/var/run/postgresql&port=5432
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: ""
+      no_proxy: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import socket; s=socket.socket(socket.AF_UNIX); s.settimeout(2);
+          s.connect('/runtime/api.sock'); s.sendall(b'GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n');
+          assert b'200 OK' in s.recv(256); s.close()
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs: [/tmp]
+    volumes:
+      - pg_socket:/var/run/postgresql:ro
+      - ../.integration-runtime/api:/runtime
+volumes:
+  pg_socket:
+secrets:
+  proxy_ca:
+    file: /etc/ssl/certs/ca-certificates.crt

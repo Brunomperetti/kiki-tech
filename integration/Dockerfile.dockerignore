@@ -1,0 +1,14 @@
+**
+!backend/
+!backend/requirements.txt
+!backend/requirements-dev.txt
+!backend/pyproject.toml
+!backend/app/
+!backend/app/**
+!backend/integration_sandbox/
+!backend/integration_sandbox/**
+!backend/tests/
+!backend/tests/**
+**/.env*
+**/__pycache__/**
+**/*.pyc
