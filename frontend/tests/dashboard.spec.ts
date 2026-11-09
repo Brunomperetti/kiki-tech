@@ -1,7 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const outbound = new WeakMap<Page, string[]>();
-test.afterEach(async ({page}) => { expect(outbound.get(page)).toEqual([]); });
+test.afterEach(async ({ page }) => {
+  expect(outbound.get(page)).toEqual([]);
+});
 test.beforeEach(async ({ page }) => {
   // Abort unexpected destinations before DNS/network, and fail if any are attempted.
   const external: string[] = [];
@@ -35,7 +37,7 @@ test("busca por nombre, SKU, marca e identidad; variantes con SKU repetido son d
     ["DEMO-1006", 1],
   ] as const) {
     await search.fill(term);
-    await expect(page.locator("tbody tr")).toHaveCount(count);
+    await expect(page.locator(".d-table tbody tr")).toHaveCount(count);
     await expect(page).toHaveURL(
       new RegExp(`q=${encodeURIComponent(term).replace(/%20/g, "\\+")}`),
     );
@@ -50,7 +52,7 @@ test("combina filtros, restaura URL y muestra vacío recuperable", async ({
 }) => {
   await page.getByLabel("Estado", { exact: true }).selectOption("Preparada");
   await page.getByLabel("Marca", { exact: true }).selectOption("Nexo");
-  await expect(page.locator("tbody tr")).toHaveCount(2);
+  await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await page.reload();
   await expect(page.getByLabel("Marca", { exact: true })).toHaveValue("Nexo");
   await page.getByLabel("Canal verificado").selectOption("tn");
@@ -58,11 +60,11 @@ test("combina filtros, restaura URL y muestra vacío recuperable", async ({
     page.getByRole("heading", { name: "No encontramos productos" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Ver todo el catálogo" }).click();
-  await expect(page.locator("tbody tr")).toHaveCount(8);
+  await expect(page.locator(".d-table tbody tr")).toHaveCount(8);
   await page.getByRole("button", { name: /Conflictos 2 Necesitan/ }).click();
-  await expect(page.locator("tbody tr")).toHaveCount(2);
+  await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await page.goBack();
-  await expect(page.locator("tbody tr")).toHaveCount(8);
+  await expect(page.locator(".d-table tbody tr")).toHaveCount(8);
 });
 
 test("ficha, pestañas, URL compartible, historial de navegación y foco", async ({
@@ -95,23 +97,28 @@ test("ficha, pestañas, URL compartible, historial de navegación y foco", async
   await expect(page).not.toHaveURL(/product=/);
 });
 
-test("requiere confirmación; afecta solo al Ecomm ID y no confirma canales", async ({
+test("requiere confirmación y bloquea preparación con conflictos", async ({
   page,
 }) => {
   await page.getByRole("button", { name: "Abrir DEMO-1006" }).click();
   const panel = page.getByRole("dialog");
+  await expect(
+    panel.getByRole("button", { name: "Preparar ficha", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Abrir DEMO-1001" }).click();
   await panel
     .getByRole("button", { name: "Preparar ficha", exact: true })
     .click();
-  await expect(panel.getByRole("alert")).toContainText("DEMO-1006");
+  await expect(panel.getByRole("alert")).toContainText("DEMO-1001");
   await panel.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(
-    panel.locator(".d-drawer-status").getByText(/Conflicto/),
-  ).toBeVisible();
+    panel.getByRole("button", { name: "Preparar ficha", exact: true }),
+  ).toBeEnabled();
   await panel
     .getByRole("button", { name: "Preparar ficha", exact: true })
     .click();
-  await panel.getByRole("button", { name: "Confirmar preparación" }).click();
+  await panel.getByRole("button", { name: "Confirmar decisión" }).click();
   await expect(
     panel.getByRole("button", { name: "Ficha preparada", exact: true }),
   ).toBeDisabled();
@@ -119,11 +126,7 @@ test("requiere confirmación; afecta solo al Ecomm ID y no confirma canales", as
   await expect(panel).toContainText("Publicación no confirmada.");
   await page.keyboard.press("Escape");
   await expect(
-    page.locator("tbody tr").filter({ hasText: "DEMO-1001" }),
-  ).toContainText("Pendiente");
-  await page.reload();
-  await expect(
-    page.locator("tbody tr").filter({ hasText: "DEMO-1006" }),
+    page.locator(".d-table tbody tr").filter({ hasText: "DEMO-1006" }),
   ).toContainText("Conflicto");
 });
 

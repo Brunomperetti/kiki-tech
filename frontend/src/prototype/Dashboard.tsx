@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { KikiIcon as Icon } from "../components/KikiIcon";
-import { products, type Status } from "./data";
+import { type Status } from "./data";
+import {
+  candidateCount,
+  createCatalog,
+  nextAction,
+  type Item,
+  type Job,
+} from "./operations-model";
+import { OperationalPanel } from "./OperationalPanel";
+import { OperationsCenter } from "./OperationsCenter";
+import "./operations.css";
 import "./dashboard.css";
 const tabs = ["Ficha", "Evidencias", "IA", "Canales", "Historial"];
 const legacy = [
@@ -43,9 +53,13 @@ function Pill({ value }: { value: string }) {
   );
 }
 export function PrototypeDashboard() {
-  const [params, setParams] = useSearchParams();
-  const [rows, setRows] = useState(products);
-  const [confirm, setConfirm] = useState(false);
+  const [urlParams, setParams] = useSearchParams();
+  const [params, setAcceptedParams] = useState(urlParams);
+  const [rows, setRows] = useState(createCatalog);
+  const [editorEpoch, setEditorEpoch] = useState(0);
+  const [dirty, setDirty] = useState(false);
+  const [pending, setPending] = useState<(() => void) | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [notice, setNotice] = useState("");
   const closeRef = useRef<HTMLButtonElement>(null);
   const originRef = useRef<HTMLElement | null>(null);
@@ -57,19 +71,26 @@ export function PrototypeDashboard() {
   const q = params.get("q") || "",
     status = params.get("status") || "",
     brand = params.get("brand") || "",
-    channel = params.get("channel") || "";
+    channel = params.get("channel") || "",
+    conflict = params.get("conflict") || "",
+    action = params.get("action") || "";
   function update(values: Record<string, string>) {
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      Object.entries(values).forEach(([k, v]) =>
-        v ? next.set(k, v) : next.delete(k),
-      );
-      return next;
-    });
+    const run = () =>
+      setParams((previous) => {
+        const next = new URLSearchParams(previous);
+        Object.entries(values).forEach(([k, v]) =>
+          v ? next.set(k, v) : next.delete(k),
+        );
+        return next;
+      });
+    if (dirty) {
+      setPending(() => run);
+      return;
+    }
+    run();
   }
   function close() {
     update({ product: "", tab: "" });
-    setConfirm(false);
     originRef.current?.focus();
   }
   useEffect(() => {
@@ -79,18 +100,19 @@ export function PrototypeDashboard() {
     }
   }, [selected?.id]);
   useEffect(() => {
-    setConfirm(false);
-  }, [selected?.id, tab]);
-  useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
+      if (pending) {
+        if (e.key === "Escape") setPending(null);
+        return;
+      }
       if (e.key === "Escape") {
         close();
         return;
       }
       if (e.key === "Tab") {
         const elements = panelRef.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),a,input,[tabindex="0"]',
+          'button:not(:disabled):not([tabindex="-1"]),a,input,textarea,select,[tabindex="0"]',
         );
         if (!elements?.length) return;
         const first = elements[0],
@@ -111,28 +133,74 @@ export function PrototypeDashboard() {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = old;
     };
-  }, [selected?.id, confirm]);
-  const filtered = rows.filter(
-    (p) =>
-      [p.name, p.sku, p.brand, p.id]
-        .join(" ")
-        .toLocaleLowerCase()
-        .includes(q.toLocaleLowerCase()) &&
-      (!status || p.status === status) &&
-      (!brand || p.brand === brand) &&
-      (!channel || (channel === "ml" ? p.ml : p.tn) === "Verificada"),
-  );
-  const count = (s: Status) => rows.filter((p) => p.status === s).length;
-  function approve() {
-    if (!selected) return;
-    setRows((old) =>
-      old.map((p) =>
-        p.id === selected.id ? { ...p, status: "Preparada" } : p,
-      ),
+  }, [selected?.id, dirty, pending]);
+  const filtered = rows
+    .filter(
+      (p) =>
+        [p.name, p.sku, p.brand, p.id]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(q.toLocaleLowerCase()) &&
+        (!status ||
+          (status === "Conflicto" ? p.conflict : p.status === status)) &&
+        (!brand || p.brand === brand) &&
+        (!channel ||
+          (channel === "candidate"
+            ? candidateCount(p) > 0
+            : (channel === "ml" ? p.ml : p.tn) === "Verificada")) &&
+        (!conflict || (conflict === "yes" ? p.conflict : !p.conflict)) &&
+        (!action || nextAction(p) === action),
+    )
+    .sort(
+      (a, b) =>
+        Number(b.conflict) - Number(a.conflict) ||
+        Number(b.status === "Pendiente") - Number(a.status === "Pendiente") ||
+        a.id.localeCompare(b.id),
     );
-    setConfirm(false);
-    setNotice(`Ficha ${selected.id} preparada en esta demostración.`);
+  const count = (s: Status) =>
+    rows.filter((p) => (s === "Conflicto" ? p.conflict : p.status === s))
+      .length;
+  function replaceProduct(p: Item) {
+    setRows((old) => old.map((row) => (row.id === p.id ? p : row)));
+    setDirty(false);
   }
+  useEffect(() => {
+    if (urlParams.toString() === params.toString()) return;
+    if (dirty) {
+      const target = new URLSearchParams(urlParams);
+      setParams(params, { replace: true });
+      setPending(() => () => {
+        setAcceptedParams(target);
+        setParams(target);
+      });
+    } else setAcceptedParams(urlParams);
+  }, [urlParams, dirty, params, setParams]);
+  useEffect(() => {
+    if (!dirty) return;
+    const before = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    const click = (e: MouseEvent) => {
+      const anchor =
+        e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (
+        anchor instanceof HTMLAnchorElement &&
+        new URL(anchor.href).origin === location.origin
+      ) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setPending(() => () => location.assign(anchor.href));
+      }
+    };
+    window.addEventListener("beforeunload", before);
+    document.addEventListener("click", click, true);
+    return () => {
+      window.removeEventListener("beforeunload", before);
+      document.removeEventListener("click", click, true);
+    };
+  }, [dirty]);
+
   return (
     <div className="d-app">
       <aside className="d-sidebar">
@@ -278,6 +346,9 @@ export function PrototypeDashboard() {
                     status: ["ml", "tn"].includes(String(filter))
                       ? ""
                       : String(filter),
+                    conflict: "",
+                    action: "",
+                    brand: "",
                     channel: ["ml", "tn"].includes(String(filter))
                       ? String(filter)
                       : "",
@@ -300,7 +371,7 @@ export function PrototypeDashboard() {
             <div>
               <strong>Un buen catálogo empieza por una ficha completa</strong>
               <p>
-                Hay {count("Pendiente")} productos para revisar. Resolvé sus
+                Hay {count("Pendiente")} variantes para revisar. Resolvé sus
                 datos antes de prepararlos para los canales.
               </p>
             </div>
@@ -308,6 +379,44 @@ export function PrototypeDashboard() {
               Ver productos <Icon name="arrow-right" size={15} />
             </button>
           </section>
+          <section className="o-progress" aria-label="Progreso del catálogo">
+            <h2>Progreso de preparación</h2>
+            <progress value={count("Preparada")} max={rows.length} />
+            <p>
+              {count("Preparada")} de {rows.length} variantes con ficha
+              preparada internamente · {new Set(rows.map((p) => p.family)).size}{" "}
+              productos base · {rows.length} variantes. No implica publicación.
+            </p>
+            <button
+              onClick={() =>
+                update({
+                  channel: "candidate",
+                  status: "",
+                  conflict: "",
+                  action: "",
+                  brand: "",
+                })
+              }
+            >
+              {rows.reduce((total, p) => total + candidateCount(p), 0)}{" "}
+              coincidencias candidatas de canal · revisar
+            </button>
+            <small>
+              Un producto puede tener varias variantes y una variante varios
+              candidatos. No se suman a publicaciones verificadas.
+            </small>
+          </section>
+          <OperationsCenter
+            key={editorEpoch}
+            rows={rows}
+            active={params.get("tool") || ""}
+            onTool={(tool) => update({ tool })}
+            onChange={setRows}
+            onSelect={(product, tab) => update({ product, tab, tool: "" })}
+            jobs={jobs}
+            onJob={(job) => setJobs((old) => [...old, job])}
+            onDirty={setDirty}
+          />
           <section className="d-catalog">
             <div className="d-section-head">
               <div>
@@ -370,14 +479,54 @@ export function PrototypeDashboard() {
                 <option value="">Todos los canales</option>
                 <option value="ml">ML verificado</option>
                 <option value="tn">TN verificado</option>
+                <option value="candidate">Coincidencias candidatas</option>
               </select>
             </div>
-            {(q || status || brand || channel) && (
+            <div className="o-extra-filters">
+              <label>
+                Conflicto
+                <select
+                  aria-label="Conflicto"
+                  value={conflict}
+                  onChange={(e) => update({ conflict: e.target.value })}
+                >
+                  <option value="">Con y sin conflicto</option>
+                  <option value="yes">Con conflicto</option>
+                  <option value="no">Sin conflicto</option>
+                </select>
+              </label>
+              <label>
+                Siguiente acción
+                <select
+                  aria-label="Siguiente acción"
+                  value={action}
+                  onChange={(e) => update({ action: e.target.value })}
+                >
+                  <option value="">Todas las acciones</option>
+                  {[
+                    "Resolver conflicto",
+                    "Revisar IA",
+                    "Completar ficha",
+                    "Preparar canal",
+                  ].map((a) => (
+                    <option key={a}>{a}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {(q || status || brand || channel || conflict || action) && (
               <div className="d-active-filters">
                 Filtros activos{" "}
                 <button
                   onClick={() =>
-                    update({ q: "", status: "", brand: "", channel: "" })
+                    update({
+                      q: "",
+                      status: "",
+                      brand: "",
+                      channel: "",
+                      conflict: "",
+                      action: "",
+                    })
                   }
                 >
                   Limpiar filtros ×
@@ -437,6 +586,24 @@ export function PrototypeDashboard() {
                       </td>
                       <td>
                         <Pill value={p.status} />
+                        <small>{nextAction(p)}</small>
+                        <button
+                          className="o-quick"
+                          onClick={() =>
+                            update({
+                              product: p.id,
+                              tab: p.conflict
+                                ? "Evidencias"
+                                : p.ai?.state === "Pendiente"
+                                  ? "IA"
+                                  : p.status === "Preparada"
+                                    ? "Canales"
+                                    : "Ficha",
+                            })
+                          }
+                        >
+                          Resolver tarea
+                        </button>
                       </td>
                       <td>
                         <button
@@ -461,7 +628,14 @@ export function PrototypeDashboard() {
                 <p>Probá otro nombre o quitá los filtros.</p>
                 <button
                   onClick={() =>
-                    update({ q: "", status: "", brand: "", channel: "" })
+                    update({
+                      q: "",
+                      status: "",
+                      brand: "",
+                      channel: "",
+                      conflict: "",
+                      action: "",
+                    })
                   }
                 >
                   Ver todo el catálogo
@@ -559,183 +733,64 @@ export function PrototypeDashboard() {
               role="tabpanel"
               aria-labelledby={`tab-${tab}`}
             >
-              {tab === "Ficha" && (
-                <>
-                  <h3>Información de la variante</h3>
-                  <p>
-                    La identidad se conserva aunque cambie o se repita el SKU.
-                  </p>
-                  <dl className="d-fields">
-                    <div>
-                      <dt>Ecomm ID de variante</dt>
-                      <dd>{selected.id}</dd>
-                    </div>
-                    <div>
-                      <dt>SKU</dt>
-                      <dd>{selected.sku}</dd>
-                    </div>
-                    <div>
-                      <dt>Marca</dt>
-                      <dd>{selected.brand}</dd>
-                    </div>
-                    <div>
-                      <dt>Categoría</dt>
-                      <dd>{selected.category}</dd>
-                    </div>
-                    <div>
-                      <dt>Precio de lista</dt>
-                      <dd>{money(selected.price)}</dd>
-                    </div>
-                    <div>
-                      <dt>Stock de muestra</dt>
-                      <dd>{selected.stock} unidades</dd>
-                    </div>
-                  </dl>
-                  <div className="d-callout">
-                    <Icon name="help" />
-                    <div>
-                      <strong>Antes de preparar la ficha</strong>
-                      <p>
-                        Revisá la identidad, la información y las evidencias.
-                        Este paso no publica el producto.
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-              {tab === "Evidencias" && (
-                <>
-                  <h3>Qué sabemos de este producto</h3>
-                  <p>
-                    Ejemplos ficticios de evidencia, sin consultas a canales.
-                  </p>
-                  {(["ml", "tn"] as const).map((c) => (
-                    <article className="d-evidence" key={c}>
-                      <h4>{c === "ml" ? "Mercado Libre" : "Tiendanube"}</h4>
-                      <Pill value={selected[c]} />
-                      <p>
-                        {selected[c] === "Verificada"
-                          ? `Asociación sintética revisada por ID de variante ${selected.id}. Referencia DEMO-${c}-${selected.id}.`
-                          : selected[c] === "SKU coincidente"
-                            ? "El SKU coincide, pero la identidad y la presentación aún deben verificarse. Publicación no confirmada."
-                            : "No hay evidencia disponible. Esto no significa que el producto no esté publicado."}
-                      </p>
-                    </article>
-                  ))}
-                </>
-              )}
-              {tab === "IA" && (
-                <>
-                  <span className="d-ai-tag">SUGERENCIA SIMULADA</span>
-                  <h3>Una ficha más clara, con tu criterio</h3>
-                  <p>
-                    Propuesta de título:{" "}
-                    <strong>
-                      {selected.name} — {selected.brand}
-                    </strong>
-                  </p>
-                  <div className="d-callout">
-                    <Icon name="sparkles" />
-                    <p>
-                      La IA no se ejecuta en este prototipo. Esta propuesta es
-                      fija, no valida datos ni se aplica automáticamente.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setNotice(
-                        "Sugerencia simulada descartada. No se modificó la ficha.",
-                      )
-                    }
-                  >
-                    Descartar sugerencia
-                  </button>
-                </>
-              )}
-              {tab === "Canales" && (
-                <>
-                  <h3>Presencia por canal</h3>
-                  <p>
-                    La preparación interna y la publicación son estados
-                    diferentes.
-                  </p>
-                  <article className="d-evidence">
-                    <h4>Ecomm-App</h4>
-                    <Pill value="Verificada" />
-                    <p>Fuente central sintética · variante {selected.id}</p>
-                  </article>
-                  {(["ml", "tn"] as const).map((c) => (
-                    <article className="d-evidence" key={c}>
-                      <h4>{c === "ml" ? "Mercado Libre" : "Tiendanube"}</h4>
-                      <Pill value={selected[c]} />
-                      <p>
-                        {selected[c] === "Verificada"
-                          ? "Publicación verificada en el ejemplo sintético."
-                          : "Publicación no confirmada. Revisar evidencias."}
-                      </p>
-                    </article>
-                  ))}
-                </>
-              )}
-              {tab === "Historial" && (
-                <>
-                  <h3>Actividad de la ficha</h3>
-                  <ol className="d-timeline">
-                    <li>
-                      <strong>Variante incorporada</strong>
-                      <p>Desde el catálogo sintético Ecomm-App · DEMO</p>
-                    </li>
-                    <li>
-                      <strong>Evidencias de muestra agregadas</strong>
-                      <p>Sin conexión con servicios externos.</p>
-                    </li>
-                    {selected.status === "Preparada" && (
-                      <li>
-                        <strong>Ficha preparada</strong>
-                        <p>
-                          Estado interno de demostración. No se publicó en
-                          canales.
-                        </p>
-                      </li>
-                    )}
-                  </ol>
-                  <p>Los cambios de esta sesión se pierden al recargar.</p>
-                </>
-              )}
-            </div>
-            <div className="d-drawer-actions">
-              {confirm ? (
-                <div className="d-confirm" role="alert">
-                  <strong>¿Preparar la ficha {selected.id}?</strong>
-                  <p>
-                    Solo cambiará su estado en esta demostración. Los conflictos
-                    de canal seguirán sin verificarse.
-                  </p>
-                  <div>
-                    <button onClick={() => setConfirm(false)}>Cancelar</button>
-                    <button className="d-primary" onClick={approve}>
-                      Confirmar preparación
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <p>Acción interna · no publica ni modifica canales</p>
-                  <button
-                    className="d-primary"
-                    disabled={selected.status === "Preparada"}
-                    onClick={() => setConfirm(true)}
-                  >
-                    {selected.status === "Preparada"
-                      ? "Ficha preparada"
-                      : "Preparar ficha"}{" "}
-                    <Icon name="check" size={17} />
-                  </button>
-                </>
-              )}
+              <OperationalPanel
+                key={`${selected.id}-${editorEpoch}`}
+                product={selected}
+                tab={tab}
+                onChange={replaceProduct}
+                onDirty={setDirty}
+              />
             </div>
           </section>
         </>
+      )}
+      {pending && (
+        <div
+          className="o-unsaved"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Cambios sin guardar"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setPending(null);
+              return;
+            }
+            if (e.key === "Tab") {
+              const buttons = e.currentTarget.querySelectorAll("button");
+              if (e.shiftKey && document.activeElement === buttons[0]) {
+                e.preventDefault();
+                buttons[buttons.length - 1].focus();
+              } else if (
+                !e.shiftKey &&
+                document.activeElement === buttons[buttons.length - 1]
+              ) {
+                e.preventDefault();
+                buttons[0].focus();
+              }
+            }
+          }}
+        >
+          <h3>Tenés cambios sin guardar</h3>
+          <p>
+            Podés seguir editando o descartar el trabajo pendiente. El catálogo
+            guardado no se modifica.
+          </p>
+          <button autoFocus onClick={() => setPending(null)}>
+            Seguir editando
+          </button>
+          <button
+            onClick={() => {
+              const run = pending;
+              setDirty(false);
+              setEditorEpoch((old) => old + 1);
+              setPending(null);
+              run();
+            }}
+          >
+            Descartar y continuar
+          </button>
+        </div>
       )}
     </div>
   );
