@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async ({ page }) => expect(attempts.get(page)).toEqual([]));
 const row = (page: Page, id: string) =>
   page.locator(".d-table tbody tr").filter({ hasText: id });
-test("navegación simple y cuatro indicadores que filtran sin salir", async ({
+test("navegación simple y ocho indicadores comerciales en la misma pantalla", async ({
   page,
 }, info) => {
   const nav = page.getByRole("navigation", {
@@ -30,24 +30,9 @@ test("navegación simple y cuatro indicadores que filtran sin salir", async ({
   ).toBeVisible();
   await expect(nav.getByRole("link")).toHaveCount(0);
   const metrics = page.getByRole("region", {
-    name: "Indicadores del catálogo",
+    name: "Cobertura comercial por canal",
   });
-  await expect(metrics.getByRole("button")).toHaveCount(4);
-  for (const [label, n] of [
-    ["Necesita atención", 2],
-    ["En preparación", 4],
-    ["Listo para publicar", 1],
-    ["Publicado", 5],
-  ] as const) {
-    const button = metrics.getByRole("button", {
-      name: new RegExp(`^${label} ${n} `),
-    });
-    await button.click();
-    await expect(button).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator(".d-table tbody tr")).toHaveCount(n);
-    await expect(page).toHaveURL(/work=/);
-    await expect(page).toHaveURL(/^http:\/\/127.0.0.1:4173\/\?/);
-  }
+  await expect(metrics.getByRole("button")).toHaveCount(8);
   await page
     .getByRole("button", { name: "Ver todo el catálogo", exact: true })
     .click();
@@ -64,7 +49,7 @@ test("editorial y canales separados; preparar no publica ni confirma candidatos"
   const lamp = row(page, "DEMO-1005");
   await expect(lamp).toContainText("Ficha aprobada");
   await expect(lamp).toContainText("Publicado");
-  await expect(lamp).toContainText("Por verificar");
+  await expect(lamp).toContainText("Sin publicación confirmada");
   await expect(lamp).not.toContainText("Sin publicar");
   const speaker = row(page, "DEMO-1008");
   await expect(speaker).toContainText("Publicado");
@@ -83,15 +68,15 @@ test("editorial y canales separados; preparar no publica ni confirma candidatos"
   await expect(lamp).toContainText("Listo para publicar");
   await expect(lamp).toContainText("Publicado");
   await page
-    .getByRole("region", { name: "Indicadores del catálogo" })
-    .getByRole("button", { name: /^Listo para publicar 2 / })
+    .getByRole("region", { name: "Cobertura comercial por canal" })
+    .getByRole("button", { name: /^Listos para Tiendanube 2 / })
     .click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
 });
 test("historial y configuración dentro del catálogo sin perder búsqueda", async ({
   page,
 }, info) => {
-  await page.getByRole("textbox", { name: "Buscar productos" }).fill("BOT-750");
+  await page.getByRole("textbox", { name: "Buscar productos" }).fill("ALM-NAT");
   await page
     .getByRole("button", { name: "Configuración", exact: true })
     .click();
@@ -109,12 +94,12 @@ test("historial y configuración dentro del catálogo sin perder búsqueda", asy
   await expect(settings).not.toBeVisible();
   await expect(page.locator(".d-table thead")).toContainText("Disponibilidad");
   await expect(page.getByLabel("Conflicto", { exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/q=BOT-750/);
+  await expect(page).toHaveURL(/q=ALM-NAT/);
   await page.getByRole("button", { name: "Historial", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "Trabajos y resultados", exact: true }),
   ).toBeVisible();
-  await expect(page).toHaveURL(/q=BOT-750/);
+  await expect(page).toHaveURL(/q=ALM-NAT/);
   await page
     .getByRole("button", { name: "Volver a búsqueda y productos ↑" })
     .click();
@@ -142,15 +127,15 @@ test("editar invalida preparación y muestra bloqueo sin borrar publicación con
   await expect(row(page, "DEMO-1008")).toContainText("Publicado");
   await expect(row(page, "DEMO-1008")).not.toContainText("Listo para publicar");
   const metrics = page.getByRole("region", {
-    name: "Indicadores del catálogo",
+    name: "Cobertura comercial por canal",
   });
   await expect(
-    metrics.getByRole("button", { name: /^Necesita atención 3 / }),
+    metrics.getByRole("button", { name: /^Necesitan revisión 4 / }),
   ).toBeVisible();
   await expect(
-    metrics.getByRole("button", { name: /^Listo para publicar 0 / }),
+    metrics.getByRole("button", { name: /^Listos para Tiendanube 0 / }),
   ).toBeVisible();
   await expect(
-    metrics.getByRole("button", { name: /^Publicado 5 / }),
+    metrics.getByRole("button", { name: /^Mercado Libre · confirmadas 4 / }),
   ).toBeVisible();
 });

@@ -150,7 +150,10 @@ export function OperationsCenter({
               p,
               {
                 status: "Preparada",
-                prepared: { ml: true, tn: !!p.seo.trim() },
+                prepared: {
+                  ml: p.evidence.ml.freshness === "current",
+                  tn: !!p.seo.trim() && p.evidence.tn.freshness === "current",
+                },
               },
               "Preparación por lote",
               "Requisitos internos de muestra revisados; no se publicó en canales",

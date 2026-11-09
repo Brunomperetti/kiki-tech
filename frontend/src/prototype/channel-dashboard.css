@@ -1,0 +1,173 @@
+.c-metrics {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.c-metrics > .d-metric:nth-child(-n + 3) {
+  grid-column: span 2;
+  min-height: 145px;
+}
+.c-metrics > .d-metric:nth-child(n + 4) {
+  grid-column: span 2;
+  min-height: 138px;
+}
+.c-metrics > .d-metric:nth-last-child(-n + 2) {
+  grid-column: span 3;
+}
+.c-central {
+  background: #eef5e9;
+  border-color: #bcd0ac;
+}
+.c-metrics .d-metric > span {
+  font-size: 14px;
+  min-height: 35px;
+}
+.c-metrics .d-metric strong {
+  margin: 12px 0 8px;
+}
+.c-metrics .d-metric small {
+  font-size: 12px;
+}
+.c-channel-filter {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #466039;
+  flex: 1;
+  min-width: 210px;
+}
+.c-channel-filter select {
+  width: 100%;
+  max-width: none;
+}
+.d-filters {
+  align-items: end;
+}
+.d-search {
+  min-height: 40px;
+}
+.d-table th,
+.d-table td {
+  white-space: normal;
+}
+.d-table td[data-channel] {
+  min-width: 170px;
+}
+.c-legend {
+  font-size: 13px;
+  border: 1px solid #d7e2cf;
+  border-radius: 8px;
+  background: #fff;
+  padding: 15px;
+  margin-top: 20px;
+  color: #4f6545;
+}
+.c-legend summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.c-legend li {
+  line-height: 1.7;
+  margin: 10px 0;
+}
+.d-table td small {
+  max-width: 210px;
+}
+.s-mobile-channels {
+  font-size: 12px;
+}
+.s-mobile-channels span {
+  padding: 3px 0;
+}
+.d-product small {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .c-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .c-metrics > .d-metric:nth-child(n) {
+    grid-column: auto;
+  }
+  .c-metrics > .d-metric:first-child {
+    grid-column: span 2;
+  }
+  .c-channel-filter {
+    min-width: 0;
+    flex-basis: 45%;
+  }
+  .d-search {
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 760px) {
+  .c-metrics {
+    gap: 9px;
+  }
+  .c-metrics > .d-metric:nth-child(n) {
+    min-height: 160px;
+    padding: 13px;
+  }
+  .c-metrics > .d-metric:first-child {
+    min-height: 125px;
+  }
+  .c-metrics .d-metric > span {
+    font-size: 12px;
+    min-height: 37px;
+  }
+  .c-metrics .d-metric small {
+    font-size: 11px;
+  }
+  .d-filters .c-channel-filter select {
+    font-size: 12px;
+    min-height: 42px;
+  }
+  .d-table td:first-child {
+    width: 58%;
+  }
+  .d-product strong {
+    font-size: 12px;
+  }
+  .s-mobile-channels span {
+    line-height: 1.5;
+  }
+  .d-table .d-pill {
+    font-size: 10px;
+  }
+  .c-legend {
+    font-size: 12px;
+  }
+}
+
+/* Consistent paired filters keep both channels together. */
+.d-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+}
+.d-filters > .d-search {
+  grid-column: 1/-1;
+}
+.d-filters > select {
+  width: 100%;
+  max-width: none;
+}
+.d-filters > .c-channel-filter {
+  min-width: 0;
+}
+@media (max-width: 1000px) {
+  .d-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .c-metrics > .d-metric:nth-child(6) {
+    grid-column: span 2;
+    min-height: 118px;
+  }
+  .c-metrics > .d-metric:nth-child(6) > span {
+    min-height: 0;
+  }
+  .d-filters > .c-channel-filter select {
+    width: 100%;
+  }
+}

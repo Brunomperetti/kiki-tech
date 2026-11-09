@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { KikiIcon as Icon } from "../components/KikiIcon";
-import { type Status } from "./data";
 import {
   candidateCount,
+  coverage,
+  channelMatches,
+  isConfirmed,
+  isReady,
+  channelDetail,
   channelState,
   inWorkState,
   workLabels,
@@ -20,6 +24,7 @@ import { OperationsCenter } from "./OperationsCenter";
 import "./dashboard.css";
 import "./operations.css";
 import "./simple-dashboard.css";
+import "./channel-dashboard.css";
 import { SettingsDialog } from "./SettingsDialog";
 const tabs = ["Ficha", "Evidencias", "IA", "Canales", "Historial"];
 const money = (n: number) =>
@@ -31,7 +36,7 @@ const money = (n: number) =>
 function Pill({ value }: { value: string }) {
   return (
     <span
-      className={`d-pill ${value === "Preparada" || value === "Verificada" || value === "Publicado" || value === "Ficha aprobada" ? "good" : value === "Conflicto" || value === "Revisión necesaria" || value === "Datos incompletos" ? "bad" : "warm"}`}
+      className={`d-pill ${value === "Preparada" || value === "Verificada" || value.startsWith("Publicado") || value === "Ficha aprobada" ? "good" : value === "Conflicto" || value === "Revisión necesaria" || value === "Datos incompletos" ? "bad" : "warm"}`}
     >
       {value === "Verificada" ? "✓ " : value === "Conflicto" ? "! " : ""}
       {value}
@@ -61,7 +66,9 @@ export function PrototypeDashboard() {
     channel = params.get("channel") || "",
     conflict = params.get("conflict") || "",
     action = params.get("action") || "",
-    work = params.get("work") || "";
+    work = params.get("work") || "",
+    mlFilter = params.get("mlState") || "",
+    tnFilter = params.get("tnState") || "";
   function update(values: Record<string, string>) {
     const run = () =>
       setParams((previous) => {
@@ -132,11 +139,13 @@ export function PrototypeDashboard() {
         (!status ||
           (status === "Conflicto" ? p.conflict : p.status === status)) &&
         inWorkState(p, work) &&
+        channelMatches(p, "ml", mlFilter) &&
+        channelMatches(p, "tn", tnFilter) &&
         (!brand || p.brand === brand) &&
         (!channel ||
           (channel === "candidate"
             ? candidateCount(p) > 0
-            : (channel === "ml" ? p.ml : p.tn) === "Verificada")) &&
+            : isConfirmed(p, channel === "ml" ? "ml" : "tn"))) &&
         (!conflict || (conflict === "yes" ? p.conflict : !p.conflict)) &&
         (!action || nextAction(p) === action),
     )
@@ -146,9 +155,66 @@ export function PrototypeDashboard() {
         Number(b.status === "Pendiente") - Number(a.status === "Pendiente") ||
         a.id.localeCompare(b.id),
     );
-  const count = (s: Status) =>
-    rows.filter((p) => (s === "Conflicto" ? p.conflict : p.status === s))
-      .length;
+  const ml = coverage(rows, "ml"),
+    tn = coverage(rows, "tn");
+  const indicators = [
+    {
+      id: "all",
+      title: "Ecomm-App · catálogo central",
+      value: new Set(rows.map((p) => p.id)).size,
+      note: "Variantes únicas · todas las presentaciones",
+      filter: { mlState: "", tnState: "", work: "" },
+    },
+    {
+      id: "ml-confirmed",
+      title: "Mercado Libre · confirmadas",
+      value: ml.publications,
+      note: `Publicaciones con evidencia · ${ml.variants} variantes`,
+      filter: { mlState: "confirmed" },
+    },
+    {
+      id: "tn-confirmed",
+      title: "Tiendanube · confirmadas",
+      value: tn.publications,
+      note: `Publicaciones con evidencia · ${tn.variants} variantes`,
+      filter: { tnState: "confirmed" },
+    },
+    {
+      id: "ml-unconfirmed",
+      title: "Sin confirmar en Mercado Libre",
+      value: ml.unconfirmed,
+      note: "Variantes · no significa sin publicar",
+      filter: { mlState: "unconfirmed" },
+    },
+    {
+      id: "tn-unconfirmed",
+      title: "Sin confirmar en Tiendanube",
+      value: tn.unconfirmed,
+      note: "Variantes · falta evidencia vigente",
+      filter: { tnState: "unconfirmed" },
+    },
+    {
+      id: "attention",
+      title: "Necesitan revisión",
+      value: rows.filter((p) => inWorkState(p, "attention")).length,
+      note: "Variantes · revisar bloqueos o evidencia",
+      filter: { work: "attention" },
+    },
+    {
+      id: "ml-ready",
+      title: "Listos para Mercado Libre",
+      value: ml.ready,
+      note: "Variantes · preparación interna, no publicación",
+      filter: { mlState: "ready" },
+    },
+    {
+      id: "tn-ready",
+      title: "Listos para Tiendanube",
+      value: tn.ready,
+      note: "Variantes · preparación interna, no publicación",
+      filter: { tnState: "ready" },
+    },
+  ];
   function replaceProduct(p: Item) {
     setRows((old) => old.map((row) => (row.id === p.id ? p : row)));
     setDirty(false);
@@ -240,7 +306,7 @@ export function PrototypeDashboard() {
           <Icon name="shield" />
           <strong>Tu catálogo, bajo control</strong>
           <p>Vos revisás y decidís cada cambio.</p>
-          <span>Etapa 1.2 · Demostración</span>
+          <span>Etapa 1.3 · Demostración</span>
         </div>
       </aside>
       <div className="d-body">
@@ -288,59 +354,67 @@ export function PrototypeDashboard() {
             </span>
             <span className="d-demo-tag">ENTORNO AISLADO</span>
           </div>
-          <section className="d-metrics" aria-label="Indicadores del catálogo">
-            {(
-              ["attention", "preparing", "ready", "published"] as WorkState[]
-            ).map((state) => (
+          <section
+            className="d-metrics c-metrics"
+            aria-label="Cobertura comercial por canal"
+          >
+            {indicators.map((card) => (
               <button
-                key={state}
-                aria-pressed={work === state}
-                className={`d-metric ${state === "attention" ? "d-metric-conflict" : ""}`}
-                onClick={() =>
-                  update({
-                    work: work === state ? "" : state,
-                    status: "",
-                    channel: "",
-                    conflict: "",
-                    action: "",
-                    brand: "",
-                  })
+                key={card.id}
+                data-metric={card.id}
+                className={`d-metric ${card.id === "all" ? "c-central" : ""}`}
+                aria-pressed={
+                  card.id === "all"
+                    ? !mlFilter &&
+                      !tnFilter &&
+                      !work &&
+                      !q &&
+                      !status &&
+                      !brand &&
+                      !channel &&
+                      !conflict &&
+                      !action
+                    : Object.entries(card.filter).every(
+                        ([k, v]) => params.get(k) === v,
+                      )
                 }
+                onClick={() => {
+                  if (card.id === "all")
+                    update({
+                      mlState: "",
+                      tnState: "",
+                      work: "",
+                      status: "",
+                      channel: "",
+                      conflict: "",
+                      action: "",
+                      brand: "",
+                      q: "",
+                    });
+                  else {
+                    const entries = Object.entries(card.filter);
+                    const active = entries.every(
+                      ([k, v]) => params.get(k) === v,
+                    );
+                    update(
+                      Object.fromEntries(
+                        entries.map(([k, v]) => [k, active ? "" : v]),
+                      ),
+                    );
+                  }
+                }}
               >
-                <span>
-                  {workLabels[state]}
-                  <Icon
-                    name={
-                      state === "attention"
-                        ? "alert"
-                        : state === "preparing"
-                          ? "clock"
-                          : state === "ready"
-                            ? "check"
-                            : "store"
-                    }
-                    size={18}
-                  />
-                </span>
-                <strong>
-                  {rows.filter((p) => inWorkState(p, state)).length}
-                </strong>
-                <small>
-                  {state === "attention"
-                    ? "Resolver una revisión o bloqueo"
-                    : state === "preparing"
-                      ? "Completar o aprobar información"
-                      : state === "ready"
-                        ? "Preparación interna · revisar vigencia"
-                        : "Con evidencia en al menos un canal"}
-                </small>
+                <span>{card.title}</span>
+                <strong>{card.value}</strong>
+                <small>{card.note}</small>
               </button>
             ))}
           </section>
           <p className="s-count-note">
-            Contamos variantes de producto. Una puede estar publicada en un
-            canal y necesitar trabajo en otro; los indicadores no se suman. Todo
-            es una demostración.
+            Totales del catálogo completo. Ecomm-App cuenta variantes; cada
+            canal cuenta publicaciones únicas con evidencia vigente. Una
+            variante puede tener varias publicaciones: no sumamos esas
+            cantidades. Los filtros de ML y TN se combinan.
           </p>
           <div
             className="s-toolbar"
@@ -365,6 +439,8 @@ export function PrototypeDashboard() {
               onClick={() =>
                 update({
                   q: "",
+                  mlState: "",
+                  tnState: "",
                   work: "",
                   status: "",
                   brand: "",
@@ -431,16 +507,32 @@ export function PrototypeDashboard() {
                   <option key={s}>{s}</option>
                 ))}
               </select>
-              <select
-                aria-label="Canal verificado"
-                value={channel}
-                onChange={(e) => update({ channel: e.target.value })}
-              >
-                <option value="">Todos los canales</option>
-                <option value="ml">ML verificado</option>
-                <option value="tn">TN verificado</option>
-                <option value="candidate">Coincidencias candidatas</option>
-              </select>
+              {(["ml", "tn"] as const).map((c) => (
+                <label className="c-channel-filter" key={c}>
+                  {c === "ml" ? "Mercado Libre" : "Tiendanube"}
+                  <select
+                    aria-label={
+                      c === "ml" ? "Estado Mercado Libre" : "Estado Tiendanube"
+                    }
+                    value={c === "ml" ? mlFilter : tnFilter}
+                    onChange={(e) =>
+                      update({
+                        [c === "ml" ? "mlState" : "tnState"]: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Todas las variantes</option>
+                    <option value="confirmed">Publicación confirmada</option>
+                    <option value="unconfirmed">
+                      Sin publicación confirmada
+                    </option>
+                    <option value="ready">Preparado internamente</option>
+                    <option value="candidate">Vinculación por revisar</option>
+                    <option value="stale">Información desactualizada</option>
+                    <option value="unknown">Información desconocida</option>
+                  </select>
+                </label>
+              ))}
             </div>
             <details className="s-advanced" open={advanced}>
               <summary
@@ -474,6 +566,7 @@ export function PrototypeDashboard() {
                     <option value="">Todas las acciones</option>
                     {[
                       "Resolver conflicto",
+                      "Revisar evidencia",
                       "Revisar IA",
                       "Completar ficha",
                       "Revisar ficha",
@@ -506,6 +599,8 @@ export function PrototypeDashboard() {
                   onClick={() =>
                     update({
                       work: "",
+                      mlState: "",
+                      tnState: "",
                       q: "",
                       status: "",
                       brand: "",
@@ -523,7 +618,7 @@ export function PrototypeDashboard() {
               <table className="d-table">
                 <thead>
                   <tr>
-                    <th>Producto / Ecomm ID</th>
+                    <th>Producto / Presentación / Ecomm ID</th>
                     <th>SKU / Marca</th>
                     <th>{showPrices ? "Precio / Stock" : "Disponibilidad"}</th>
                     <th>Mercado Libre</th>
@@ -552,7 +647,9 @@ export function PrototypeDashboard() {
                           </span>
                           <span>
                             <strong>{p.name}</strong>
-                            <small>{p.id}</small>
+                            <small>
+                              {p.presentation} · {p.sku} · {p.id}
+                            </small>
                             <span className="s-mobile-channels">
                               <span>ML · {channelState(p, "ml")}</span>
                               <span>TN · {channelState(p, "tn")}</span>
@@ -568,34 +665,12 @@ export function PrototypeDashboard() {
                         {showPrices && <strong>{money(p.price)}</strong>}
                         <small>{p.stock} disponibles</small>
                       </td>
-                      <td>
-                        <Pill value={channelState(p, "ml")} />
-                        <small>
-                          {p.ml === "SKU coincidente"
-                            ? p.decisions.ml.state === "Rechazada"
-                              ? "Coincidencia descartada"
-                              : p.decisions.ml.state === "Aceptada"
-                                ? "Coincidencia revisada; no confirma publicación"
-                                : "Coincidencia por revisar"
-                            : p.ml === "Sin evidencia"
-                              ? "Falta evidencia; no implica ausencia"
-                              : "Evidencia de muestra"}
-                        </small>
-                      </td>
-                      <td>
-                        <Pill value={channelState(p, "tn")} />
-                        <small>
-                          {p.tn === "SKU coincidente"
-                            ? p.decisions.tn.state === "Rechazada"
-                              ? "Coincidencia descartada"
-                              : p.decisions.tn.state === "Aceptada"
-                                ? "Coincidencia revisada; no confirma publicación"
-                                : "Coincidencia por revisar"
-                            : p.tn === "Sin evidencia"
-                              ? "Falta evidencia; no implica ausencia"
-                              : "Evidencia de muestra"}
-                        </small>
-                      </td>
+                      {(["ml", "tn"] as const).map((c) => (
+                        <td key={c} data-channel={c}>
+                          <Pill value={channelState(p, c)} />
+                          <small>{channelDetail(p, c)}</small>
+                        </td>
+                      ))}
                       <td>
                         <Pill value={editorialState(p)} />
                         <small>{nextAction(p)}</small>
@@ -636,6 +711,8 @@ export function PrototypeDashboard() {
                   onClick={() =>
                     update({
                       work: "",
+                      mlState: "",
+                      tnState: "",
                       q: "",
                       status: "",
                       brand: "",
@@ -680,6 +757,31 @@ export function PrototypeDashboard() {
               />
             </div>
           )}
+          <details className="c-legend">
+            <summary>Cómo interpretar los estados de canal</summary>
+            <ul>
+              <li>
+                <strong>Publicado con evidencia:</strong> hay una referencia de
+                publicación y evidencia vigente de muestra.
+              </li>
+              <li>
+                <strong>Vinculación por revisar:</strong> la coincidencia es
+                candidata; requiere comparar la presentación y el Ecomm ID.
+              </li>
+              <li>
+                <strong>Sin publicación confirmada:</strong> no tenemos
+                evidencia suficiente. No demuestra que no esté publicado.
+              </li>
+              <li>
+                <strong>Listo para publicar:</strong> preparación interna
+                completa; revisar vigencia antes de cualquier publicación.
+              </li>
+              <li>
+                <strong>Información desactualizada o desconocida:</strong> no
+                permite confirmar el estado actual del canal.
+              </li>
+            </ul>
+          </details>
           <p className="d-footnote">
             <Icon name="help" size={15} /> Un SKU coincidente es una pista. Solo
             una evidencia verificada confirma la publicación.

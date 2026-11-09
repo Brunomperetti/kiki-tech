@@ -31,8 +31,8 @@ test("busca por nombre, SKU, marca e identidad; variantes con SKU repetido son d
 }) => {
   const search = page.getByRole("textbox", { name: "Buscar productos" });
   for (const [term, count] of [
-    ["Auriculares", 1],
-    ["BOT-750", 2],
+    ["Nueces", 1],
+    ["ALM-NAT", 2],
     ["Casa Sur", 2],
     ["DEMO-1006", 1],
   ] as const) {
@@ -43,7 +43,7 @@ test("busca por nombre, SKU, marca e identidad; variantes con SKU repetido son d
     );
   }
   await page.getByRole("button", { name: "Abrir DEMO-1006" }).click();
-  await expect(page.getByRole("dialog")).toContainText("coral");
+  await expect(page.getByRole("dialog")).toContainText("1 kg");
   await expect(page).toHaveURL(/product=DEMO-1006/);
 });
 
@@ -55,7 +55,7 @@ test("combina filtros, restaura URL y muestra vacío recuperable", async ({
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await page.reload();
   await expect(page.getByLabel("Marca", { exact: true })).toHaveValue("Nexo");
-  await page.getByLabel("Canal verificado").selectOption("tn");
+  await page.getByLabel("Estado Tiendanube").selectOption("confirmed");
   await expect(
     page.getByRole("heading", { name: "No encontramos productos" }),
   ).toBeVisible();
@@ -64,8 +64,8 @@ test("combina filtros, restaura URL y muestra vacío recuperable", async ({
     .getByRole("button", { name: "Ver todo el catálogo" })
     .click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(8);
-  await page.getByRole("button", { name: /^Necesita atención 2/ }).click();
-  await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
+  await page.getByRole("button", { name: /^Necesitan revisión 3/ }).click();
+  await expect(page.locator(".d-table tbody tr")).toHaveCount(3);
   await page.goBack();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(8);
 });

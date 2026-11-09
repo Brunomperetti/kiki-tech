@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   change,
+  isConfirmed,
+  channelDetail,
   channelState,
   editorialState,
   requirements,
@@ -231,24 +233,47 @@ export function OperationalPanel({
         <>
           <h3>Revisar evidencia y resolver identidad</h3>
           <p>
-            Publicación no confirmada. Un SKU coincidente no prueba publicación.
-            Una decisión humana tampoco sustituye la evidencia del canal.
+            La publicación se confirma por canal con evidencia vigente. Un SKU
+            coincidente o una decisión de vinculación no sustituyen esa
+            evidencia.
           </p>
           {(["ml", "tn"] as const).map((c) => (
             <article className="d-evidence" key={c}>
               <h4>{c === "ml" ? "Mercado Libre" : "Tiendanube"}</h4>
+              {!isConfirmed(p, c) && <p>Publicación no confirmada.</p>}
               <p>
-                <strong>{p[c]}</strong> · {p.decisions[c].state}
+                <strong>{channelState(p, c)}</strong> · {channelDetail(p, c)}
               </p>
               <p>
-                Fuente: captura sintética DEMO-{c}-{p.id} · 09/11/2026, 12:00
-                (Argentina).
+                Vigencia:{" "}
+                {p.evidence[c].freshness === "current"
+                  ? "información vigente de muestra"
+                  : p.evidence[c].freshness === "stale"
+                    ? "información desactualizada"
+                    : "información desconocida"}
+              </p>
+              {p.evidence[c].publications
+                .filter(
+                  (pub, index, list) =>
+                    list.findIndex((other) => other.id === pub.id) === index,
+                )
+                .map((pub, i) => (
+                  <p key={i}>
+                    Referencia: {pub.id} · {pub.proof} · {pub.capturedAt} (hora
+                    argentina)
+                  </p>
+                ))}
+              <p>Decisión de vinculación: {p.decisions[c].state}</p>
+              <p>
+                Fuente: datos sintéticos de{" "}
+                {c === "ml" ? "Mercado Libre" : "Tiendanube"}. La vigencia y las
+                fechas se muestran por referencia.
               </p>
               <p>
                 Variante Ecomm: {p.id}.{" "}
-                {p.sku === "BOT-750"
-                  ? "SKU compartido con otra variante: verificar color y presentación."
-                  : "Comparar marca, tamaño y presentación."}
+                {p.sku === "ALM-NAT"
+                  ? "SKU compartido con otra variante: verificar peso y presentación."
+                  : "Comparar marca, peso y presentación."}
               </p>
               {p.decisions[c].reason && (
                 <p>Fundamento: {p.decisions[c].reason}</p>
@@ -411,13 +436,36 @@ export function OperationalPanel({
           <article className="d-evidence">
             <h4>Ecomm-App · fuente central</h4>
             <p>
-              SKU {p.sku} · Ecomm ID {p.id}. Versión de demostración; no
-              sincronizada.
+              SKU {p.sku} · Presentación {p.presentation} · Ecomm ID {p.id}.
+              Versión de demostración; no sincronizada.
             </p>
           </article>
           {(["ml", "tn"] as const).map((c) => (
             <article className="d-evidence" key={c}>
               <h4>{c === "ml" ? "Mercado Libre" : "Tiendanube"}</h4>
+              {!isConfirmed(p, c) && <p>Publicación no confirmada.</p>}
+              <p>
+                <strong>{channelState(p, c)}</strong> · {channelDetail(p, c)}
+              </p>
+              <p>
+                Vigencia:{" "}
+                {p.evidence[c].freshness === "current"
+                  ? "información vigente de muestra"
+                  : p.evidence[c].freshness === "stale"
+                    ? "información desactualizada"
+                    : "información desconocida"}
+              </p>
+              {p.evidence[c].publications
+                .filter(
+                  (pub, index, list) =>
+                    list.findIndex((other) => other.id === pub.id) === index,
+                )
+                .map((pub, i) => (
+                  <p key={i}>
+                    Referencia: {pub.id} · {pub.proof} · {pub.capturedAt} (hora
+                    argentina)
+                  </p>
+                ))}
               <p>
                 <strong>{channelState(p, c)}</strong>
                 {channelState(p, c) === "Listo para publicar"
@@ -426,7 +474,7 @@ export function OperationalPanel({
               </p>
               <p>
                 Publicación:{" "}
-                {p[c] === "Verificada"
+                {isConfirmed(p, c)
                   ? "Verificada en fixture sintético"
                   : "Publicación no confirmada."}
               </p>
@@ -459,9 +507,17 @@ export function OperationalPanel({
               ) : (
                 <p>Requisitos internos de muestra completos.</p>
               )}
+              {p.evidence[c].freshness !== "current" && (
+                <p className="o-warning">
+                  Antes de preparar este canal, revisá una copia vigente de la
+                  evidencia. No se consulta ningún servicio en esta
+                  demostración.
+                </p>
+              )}
               <button
                 disabled={
                   !!missing.length ||
+                  p.evidence[c].freshness !== "current" ||
                   (c === "tn" && !p.seo.trim()) ||
                   p.prepared[c]
                 }

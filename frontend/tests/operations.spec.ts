@@ -46,12 +46,12 @@ async function select(work: ReturnType<Page["getByRole"]>, id: string) {
 test("edita ficha, guarda borrador, consulta versión y conserva búsqueda y filtros", async ({
   page,
 }, info) => {
-  await page.getByRole("textbox", { name: "Buscar productos" }).fill("BOT-750");
+  await page.getByRole("textbox", { name: "Buscar productos" }).fill("ALM-NAT");
   await page.getByLabel("Marca", { exact: true }).selectOption("Monte");
   const panel = await open(page);
   await panel
     .getByLabel("Nombre", { exact: true })
-    .fill("Botella de excursión demo");
+    .fill("Almendras selección demo");
   await panel
     .getByLabel("Descripción", { exact: true })
     .fill("Descripción revisada por el operador de muestra.");
@@ -67,7 +67,7 @@ test("edita ficha, guarda borrador, consulta versión y conserva búsqueda y fil
   await expect(alert).toBeVisible();
   await alert.getByRole("button", { name: "Seguir editando" }).click();
   await expect(panel.getByLabel("Nombre", { exact: true })).toHaveValue(
-    "Botella de excursión demo",
+    "Almendras selección demo",
   );
   await page.screenshot({
     path: `artifacts/edicion-${info.project.name}.png`,
@@ -82,17 +82,17 @@ test("edita ficha, guarda borrador, consulta versión y conserva búsqueda y fil
     .click();
   await expect(
     panel.getByRole("region", { name: "Versión anterior" }),
-  ).toContainText("Botella térmica · 750 ml");
+  ).toContainText("Almendras naturales · 250 g");
   await expect(
-    panel.getByRole("heading", { name: "Botella de excursión demo" }),
+    panel.getByRole("heading", { name: "Almendras selección demo" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Cerrar ficha" }).click();
-  await expect(page).toHaveURL(/q=BOT-750/);
+  await expect(page).toHaveURL(/q=ALM-NAT/);
   await expect(page).toHaveURL(/brand=Monte/);
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await expect(
     page.locator(".d-table tbody tr").filter({ hasText: "DEMO-1006" }),
-  ).toContainText("coral");
+  ).toContainText("1 kg");
 });
 
 test("aviso de cambios sin guardar protege Escape, pestañas, atrás y descarte", async ({
@@ -120,7 +120,7 @@ test("aviso de cambios sin guardar protege Escape, pestañas, atrás y descarte"
   ).toHaveAttribute("aria-selected", "true");
   await panel.getByRole("tab", { name: "Ficha", exact: true }).click();
   await expect(panel.getByLabel("Nombre", { exact: true })).toHaveValue(
-    "Botella térmica · 750 ml",
+    "Almendras naturales · 250 g",
   );
 });
 
@@ -173,7 +173,7 @@ test("resuelve conflicto fundamentado, prepara canal sin confirmar publicación"
   ).toBeDisabled();
   await panel
     .getByLabel("Fundamento de la decisión")
-    .fill("Comparé color coral, presentación de 750 ml y Ecomm ID DEMO-1006.");
+    .fill("Comparé color 1 kg, presentación de 1 kg y Ecomm ID DEMO-1006.");
   await expect(
     panel.getByRole("button", { name: "Aceptar candidato" }),
   ).toBeDisabled();
@@ -206,7 +206,7 @@ test("resuelve conflicto fundamentado, prepara canal sin confirmar publicación"
 test("lotes omiten conflictos, muestran resultados y preservan contexto", async ({
   page,
 }, info) => {
-  await page.getByRole("textbox", { name: "Buscar productos" }).fill("BOT-750");
+  await page.getByRole("textbox", { name: "Buscar productos" }).fill("ALM-NAT");
   const work = await tool(page, "Preparación por lotes");
   await work
     .getByRole("button", { name: "Seleccionar las 8 variantes de muestra" })
@@ -224,7 +224,7 @@ test("lotes omiten conflictos, muestran resultados y preservan contexto", async 
   await expect(work.getByRole("status")).toContainText(
     "6 variantes preparadas internamente; 2 omitidas",
   );
-  await expect(page).toHaveURL(/q=BOT-750/);
+  await expect(page).toHaveURL(/q=ALM-NAT/);
   await expect(page).toHaveURL(/tool=/);
   await work.getByRole("button", { name: "Ver trabajos y resultados" }).click();
   const jobs = page.getByRole("region", {
@@ -265,7 +265,7 @@ test("herramientas de actualización, familias, conciliación, evidencias, IA y 
       await work
         .getByLabel("Fundamento de la revisión")
         .fill(
-          "Identidad coral y Ecomm ID revisados individualmente en fixture.",
+          "Identidad 1 kg y Ecomm ID revisados individualmente en fixture.",
         );
     }
     await work

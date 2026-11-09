@@ -40,7 +40,7 @@ export function createCatalog(): Item[] {
     const editorial = {
       ...p,
       description: `${p.name}, una opción de ${p.brand} para el uso cotidiano. Texto de demostración.`,
-      features: "Material y medidas pendientes de verificación.",
+      features: "Ingredientes, origen y alérgenos pendientes de verificación.",
       image: "Vista frontal de muestra",
       alt: `Vista de ${p.name}`,
       seo: p.name,
@@ -55,7 +55,9 @@ export function createCatalog(): Item[] {
       },
       prepared: {
         ml: p.status === "Preparada",
-        tn: p.status === "Preparada" && p.id !== "DEMO-1005",
+        tn:
+          p.status === "Preparada" &&
+          !["DEMO-1005", "DEMO-1004"].includes(p.id),
       },
       ai: null,
       history: [
@@ -98,22 +100,89 @@ export const workLabels: Record<WorkState, string> = {
   ready: "Listo para publicar",
   published: "Publicado",
 };
-export function channelState(p: Item, c: "ml" | "tn") {
-  if (p[c] === "Verificada") return "Publicado";
-  if (
+export function confirmedPublications(p: Item, c: "ml" | "tn") {
+  return p.evidence[c].freshness === "current"
+    ? p.evidence[c].publications.filter(
+        (link) => link.id.trim() && link.proof.trim() && link.capturedAt.trim(),
+      )
+    : [];
+}
+export function isConfirmed(p: Item, c: "ml" | "tn") {
+  return confirmedPublications(p, c).length > 0;
+}
+export function isReady(p: Item, c: "ml" | "tn") {
+  return (
+    !isConfirmed(p, c) &&
+    p.evidence[c].freshness === "current" &&
     p.status === "Preparada" &&
     p.prepared[c] &&
     requirements(p).length === 0 &&
-    (c !== "tn" || p.seo.trim())
-  )
-    return "Listo para publicar";
-  return "Por verificar";
+    (c !== "tn" || !!p.seo.trim())
+  );
+}
+export function channelState(p: Item, c: "ml" | "tn") {
+  if (isConfirmed(p, c)) return "Publicado con evidencia";
+  if (p.evidence[c].freshness === "stale") return "Información desactualizada";
+  if (p.evidence[c].freshness === "unknown") return "Información desconocida";
+  if (isReady(p, c)) return "Listo para publicar";
+  if (p[c] === "SKU coincidente" && p.decisions[c].state === "Pendiente")
+    return "Vinculación por revisar";
+  return "Sin publicación confirmada";
+}
+export function channelDetail(p: Item, c: "ml" | "tn") {
+  if (isConfirmed(p, c))
+    return `${new Set(confirmedPublications(p, c).map((v) => v.id)).size} publicación(es) con evidencia de muestra vigente`;
+  if (p.evidence[c].freshness !== "current")
+    return "Revisar vigencia; no permite concluir si está publicado.";
+  if (isReady(p, c))
+    return "Preparación interna. Revisar vigencia antes de publicar.";
+  return p.decisions[c].state === "Rechazada"
+    ? "Candidato descartado; no prueba ausencia de publicación."
+    : p.decisions[c].state === "Aceptada"
+      ? "Vinculación revisada; publicación aún no confirmada."
+      : p[c] === "SKU coincidente"
+        ? "Comparar presentación e identidad; no confirma publicación."
+        : "Falta evidencia; no significa que no esté publicado.";
+}
+export function channelMatches(p: Item, c: "ml" | "tn", filter: string) {
+  return (
+    !filter ||
+    (filter === "confirmed"
+      ? isConfirmed(p, c)
+      : filter === "unconfirmed"
+        ? !isConfirmed(p, c)
+        : filter === "ready"
+          ? isReady(p, c)
+          : filter === "candidate"
+            ? p[c] === "SKU coincidente" && p.decisions[c].state === "Pendiente"
+            : filter === "stale"
+              ? p.evidence[c].freshness === "stale"
+              : filter === "unknown"
+                ? p.evidence[c].freshness === "unknown"
+                : false)
+  );
+}
+export function coverage(rows: Item[], c: "ml" | "tn") {
+  return {
+    publications: new Set(
+      rows.flatMap((p) => confirmedPublications(p, c).map((link) => link.id)),
+    ).size,
+    variants: new Set(rows.filter((p) => isConfirmed(p, c)).map((p) => p.id))
+      .size,
+    unconfirmed: new Set(
+      rows.filter((p) => !isConfirmed(p, c)).map((p) => p.id),
+    ).size,
+    ready: new Set(rows.filter((p) => isReady(p, c)).map((p) => p.id)).size,
+  };
 }
 export function inWorkState(p: Item, state: string) {
-  const attention = p.conflict || requirements(p).length > 0;
+  const attention =
+    p.conflict ||
+    requirements(p).length > 0 ||
+    (["ml", "tn"] as const).some((c) => p.evidence[c].freshness !== "current");
   if (state === "attention") return attention;
   if (state === "published")
-    return p.ml === "Verificada" || p.tn === "Verificada";
+    return isConfirmed(p, "ml") || isConfirmed(p, "tn");
   if (state === "ready")
     return (["ml", "tn"] as const).some(
       (c) => channelState(p, c) === "Listo para publicar",
@@ -124,8 +193,7 @@ export function inWorkState(p: Item, state: string) {
       (p.status !== "Preparada" ||
         (["ml", "tn"] as const).some(
           (c) =>
-            p[c] !== "Verificada" &&
-            channelState(p, c) !== "Listo para publicar",
+            !isConfirmed(p, c) && channelState(p, c) !== "Listo para publicar",
         ))
     );
   return true;
@@ -141,13 +209,16 @@ export function editorialState(p: Item) {
 }
 export function nextAction(p: Item) {
   if (p.conflict) return "Resolver conflicto";
+  if (
+    (["ml", "tn"] as const).some((c) => p.evidence[c].freshness !== "current")
+  )
+    return "Revisar evidencia";
   if (requirements(p).length) return "Completar ficha";
   if (p.ai?.state === "Pendiente") return "Revisar IA";
   if (p.status !== "Preparada") return "Revisar ficha";
   if (
     (["ml", "tn"] as const).some(
-      (c) =>
-        p[c] !== "Verificada" && channelState(p, c) !== "Listo para publicar",
+      (c) => !isConfirmed(p, c) && channelState(p, c) !== "Listo para publicar",
     )
   )
     return "Preparar canal";
@@ -156,7 +227,7 @@ export function nextAction(p: Item) {
 }
 export function actionTab(p: Item) {
   const action = nextAction(p);
-  return p.conflict
+  return p.conflict || action === "Revisar evidencia"
     ? "Evidencias"
     : action === "Revisar IA"
       ? "IA"
