@@ -1,57 +1,161 @@
-import React, {FormEvent, useEffect, useState} from 'react';
-import ReactDOM from 'react-dom/client';
-import {BrowserRouter, Route, Routes} from 'react-router-dom';
-import {Layout} from './components/Layout';
-import {Dashboard} from './pages/Dashboard';
-import {Pilot} from './pages/Pilot';
-import {CaseExplorer} from './pages/CaseExplorer';
-import {ProductWorkspace} from './pages/ProductWorkspace';
-import {EnrichmentQueue} from './pages/EnrichmentQueue';
-import {KikiGuide} from './pages/KikiGuide';
-import {KikiAiInbox} from './pages/KikiAiInbox';
-import {Channels} from './pages/Channels';
-import {WorkQueue} from './pages/WorkQueue';
-import {TaskCenter} from './pages/TaskCenter';
-import {Products} from './pages/Products';
-import {Review} from './pages/Review';
-import {DuplicateReview} from './pages/DuplicateReview';
-import {Imports} from './pages/Imports';
-import {Readiness} from './pages/Readiness';
-import {Enrichment} from './pages/Enrichment';
-import {ExternalResearch} from './pages/ExternalResearch';
-import {Prepublication} from './pages/Prepublication';
-import {ImageReview} from './pages/ImageReview';
-import {MetadataReview} from './pages/MetadataReview';
-import {api} from './services/api';
-import './styles.css';
+import React, { FormEvent, useEffect, useState } from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { Dashboard } from "./pages/Dashboard";
+import { Pilot } from "./pages/Pilot";
+import { CaseExplorer } from "./pages/CaseExplorer";
+import { ProductWorkspace } from "./pages/ProductWorkspace";
+import { EnrichmentQueue } from "./pages/EnrichmentQueue";
+import { KikiGuide } from "./pages/KikiGuide";
+import { KikiAiInbox } from "./pages/KikiAiInbox";
+import { Channels } from "./pages/Channels";
+import { WorkQueue } from "./pages/WorkQueue";
+import { TaskCenter } from "./pages/TaskCenter";
+import { Products } from "./pages/Products";
+import { Review } from "./pages/Review";
+import { DuplicateReview } from "./pages/DuplicateReview";
+import { Imports } from "./pages/Imports";
+import { Readiness } from "./pages/Readiness";
+import { Enrichment } from "./pages/Enrichment";
+import { ExternalResearch } from "./pages/ExternalResearch";
+import { Prepublication } from "./pages/Prepublication";
+import { ImageReview } from "./pages/ImageReview";
+import { MetadataReview } from "./pages/MetadataReview";
+import { api } from "./services/api";
+import "./styles.css";
+import { PrototypeDashboard, LegacyNotice } from "./prototype/Dashboard";
+import { installIsolation } from "./prototype/isolation";
+installIsolation();
 
-function Login({onLogin}: {onLogin: () => void}) {
-  const [username, setUsername] = useState(''); const [password, setPassword] = useState('');
-  const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+function Login({ onLogin }: { onLogin: () => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError('');
-    try { await api.login(username, password); onLogin(); }
-    catch (err) { setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión.'); }
-    finally { setBusy(false); }
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await api.login(username, password);
+      onLogin();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo iniciar sesión.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
-  return <main className="login-page"><section className="login-card">
-    <div className="brand login-brand"><span>K</span><div>KIKI Tech<small>Acceso interno seguro</small></div></div>
-    <div><p className="eyebrow">ADMINISTRACIÓN</p><h1>Bienvenido</h1><p className="muted">Ingresá para gestionar el catálogo de KIKI.</p></div>
-    <form onSubmit={submit} className="login-form">
-      <label>Usuario<input autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required autoFocus /></label>
-      <label>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
-      {error && <p className="login-error" role="alert">{error}</p>}
-      <button type="submit" disabled={busy}>{busy ? 'Verificando…' : 'Iniciar sesión'}</button>
-    </form><p className="secure-note">Sesión privada · Sin publicación automática en Mercado Libre</p>
-  </section></main>;
+  return (
+    <main className="login-page">
+      <section className="login-card">
+        <div className="brand login-brand">
+          <span>K</span>
+          <div>
+            KIKI Tech<small>Acceso interno seguro</small>
+          </div>
+        </div>
+        <div>
+          <p className="eyebrow">ADMINISTRACIÓN</p>
+          <h1>Bienvenido</h1>
+          <p className="muted">Ingresá para gestionar el catálogo de KIKI.</p>
+        </div>
+        <form onSubmit={submit} className="login-form">
+          <label>
+            Usuario
+            <input
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            Contraseña
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </label>
+          {error && (
+            <p className="login-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={busy}>
+            {busy ? "Verificando…" : "Iniciar sesión"}
+          </button>
+        </form>
+        <p className="secure-note">
+          Sesión privada · Sin publicación automática en Mercado Libre
+        </p>
+      </section>
+    </main>
+  );
 }
 
-function App() {
-  const [state, setState] = useState<'loading'|'anonymous'|'authenticated'>('loading');
-  useEffect(() => { api.me().then(() => setState('authenticated')).catch(() => setState('anonymous')); }, []);
-  if (state === 'loading') return <div className="auth-loading">Verificando sesión…</div>;
-  if (state === 'anonymous') return <Login onLogin={() => setState('authenticated')} />;
-  return <BrowserRouter><Routes><Route element={<Layout/>}><Route path="/" element={<Dashboard/>}/><Route path="/pilot" element={<Pilot/>}/><Route path="/cases" element={<CaseExplorer/>}/><Route path="/workspace" element={<ProductWorkspace/>}/><Route path="/queue" element={<EnrichmentQueue/>}/><Route path="/guia" element={<KikiGuide/>}/><Route path="/propuestas-ia" element={<KikiAiInbox/>}/><Route path="/work" element={<TaskCenter/>}/><Route path="/work/details" element={<WorkQueue/>}/><Route path="/channels" element={<Channels/>}/><Route path="/products" element={<Products/>}/><Route path="/readiness" element={<Readiness/>}/><Route path="/enrichment" element={<Enrichment/>}/><Route path="/external-research" element={<ExternalResearch/>}/><Route path="/prepublication" element={<Prepublication/>}/><Route path="/images" element={<ImageReview/>}/><Route path="/metadata" element={<MetadataReview/>}/><Route path="/review" element={<Review/>}/><Route path="/duplicate-review" element={<DuplicateReview/>}/><Route path="/tiendanube" element={<Imports mode="tiendanube"/>}/><Route path="/imports" element={<Imports/>}/></Route></Routes></BrowserRouter>;
+function App({ prototypeSession = false }: { prototypeSession?: boolean }) {
+  const [state, setState] = useState<"loading" | "anonymous" | "authenticated">(
+    prototypeSession ? "authenticated" : "loading",
+  );
+  useEffect(() => {
+    if (prototypeSession) return; // Local synthetic session; never contacts authentication.
+    api
+      .me()
+      .then(() => setState("authenticated"))
+      .catch(() => setState("anonymous"));
+  }, [prototypeSession]);
+  if (state === "loading")
+    return <div className="auth-loading">Verificando sesión…</div>;
+  if (state === "anonymous")
+    return <Login onLogin={() => setState("authenticated")} />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<PrototypeDashboard />} />
+        <Route
+          element={
+            <>
+              <LegacyNotice />
+              <Layout />
+            </>
+          }
+        >
+          <Route path="/dashboard-classic" element={<Dashboard />} />
+          <Route path="/pilot" element={<Pilot />} />
+          <Route path="/cases" element={<CaseExplorer />} />
+          <Route path="/workspace" element={<ProductWorkspace />} />
+          <Route path="/queue" element={<EnrichmentQueue />} />
+          <Route path="/guia" element={<KikiGuide />} />
+          <Route path="/propuestas-ia" element={<KikiAiInbox />} />
+          <Route path="/work" element={<TaskCenter />} />
+          <Route path="/work/details" element={<WorkQueue />} />
+          <Route path="/channels" element={<Channels />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/readiness" element={<Readiness />} />
+          <Route path="/enrichment" element={<Enrichment />} />
+          <Route path="/external-research" element={<ExternalResearch />} />
+          <Route path="/prepublication" element={<Prepublication />} />
+          <Route path="/images" element={<ImageReview />} />
+          <Route path="/metadata" element={<MetadataReview />} />
+          <Route path="/review" element={<Review />} />
+          <Route path="/duplicate-review" element={<DuplicateReview />} />
+          <Route path="/tiendanube" element={<Imports mode="tiendanube" />} />
+          <Route path="/imports" element={<Imports />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App prototypeSession />
+  </React.StrictMode>,
+);
