@@ -1,0 +1,10 @@
+**
+!ecomm_reader/
+!ecomm_reader/*.py
+!tests/
+!tests/*.py
+!entrypoint.py
+!prepare_runtime.py
+**/.env*
+**/__pycache__/**
+**/*.pyc
