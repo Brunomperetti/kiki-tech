@@ -41,6 +41,9 @@ LABELS.update(
         "presentation": "Presentación documentada",
         "category": "Categoría validada",
         "subcategory": "Subcategoría validada",
+        "ean": "EAN individual documentado",
+        "logistic_units": "Unidades de la caja logística (no pack comercial)",
+        "logistic_dun": "DUN logístico (no EAN individual)",
     }
 )
 

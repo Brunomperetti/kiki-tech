@@ -22,6 +22,9 @@ from integration_sandbox.policy import (
     CSP,
     install_network_guard,
 )  # noqa: E402
+from integration_sandbox.hileret_brochure import MAX_HTTP_BODY  # noqa: E402
+
+HILERET_ID = r"PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC"
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.integration-dist"
 WEB_CSP = (
@@ -84,6 +87,10 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 else 16_384
             )
+            if self.command == "POST" and re.fullmatch(
+                r"/api/test-documents/" + HILERET_ID + "/import", path.path
+            ):
+                max_body = MAX_HTTP_BODY
             if not 0 <= length <= max_body:
                 self.deny(413)
                 return
@@ -108,8 +115,19 @@ class Handler(BaseHTTPRequestHandler):
         try:
             connection.request(self.command, self.path, body=data, headers=headers)
             upstream = connection.getresponse()
-            body = upstream.read(2_000_001)
-            if len(body) > 2_000_000:
+            max_response = (
+                MAX_HTTP_BODY
+                if self.command == "GET"
+                and re.fullmatch(
+                    r"/api/test-documents/"
+                    + HILERET_ID
+                    + r"/local-[a-f0-9]{32}/original/[1-8]",
+                    path.path,
+                )
+                else 2_000_000
+            )
+            body = upstream.read(max_response + 1)
+            if len(body) > max_response:
                 raise OSError("Response too large")
             self.send_response(upstream.status)
             for key, value in upstream.getheaders():

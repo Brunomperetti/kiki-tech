@@ -1,5 +1,9 @@
 # Etapa 2K — Hileret Stevia: preparación con original pendiente
 
+La [continuación con el original auténtico adjunto](HILERET-AUTHENTIC.md) documenta
+su SHA-256, extracción de página 2 y recorrido posterior. Este informe conserva el
+resultado histórico de preparación, anterior a disponer de los bytes del PDF.
+
 Base comprobada: `feature/kiki-tech-2-dashboard`,
 `df6fa70aa4b4f03d310460f37d012560bad601e1`, árbol inicialmente limpio.
 

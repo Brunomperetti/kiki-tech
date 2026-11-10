@@ -69,6 +69,18 @@ class GatewayTests(unittest.TestCase):
         self.assertIn("img-src 'none'", headers["content-security-policy"])
         self.assertIn("media-src 'none'", headers["content-security-policy"])
 
+    def test_hileret_upload_exception_is_bounded_and_does_not_expand_other_routes(self):
+        for path, size in [
+            ("/api/test-documents/PILOT-HILERET-200-UNIT-SYNTHETIC/import", "9000000"),
+            ("/api/test-documents/PILOT-HILERET-200-PACK6-SYNTHETIC/import", "9000000"),
+            ("/api/test-documents/900001/import", "1048577"),
+            ("/api/ecomm-app/workspace/PILOT-HILERET-200-UNIT-SYNTHETIC", "1048577"),
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(
+                    self.request("POST", path, "", {"Content-Length": size})[0], 413
+                )
+
     def test_login_session_csrf_and_logout_over_real_https(self):
         payload = json.dumps(
             {"username": "operador-prueba", "password": "solo-datos-sinteticos"}

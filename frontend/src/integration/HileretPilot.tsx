@@ -18,14 +18,12 @@ export function HileretPilotLauncher({
   onOpen: (report: HileretReport, id: string) => void;
 }) {
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [hasLocalPdf, setHasLocalPdf] = useState(false);
+    [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     loadHileret(controller.signal)
       .then((v) => {
         if (!controller.signal.aborted) {
-          setHasLocalPdf(v.cases.some((c) => c.original_pdf_available));
           onLoaded(v);
         }
       })
@@ -42,9 +40,9 @@ export function HileretPilotLauncher({
         catálogo maestro ni modifican sus indicadores.
       </p>
       <p>
-        {hasLocalPdf
-          ? "Hay un PDF local en un expediente. Revisá su procedencia y estado en Evidencias; disponer de bytes no equivale a aprobación."
-          : "PDF original pendiente de incorporación manual. La URL informada no equivale a un documento procesado."}
+        Incorporación manual desde Evidencias. Cada expediente muestra el
+        original conservado, sus citas y las revisiones pendientes. Una URL no
+        equivale a un documento procesado.
       </p>
       {[
         [hileretUnitId, "unidad"],
@@ -58,7 +56,6 @@ export function HileretPilotLauncher({
             setError("");
             try {
               const value = await loadHileret(undefined, csrf);
-              setHasLocalPdf(value.cases.some((c) => c.original_pdf_available));
               onOpen(value, id);
             } catch (e) {
               setError((e as Error).message);
@@ -143,7 +140,7 @@ export function HileretPilotSummary({
           Folleto oficial informado · Página {brochure.reported_page}
         </summary>
         <p style={{ overflowWrap: "anywhere" }}>{brochure.url}</p>
-        <p>{brochure.source}</p>
+        <p>Referencia declarada al preparar el expediente: {brochure.source}</p>
         {!data.original_pdf_available ? (
           <p role="status">
             <strong>Bloqueado: PDF original no disponible.</strong> Sin
@@ -159,7 +156,9 @@ export function HileretPilotSummary({
           </p>
         )}
         <p>
-          Informado por el usuario, pendiente de contraste:{" "}
+          {data.ean_verified_in_test
+            ? "Contrastado y aprobado en el recorrido de pruebas; no es aprobación efectiva del cliente:"
+            : "Informado por el usuario, pendiente de contraste:"}{" "}
           {brochure.reported_product}, {brochure.reported_unit_volume}, EAN{" "}
           {brochure.reported_unit_ean}.
         </p>
@@ -189,7 +188,11 @@ export function HileretPilotSummary({
       <p>
         <strong>{data.approved_fact_count} hechos aprobados.</strong>{" "}
         {data.approved_fact_count === 0 &&
-          "Propuesta bloqueada: faltan original, identidad y revisión de evidencias. Ninguna afirmación comercial aprobada."}
+          (data.original_pdf_available
+            ? "Propuesta bloqueada: identidad y aprobación individual pendientes; incorporar un PDF no aprueba hechos."
+            : "Propuesta bloqueada: faltan original, identidad y revisión de evidencias. Ninguna afirmación comercial aprobada.")}
+        {data.approved_fact_count > 0 &&
+          " Las decisiones del operador de prueba permiten demostrar el flujo; no sustituyen la aprobación humana efectiva del cliente."}
       </p>
       {data.documents
         .filter((d) => d.original)
@@ -203,9 +206,11 @@ export function HileretPilotSummary({
       <details>
         <summary>Documentación pendiente</summary>
         <ul>
-          {data.references.missing_evidence.map((v) => (
-            <li key={v}>{v}</li>
-          ))}
+          {(data.pending_evidence || data.references.missing_evidence).map(
+            (v) => (
+              <li key={v}>{v}</li>
+            ),
+          )}
         </ul>
       </details>
       <p>

@@ -293,8 +293,9 @@ export function IntegrationCatalog() {
           <p className="eyebrow">KIKI TECH 2.0 · INTEGRACIÓN AISLADA</p>
           <h1>Ingresá al catálogo de prueba</h1>
           <p>
-            FastAPI y PostgreSQL descartable. Sólo productos sintéticos; sin
-            proveedores externos.
+            FastAPI y PostgreSQL descartable. Catálogo y usuarios de prueba;
+            documentos locales autorizados. Sin conexiones a proveedores
+            externos.
           </p>
           <form className="login-form" onSubmit={login}>
             <label>

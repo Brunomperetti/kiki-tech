@@ -55,6 +55,7 @@ def report(db, session):
                     "source_review_state": body["source"]["review_state"],
                     "issues": research.identity_issues(item.identity, body),
                     "locations": list(body["sections"]),
+                    "extraction_profile": body.get("extraction_profile"),
                 }
             )
         has_pdf = any(
@@ -73,6 +74,12 @@ def report(db, session):
                 "current_fields": edit["fields"],
                 "workspace_version": edit["version"],
                 "approved_fact_count": len(approved),
+                "ean_verified_in_test": any(f["field"] == "ean" for f in approved),
+                "logistics_verified_in_test": {
+                    f["field"]: f["value"]
+                    for f in approved
+                    if f["field"] in {"logistic_units", "logistic_dun"}
+                },
                 "proposed_fields_preview": proposed,
                 "blocked_fields": [
                     key for key in REQUESTED_FIELDS if key not in proposed
@@ -80,9 +87,31 @@ def report(db, session):
                 "missing": missing,
                 "documents": documents,
                 "original_pdf_available": has_pdf,
-                "document_status": "LOCAL_PDF_REQUIRES_REVIEW"
+                "document_status": "REVIEWED_FACTS_IN_TEST"
+                if approved
+                else "LOCAL_PDF_REQUIRES_REVIEW"
                 if has_pdf
                 else "BLOCKED_NO_ORIGINAL_PDF",
+                "pending_evidence": [
+                    *([] if has_pdf else ["PDF original pendiente de incorporación."]),
+                    *(
+                        []
+                        if any(f["field"] == "ean" for f in approved)
+                        else [
+                            "EAN: aprobación documental individual pendiente para esta variante."
+                        ]
+                    ),
+                    *(
+                        [
+                            "Pack x6: el folleto de la unidad y caja x9 no acreditan el pack comercial."
+                        ]
+                        if pilot["is_combo"]
+                        else []
+                    ),
+                    "Ecomm ID auténtico por variante: pendiente de referencia autorizada Ecomm-App.",
+                    "Ingredientes, alérgenos, nutrición, certificaciones y beneficios: sin respaldo específico vigente.",
+                    "Fabricante legal, categorías/subcategorías, palabras clave e imágenes/videos: pendientes de respaldo y revisión.",
+                ],
                 "variant": {
                     "id": ident,
                     "name": pilot["name"],

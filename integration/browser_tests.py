@@ -56,6 +56,15 @@ def main():
             },
             check=True,
         )
+        subprocess.run(
+            ["npm", "run", "test:pilot"],
+            cwd=ROOT / "frontend",
+            env={
+                **clean_environment(),
+                "NODE_EXTRA_CA_CERTS": str(directory / "tls-cert.pem"),
+            },
+            check=True,
+        )
     finally:
         process.terminate()
         process.wait(timeout=5)

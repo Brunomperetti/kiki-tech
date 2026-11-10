@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "build:integration": "tsc -b && node scripts/build-integration.mjs",
     "test:integration": "playwright test --config playwright.integration.config.ts",
+    "test:pilot": "playwright test --config playwright.pilot.config.ts",
     "test": "playwright test",
     "typecheck": "tsc -b"
   },

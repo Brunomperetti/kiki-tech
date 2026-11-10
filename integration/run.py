@@ -222,6 +222,7 @@ def main():
                         "pilot_checks",
                         "mama_checks",
                         "hileret_checks",
+                        "hileret_authentic_checks",
                     ):
                         compose(
                             "run",

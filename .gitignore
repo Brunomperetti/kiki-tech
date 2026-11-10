@@ -12,3 +12,4 @@ dist/
 .integration-runtime/
 frontend/.integration-dist/
 frontend/integration-test-results/
+frontend/pilot-test-results/

@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { request, captureDate } from "./catalog-adapter";
 import {
+  isHileret,
+  hileretOriginalSha,
+  hileretOriginalSize,
+} from "./hileret-pilot";
+import {
   changeResearch,
   type Dossier,
   type ResearchDocument,
@@ -57,12 +62,31 @@ export function DocumentImport({
         );
       let encoded = "";
       if (kind === "FILE") {
-        if (!file || file.size > 524288 || !file.size)
+        if (
+          !file ||
+          !file.size ||
+          (file.size > 524288 &&
+            !(isHileret(id) && file.size === hileretOriginalSize))
+        )
           throw new Error("Elegí un archivo no vacío de hasta 512 KiB.");
         const bytes = new Uint8Array(await file.arrayBuffer());
-        let binary = "";
-        for (const byte of bytes) binary += String.fromCharCode(byte);
-        encoded = btoa(binary);
+        if (file.size > 524288) {
+          const hash = Array.from(
+            new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+          )
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          if (hash !== hileretOriginalSha)
+            throw new Error(
+              "El PDF no coincide con el SHA-256 autorizado para este piloto. No se amplía el límite general de 512 KiB.",
+            );
+        }
+        const chunks: string[] = [];
+        for (let offset = 0; offset < bytes.length; offset += 32768)
+          chunks.push(
+            String.fromCharCode(...bytes.subarray(offset, offset + 32768)),
+          );
+        encoded = btoa(chunks.join(""));
       }
       const value = await changeResearch(
         id,
@@ -159,6 +183,13 @@ export function DocumentImport({
           texto (máximo 10 páginas), TXT UTF-8, HTML pasivo sin atributos o JSON
           estructurado; hasta 512 KiB. Sin OCR ni búsquedas web.
         </p>
+        {isHileret(id) && (
+          <p>
+            Excepción acotada: sólo el folleto Hileret original de 6.232.081
+            bytes, identificado por SHA-256, admite su tamaño completo y
+            extracción de página 2. No se aprueba automáticamente.
+          </p>
+        )}
         <label>
           Origen a incorporar
           <select

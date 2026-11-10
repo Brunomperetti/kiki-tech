@@ -9,9 +9,9 @@ import socketserver
 import struct
 import sys
 from .document_parser import parse
+from .hileret_brochure import MAX_REQUEST
 
 SOCKET = "/document-parser/parser.sock"
-MAX_REQUEST = 750_000
 
 
 def read_exact(stream, size):

@@ -1,0 +1,2779 @@
+{
+  "scope": "Recorrido automatizado del operador de prueba; no aprobación efectiva del cliente",
+  "original_sha256": "bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+  "original_bytes": 6232081,
+  "before": {
+    "available": true,
+    "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+    "source": {
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "sku": "SYNTHETIC-HILERET-1-NOT-A-LINK",
+      "product_name": "Edulcorante líquido con Stevia Hileret",
+      "variant_description": "200 ml",
+      "is_combo": false,
+      "gtin": null,
+      "stock_at_capture": null,
+      "captured_at": null,
+      "source_kind": "CLIENT_AUXILIARY_REFERENCE",
+      "test_id_is_synthetic": true,
+      "authentic_ecomm_id": null
+    },
+    "source_sku_changed": false,
+    "status": "DRAFT",
+    "version": 5,
+    "fields": {
+      "brand": "",
+      "manufacturer": "",
+      "title": "",
+      "short_title": "",
+      "short_description": "",
+      "description": "",
+      "details": "",
+      "presentation": "",
+      "category": "",
+      "subcategory": "",
+      "seo_title": "",
+      "seo_description": "",
+      "seo_keywords": "",
+      "proposed_gtin": "",
+      "note": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+      "attributes": [],
+      "media": [],
+      "sources": []
+    },
+    "readiness": {
+      "missing": [
+        "brand",
+        "title",
+        "short_title",
+        "short_description",
+        "description",
+        "category",
+        "subcategory",
+        "presentation",
+        "seo_title",
+        "seo_description",
+        "attributes",
+        "images",
+        "primary_source",
+        "seo_keywords"
+      ],
+      "ready": false,
+      "completed": 0,
+      "total": 14,
+      "percent": 0,
+      "policy": "Listo para canales significa ficha completa y fuente primaria registrada por el operador; NO confirma automáticamente la autenticidad ni publica."
+    },
+    "review_schedule": {
+      "last_review_at": null,
+      "next_review_at": null,
+      "review_due": false
+    },
+    "history": [
+      {
+        "at": "2026-11-10T22:50:50.253274+00:00",
+        "version": 1,
+        "previous_status": "NOT_STARTED",
+        "new_status": "DRAFT",
+        "changes": {
+          "note": {
+            "before": "",
+            "after": "Seguimiento desktop: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada."
+          },
+          "attributes": {
+            "before": "",
+            "after": []
+          },
+          "media": {
+            "before": "",
+            "after": []
+          },
+          "sources": {
+            "before": "",
+            "after": []
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:56:27.728300+00:00",
+        "version": 2,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "note": {
+            "before": "Seguimiento desktop: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada.",
+            "after": "Seguimiento mobile: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada."
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:56:38.355291+00:00",
+        "version": 3,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "note": {
+            "before": "Seguimiento mobile: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada.",
+            "after": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario."
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:57:17.389346+00:00",
+        "version": 4,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "brand": {
+            "before": "",
+            "after": "Hileret"
+          },
+          "title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "short_title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "short_description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml."
+          },
+          "description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml."
+          },
+          "details": {
+            "before": "",
+            "after": "Contenido neto: 200 ml."
+          },
+          "presentation": {
+            "before": "",
+            "after": "200 ml"
+          },
+          "seo_title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "seo_description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml."
+          },
+          "attributes": {
+            "before": [],
+            "after": [
+              {
+                "name": "Contenido neto",
+                "value": "200 ml"
+              }
+            ]
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:57:35.320942+00:00",
+        "version": 5,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "brand": {
+            "before": "Hileret",
+            "after": ""
+          },
+          "title": {
+            "before": "Hileret Stevia · 200 ml",
+            "after": ""
+          },
+          "short_title": {
+            "before": "Hileret Stevia · 200 ml",
+            "after": ""
+          },
+          "short_description": {
+            "before": "Hileret Stevia · 200 ml.",
+            "after": ""
+          },
+          "description": {
+            "before": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml.",
+            "after": ""
+          },
+          "details": {
+            "before": "Contenido neto: 200 ml.",
+            "after": ""
+          },
+          "presentation": {
+            "before": "200 ml",
+            "after": ""
+          },
+          "seo_title": {
+            "before": "Hileret Stevia · 200 ml",
+            "after": ""
+          },
+          "seo_description": {
+            "before": "Hileret Stevia · 200 ml.",
+            "after": ""
+          },
+          "attributes": {
+            "before": [
+              {
+                "name": "Contenido neto",
+                "value": "200 ml"
+              }
+            ],
+            "after": []
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      }
+    ],
+    "created_at": "2026-11-10T22:50:50.253274+00:00",
+    "updated_at": "2026-11-10T22:57:35.320942+00:00",
+    "saved_in": "KIKI_POSTGRESQL_INTERNAL_ONLY",
+    "external_writes_enabled": false
+  },
+  "after": {
+    "available": true,
+    "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+    "source": {
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "sku": "SYNTHETIC-HILERET-1-NOT-A-LINK",
+      "product_name": "Edulcorante líquido con Stevia Hileret",
+      "variant_description": "200 ml",
+      "is_combo": false,
+      "gtin": null,
+      "stock_at_capture": null,
+      "captured_at": null,
+      "source_kind": "CLIENT_AUXILIARY_REFERENCE",
+      "test_id_is_synthetic": true,
+      "authentic_ecomm_id": null
+    },
+    "source_sku_changed": false,
+    "status": "DRAFT",
+    "version": 6,
+    "fields": {
+      "brand": "Hileret",
+      "manufacturer": "",
+      "title": "Hileret Stevia · 200 ml",
+      "short_title": "Hileret Stevia · 200 ml",
+      "short_description": "Hileret Stevia · 200 ml.",
+      "description": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml.",
+      "details": "Contenido neto: 200 ml.",
+      "presentation": "200 ml",
+      "category": "",
+      "subcategory": "",
+      "seo_title": "Hileret Stevia · 200 ml",
+      "seo_description": "Hileret Stevia · 200 ml.",
+      "seo_keywords": "",
+      "proposed_gtin": "",
+      "note": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+      "attributes": [
+        {
+          "name": "Contenido neto",
+          "value": "200 ml"
+        }
+      ],
+      "media": [],
+      "sources": []
+    },
+    "readiness": {
+      "missing": [
+        "category",
+        "subcategory",
+        "images",
+        "primary_source",
+        "seo_keywords"
+      ],
+      "ready": false,
+      "completed": 9,
+      "total": 14,
+      "percent": 64,
+      "policy": "Listo para canales significa ficha completa y fuente primaria registrada por el operador; NO confirma automáticamente la autenticidad ni publica."
+    },
+    "review_schedule": {
+      "last_review_at": null,
+      "next_review_at": null,
+      "review_due": false
+    },
+    "history": [
+      {
+        "at": "2026-11-10T22:50:50.253274+00:00",
+        "version": 1,
+        "previous_status": "NOT_STARTED",
+        "new_status": "DRAFT",
+        "changes": {
+          "note": {
+            "before": "",
+            "after": "Seguimiento desktop: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada."
+          },
+          "attributes": {
+            "before": "",
+            "after": []
+          },
+          "media": {
+            "before": "",
+            "after": []
+          },
+          "sources": {
+            "before": "",
+            "after": []
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:56:27.728300+00:00",
+        "version": 2,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "note": {
+            "before": "Seguimiento desktop: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada.",
+            "after": "Seguimiento mobile: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada."
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:56:38.355291+00:00",
+        "version": 3,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "note": {
+            "before": "Seguimiento mobile: falta PDF original, Ecomm ID y respaldo específico del pack. Sin composición aprobada.",
+            "after": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario."
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:57:17.389346+00:00",
+        "version": 4,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "brand": {
+            "before": "",
+            "after": "Hileret"
+          },
+          "title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "short_title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "short_description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml."
+          },
+          "description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml."
+          },
+          "details": {
+            "before": "",
+            "after": "Contenido neto: 200 ml."
+          },
+          "presentation": {
+            "before": "",
+            "after": "200 ml"
+          },
+          "seo_title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "seo_description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml."
+          },
+          "attributes": {
+            "before": [],
+            "after": [
+              {
+                "name": "Contenido neto",
+                "value": "200 ml"
+              }
+            ]
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:57:35.320942+00:00",
+        "version": 5,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "brand": {
+            "before": "Hileret",
+            "after": ""
+          },
+          "title": {
+            "before": "Hileret Stevia · 200 ml",
+            "after": ""
+          },
+          "short_title": {
+            "before": "Hileret Stevia · 200 ml",
+            "after": ""
+          },
+          "short_description": {
+            "before": "Hileret Stevia · 200 ml.",
+            "after": ""
+          },
+          "description": {
+            "before": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml.",
+            "after": ""
+          },
+          "details": {
+            "before": "Contenido neto: 200 ml.",
+            "after": ""
+          },
+          "presentation": {
+            "before": "200 ml",
+            "after": ""
+          },
+          "seo_title": {
+            "before": "Hileret Stevia · 200 ml",
+            "after": ""
+          },
+          "seo_description": {
+            "before": "Hileret Stevia · 200 ml.",
+            "after": ""
+          },
+          "attributes": {
+            "before": [
+              {
+                "name": "Contenido neto",
+                "value": "200 ml"
+              }
+            ],
+            "after": []
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      },
+      {
+        "at": "2026-11-10T22:58:07.564244+00:00",
+        "version": 6,
+        "previous_status": "DRAFT",
+        "new_status": "DRAFT",
+        "changes": {
+          "brand": {
+            "before": "",
+            "after": "Hileret"
+          },
+          "title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "short_title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "short_description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml."
+          },
+          "description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml."
+          },
+          "details": {
+            "before": "",
+            "after": "Contenido neto: 200 ml."
+          },
+          "presentation": {
+            "before": "",
+            "after": "200 ml"
+          },
+          "seo_title": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml"
+          },
+          "seo_description": {
+            "before": "",
+            "after": "Hileret Stevia · 200 ml."
+          },
+          "attributes": {
+            "before": [],
+            "after": [
+              {
+                "name": "Contenido neto",
+                "value": "200 ml"
+              }
+            ]
+          }
+        },
+        "source": "ECOMM_APP_API_STAGE",
+        "external_writes": false
+      }
+    ],
+    "created_at": "2026-11-10T22:50:50.253274+00:00",
+    "updated_at": "2026-11-10T22:58:07.564244+00:00",
+    "saved_in": "KIKI_POSTGRESQL_INTERNAL_ONLY",
+    "external_writes_enabled": false
+  },
+  "approved_evidence": [
+    {
+      "field": "product_name",
+      "value": "Hileret Stevia",
+      "unit": null,
+      "presentation": "200 ml",
+      "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+      "quote": "Hileret Stevia 9 x 200 ml",
+      "commercial_field": "attributes",
+      "id": "0c68bcb9195e821b2c010d59",
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+      "document_version": 2,
+      "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+      "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+      "consulted_at": "2026-11-10T22:57:52.691665+00:00",
+      "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+      "version": 4,
+      "history": [
+        {
+          "at": "2026-11-10T22:57:49.362328+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Extracción determinista de un documento sintético.",
+          "version": 1,
+          "before": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362269+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 0,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114"
+          },
+          "after": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362269+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:51.212562+00:00",
+          "actor": "Sistema",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "INVALIDATE",
+          "reason": "El documento cambió.",
+          "version": 2,
+          "before": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362269+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362269+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:52.691731+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Nueva extracción documental, sin aprobación automática.",
+          "version": 3,
+          "before": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362269+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691665+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:53.789188+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "REVIEW",
+          "reason": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "version": 4,
+          "before": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691665+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "product_name",
+            "value": "Hileret Stevia",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "0c68bcb9195e821b2c010d59",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691665+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 4,
+            "state": "APPROVED",
+            "reviewer": "operador-prueba · sesión de prueba 114",
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": "fc1fbe9c9796023b5b2c77662e400c6f298deb136004d5ae14c9b0db74e08a3a",
+            "reviewed_at": "2026-11-10T22:57:53.789163+00:00"
+          }
+        }
+      ],
+      "state": "APPROVED",
+      "reviewer": "operador-prueba · sesión de prueba 114",
+      "created_by": "operador-prueba · sesión de prueba 114",
+      "verification_digest": "fc1fbe9c9796023b5b2c77662e400c6f298deb136004d5ae14c9b0db74e08a3a",
+      "reviewed_at": "2026-11-10T22:57:53.789163+00:00",
+      "blockers": [],
+      "verified": true,
+      "label": "Nombre del alimento"
+    },
+    {
+      "field": "brand",
+      "value": "Hileret",
+      "unit": null,
+      "presentation": "200 ml",
+      "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+      "quote": "Hileret Stevia 9 x 200 ml",
+      "commercial_field": "brand",
+      "id": "bc67c3ec3df8c6aaf5df2321",
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+      "document_version": 2,
+      "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+      "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+      "consulted_at": "2026-11-10T22:57:52.691761+00:00",
+      "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+      "version": 4,
+      "history": [
+        {
+          "at": "2026-11-10T22:57:49.362378+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Extracción determinista de un documento sintético.",
+          "version": 1,
+          "before": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362359+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 0,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114"
+          },
+          "after": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362359+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:51.212624+00:00",
+          "actor": "Sistema",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "INVALIDATE",
+          "reason": "El documento cambió.",
+          "version": 2,
+          "before": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362359+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362359+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:52.691796+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Nueva extracción documental, sin aprobación automática.",
+          "version": 3,
+          "before": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362359+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691761+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:55.683783+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "REVIEW",
+          "reason": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "version": 4,
+          "before": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691761+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "brand",
+            "value": "Hileret",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "brand",
+            "id": "bc67c3ec3df8c6aaf5df2321",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691761+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 4,
+            "state": "APPROVED",
+            "reviewer": "operador-prueba · sesión de prueba 114",
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": "174f39ff74dc0da1e03ff6c9e882cc3b089e87fddd6e26e0d0982ac8b495a9d1",
+            "reviewed_at": "2026-11-10T22:57:55.683753+00:00"
+          }
+        }
+      ],
+      "state": "APPROVED",
+      "reviewer": "operador-prueba · sesión de prueba 114",
+      "created_by": "operador-prueba · sesión de prueba 114",
+      "verification_digest": "174f39ff74dc0da1e03ff6c9e882cc3b089e87fddd6e26e0d0982ac8b495a9d1",
+      "reviewed_at": "2026-11-10T22:57:55.683753+00:00",
+      "blockers": [],
+      "verified": true,
+      "label": "Marca"
+    },
+    {
+      "field": "presentation",
+      "value": "200 ml",
+      "unit": null,
+      "presentation": "200 ml",
+      "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+      "quote": "200 ml",
+      "commercial_field": "presentation",
+      "id": "6adfc957f5c99e0491973d2b",
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+      "document_version": 2,
+      "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+      "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+      "consulted_at": "2026-11-10T22:57:52.691819+00:00",
+      "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+      "version": 4,
+      "history": [
+        {
+          "at": "2026-11-10T22:57:49.362418+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Extracción determinista de un documento sintético.",
+          "version": 1,
+          "before": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362401+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 0,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114"
+          },
+          "after": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362401+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:51.212652+00:00",
+          "actor": "Sistema",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "INVALIDATE",
+          "reason": "El documento cambió.",
+          "version": 2,
+          "before": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362401+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362401+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:52.691851+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Nueva extracción documental, sin aprobación automática.",
+          "version": 3,
+          "before": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362401+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691819+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:57.191537+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "REVIEW",
+          "reason": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "version": 4,
+          "before": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691819+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "presentation",
+            "value": "200 ml",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "presentation",
+            "id": "6adfc957f5c99e0491973d2b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691819+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 4,
+            "state": "APPROVED",
+            "reviewer": "operador-prueba · sesión de prueba 114",
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": "8951260b6baa65eeadb4991c1f35ebc20fbbc786cb07e2be04f9b12f3b08756c",
+            "reviewed_at": "2026-11-10T22:57:57.191511+00:00"
+          }
+        }
+      ],
+      "state": "APPROVED",
+      "reviewer": "operador-prueba · sesión de prueba 114",
+      "created_by": "operador-prueba · sesión de prueba 114",
+      "verification_digest": "8951260b6baa65eeadb4991c1f35ebc20fbbc786cb07e2be04f9b12f3b08756c",
+      "reviewed_at": "2026-11-10T22:57:57.191511+00:00",
+      "blockers": [],
+      "verified": true,
+      "label": "Presentación documentada"
+    },
+    {
+      "field": "net_weight",
+      "value": "200",
+      "unit": "ml",
+      "presentation": "200 ml",
+      "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+      "quote": "200 ml",
+      "commercial_field": "attributes",
+      "id": "c1646703511487e8ab3e9a9b",
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+      "document_version": 2,
+      "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+      "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+      "consulted_at": "2026-11-10T22:57:52.691872+00:00",
+      "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+      "version": 4,
+      "history": [
+        {
+          "at": "2026-11-10T22:57:49.362455+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Extracción determinista de un documento sintético.",
+          "version": 1,
+          "before": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362439+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 0,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114"
+          },
+          "after": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362439+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:51.212688+00:00",
+          "actor": "Sistema",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "INVALIDATE",
+          "reason": "El documento cambió.",
+          "version": 2,
+          "before": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362439+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362439+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:52.691903+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Nueva extracción documental, sin aprobación automática.",
+          "version": 3,
+          "before": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362439+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691872+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:58.794212+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "REVIEW",
+          "reason": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "version": 4,
+          "before": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691872+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "net_weight",
+            "value": "200",
+            "unit": "ml",
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+            "quote": "200 ml",
+            "commercial_field": "attributes",
+            "id": "c1646703511487e8ab3e9a9b",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691872+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 4,
+            "state": "APPROVED",
+            "reviewer": "operador-prueba · sesión de prueba 114",
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": "d029b89f79c1742f6d9d30fd45d18b9f3a170d4ff5f836bd87a4456404bf424d",
+            "reviewed_at": "2026-11-10T22:57:58.794188+00:00"
+          }
+        }
+      ],
+      "state": "APPROVED",
+      "reviewer": "operador-prueba · sesión de prueba 114",
+      "created_by": "operador-prueba · sesión de prueba 114",
+      "verification_digest": "d029b89f79c1742f6d9d30fd45d18b9f3a170d4ff5f836bd87a4456404bf424d",
+      "reviewed_at": "2026-11-10T22:57:58.794188+00:00",
+      "blockers": [],
+      "verified": true,
+      "label": "Contenido neto"
+    },
+    {
+      "field": "ean",
+      "value": "7794940000796",
+      "unit": null,
+      "presentation": "200 ml",
+      "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+      "quote": "7794940000796",
+      "commercial_field": "attributes",
+      "id": "c446f045eb754bb893ed7c95",
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+      "document_version": 2,
+      "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+      "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+      "consulted_at": "2026-11-10T22:57:52.691922+00:00",
+      "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+      "version": 4,
+      "history": [
+        {
+          "at": "2026-11-10T22:57:49.362491+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Extracción determinista de un documento sintético.",
+          "version": 1,
+          "before": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362474+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 0,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114"
+          },
+          "after": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362474+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:51.212715+00:00",
+          "actor": "Sistema",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "INVALIDATE",
+          "reason": "El documento cambió.",
+          "version": 2,
+          "before": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362474+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362474+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:52.691952+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Nueva extracción documental, sin aprobación automática.",
+          "version": 3,
+          "before": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362474+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691922+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:58:00.446392+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "REVIEW",
+          "reason": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "version": 4,
+          "before": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691922+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "ean",
+            "value": "7794940000796",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+            "quote": "7794940000796",
+            "commercial_field": "attributes",
+            "id": "c446f045eb754bb893ed7c95",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691922+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 4,
+            "state": "APPROVED",
+            "reviewer": "operador-prueba · sesión de prueba 114",
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": "e224f09a4fafc40da03fd89b5c07a62d799b39625ae3f2401473ccddfeaafd16",
+            "reviewed_at": "2026-11-10T22:58:00.446351+00:00"
+          }
+        }
+      ],
+      "state": "APPROVED",
+      "reviewer": "operador-prueba · sesión de prueba 114",
+      "created_by": "operador-prueba · sesión de prueba 114",
+      "verification_digest": "e224f09a4fafc40da03fd89b5c07a62d799b39625ae3f2401473ccddfeaafd16",
+      "reviewed_at": "2026-11-10T22:58:00.446351+00:00",
+      "blockers": [],
+      "verified": true,
+      "label": "EAN individual documentado"
+    },
+    {
+      "field": "logistic_units",
+      "value": "9",
+      "unit": null,
+      "presentation": "200 ml",
+      "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+      "quote": "Hileret Stevia 9 x 200 ml",
+      "commercial_field": "attributes",
+      "id": "2facdf37ed94e04926f10ae8",
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+      "document_version": 2,
+      "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+      "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+      "consulted_at": "2026-11-10T22:57:52.691971+00:00",
+      "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+      "version": 4,
+      "history": [
+        {
+          "at": "2026-11-10T22:57:49.362527+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Extracción determinista de un documento sintético.",
+          "version": 1,
+          "before": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362511+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 0,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114"
+          },
+          "after": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362511+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:51.213014+00:00",
+          "actor": "Sistema",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "INVALIDATE",
+          "reason": "El documento cambió.",
+          "version": 2,
+          "before": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362511+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362511+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:52.692000+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Nueva extracción documental, sin aprobación automática.",
+          "version": 3,
+          "before": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362511+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691971+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:58:01.851007+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "REVIEW",
+          "reason": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "version": 4,
+          "before": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691971+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "logistic_units",
+            "value": "9",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+            "quote": "Hileret Stevia 9 x 200 ml",
+            "commercial_field": "attributes",
+            "id": "2facdf37ed94e04926f10ae8",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.691971+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 4,
+            "state": "APPROVED",
+            "reviewer": "operador-prueba · sesión de prueba 114",
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": "bf660af69cd495168c3e4bb4cb8f8e0bfed8f9122000c3fb67674dfd3e7446a8",
+            "reviewed_at": "2026-11-10T22:58:01.850978+00:00"
+          }
+        }
+      ],
+      "state": "APPROVED",
+      "reviewer": "operador-prueba · sesión de prueba 114",
+      "created_by": "operador-prueba · sesión de prueba 114",
+      "verification_digest": "bf660af69cd495168c3e4bb4cb8f8e0bfed8f9122000c3fb67674dfd3e7446a8",
+      "reviewed_at": "2026-11-10T22:58:01.850978+00:00",
+      "blockers": [],
+      "verified": true,
+      "label": "Unidades de la caja logística (no pack comercial)"
+    },
+    {
+      "field": "logistic_dun",
+      "value": "97794940000799",
+      "unit": null,
+      "presentation": "200 ml",
+      "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+      "quote": "97794940000799",
+      "commercial_field": "attributes",
+      "id": "d0d4c922da61d560a0972dc2",
+      "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+      "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+      "document_version": 2,
+      "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+      "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+      "consulted_at": "2026-11-10T22:57:52.692019+00:00",
+      "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+      "version": 4,
+      "history": [
+        {
+          "at": "2026-11-10T22:57:49.362563+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Extracción determinista de un documento sintético.",
+          "version": 1,
+          "before": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362547+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 0,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114"
+          },
+          "after": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362547+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:51.213046+00:00",
+          "actor": "Sistema",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "INVALIDATE",
+          "reason": "El documento cambió.",
+          "version": 2,
+          "before": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362547+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 1,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362547+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:57:52.692049+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "EXTRACT",
+          "reason": "Nueva extracción documental, sin aprobación automática.",
+          "version": 3,
+          "before": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 1,
+            "document_hash": "6d24d7d2ba3f2783e26468ba28629d104a21232bf50b18c829d503e5990b24ef",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:49.362547+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 2,
+            "state": "STALE",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.692019+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          }
+        },
+        {
+          "at": "2026-11-10T22:58:03.132241+00:00",
+          "actor": "operador-prueba · sesión de prueba 114",
+          "triggered_by": "operador-prueba · sesión de prueba 114",
+          "action": "REVIEW",
+          "reason": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "version": 4,
+          "before": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.692019+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 3,
+            "state": "PENDING",
+            "reviewer": null,
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": null,
+            "reviewed_at": null
+          },
+          "after": {
+            "field": "logistic_dun",
+            "value": "97794940000799",
+            "unit": null,
+            "presentation": "200 ml",
+            "location": "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+            "quote": "97794940000799",
+            "commercial_field": "attributes",
+            "id": "d0d4c922da61d560a0972dc2",
+            "ecomm_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+            "document_id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "document_version": 2,
+            "document_hash": "2e967423ec5d1eb60a4f89edad49ee49306907d5e41545e28115e44528d5ea35",
+            "identity_hash": "42230833da969bbdfa471636de1f14fc98870e8a025f4348fed1b8919eb7d85b",
+            "consulted_at": "2026-11-10T22:57:52.692019+00:00",
+            "provenance": "local://sha256/bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+            "version": 4,
+            "state": "APPROVED",
+            "reviewer": "operador-prueba · sesión de prueba 114",
+            "created_by": "operador-prueba · sesión de prueba 114",
+            "verification_digest": "31264debf33e9a36d5c49763c8dbd474cc96b32c1a81e06c39e664b3b99df654",
+            "reviewed_at": "2026-11-10T22:58:03.132217+00:00"
+          }
+        }
+      ],
+      "state": "APPROVED",
+      "reviewer": "operador-prueba · sesión de prueba 114",
+      "created_by": "operador-prueba · sesión de prueba 114",
+      "verification_digest": "31264debf33e9a36d5c49763c8dbd474cc96b32c1a81e06c39e664b3b99df654",
+      "reviewed_at": "2026-11-10T22:58:03.132217+00:00",
+      "blockers": [],
+      "verified": true,
+      "label": "DUN logístico (no EAN individual)"
+    }
+  ],
+  "report": {
+    "cases": [
+      {
+        "test_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+        "test_id_is_synthetic": true,
+        "authentic_ecomm_id": null,
+        "binding_status": "PENDING",
+        "references": {
+          "test_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+          "test_id_is_synthetic": true,
+          "authentic_ecomm_id": null,
+          "binding_status": "PENDING",
+          "excel": {
+            "file_name": "productos.xlsx",
+            "row": 28,
+            "name": "Edulcorante líquido con Stevia Hileret",
+            "presentation": "200 cc",
+            "ean_declared": "7794940000796",
+            "source_kind": "CLIENT_AUXILIARY_REFERENCE",
+            "source": "Datos comunicados por el usuario; no lectura local del Excel ni captura Ecomm-App.",
+            "cells": null
+          },
+          "brochure": {
+            "url": "https://descargas.hileret.com.ar/Hileret/Folleto%20Ventas%20Hileret%2017x25_400s.pdf",
+            "domain": "descargas.hileret.com.ar",
+            "reported_page": 2,
+            "reported_brand": "Hileret",
+            "reported_product": "Hileret Stevia",
+            "reported_unit_volume": "200 ml",
+            "reported_unit_ean": "7794940000796",
+            "reported_logistic_units": 9,
+            "reported_logistic_dun": "97794940000799",
+            "source": "Folleto oficial informado por el usuario; contenido no consultado ni procesado por Codex.",
+            "original_available_at_registration": false,
+            "document_sha256_at_registration": null,
+            "consulted_at": null,
+            "network_enabled": false
+          },
+          "sale_units": 1,
+          "other_test_id": "PILOT-HILERET-200-PACK6-SYNTHETIC",
+          "missing_evidence": [
+            "PDF original autorizado: bytes, SHA-256, revisión de procedencia y citas ubicadas en página 2.",
+            "EAN, marca y volumen individual: contrastar con el original; checksum no acredita correspondencia.",
+            "Pack comercial x6: respaldo específico del pack; el EAN compartido no vincula ni fusiona variantes.",
+            "Caja logística x9 y DUN: nunca convertirlos en presentación o EAN de la unidad ni del pack x6.",
+            "Ingredientes, alérgenos y nutrición: etiqueta o ficha técnica específica y vigente.",
+            "Certificaciones, beneficios y «sin gluten»: documentación específica; no inferir desde este folleto.",
+            "Categoría y subcategoría justificadas, recursos multimedia autorizados y Ecomm ID auténtico por variante."
+          ]
+        },
+        "reference_record_hash": "a02e2a45e817aa0ab0a6f61f0f08fe0bd8c487da261dbe617f57e4068216ec40",
+        "initial_fields": {
+          "brand": "",
+          "manufacturer": "",
+          "title": "",
+          "short_title": "",
+          "short_description": "",
+          "description": "",
+          "details": "",
+          "presentation": "",
+          "category": "",
+          "subcategory": "",
+          "seo_title": "",
+          "seo_description": "",
+          "seo_keywords": "",
+          "proposed_gtin": "",
+          "note": "",
+          "attributes": [],
+          "media": [],
+          "sources": []
+        },
+        "current_fields": {
+          "brand": "Hileret",
+          "manufacturer": "",
+          "title": "Hileret Stevia · 200 ml",
+          "short_title": "Hileret Stevia · 200 ml",
+          "short_description": "Hileret Stevia · 200 ml.",
+          "description": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml.",
+          "details": "Contenido neto: 200 ml.",
+          "presentation": "200 ml",
+          "category": "",
+          "subcategory": "",
+          "seo_title": "Hileret Stevia · 200 ml",
+          "seo_description": "Hileret Stevia · 200 ml.",
+          "seo_keywords": "",
+          "proposed_gtin": "",
+          "note": "RECORRIDO AUTOMATIZADO DE PRUEBA, no aprobación efectiva del cliente: contrastados bytes, página 2 y citas del original adjunto por el usuario.",
+          "attributes": [
+            {
+              "name": "Contenido neto",
+              "value": "200 ml"
+            }
+          ],
+          "media": [],
+          "sources": []
+        },
+        "workspace_version": 6,
+        "approved_fact_count": 7,
+        "ean_verified_in_test": true,
+        "logistics_verified_in_test": {
+          "logistic_units": "9",
+          "logistic_dun": "97794940000799"
+        },
+        "proposed_fields_preview": {
+          "brand": {
+            "value": "Hileret",
+            "evidence_ids": [
+              "bc67c3ec3df8c6aaf5df2321"
+            ],
+            "clauses": [
+              "Hileret"
+            ]
+          },
+          "presentation": {
+            "value": "200 ml",
+            "evidence_ids": [
+              "6adfc957f5c99e0491973d2b"
+            ],
+            "clauses": [
+              "200 ml"
+            ]
+          },
+          "title": {
+            "value": "Hileret Stevia · 200 ml",
+            "evidence_ids": [
+              "0c68bcb9195e821b2c010d59",
+              "6adfc957f5c99e0491973d2b"
+            ],
+            "clauses": [
+              "Hileret Stevia",
+              "200 ml"
+            ]
+          },
+          "short_title": {
+            "value": "Hileret Stevia · 200 ml",
+            "evidence_ids": [
+              "0c68bcb9195e821b2c010d59",
+              "6adfc957f5c99e0491973d2b"
+            ],
+            "clauses": [
+              "Hileret Stevia",
+              "200 ml"
+            ]
+          },
+          "seo_title": {
+            "value": "Hileret Stevia · 200 ml",
+            "evidence_ids": [
+              "0c68bcb9195e821b2c010d59",
+              "6adfc957f5c99e0491973d2b"
+            ],
+            "clauses": [
+              "Hileret Stevia",
+              "200 ml"
+            ]
+          },
+          "details": {
+            "value": "Contenido neto: 200 ml.",
+            "evidence_ids": [
+              "c1646703511487e8ab3e9a9b"
+            ],
+            "clauses": [
+              "Contenido neto: 200 ml."
+            ]
+          },
+          "attributes": {
+            "value": [
+              {
+                "name": "Contenido neto",
+                "value": "200 ml"
+              }
+            ],
+            "evidence_ids": [
+              "c1646703511487e8ab3e9a9b"
+            ],
+            "clauses": []
+          },
+          "description": {
+            "value": "Hileret Stevia · 200 ml.\nContenido neto: 200 ml.",
+            "evidence_ids": [
+              "0c68bcb9195e821b2c010d59",
+              "6adfc957f5c99e0491973d2b",
+              "c1646703511487e8ab3e9a9b"
+            ],
+            "clauses": [
+              "Hileret Stevia · 200 ml.",
+              "Contenido neto: 200 ml."
+            ]
+          },
+          "short_description": {
+            "value": "Hileret Stevia · 200 ml.",
+            "evidence_ids": [
+              "0c68bcb9195e821b2c010d59",
+              "6adfc957f5c99e0491973d2b"
+            ],
+            "clauses": [
+              "Hileret Stevia · 200 ml."
+            ]
+          },
+          "seo_description": {
+            "value": "Hileret Stevia · 200 ml.",
+            "evidence_ids": [
+              "0c68bcb9195e821b2c010d59",
+              "6adfc957f5c99e0491973d2b"
+            ],
+            "clauses": [
+              "Hileret Stevia · 200 ml."
+            ]
+          }
+        },
+        "blocked_fields": [
+          "category",
+          "subcategory"
+        ],
+        "missing": [
+          "Fabricante: sin evidencia aprobada; no se propone.",
+          "Categoría validada: sin evidencia aprobada; no se propone.",
+          "Subcategoría validada: sin evidencia aprobada; no se propone.",
+          "Ancho documentado: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Hidratos de carbono: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Azúcares: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Grasas totales: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Grasas saturadas: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Fibra alimentaria: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Sodio: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Certificación declarada: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Respaldo documental de certificación: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Ingredientes: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Alérgenos: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Energía: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Proteínas: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Declaración comercial: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Conservación: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Características verificables: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Formulación: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Multimedia y fuentes manuales: se conservan exactamente; no se inventan recursos ni derechos.",
+          "EAN, notas y palabras clave: no se generan ni se consideran verificados por la IA."
+        ],
+        "documents": [
+          {
+            "id": "local-8460dec727634d7e8d552f91046d079b",
+            "version": 1,
+            "kind": "URL",
+            "parse_status": "REFERENCE_ONLY",
+            "original": null,
+            "source_review_state": "PENDING",
+            "issues": [
+              "Nombre/presentación comercial no contrastados: unidad y pack x6 son registros distintos.",
+              "Tipo de venta incompatible o ausente: distinguir unidad, pack x6 y caja logística x9.",
+              "Presentación incompatible o ausente: referencia «200 ml» / documento «sin datos».",
+              "EAN incompatible o ausente: referencia «7794940000796» / documento «sin datos».",
+              "Marca incompatible o ausente: referencia «Hileret» / documento «sin datos».",
+              "Tipo de venta (unidad/pack) ausente o incompatible."
+            ],
+            "locations": [],
+            "extraction_profile": null
+          },
+          {
+            "id": "local-8e82dd1411ab41fb818ca2a9d2c766df",
+            "version": 2,
+            "kind": "FILE",
+            "parse_status": "TEXT_EXTRACTED",
+            "original": {
+              "filename": "Folleto Ventas Hileret 17x25_400s.pdf",
+              "content_type": "application/pdf",
+              "size": 6232081,
+              "sha256": "bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291"
+            },
+            "source_review_state": "REVIEWED",
+            "issues": [],
+            "locations": [
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/cabeceras/x31.98/y120.15"
+            ],
+            "extraction_profile": "hileret-original-page2-v1"
+          },
+          {
+            "id": "local-e934ff0d4821466488f15d3032dbfc7a",
+            "version": 2,
+            "kind": "FILE",
+            "parse_status": "TEXT_EXTRACTED",
+            "original": {
+              "filename": "Folleto Ventas Hileret 17x25_400s.pdf",
+              "content_type": "application/pdf",
+              "size": 6232081,
+              "sha256": "bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291"
+            },
+            "source_review_state": "REVIEWED",
+            "issues": [],
+            "locations": [
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/cabeceras/x31.98/y120.15"
+            ],
+            "extraction_profile": "hileret-original-page2-v1"
+          }
+        ],
+        "original_pdf_available": true,
+        "document_status": "REVIEWED_FACTS_IN_TEST",
+        "pending_evidence": [
+          "Ecomm ID auténtico por variante: pendiente de referencia autorizada Ecomm-App.",
+          "Ingredientes, alérgenos, nutrición, certificaciones y beneficios: sin respaldo específico vigente.",
+          "Fabricante legal, categorías/subcategorías, palabras clave e imágenes/videos: pendientes de respaldo y revisión."
+        ],
+        "variant": {
+          "id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+          "name": "Edulcorante líquido con Stevia Hileret",
+          "presentation": "200 ml",
+          "sku": "SYNTHETIC-HILERET-1-NOT-A-LINK",
+          "stock": null,
+          "capturedAt": null,
+          "gtin": null,
+          "isCombo": false
+        }
+      },
+      {
+        "test_id": "PILOT-HILERET-200-PACK6-SYNTHETIC",
+        "test_id_is_synthetic": true,
+        "authentic_ecomm_id": null,
+        "binding_status": "PENDING",
+        "references": {
+          "test_id": "PILOT-HILERET-200-PACK6-SYNTHETIC",
+          "test_id_is_synthetic": true,
+          "authentic_ecomm_id": null,
+          "binding_status": "PENDING",
+          "excel": {
+            "file_name": "productos.xlsx",
+            "row": 27,
+            "name": "Pack x6 Hileret Stevia líquido",
+            "presentation": "Pack x6 de 200 ml",
+            "ean_declared": "7794940000796",
+            "source_kind": "CLIENT_AUXILIARY_REFERENCE",
+            "source": "Datos comunicados por el usuario; no lectura local del Excel ni captura Ecomm-App.",
+            "cells": null
+          },
+          "brochure": {
+            "url": "https://descargas.hileret.com.ar/Hileret/Folleto%20Ventas%20Hileret%2017x25_400s.pdf",
+            "domain": "descargas.hileret.com.ar",
+            "reported_page": 2,
+            "reported_brand": "Hileret",
+            "reported_product": "Hileret Stevia",
+            "reported_unit_volume": "200 ml",
+            "reported_unit_ean": "7794940000796",
+            "reported_logistic_units": 9,
+            "reported_logistic_dun": "97794940000799",
+            "source": "Folleto oficial informado por el usuario; contenido no consultado ni procesado por Codex.",
+            "original_available_at_registration": false,
+            "document_sha256_at_registration": null,
+            "consulted_at": null,
+            "network_enabled": false
+          },
+          "sale_units": 6,
+          "other_test_id": "PILOT-HILERET-200-UNIT-SYNTHETIC",
+          "missing_evidence": [
+            "PDF original autorizado: bytes, SHA-256, revisión de procedencia y citas ubicadas en página 2.",
+            "EAN, marca y volumen individual: contrastar con el original; checksum no acredita correspondencia.",
+            "Pack comercial x6: respaldo específico del pack; el EAN compartido no vincula ni fusiona variantes.",
+            "Caja logística x9 y DUN: nunca convertirlos en presentación o EAN de la unidad ni del pack x6.",
+            "Ingredientes, alérgenos y nutrición: etiqueta o ficha técnica específica y vigente.",
+            "Certificaciones, beneficios y «sin gluten»: documentación específica; no inferir desde este folleto.",
+            "Categoría y subcategoría justificadas, recursos multimedia autorizados y Ecomm ID auténtico por variante."
+          ]
+        },
+        "reference_record_hash": "419c7f3b4f9633675e8f63ad76eb0c0d846a62aa9720e6ca0162cadf89316826",
+        "initial_fields": {
+          "brand": "",
+          "manufacturer": "",
+          "title": "",
+          "short_title": "",
+          "short_description": "",
+          "description": "",
+          "details": "",
+          "presentation": "",
+          "category": "",
+          "subcategory": "",
+          "seo_title": "",
+          "seo_description": "",
+          "seo_keywords": "",
+          "proposed_gtin": "",
+          "note": "",
+          "attributes": [],
+          "media": [],
+          "sources": []
+        },
+        "current_fields": {
+          "brand": "",
+          "manufacturer": "",
+          "title": "",
+          "short_title": "",
+          "short_description": "",
+          "description": "",
+          "details": "",
+          "presentation": "",
+          "category": "",
+          "subcategory": "",
+          "seo_title": "",
+          "seo_description": "",
+          "seo_keywords": "",
+          "proposed_gtin": "",
+          "note": "",
+          "attributes": [],
+          "media": [],
+          "sources": []
+        },
+        "workspace_version": 0,
+        "approved_fact_count": 0,
+        "ean_verified_in_test": false,
+        "logistics_verified_in_test": {},
+        "proposed_fields_preview": {},
+        "blocked_fields": [
+          "title",
+          "short_description",
+          "description",
+          "details",
+          "presentation",
+          "category",
+          "subcategory",
+          "seo_title",
+          "seo_description"
+        ],
+        "missing": [
+          "Marca: sin evidencia aprobada; no se propone.",
+          "Fabricante: sin evidencia aprobada; no se propone.",
+          "Presentación documentada: sin evidencia aprobada; no se propone.",
+          "Categoría validada: sin evidencia aprobada; no se propone.",
+          "Subcategoría validada: sin evidencia aprobada; no se propone.",
+          "Títulos: falta nombre o presentación con respaldo aprobado.",
+          "Ancho documentado: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Hidratos de carbono: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Azúcares: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Grasas totales: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Grasas saturadas: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Fibra alimentaria: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Sodio: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Certificación declarada: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Respaldo documental de certificación: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Ingredientes: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Alérgenos: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Energía: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Proteínas: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Contenido neto: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Declaración comercial: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Conservación: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Características verificables: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Formulación: afirmación bloqueada por falta de evidencia aprobada vigente.",
+          "Multimedia y fuentes manuales: se conservan exactamente; no se inventan recursos ni derechos.",
+          "EAN, notas y palabras clave: no se generan ni se consideran verificados por la IA."
+        ],
+        "documents": [
+          {
+            "id": "local-36e1f19f894e4b3190d6ddd164971dd3",
+            "version": 1,
+            "kind": "FILE",
+            "parse_status": "TEXT_EXTRACTED",
+            "original": {
+              "filename": "Folleto Ventas Hileret 17x25_400s.pdf",
+              "content_type": "application/pdf",
+              "size": 6232081,
+              "sha256": "bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291"
+            },
+            "source_review_state": "PENDING",
+            "issues": [
+              "Nombre/presentación comercial no contrastados: unidad y pack x6 son registros distintos.",
+              "Tipo de venta incompatible o ausente: distinguir unidad, pack x6 y caja logística x9.",
+              "Presentación incompatible o ausente: referencia «6 x 200 ml» / documento «200 ml».",
+              "Tipo de venta (unidad/pack) ausente o incompatible."
+            ],
+            "locations": [
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/cabeceras/x31.98/y120.15"
+            ],
+            "extraction_profile": "hileret-original-page2-v1"
+          },
+          {
+            "id": "local-b00044b303df4eb2a3bd276ef358c447",
+            "version": 1,
+            "kind": "URL",
+            "parse_status": "REFERENCE_ONLY",
+            "original": null,
+            "source_review_state": "PENDING",
+            "issues": [
+              "Nombre/presentación comercial no contrastados: unidad y pack x6 son registros distintos.",
+              "Tipo de venta incompatible o ausente: distinguir unidad, pack x6 y caja logística x9.",
+              "Presentación incompatible o ausente: referencia «6 x 200 ml» / documento «sin datos».",
+              "EAN incompatible o ausente: referencia «7794940000796» / documento «sin datos».",
+              "Marca incompatible o ausente: referencia «Hileret» / documento «sin datos».",
+              "Tipo de venta (unidad/pack) ausente o incompatible."
+            ],
+            "locations": [],
+            "extraction_profile": null
+          },
+          {
+            "id": "local-bc956d61ccb3472cb3f0c5b3356b641e",
+            "version": 1,
+            "kind": "FILE",
+            "parse_status": "TEXT_EXTRACTED",
+            "original": {
+              "filename": "Folleto Ventas Hileret 17x25_400s.pdf",
+              "content_type": "application/pdf",
+              "size": 6232081,
+              "sha256": "bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291"
+            },
+            "source_review_state": "PENDING",
+            "issues": [
+              "Nombre/presentación comercial no contrastados: unidad y pack x6 son registros distintos.",
+              "Tipo de venta incompatible o ausente: distinguir unidad, pack x6 y caja logística x9.",
+              "Presentación incompatible o ausente: referencia «6 x 200 ml» / documento «200 ml».",
+              "Tipo de venta (unidad/pack) ausente o incompatible."
+            ],
+            "locations": [
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/producto/x31.99/y41.31",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/rotulo-envase/x438.57/y152.97",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/EAN/x142.57/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/DUN/x190.98/y41.32",
+              "pagina/2/tabla/stevia/fila/liquido-200ml/columna/cabeceras/x31.98/y120.15"
+            ],
+            "extraction_profile": "hileret-original-page2-v1"
+          }
+        ],
+        "original_pdf_available": true,
+        "document_status": "LOCAL_PDF_REQUIRES_REVIEW",
+        "pending_evidence": [
+          "EAN: aprobación documental individual pendiente para esta variante.",
+          "Pack x6: el folleto de la unidad y caja x9 no acreditan el pack comercial.",
+          "Ecomm ID auténtico por variante: pendiente de referencia autorizada Ecomm-App.",
+          "Ingredientes, alérgenos, nutrición, certificaciones y beneficios: sin respaldo específico vigente.",
+          "Fabricante legal, categorías/subcategorías, palabras clave e imágenes/videos: pendientes de respaldo y revisión."
+        ],
+        "variant": {
+          "id": "PILOT-HILERET-200-PACK6-SYNTHETIC",
+          "name": "Pack x6 Hileret Stevia líquido",
+          "presentation": "6 x 200 ml",
+          "sku": "SYNTHETIC-HILERET-6-NOT-A-LINK",
+          "stock": null,
+          "capturedAt": null,
+          "gtin": null,
+          "isCombo": true
+        }
+      }
+    ],
+    "network_enabled": false,
+    "external_writes_enabled": false,
+    "automatic_discovery_enabled": false
+  }
+}

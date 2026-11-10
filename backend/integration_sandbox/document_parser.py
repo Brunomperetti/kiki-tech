@@ -1,6 +1,5 @@
 """No application imports, I/O or URLs: untrusted bytes -> bounded text and claims."""
 
-import base64
 from html.parser import HTMLParser
 from io import BytesIO
 import json
@@ -151,6 +150,11 @@ class PassiveHTML(HTMLParser):
 
 
 def pdf_sections(raw):
+    from .hileret_brochure import matches, STREAM_LIMIT, TOTAL_STREAM_LIMIT
+
+    pilot = matches(raw)
+    stream_limit = STREAM_LIMIT if pilot else 1_048_576
+    total_limit = TOTAL_STREAM_LIMIT if pilot else 2_097_152
     from pypdf import PdfReader, Configuration, overwrite_configuration
     from pypdf.generic import (
         IndirectObject,
@@ -161,16 +165,16 @@ def pdf_sections(raw):
 
     overwrite_configuration(
         Configuration(
-            zlib_maximum_output_length=1_048_576,
-            maximum_declared_stream_length=1_048_576,
-            array_based_stream_maximum_output_length=1_048_576,
-            stream_decoding_work_maximum_length=2_097_152,
-            stream_parsing_work_maximum_count=10000,
+            zlib_maximum_output_length=stream_limit,
+            maximum_declared_stream_length=stream_limit,
+            array_based_stream_maximum_output_length=stream_limit,
+            stream_decoding_work_maximum_length=total_limit,
+            stream_parsing_work_maximum_count=2_000_000 if pilot else 10000,
             array_maximum_element_count=3000,
             dictionary_maximum_element_count=3000,
             page_tree_maximum_entries=32,
             page_tree_maximum_depth=16,
-            page_tree_maximum_page_entries=32,
+            page_tree_maximum_page_entries=128 if pilot else 32,
             xform_maximum_invocations_per_extraction=64,
             jbig2dec_binary=None,
         )
@@ -192,7 +196,7 @@ def pdf_sections(raw):
     def inspect(obj, depth=0):
         nonlocal count, streams
         count += 1
-        if count > 10000 or depth > 40:
+        if count > (40000 if pilot else 10000) or depth > 40:
             raise ValueError("PDF excesivamente complejo.")
         if isinstance(obj, IndirectObject):
             if obj.idnum in seen:
@@ -225,7 +229,7 @@ def pdf_sections(raw):
                     raise ValueError("PDF con codificación de stream no soportada.")
                 data = obj.get_data()
                 streams += len(data)
-                if len(data) > 1_048_576 or streams > 2_097_152:
+                if len(data) > stream_limit or streams > total_limit:
                     raise ValueError("PDF con expansión excesiva.")
             for value in obj.values():
                 inspect(value, depth + 1)
@@ -236,6 +240,14 @@ def pdf_sections(raw):
     inspect(reader.trailer)
     if len(reader.pages) > 10:
         raise ValueError("Máximo 10 páginas PDF.")
+    if pilot:
+        if len(reader.pages) != 4:
+            raise ValueError(
+                "El perfil Hileret requiere el original de cuatro páginas."
+            )
+        from .hileret_brochure import extract
+
+        return extract(reader.pages[1])
     sections = {}
     for number, page in enumerate(reader.pages, 1):
         text = page.extract_text() or ""
@@ -251,15 +263,16 @@ def parse(name, mime, encoded):
     extension = safe_filename(name)
     if mime != MIMES[extension]:
         raise ValueError("El MIME no corresponde a la extensión permitida.")
-    try:
-        raw = base64.b64decode(encoded, validate=True)
-    except (ValueError, TypeError):
-        raise ValueError("Contenido base64 inválido.") from None
-    if not raw or len(raw) > MAX_BYTES:
+    from .hileret_brochure import validate_encoding, matches
+
+    raw = validate_encoding(encoded)
+    if not raw:
         raise ValueError("Archivo vacío o superior a 512 KiB.")
     json_values = None
     if extension == ".pdf":
         sections = pdf_sections(raw)
+        if matches(raw):
+            return sections  # bounded profile result, original bytes retained by the same ingester
     else:
         try:
             text = raw.decode("utf-8-sig")

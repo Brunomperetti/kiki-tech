@@ -5,6 +5,9 @@ import { mamaPilotId } from "./mama-pilot";
 export const hileretUnitId = "PILOT-HILERET-200-UNIT-SYNTHETIC";
 export const hileretPackId = "PILOT-HILERET-200-PACK6-SYNTHETIC";
 export const hileretPilotPath = "/api/test-commercial-pilot/hileret-200";
+export const hileretOriginalSha =
+  "bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291";
+export const hileretOriginalSize = 6232081;
 export const isHileret = (id: string) =>
   [hileretUnitId, hileretPackId].includes(id);
 export const isAuxiliaryPilot = (id: string) =>
@@ -19,6 +22,9 @@ export type HileretCase = {
   current_fields: EcommEditableFields;
   workspace_version: number;
   approved_fact_count: number;
+  ean_verified_in_test: boolean;
+  logistics_verified_in_test: Record<string, string>;
+  pending_evidence: string[];
   blocked_fields: string[];
   original_pdf_available: boolean;
   references: {

@@ -7,6 +7,8 @@ from app.core.security import require_session, require_csrf
 from app.database.session import get_db
 from .local_documents import LocalDocuments, parse_local
 from .research.routes import execute
+from .hileret_brochure import ENCODED_SIZE, validate_encoding
+from .hileret_reference import PILOTS
 
 router = APIRouter(prefix="/api/test-documents", tags=["isolated-local-documents"])
 
@@ -17,7 +19,7 @@ class Incorporate(BaseModel):
     expected_version: int = Field(ge=0)
     filename: str = Field(default="", max_length=120)
     content_type: str = Field(default="", max_length=80)
-    content_base64: str = Field(default="", max_length=699_052)
+    content_base64: str = Field(default="", max_length=ENCODED_SIZE)
     provenance_note: str = Field(min_length=10, max_length=600)
     reference_url: str = Field(default="", max_length=1000)
     declared_official: bool = False
@@ -52,6 +54,12 @@ def incorporate(
     session=Depends(require_csrf),
 ):
     def operation():
+        if len(body.content_base64) > 699_052 and ecomm_id not in PILOTS:
+            raise ValueError(
+                "El original ampliado sólo está autorizado en los dos expedientes Hileret de pruebas."
+            )
+        if len(body.content_base64) > 699_052:
+            validate_encoding(body.content_base64)
         # Parse only after auth/authorization, before holding the database mutex.
         parsed = parse_local(body) if body.kind == "FILE" else None
         return LocalDocuments(db, session).incorporate(ecomm_id, body, parsed)

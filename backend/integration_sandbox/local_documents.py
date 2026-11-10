@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 from .research.service import Research, now
 from .research.storage import Document, digest
+from .hileret_brochure import MAX_REQUEST
 
 PARSER_SOCKET = "/document-parser/parser.sock"
 
@@ -21,7 +22,7 @@ def parse_local(body):
             for key in ("filename", "content_type", "content_base64")
         }
     ).encode()
-    if len(request) > 750_000:
+    if len(request) > MAX_REQUEST:
         raise ValueError("Archivo superior al límite de lectura.")
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:

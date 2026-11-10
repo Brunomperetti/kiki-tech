@@ -9,6 +9,9 @@
 !backend/integration_sandbox/**
 !backend/tests/
 !backend/tests/**
+!integration/
+!integration/fixtures/
+!integration/fixtures/hileret-original.pdf
 **/.env*
 **/__pycache__/**
 **/*.pyc

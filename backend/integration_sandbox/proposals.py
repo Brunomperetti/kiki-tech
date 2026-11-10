@@ -328,7 +328,11 @@ class Proposals:
                     "actor": self.research.actor,
                     "proposal": meta,
                     "quality_warnings": [
-                        "Demostración determinista con documentos sintéticos; no es IA ni investigación oficial."
+                        "Redacción determinista desde hechos de documentos locales revisados; sin IA real. Las decisiones de un operador de prueba no son aprobación efectiva del cliente."
+                        if any(
+                            not f["provenance"].startswith("fixture://") for f in facts
+                        )
+                        else "Demostración determinista con documentos sintéticos; no es IA ni investigación oficial."
                     ],
                 }
             ],
