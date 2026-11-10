@@ -288,7 +288,6 @@ test("operaciones comerciales bloqueadas tanto en UI como en gateway", async ({
   for (const tab of ["Ficha", "Evidencias", "IA", "Canales", "Historial"]) {
     await page.getByRole("tab", { name: tab, exact: true }).click();
     for (const name of [
-      "Editar ficha",
       "Generar con IA",
       "Aprobar cambios",
       "Preparar por canal",
@@ -298,7 +297,7 @@ test("operaciones comerciales bloqueadas tanto en UI como en gateway", async ({
       ).toBeDisabled();
   }
   for (const path of [
-    "/api/ecomm-app/workspace/900001",
+    "/api/ecomm-app/workspace/900001/confirm-review",
     "/api/ecomm-app/stage/manual/start",
     "/api/mercadolibre/sync",
     "/api/tiendanube/import-csv",

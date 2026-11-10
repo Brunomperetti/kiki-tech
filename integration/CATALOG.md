@@ -1,5 +1,8 @@
 # Etapa 2C — Catálogo de FastAPI en el dashboard
 
+Documento histórico de lectura. La etapa 2D habilita además el editor comercial
+individual existente dentro del panel: [contratos, pruebas y límites actuales](EDITOR.md).
+
 Base: `6cf0a2f1de90b52a7a250765ae661daea5b1f6df`, rama
 `feature/kiki-tech-2-dashboard`. Antes de implementar se comprobó HEAD, árbol
 limpio, ascendencia desde `f843ce135a87515a8ef8f7ced40e57dc911c0480` y referencias

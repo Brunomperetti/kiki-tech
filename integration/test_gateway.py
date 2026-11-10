@@ -155,6 +155,57 @@ class GatewayTests(unittest.TestCase):
             result = clean_environment()
         self.assertFalse(set(result) & set(canaries))
 
+    def test_workspace_large_valid_payload_csrf_and_body_limits(self):
+        status, headers, body = self.request(
+            "POST",
+            "/api/auth/login",
+            json.dumps(
+                {"username": "operador-prueba", "password": "solo-datos-sinteticos"}
+            ),
+            {"Content-Type": "application/json"},
+        )
+        self.assertEqual(status, 200)
+        auth = {
+            "Cookie": headers["set-cookie"].split(";", 1)[0],
+            "X-CSRF-Token": json.loads(body)["csrf_token"],
+            "Content-Type": "application/json",
+        }
+        status, _, body = self.request(
+            "GET", "/api/ecomm-app/workspace/900006", headers=auth
+        )
+        self.assertEqual(status, 200)
+        version = json.loads(body)["version"]
+        fields = {
+            "description": "S" * 5000,
+            "details": "D" * 5000,
+            "attributes": [{"name": f"A{i}", "value": "V" * 450} for i in range(40)],
+        }
+        payload = json.dumps(
+            {"expected_version": version, "status": "DRAFT", "fields": fields}
+        )
+        self.assertGreater(len(payload), 16384)
+        self.assertEqual(
+            self.request(
+                "POST",
+                "/api/ecomm-app/workspace/900006",
+                payload,
+                {"Cookie": auth["Cookie"], "Content-Type": "application/json"},
+            )[0],
+            403,
+        )
+        status, _, body = self.request(
+            "POST", "/api/ecomm-app/workspace/900006", payload, auth
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["fields"]["attributes"], fields["attributes"])
+        self.assertEqual(
+            self.request(
+                "POST", "/api/ecomm-app/workspace/900006", "X" * 1048577, auth
+            )[0],
+            413,
+        )
+        self.assertEqual(self.request("POST", "/api/auth/login", "X" * 16385)[0], 413)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

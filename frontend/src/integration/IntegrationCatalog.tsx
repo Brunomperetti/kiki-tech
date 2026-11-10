@@ -10,11 +10,14 @@ import {
   unavailable,
 } from "./catalog-adapter";
 import "./integration.css";
+import { PersistentWorkspace } from "./PersistentWorkspace";
+import { stateLabels } from "./workspace-adapter";
+import type { EcommApiProductEdit } from "../types/ecomm-app";
 
 type Session = { username: string; csrf_token: string };
 const tabs = ["Ficha", "Evidencias", "IA", "Canales", "Historial"];
 const blocked =
-  "Esta operación todavía no está conectada. Sólo lectura en etapa 2C.";
+  "Esta operación todavía no está conectada en el entorno de prueba.";
 function sessionData(value: unknown): Session {
   const data = value as Record<string, unknown> | null;
   if (
@@ -28,7 +31,11 @@ function sessionData(value: unknown): Session {
   return { username: data.username, csrf_token: data.csrf_token };
 }
 export function IntegrationCatalog() {
-  const [params, setParams] = useSearchParams();
+  const [urlParams, setParams] = useSearchParams();
+  const [params, setAcceptedParams] = useState(urlParams);
+  const [dirty, setDirty] = useState(false);
+  const [editorBusy, setEditorBusy] = useState(false);
+  const [editorStates, setEditorStates] = useState<Record<string, string>>({});
   const [session, setSession] = useState<Session | null>();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -68,19 +75,68 @@ export function IntegrationCatalog() {
   const closeRef = useRef<HTMLButtonElement>(null);
   const originRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const navigationPermit = useRef<string | null>(null);
+  const navigationAttempt = useRef<string | null>(null);
   function update(values: Record<string, string>) {
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      Object.entries(values).forEach(([key, value]) =>
-        value ? next.set(key, value) : next.delete(key),
-      );
-      return next;
-    });
+    const next = new URLSearchParams(params);
+    Object.entries(values).forEach(([key, value]) =>
+      value ? next.set(key, value) : next.delete(key),
+    );
+    const leaving = ["product", "q", "page", "limit"].some(
+      (key) => next.get(key) !== params.get(key),
+    );
+    // Confirm before pushing history; cancel must not leave a duplicate URL entry.
+    if (
+      leaving &&
+      (editorBusy ||
+        (dirty &&
+          !window.confirm(
+            "Hay cambios sin guardar. ¿Descartarlos y continuar?",
+          )))
+    )
+      return;
+    navigationAttempt.current = null;
+    navigationPermit.current = next.toString();
+    setParams(next);
   }
   function close() {
     update({ product: "", tab: "" });
-    originRef.current?.focus();
   }
+  useEffect(() => {
+    if (urlParams.toString() === params.toString()) {
+      navigationPermit.current = null;
+      navigationAttempt.current = null;
+      return;
+    }
+    if (navigationAttempt.current === urlParams.toString()) return;
+    navigationAttempt.current = urlParams.toString();
+    const leaving = ["product", "q", "page", "limit"].some(
+      (key) => urlParams.get(key) !== params.get(key),
+    );
+    if (
+      leaving &&
+      navigationPermit.current !== urlParams.toString() &&
+      (editorBusy ||
+        (dirty &&
+          !window.confirm(
+            "Hay cambios sin guardar. ¿Descartarlos y continuar?",
+          )))
+    ) {
+      setParams(params, { replace: true });
+      return;
+    }
+    setAcceptedParams(urlParams);
+    if (leaving) setDirty(false);
+  }, [urlParams, params, dirty, editorBusy, setParams]);
+  useEffect(() => {
+    if (!dirty && !editorBusy) return;
+    const protect = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protect);
+    return () => window.removeEventListener("beforeunload", protect);
+  }, [dirty, editorBusy]);
   useEffect(() => {
     setSearch(q);
   }, [q]);
@@ -132,9 +188,12 @@ export function IntegrationCatalog() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [session, q, page, pageSize, invalid, revision]);
+  }, [!!session, q, page, pageSize, invalid, revision]);
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) {
+      originRef.current?.focus();
+      return;
+    }
     closeRef.current?.focus();
     const keydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -142,8 +201,8 @@ export function IntegrationCatalog() {
         close();
       }
       if (event.key === "Tab") {
-        const controls = panelRef.current?.querySelectorAll<HTMLButtonElement>(
-          "button:not(:disabled)",
+        const controls = panelRef.current?.querySelectorAll<HTMLElement>(
+          "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href]",
         );
         if (!controls?.length) return;
         const first = controls[0],
@@ -185,6 +244,14 @@ export function IntegrationCatalog() {
   }
   async function logout() {
     if (!session) return;
+    if (
+      editorBusy ||
+      (dirty &&
+        !window.confirm(
+          "Hay cambios sin guardar. ¿Descartarlos y cerrar sesión?",
+        ))
+    )
+      return;
     setBusy(true);
     try {
       await request("/api/auth/logout", {
@@ -323,9 +390,9 @@ export function IntegrationCatalog() {
           <div className="d-demo">
             <Icon name="shield" />
             <span>
-              <strong>Modo integración · Sólo lectura.</strong> Variantes
-              sintéticas guardadas en PostgreSQL descartable. Sin conexión a
-              proveedores.
+              <strong>Modo integración · Edición interna de prueba.</strong>{" "}
+              Variantes sintéticas guardadas en PostgreSQL descartable. Sin
+              conexión a proveedores.
             </span>
           </div>
           <section
@@ -386,7 +453,7 @@ export function IntegrationCatalog() {
               </div>
               <button
                 onClick={() => retry((value) => value + 1)}
-                disabled={loading}
+                disabled={loading || editorBusy || dirty}
               >
                 Volver a consultar
               </button>
@@ -504,7 +571,12 @@ export function IntegrationCatalog() {
                             <small>{captureDate(item.capturedAt)}</small>
                           </td>
                           <td data-label="Estados comerciales">
-                            <small>Editorial: {unavailable}</small>
+                            <small>
+                              Editorial:{" "}
+                              {editorStates[item.id]
+                                ? stateLabels[editorStates[item.id]]
+                                : unavailable}
+                            </small>
                             <small>ML: {unavailable}</small>
                             <small>TN: {unavailable}</small>
                           </td>
@@ -592,7 +664,12 @@ export function IntegrationCatalog() {
           >
             <div className="d-drawer-top">
               <span>CONSULTA DE VARIANTE</span>
-              <button ref={closeRef} onClick={close} aria-label="Cerrar ficha">
+              <button
+                ref={closeRef}
+                onClick={close}
+                disabled={editorBusy}
+                aria-label="Cerrar ficha"
+              >
                 ×
               </button>
             </div>
@@ -608,99 +685,25 @@ export function IntegrationCatalog() {
                 </p>
               </div>
             </div>
-            <div className="d-drawer-status">
-              <span className="d-pill">Sólo lectura</span>
-              <span>Datos del backend sintético</span>
-            </div>
-            <div
-              className="d-tabs"
-              role="tablist"
-              aria-label="Detalle de la variante"
-            >
-              {tabs.map((label) => (
-                <button
-                  role="tab"
-                  key={label}
-                  aria-selected={tab === label}
-                  aria-controls="integration-tab"
-                  onClick={() => update({ tab: label })}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div
-              className="d-tab-content"
-              role="tabpanel"
-              id="integration-tab"
-              aria-label={tab}
-            >
-              {tab === "Ficha" ? (
-                <>
-                  <h3>Datos disponibles</h3>
-                  <dl className="i-details">
-                    {[
-                      ["Nombre original", selected.name],
-                      ["Ecomm ID", selected.id],
-                      ["SKU", selected.sku],
-                      ["Presentación", selected.presentation],
-                      ["Stock de captura", selected.stock],
-                      ["Fecha de captura", captureDate(selected.capturedAt)],
-                      ["EAN informado", selected.gtin],
-                      ["Marca", null],
-                      ["Precio", null],
-                      ["Imágenes y videos", null],
-                    ].map(([label, value]) => (
-                      <div key={String(label)}>
-                        <dt>{label}</dt>
-                        <dd>{value ?? unavailable}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              ) : tab === "Evidencias" ? (
-                <>
-                  <h3>Origen de la consulta</h3>
-                  <p>{data?.source}</p>
-                  <p>Captura: {captureDate(selected.capturedAt)}</p>
-                  <p>
-                    Esta captura sintética no acredita publicaciones, fuentes
-                    oficiales ni información vigente en canales.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h3>
-                    {tab === "IA"
-                      ? "Propuestas de IA"
-                      : tab === "Canales"
-                        ? "Mercado Libre y Tiendanube"
-                        : "Historial y decisiones"}
-                  </h3>
-                  <p>
-                    {unavailable}. Esta función todavía no tiene una fuente
-                    integrada en este modo.
-                  </p>
-                </>
-              )}
-              <div
-                className="i-disabled-actions"
-                aria-label="Operaciones no conectadas"
-              >
-                {[
-                  "Editar ficha",
-                  "Generar con IA",
-                  "Aprobar cambios",
-                  "Preparar por canal",
-                ].map((label) => (
-                  <button key={label} disabled title={blocked}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <p>{blocked}</p>
-              <button onClick={close}>Volver a la tabla</button>
-            </div>
+            <PersistentWorkspace
+              key={selected.id}
+              variant={selected}
+              csrf={session.csrf_token}
+              username={session.username}
+              tab={tab}
+              onTab={(value) => update({ tab: value })}
+              onDirty={setDirty}
+              onBusy={setEditorBusy}
+              onClose={close}
+              onAuthenticated={(value) => setSession(sessionData(value))}
+              onRecord={(value: EcommApiProductEdit) =>
+                setEditorStates((previous) =>
+                  previous[value.ecomm_id] === value.status
+                    ? previous
+                    : { ...previous, [value.ecomm_id]: value.status },
+                )
+              }
+            />
           </section>
         </>
       )}

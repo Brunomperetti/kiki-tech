@@ -154,6 +154,15 @@ def main():
                     "integration_sandbox." + module,
                 )
                 if command == "test":
+                    compose(
+                        "run",
+                        "--rm",
+                        "--no-deps",
+                        "backend",
+                        "python",
+                        "-m",
+                        "integration_sandbox.editor_checks",
+                    )
                     subprocess.run(
                         [sys.executable, str(ROOT / "integration/test_gateway.py")],
                         check=True,

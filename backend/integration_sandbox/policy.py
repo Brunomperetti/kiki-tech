@@ -2,6 +2,7 @@
 
 import os
 import sys
+import re
 from collections.abc import Mapping
 
 DATABASE_URL = (
@@ -19,6 +20,19 @@ ALLOWED_ROUTES = frozenset(
         ("GET", "/api/ecomm-app/stage/catalog"),
     }
 )
+
+
+def is_workspace_route(method: str, path: str) -> bool:
+    # Deliberately only the six synthetic variants; no reserved/AI/bulk subroutes.
+    return method in {"GET", "POST"} and bool(
+        re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]", path)
+    )
+
+
+def route_allowed(method: str, path: str) -> bool:
+    return (method, path) in ALLOWED_ROUTES or is_workspace_route(method, path)
+
+
 CSP = (
     "default-src 'none'; connect-src 'self'; img-src 'none'; media-src 'none'; "
     "frame-src 'none'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'"

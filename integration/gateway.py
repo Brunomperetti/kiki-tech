@@ -12,7 +12,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
-from integration_sandbox.policy import ALLOWED_ROUTES, CSP, install_network_guard  # noqa: E402
+from integration_sandbox.policy import (
+    route_allowed,
+    is_workspace_route,
+    CSP,
+    install_network_guard,
+)  # noqa: E402
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.integration-dist"
 WEB_CSP = (
@@ -57,12 +62,15 @@ class Handler(BaseHTTPRequestHandler):
         ):
             self.serve_static(path.path)
             return
-        if (self.command, path.path) not in ALLOWED_ROUTES:
+        if not route_allowed(self.command, path.path):
             self.deny(403)
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 <= length <= 16_384:
+            max_body = (
+                1_048_576 if is_workspace_route(self.command, path.path) else 16_384
+            )
+            if not 0 <= length <= max_body:
                 self.deny(413)
                 return
         except ValueError:

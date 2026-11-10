@@ -1,4 +1,9 @@
-# Integración local sintética: etapas 2B y 2C
+# Integración local sintética: etapas 2B, 2C y 2D
+
+La etapa actual agrega el editor comercial existente y persistencia interna
+individual. Ver [Editor persistente 2D](EDITOR.md) para los contratos habilitados,
+concurrencia, seguridad y validación. El resto de este documento conserva la
+infraestructura de aislamiento y el registro histórico de 2B/2C.
 
 La etapa 2C conecta **sólo la lectura** del dashboard al backend sintético. Ver
 [Catálogo conectado y validación 2C](CATALOG.md) para la arquitectura actual,
@@ -103,11 +108,12 @@ con certificado validado. El demo conserva su funcionamiento anterior sin backen
 
 ## Superficie habilitada y límites
 
-Únicamente `/health`, login/me/logout y `GET /api/ecomm-app/stage/catalog`.
+Únicamente `/health`, login/me/logout, `GET /api/ecomm-app/stage/catalog` y,
+desde 2D, GET/POST individual de workspace para los seis IDs sintéticos.
 El último sirve exclusivamente el fixture interno, consumido desde el dashboard
 en etapa 2C. El resto responde 403 antes de
 ejecutar endpoints, incluidas actualización manual/programada, OAuth/callback,
-sincronización, CSV, editor, IA y documentación API. Las rutas originales siguen
+sincronización, CSV, IA, edición fuera de esos IDs y documentación API. Las rutas originales siguen
 en el backend habitual, sin cambios.
 
 Las respuestas API mantienen la CSP de 2B. El HTML del dashboard admite sólo

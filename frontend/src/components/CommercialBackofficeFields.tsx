@@ -24,6 +24,7 @@ type Props={
   onChange:<K extends keyof EcommEditableFields>(field:K,value:EcommEditableFields[K])=>void;
   readiness:KikiReadiness;
   categories:{name:string;count:number;subcategories:{name:string;count:number}[]}[];
+  allowExternalResources?:boolean;
 };
 
 const fieldNames:Record<string,string>={
@@ -35,7 +36,7 @@ const fieldNames:Record<string,string>={
   seo_title:'Título SEO',seo_description:'Metadescripción SEO',
   seo_keywords:'Palabras clave',
 };
-export function CommercialBackofficeFields({fields,onChange,readiness,categories}:Props){
+export function CommercialBackofficeFields({fields,onChange,readiness,categories,allowExternalResources=true}:Props){
   const editAttribute=(idx:number,key:keyof KikiAttribute,value:string)=>{
     onChange('attributes',fields.attributes.map((a,i)=>i===idx?{...a,[key]:value}:a));
   };
@@ -81,7 +82,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
           <input maxLength={100} placeholder="Nombre breve para listados"
             value={fields.short_title} onChange={e=>onChange('short_title',e.target.value)}/></label>
         <label>Presentación comercial y packs
-          <textarea rows={2} maxLength={750} placeholder="Contenido neto, formato y composición comprobados"
+          <textarea aria-label="Presentación comercial y packs" rows={2} maxLength={750} placeholder="Contenido neto, formato y composición comprobados"
             value={fields.presentation} onChange={e=>onChange('presentation',e.target.value)}/></label>
         <label className="wide">GTIN/EAN sugerido (si existe)
           <input maxLength={14} inputMode="numeric" placeholder="8, 12, 13 o 14 dígitos, confirmar en envase"
@@ -94,13 +95,13 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
         <p>Textos expresivos, específicos y sustentados en documentación. Sin atributos inventados ni promesas médicas.</p></div></div>
       <div className="kiki-commercial-grid">
         <label className="wide">Descripción corta
-          <textarea rows={3} maxLength={500} placeholder="Resumen que se entienda al primer vistazo"
+          <textarea aria-label="Descripción corta" rows={3} maxLength={500} placeholder="Resumen que se entienda al primer vistazo"
             value={fields.short_description} onChange={e=>onChange('short_description',e.target.value)}/></label>
         <label className="wide">Descripción larga
-          <textarea rows={6} maxLength={5000} placeholder="Información verificada del producto para su futura publicación"
+          <textarea aria-label="Descripción larga" rows={6} maxLength={5000} placeholder="Información verificada del producto para su futura publicación"
             value={fields.description} onChange={e=>onChange('description',e.target.value)}/></label>
         <label className="wide">Detalles, uso y aclaraciones
-          <textarea rows={5} maxLength={5000} placeholder="Uso y precauciones solo cuando estén documentados"
+          <textarea aria-label="Detalles, uso y aclaraciones" rows={5} maxLength={5000} placeholder="Uso y precauciones solo cuando estén documentados"
             value={fields.details} onChange={e=>onChange('details',e.target.value)}/></label>
       </div>
     </section>
@@ -119,7 +120,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
           <input maxLength={180} placeholder="Búsqueda natural + producto + presentación verificada"
             value={fields.seo_title} onChange={e=>onChange('seo_title',e.target.value)}/></label>
         <label className="wide">Descripción para buscadores
-          <textarea rows={3} maxLength={320} placeholder="Metadescripción clara, sin atributos no comprobados"
+          <textarea aria-label="Descripción para buscadores" rows={3} maxLength={320} placeholder="Metadescripción clara, sin atributos no comprobados"
             value={fields.seo_description} onChange={e=>onChange('seo_description',e.target.value)}/></label>
         <label className="wide">Palabras clave / términos relevantes
           <input maxLength={1000} placeholder="Separá términos con comas, sin repetir palabras"
@@ -157,7 +158,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       <div className="kiki-commercial-list">
         {fields.media.map((m,i)=><div className="kiki-commercial-array kiki-commercial-media" key={'media'+i}>
           <label>Tipo
-            <select value={m.kind} onChange={e=>editMedia(i,'kind',e.target.value)}>
+            <select aria-label="Tipo de recurso" value={m.kind} onChange={e=>editMedia(i,'kind',e.target.value)}>
               <option value="IMAGE">Fotografía / gráfica</option><option value="VIDEO">Video</option>
             </select></label>
           <label>URL HTTPS del archivo o video
@@ -171,7 +172,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
               value={m.source_url} onChange={e=>editMedia(i,'source_url',e.target.value)}/></label>
           <button type="button" aria-label={'Quitar recurso '+(i+1)}
             onClick={()=>onChange('media',fields.media.filter((_,n)=>n!==i))}>Quitar</button>
-          {m.url.startsWith('https://')&&<div className="kiki-commercial-media-preview">
+          {allowExternalResources&&m.url.startsWith('https://')&&<div className="kiki-commercial-media-preview">
             {m.kind==='IMAGE'&&<img alt={m.alt||'Vista previa comercial'} src={m.url} loading="lazy" referrerPolicy="no-referrer"/>}
             <a href={m.url} target="_blank" rel="noopener noreferrer">Abrir recurso multimedia</a>
           </div>}
@@ -198,7 +199,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
             <input maxLength={1000} type="url" placeholder="https://fabricante.com/producto" value={src.url}
               onChange={e=>editSource(i,'url',e.target.value)}/></label>
           <label>Verificación, fecha o evidencia en envase
-            <textarea rows={2} maxLength={500} placeholder="Qué dato se verificó y cómo" value={src.note}
+            <textarea aria-label="Verificación, fecha o evidencia en envase" rows={2} maxLength={500} placeholder="Qué dato se verificó y cómo" value={src.note}
               onChange={e=>editSource(i,'note',e.target.value)}/></label>
           <label className="kiki-commercial-attestation">
             <input type="checkbox" checked={src.verified} onChange={e=>verifySource(i,e.target.checked)}/>
@@ -206,13 +207,13 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
           </label>
           <button type="button" onClick={()=>onChange('sources',fields.sources.filter((_,n)=>n!==i))}
             aria-label={'Quitar fuente '+(i+1)}>Quitar</button>
-          {src.url.startsWith('https://')&&<a href={src.url} target="_blank" rel="noopener noreferrer">Abrir fuente</a>}
+          {allowExternalResources&&src.url.startsWith('https://')&&<a href={src.url} target="_blank" rel="noopener noreferrer">Abrir fuente</a>}
         </div>)}
         {fields.sources.length<20&&<button type="button" className="kiki-commercial-add"
           onClick={()=>onChange('sources',[...fields.sources,{kind:'FABRICANTE',name:'',url:'',note:'',verified:false}])}>+ Registrar fuente verificable</button>}
       </div>
       <label className="kiki-commercial-note">Observaciones y pendientes
-        <textarea maxLength={1800} rows={3} value={fields.note}
+        <textarea aria-label="Observaciones y pendientes" maxLength={1800} rows={3} value={fields.note}
           placeholder="Qué debe comprobarse y qué quedó pendiente, sin completar con suposiciones"
           onChange={e=>onChange('note',e.target.value)}/></label>
     </section>

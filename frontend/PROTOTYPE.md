@@ -1,5 +1,10 @@
 # KIKI Tech 2.0 · Demo y catálogo de integración
 
+La etapa 2D incorpora el editor comercial existente en el panel del modo
+integración, con guardado individual en PostgreSQL descartable, versiones e
+historial: [documentación de la etapa](../integration/EDITOR.md). El modo demo
+conserva su aislamiento y persistencia simulada anterior.
+
 La etapa 2C agrega un modo explícito de lectura desde FastAPI/PostgreSQL descartable.
 No utiliza las cifras ni productos de este demo como fallback. Ver
 [inicio, arquitectura, límites y pruebas](../integration/CATALOG.md).

@@ -1,4 +1,4 @@
-from .policy import ALLOWED_ROUTES, CSP, preflight
+from .policy import route_allowed, CSP, preflight
 
 
 def create_sandbox_app():
@@ -53,7 +53,7 @@ def create_sandbox_app():
 
     @application.middleware("http")
     async def isolation_boundary(request, call_next):
-        if (request.method, request.url.path) not in ALLOWED_ROUTES:
+        if not route_allowed(request.method, request.url.path):
             response = JSONResponse(
                 status_code=403,
                 content={"detail": "Operación deshabilitada en etapa 2B sintética."},

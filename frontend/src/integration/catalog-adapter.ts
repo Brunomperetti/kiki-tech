@@ -9,6 +9,7 @@ export type Variant = {
   stock: number | null;
   capturedAt: string | null;
   gtin: string | null;
+  isCombo: boolean | null;
 };
 export type CatalogPage = {
   items: Variant[];
@@ -45,11 +46,24 @@ export async function request(path: string, options: RequestInit = {}) {
       "No pudimos comunicarnos con el backend de pruebas. No se cargaron datos de demostración.",
     );
   }
-  if (!response.ok)
+  if (!response.ok) {
+    if (
+      /^\/api\/ecomm-app\/workspace\//.test(path) &&
+      [409, 422].includes(response.status)
+    ) {
+      const body = await response.json().catch(() => null);
+      throw new CatalogError(
+        response.status,
+        typeof body?.detail === "string"
+          ? body.detail.slice(0, 600)
+          : "Revisá el formato y los límites de los campos de la ficha.",
+      );
+    }
     throw new CatalogError(
       response.status,
       messages[response.status] || "El backend de pruebas no está disponible.",
     );
+  }
   if (response.headers.get("X-Kiki-Environment") !== "local-synthetic")
     throw new CatalogError(
       0,
@@ -128,6 +142,7 @@ export function adaptCatalog(
         stock,
         capturedAt: date(row.captured_at),
         gtin: text(row.gtin),
+        isCombo: typeof row.is_combo === "boolean" ? row.is_combo : null,
       };
     });
     if (

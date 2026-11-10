@@ -24,7 +24,11 @@ export function installIntegrationIsolation() {
       url.origin !== gatewayOrigin ||
       url.username ||
       url.password ||
-      !allowed.has(`${method} ${url.pathname}`)
+      !(
+        allowed.has(`${method} ${url.pathname}`) ||
+        (["GET", "POST"].includes(method) &&
+          /^\/api\/ecomm-app\/workspace\/90000[1-6]$/.test(url.pathname))
+      )
     ) {
       throw new Error("Integración aislada: solicitud no autorizada.");
     }
