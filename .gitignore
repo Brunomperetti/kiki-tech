@@ -10,3 +10,5 @@ dist/
 
 *.tsbuildinfo
 .integration-runtime/
+frontend/.integration-dist/
+frontend/integration-test-results/

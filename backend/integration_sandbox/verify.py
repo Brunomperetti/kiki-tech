@@ -225,6 +225,59 @@ class BApplication(unittest.TestCase):
         self.assertFalse(result["external_writes_enabled"])
         self.assertFalse(result["operational_source_activated"])
 
+    def test_catalog_authentication_empty_search_and_incomplete_capture(self):
+        from app.database.models import CatalogSnapshot
+        from app.database.session import SessionLocal
+        from app.integrations.ecomm_app.catalog_stage import STAGE_SOURCE
+        from sqlalchemy import select
+
+        self.client.cookies.clear()
+        self.assertEqual(
+            self.client.get("/api/ecomm-app/stage/catalog").status_code, 401
+        )
+        self.login()
+        empty = self.client.get(
+            "/api/ecomm-app/stage/catalog?q=NO-SUCH-SYNTHETIC-VARIANT"
+        ).json()
+        self.assertEqual(empty["total_matches"], 0)
+        self.assertEqual(empty["total_variants_in_capture"], 6)
+        self.assertEqual(empty["items"], [])
+        with SessionLocal() as db:
+            record = db.scalar(
+                select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE)
+            )
+            original = record.payload
+            record.payload = []
+            db.commit()
+            try:
+                response = self.client.get("/api/ecomm-app/stage/catalog")
+                self.assertEqual(response.status_code, 409)
+                self.assertNotIn("items", response.json())
+            finally:
+                record.payload = original
+                db.commit()
+
+    def test_expired_session_cannot_read_the_catalog(self):
+        from datetime import timedelta
+        from app.core.security import utcnow, token_hash
+        from app.database.models import AdminSession
+        from app.database.session import SessionLocal
+        from sqlalchemy import select
+
+        self.login()
+        with SessionLocal() as db:
+            record = db.scalar(
+                select(AdminSession).where(
+                    AdminSession.token_hash
+                    == token_hash(self.client.cookies["kiki_session"])
+                )
+            )
+            record.expires_at = utcnow() - timedelta(seconds=1)
+            db.commit()
+        self.assertEqual(
+            self.client.get("/api/ecomm-app/stage/catalog").status_code, 401
+        )
+
     def test_all_business_operations_remain_disabled(self):
         csrf = self.login().json()["csrf_token"]
         for method, path in [

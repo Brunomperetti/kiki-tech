@@ -1,9 +1,11 @@
-# Etapa 2B: integración local sintética
+# Integración local sintética: etapas 2B y 2C
 
-Este entorno **no conecta el dashboard al backend**. Prepara y verifica el límite
-de aislamiento para la etapa 2C. El punto de entrada productivo `app.main:app`,
+La etapa 2C conecta **sólo la lectura** del dashboard al backend sintético. Ver
+[Catálogo conectado y validación 2C](CATALOG.md) para la arquitectura actual,
+sesiones, pruebas y capturas. La infraestructura de aislamiento de 2B se conserva.
+El punto de entrada productivo `app.main:app`,
 los modelos, servicios, reglas comerciales, rutas antiguas, `render.yaml` y el
-frontend de demostración no se modifican.
+aislamiento del frontend de demostración no se modifican.
 
 ## Arquitectura
 
@@ -52,7 +54,8 @@ los contenedores; el volumen compartido sólo contiene el socket y se elimina.
 
 ## Inicio y apagado
 
-Requisitos: Linux o WSL2, usuario UID 1000, Python 3.11+, Docker local en
+Requisitos: Linux o WSL2, usuario UID 1000, Python 3.11+, Node.js 22 y dependencias
+del frontend instaladas con `npm ci`, Docker local en
 `/var/run/docker.sock`, Docker Compose v2 con soporte de build secrets y bundle de
 CA en `/etc/ssl/certs/ca-certificates.crt`. No se admite Docker remoto ni cambiar
 permisos para eludir estas comprobaciones. En Docker Desktop usar la integración
@@ -68,7 +71,7 @@ python3 integration/run.py up
 ```
 
 `up` inicia los contenedores y mantiene la pasarela en primer plano:
-`https://127.0.0.1:8443/health`. Ctrl+C los detiene y elimina sus volúmenes. Otra
+`https://127.0.0.1:8443/` (dashboard) y `/health`. Ctrl+C los detiene y elimina sus volúmenes. Otra
 terminal permite `python3 integration/run.py status` y
 `python3 integration/run.py down`. No ejecutar simultáneamente `up` y `test`:
 usan el mismo proyecto local y las pruebas lo limpian al terminar. Ante errores
@@ -94,20 +97,22 @@ Autenticación de demostración de backend:
 - reutilizar cookie en `GET /api/auth/me`; para `POST /api/auth/logout` enviar además
   `X-CSRF-Token` devuelto por login.
 
-No hay un nuevo formulario ni bypass de autenticación para el dashboard. La
-prueba automatizada hace el ciclo completo sobre HTTPS con certificado validado.
+El dashboard de integración agrega un formulario para estas credenciales de prueba,
+sin bypass de autenticación. Las pruebas hacen el ciclo completo sobre HTTPS
+con certificado validado. El demo conserva su funcionamiento anterior sin backend.
 
 ## Superficie habilitada y límites
 
 Únicamente `/health`, login/me/logout y `GET /api/ecomm-app/stage/catalog`.
-El último sirve exclusivamente el fixture interno para comprobar servicios; no
-se consume desde el dashboard en esta etapa. El resto responde 403 antes de
+El último sirve exclusivamente el fixture interno, consumido desde el dashboard
+en etapa 2C. El resto responde 403 antes de
 ejecutar endpoints, incluidas actualización manual/programada, OAuth/callback,
 sincronización, CSV, editor, IA y documentación API. Las rutas originales siguen
 en el backend habitual, sin cambios.
 
-Todas las respuestas del harness/pasarela tienen CSP que impide imágenes, videos,
-scripts, frames y recursos externos. La pasarela sólo acepta los hosts loopback
+Las respuestas API mantienen la CSP de 2B. El HTML del dashboard admite sólo
+scripts y estilos locales y conexiones al mismo gateway; bloquea imágenes,
+videos, frames, fuentes y recursos externos. La pasarela sólo acepta los hosts loopback
 previstos, rechaza orígenes ajenos y URLs absolutas y nunca lee rewrites de Render.
 No hay scheduler ni workers de negocio. El healthcheck Docker sólo ejecuta un
 `SELECT 1` local; no es una tarea de sincronización.
@@ -148,7 +153,7 @@ y rechazos de upstream/origen/host. `legacy-test` ejecuta los tests existentes
 dentro del contenedor sin red y con configuración sintética. Ninguna suite se
 ejecuta contra Render o una base productiva.
 
-## Riesgos pendientes / etapa 2C
+## Riesgos pendientes
 
 - Este arnés no sustituye pruebas de concurrencia, migración, rendimiento o
   recuperación de PostgreSQL productivo, ni acredita que una integración real
@@ -158,8 +163,8 @@ ejecuta contra Render o una base productiva.
 - Se requiere soporte de sockets Unix y UID 1000; no se promete ejecución nativa
   en PowerShell sin WSL2.
 - El gateway es mínimo, sólo para pruebas locales, con límites de cuerpo y sin
-  exposición pública. El dashboard continúa en demo con `connect-src 'none'`;
-  conectar lectura y diseñar su origen/CSP serán cambios explícitos de etapa 2C.
+  exposición pública. El modo demo continúa con `connect-src 'none'`; el modo
+  integración tiene un build y entrada explícitos con su propia CSP y guardas.
 - Fixtures, credenciales de prueba y certificados temporales nunca deben usarse
   con datos reales. El certificado/clave permanecen ignorados localmente después
   de apagar; la base no persiste. Para borrarlos, con todo detenido quitar
@@ -170,7 +175,7 @@ ejecuta contra Render o una base productiva.
 
 Sin push, PR, merge, despliegue, cambios en Render o integración de PR #87.
 
-## Resultado de la validación del 9 de noviembre de 2026
+## Resultado histórico de la validación 2B del 9 de noviembre de 2026
 
 Base comprobada: `feature/kiki-tech-2-dashboard`,
 `377efe78894c1fc8ba999818e28b959282845890`, árbol inicialmente limpio.

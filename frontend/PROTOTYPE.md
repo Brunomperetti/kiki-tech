@@ -1,4 +1,12 @@
-# KIKI Tech 2.0 · Etapa 1.3 — Visibilidad por canal
+# KIKI Tech 2.0 · Demo y catálogo de integración
+
+La etapa 2C agrega un modo explícito de lectura desde FastAPI/PostgreSQL descartable.
+No utiliza las cifras ni productos de este demo como fallback. Ver
+[inicio, arquitectura, límites y pruebas](../integration/CATALOG.md).
+El build habitual y `npm run dev` conservan el modo demo sin backend. El build
+`npm run build:integration` sólo se sirve en el gateway sintético autorizado.
+
+## Etapa 1.3 — Visibilidad por canal (modo demo)
 
 Base comprobada: `730dcbccae63182aee2a03095821b89530317397`, rama `feature/kiki-tech-2-dashboard`, árbol limpio antes de editar.
 

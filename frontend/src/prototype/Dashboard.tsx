@@ -26,6 +26,7 @@ import "./operations.css";
 import "./simple-dashboard.css";
 import "./channel-dashboard.css";
 import { SettingsDialog } from "./SettingsDialog";
+import { IntegrationCatalog } from "../integration/IntegrationCatalog";
 const tabs = ["Ficha", "Evidencias", "IA", "Canales", "Historial"];
 const money = (n: number) =>
   new Intl.NumberFormat("es-AR", {
@@ -43,7 +44,14 @@ function Pill({ value }: { value: string }) {
     </span>
   );
 }
-export function PrototypeDashboard() {
+export function PrototypeDashboard({
+  mode = "demo",
+}: {
+  mode?: "demo" | "integration";
+}) {
+  return mode === "integration" ? <IntegrationCatalog /> : <DemoDashboard />;
+}
+function DemoDashboard() {
   const [urlParams, setParams] = useSearchParams();
   const [params, setAcceptedParams] = useState(urlParams);
   const [rows, setRows] = useState(createCatalog);

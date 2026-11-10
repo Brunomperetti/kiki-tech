@@ -2,6 +2,7 @@
 
 import http.client
 import json
+import re
 import ssl
 import subprocess
 import sys
@@ -108,7 +109,6 @@ class GatewayTests(unittest.TestCase):
 
     def test_other_methods_and_dashboard_are_not_forwarded(self):
         for method, path in [
-            ("GET", "/"),
             ("GET", "/dashboard"),
             ("DELETE", "/api/auth/me"),
             ("PUT", "/api/auth/me"),
@@ -116,6 +116,22 @@ class GatewayTests(unittest.TestCase):
         ]:
             with self.subTest(method=method, path=path):
                 self.assertEqual(self.request(method, path)[0], 403)
+
+    def test_integration_entry_and_assets_are_local_and_demo_is_not_served(self):
+        status, headers, body = self.request("GET", "/")
+        self.assertEqual(status, 200)
+        self.assertIn(b'name="kiki-environment" content="local-synthetic"', body)
+        self.assertIn("script-src 'self'", headers["Content-Security-Policy"])
+        for asset in re.findall(rb'(?:src|href)="(/assets/[^"]+)"', body):
+            self.assertEqual(self.request("GET", asset.decode())[0], 200)
+        for path in [
+            "/index.html",
+            "/integration.html",
+            "/assets/../../render.yaml",
+            "/assets/https://production.invalid/example.js",
+            "/src/main.tsx",
+        ]:
+            self.assertEqual(self.request("GET", path)[0], 403)
 
     def test_parent_application_and_docker_selectors_are_not_inherited(self):
         canaries = {

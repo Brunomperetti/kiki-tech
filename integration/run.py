@@ -111,13 +111,33 @@ def runtime_directory():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=["build", "up", "test", "legacy-test", "down", "status"]
+        "command",
+        choices=[
+            "build",
+            "up",
+            "test",
+            "legacy-test",
+            "browser-test",
+            "down",
+            "status",
+        ],
     )
     command = parser.parse_args().command
     if command == "build":
+        subprocess.run(
+            ["npm", "run", "build:integration"],
+            cwd=ROOT / "frontend",
+            env=clean_environment(),
+            check=True,
+        )
         compose("build", "backend", build=True)
-        compose("pull", "postgres", build=True)
-    elif command in {"up", "test", "legacy-test"}:
+        # Runtime pull_policy stays "never"; only this explicit setup step may download.
+        compose("pull", "--policy", "missing", "postgres", build=True)
+    elif command in {"up", "test", "legacy-test", "browser-test"}:
+        if not (ROOT / "frontend/.integration-dist/integration.html").is_file():
+            raise RuntimeError(
+                "Falta el frontend de integración. Ejecutá primero integration/run.py build."
+            )
         directory = runtime_directory()
         try:
             compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "90")
@@ -139,6 +159,13 @@ def main():
                         check=True,
                         env=clean_environment(),
                     )
+            elif command == "browser-test":
+                # Runs its own gateway and Playwright against the actual isolated backend.
+                subprocess.run(
+                    [sys.executable, str(ROOT / "integration/browser_tests.py")],
+                    check=True,
+                    env=clean_environment(),
+                )
             else:
                 for _ in range(60):
                     if (directory / "api.sock").exists() and (

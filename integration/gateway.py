@@ -2,6 +2,7 @@
 
 import http.client
 import os
+import re
 import socket
 import socketserver
 import ssl
@@ -12,6 +13,14 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from integration_sandbox.policy import ALLOWED_ROUTES, CSP, install_network_guard  # noqa: E402
+
+WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.integration-dist"
+WEB_CSP = (
+    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "connect-src 'self'; img-src 'none'; media-src 'none'; font-src 'none'; "
+    "frame-src 'none'; frame-ancestors 'none'; object-src 'none'; "
+    "form-action 'none'; base-uri 'none'"
+)
 
 
 class UnixHTTPConnection(http.client.HTTPConnection):
@@ -39,9 +48,16 @@ class Handler(BaseHTTPRequestHandler):
             or path.scheme
             or path.netloc
             or origin not in {None, "https://127.0.0.1:8443", "https://localhost:8443"}
-            or (self.command, path.path) not in ALLOWED_ROUTES
             or self.headers.get("Transfer-Encoding")
         ):
+            self.deny(403)
+            return
+        if self.command == "GET" and (
+            path.path == "/" or path.path.startswith("/assets/")
+        ):
+            self.serve_static(path.path)
+            return
+        if (self.command, path.path) not in ALLOWED_ROUTES:
             self.deny(403)
             return
         try:
@@ -84,6 +100,38 @@ class Handler(BaseHTTPRequestHandler):
             self.deny(502)
         finally:
             connection.close()
+
+    def serve_static(self, path):
+        if path == "/":
+            file = WEB_ROOT / "integration.html"
+            content_type = "text/html; charset=utf-8"
+        elif re.fullmatch(r"/assets/[A-Za-z0-9_-]+\.(js|css)", path):
+            file = WEB_ROOT / path.removeprefix("/")
+            content_type = (
+                "text/javascript; charset=utf-8"
+                if path.endswith(".js")
+                else "text/css; charset=utf-8"
+            )
+        else:
+            self.deny(403)
+            return
+        if (
+            WEB_ROOT.is_symlink()
+            or not file.resolve().is_relative_to(WEB_ROOT.resolve())
+            or not file.is_file()
+        ):
+            self.deny(403)
+            return
+        body = file.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Security-Policy", WEB_CSP)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Kiki-Environment", "local-synthetic")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
 
     def deny(self, status):
         self.send_response(status)
