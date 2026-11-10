@@ -10,9 +10,17 @@ from app.api.routes.ecomm_api_workspace import SaveProductEdit
 from app.services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
 from .proposals import Proposals
 from .research.routes import execute
+from .generation_contract import generation_context
 
 router = APIRouter(prefix="/api/test-proposals", tags=["synthetic-proposals-only"])
 editor_router = APIRouter()
+
+
+@router.get("/{ecomm_id}/generation-context")
+def context_for_future_generation(
+    ecomm_id: str, db: Session = Depends(get_db), session=Depends(require_session)
+):
+    return execute(db, lambda: generation_context(db, session, ecomm_id))
 
 
 class Generate(BaseModel):

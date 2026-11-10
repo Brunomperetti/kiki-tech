@@ -1,5 +1,9 @@
 # KIKI Tech 2.0 · Demo y catálogo de integración
 
+La etapa 2I muestra la preparación del piloto documental, la procedencia declarada
+frente a la revisada y un contrato de hechos aprobados para IA futura. Fabricantes
+y OpenAI permanecen desconectados: [documentación](../integration/PILOT.md).
+
 La etapa 2H agrega «Investigar producto» en la ficha lateral del modo integración:
 candidatos sintéticos, contraste de identidad, selección e incorporación mediante
 el lector existente. No consulta Internet ni aprueba fuentes automáticamente.

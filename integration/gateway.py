@@ -35,7 +35,9 @@ WEB_CSP = (
 class UnixHTTPConnection(http.client.HTTPConnection):
     def connect(self):
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.settimeout(10)
+        # Local UDS only: collector (<=5s) + parser (<=8s) + serialization.
+        # This does not change any outbound HTTPS/DNS deadline or allowlist.
+        self.sock.settimeout(25)
         self.sock.connect(str(SOCKET))
 
 

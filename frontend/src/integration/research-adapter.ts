@@ -112,6 +112,8 @@ export type ResearchDocument = {
       sha256: string;
     };
     source?: {
+      declared_manufacturer?: string | null;
+      declared_consulted_at?: string | null;
       declared_official: boolean;
       note: string;
       reference_url: string;

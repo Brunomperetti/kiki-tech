@@ -180,6 +180,10 @@ class LocalDocuments:
             "original_base64": body.content_base64,
             "source": {
                 "declared_official": body.declared_official,
+                "declared_manufacturer": body.declared_manufacturer.strip() or None,
+                "declared_consulted_at": body.declared_consulted_at.isoformat()
+                if body.declared_consulted_at
+                else None,
                 "note": body.provenance_note.strip(),
                 "reference_url": body.reference_url,
                 "registered_at": now(),

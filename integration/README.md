@@ -1,6 +1,10 @@
-# Integración local aislada: etapas 2B–2H
+# Integración local aislada: etapas 2B–2I
 
-La etapa actual incorpora [investigación asistida de fabricantes 2H](ASSISTED.md),
+La etapa 2I prepara el [conector HTTPS y piloto documental](PILOT.md), con bloqueo
+de red real, manifiesto vacío y contrato de hechos aprobados para IA futura.
+No conecta fabricantes, OpenAI ni productos reales al entorno actual.
+
+La etapa 2H incorporó [investigación asistida de fabricantes](ASSISTED.md),
 con recolector separado, HTTP/DNS exclusivamente simulados y transferencia al
 lector 2G. No habilita investigación en Internet ni valida fuentes auténticas.
 

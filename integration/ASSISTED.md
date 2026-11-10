@@ -1,5 +1,8 @@
 # Etapa 2H — Investigación asistida, exclusivamente simulada
 
+La [etapa 2I](PILOT.md) prepara un adaptador HTTPS independiente, sin activarlo ni
+sustituir este recolector simulado. Los resultados de este documento son los de 2H.
+
 Base comprobada antes de modificar: rama `feature/kiki-tech-2-dashboard`, HEAD
 `e2a22b9d21568076e1c31b7513ec4b0397396c42`, árbol limpio. No se realizaron
 operaciones remotas de Git ni se habilitaron proveedores.

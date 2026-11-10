@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { captureDate } from "./catalog-adapter";
+import { PilotReadiness } from "./PilotReadiness";
 import {
   changeResearch,
   loadResearch,
@@ -125,6 +126,7 @@ export function AssistedResearch({
       className="a-research"
       aria-label="Investigación asistida de fabricantes"
     >
+      <PilotReadiness />
       <h3>Investigar producto</h3>
       <div className="r-notice">
         <strong>Demostración con fuentes simuladas · Sin Internet</strong>

@@ -35,6 +35,8 @@ export function DocumentImport({
   const [replace, setReplace] = useState(false),
     [reason, setReason] = useState("");
   const [originalInfo, setOriginalInfo] = useState("");
+  const [manufacturer, setManufacturer] = useState("");
+  const [consultedDate, setConsultedDate] = useState("");
   const local = document?.body.synthetic === false;
   async function perform(action: () => Promise<void>) {
     onBusy(true);
@@ -84,6 +86,10 @@ export function DocumentImport({
           provenance_note: note,
           reference_url: url,
           declared_official: official,
+          declared_manufacturer: manufacturer,
+          declared_consulted_at: consultedDate
+            ? `${consultedDate}T00:00:00Z`
+            : null,
           authorized_local_processing: true,
           ...(replace && local
             ? {
@@ -131,6 +137,23 @@ export function DocumentImport({
     <div className="r-upload">
       <details className="r-document">
         <summary>Incorporar archivo local o referencia oficial</summary>
+        <label>
+          Fabricante declarado por quien suministra el documento (opcional)
+          <input
+            value={manufacturer}
+            maxLength={180}
+            onChange={(e) => setManufacturer(e.target.value)}
+          />
+        </label>
+        <label>
+          Fecha de consulta informada por el usuario (opcional)
+          <input
+            type="date"
+            value={consultedDate}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setConsultedDate(e.target.value)}
+          />
+        </label>
         <p>
           Procesamiento local aislado. No se envían archivos a terceros. PDF con
           texto (máximo 10 páginas), TXT UTF-8, HTML pasivo sin atributos o JSON
@@ -280,8 +303,29 @@ export function DocumentImport({
           </p>
           <p>{document.body.source!.note}</p>
           <p>
+            Fabricante declarado:{" "}
+            {document.body.source!.declared_manufacturer || "No informado"} ·
+            Fabricante extraído:{" "}
+            {document.body.identity.manufacturer || "No identificado"}
+          </p>
+          <p>
+            Dominio de referencia:{" "}
+            {document.body.source!.reference_url
+              ? new URL(document.body.source!.reference_url).hostname
+              : "Sin dominio informado"}
+            <br />
+            Fecha de consulta declarada:{" "}
+            {document.body.source!.declared_consulted_at
+              ? document.body
+                  .source!.declared_consulted_at.slice(0, 10)
+                  .split("-")
+                  .reverse()
+                  .join("/")
+              : "No informada; no se supone a partir de la carga"}
+          </p>
+          <p>
             {document.body.source!.reference_url || "Sin URL declarada"} · No
-            consultada
+            consultada por el navegador
           </p>
           <p>
             Registrado por {document.body.source!.registered_by} ·{" "}

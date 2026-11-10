@@ -217,6 +217,16 @@ def main():
                         "-m",
                         "integration_sandbox.assisted_checks",
                     )
+                    for checks in ("connector_checks", "pilot_checks"):
+                        compose(
+                            "run",
+                            "--rm",
+                            "--no-deps",
+                            "backend",
+                            "python",
+                            "-m",
+                            "integration_sandbox." + checks,
+                        )
                     subprocess.run(
                         [sys.executable, str(ROOT / "integration/test_gateway.py")],
                         check=True,

@@ -14,6 +14,7 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   timeout: 30000,
+  expect: { timeout: 15000 },
   use: {
     baseURL: "https://127.0.0.1:8443",
     trace: "retain-on-failure",

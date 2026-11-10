@@ -43,6 +43,8 @@ def route_allowed(method: str, path: str) -> bool:
 
 
 def is_assisted_route(method: str, path: str) -> bool:
+    if method == "GET" and path == "/api/test-discovery/pilot-status":
+        return True
     return method == "POST" and bool(
         re.fullmatch(
             r"/api/test-discovery/90000[1-6]/(?:start|candidates/[a-f0-9]{24}/(?:decision|acquire))",
@@ -64,7 +66,11 @@ def is_document_route(method: str, path: str) -> bool:
 
 def is_proposal_route(method: str, path: str) -> bool:
     if method == "GET":
-        return bool(re.fullmatch(r"/api/test-proposals/90000[1-6]", path))
+        return bool(
+            re.fullmatch(
+                r"/api/test-proposals/90000[1-6](?:/generation-context)?", path
+            )
+        )
     return method == "POST" and bool(
         re.fullmatch(
             r"/api/test-proposals/90000[1-6]/(?:generate|[1-9][0-9]{0,9}/review)", path

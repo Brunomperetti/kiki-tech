@@ -2,12 +2,18 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 from sqlalchemy.orm import Session
-from app.core.security import require_csrf
+from app.core.security import require_csrf, require_session
 from app.database.session import get_db
 from .research.routes import execute
 from .assisted_research import AssistedResearch
+from .pilot_policy import pilot_status
 
 router = APIRouter(prefix="/api/test-discovery", tags=["simulated-discovery-only"])
+
+
+@router.get("/pilot-status")
+def status(session=Depends(require_session)):
+    return pilot_status()
 
 
 class Start(BaseModel):

@@ -5,6 +5,7 @@ const allowed = new Set([
   "POST /api/auth/login",
   "POST /api/auth/logout",
   "GET /api/ecomm-app/stage/catalog",
+  "GET /api/test-discovery/pilot-status",
 ]);
 
 export function installIntegrationIsolation() {
@@ -43,7 +44,9 @@ export function installIntegrationIsolation() {
             url.pathname,
           )) ||
         (method === "GET" &&
-          /^\/api\/test-proposals\/90000[1-6]$/.test(url.pathname)) ||
+          /^\/api\/test-proposals\/90000[1-6](?:\/generation-context)?$/.test(
+            url.pathname,
+          )) ||
         (method === "POST" &&
           /^\/api\/test-proposals\/90000[1-6]\/(?:generate|[1-9][0-9]{0,9}\/review)$/.test(
             url.pathname,

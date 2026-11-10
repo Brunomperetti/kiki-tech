@@ -10,6 +10,7 @@ import {
   type Decisions,
 } from "./proposal-adapter";
 import "./research.css";
+import { GenerationReadiness } from "./GenerationReadiness";
 
 const labels: Record<string, string> = {
   brand: "Marca",
@@ -213,6 +214,10 @@ export function ProposalPanel({
       aria-label="Propuestas comerciales documentadas"
     >
       <h3>Propuesta comercial desde evidencias</h3>
+      <GenerationReadiness
+        key={`${record.ecomm_id}:${record.version}:${active}`}
+        id={record.ecomm_id}
+      />
       <div className="r-notice">
         <strong>Demostración determinista · Sin IA real</strong>
         <p>

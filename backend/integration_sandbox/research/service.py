@@ -49,11 +49,20 @@ class Research:
         self.actor = (
             f"{get_settings().kiki_admin_username} · sesión de prueba {session.id}"
         )
+        # Hold ORM references for this operation under the existing mutex.
+        # The weak identity map otherwise reloads documents for each pair of
+        # facts. Values and verification rules are never memoized.
+        self._document_refs = {}
         # One transaction mutex for this small test schema. All reads/revisions use it.
         if db.scalar(select(Control).where(Control.id == 1).with_for_update()) is None:
             raise RuntimeError(
                 "Falta el control transaccional de investigación; operación bloqueada."
             )
+
+    def _document(self, document_id):
+        if document_id not in self._document_refs:
+            self._document_refs[document_id] = self.db.get(Document, document_id)
+        return self._document_refs[document_id]
 
     def reference(self, ident):
         source = EcommApiProductWorkspace(self.db)._source(ident)
@@ -232,7 +241,7 @@ class Research:
         self.db.flush()
 
     def blockers(self, item, fact, *, include_conflicts=True):
-        doc = self.db.get(Document, fact["document_id"])
+        doc = self._document(fact["document_id"])
         issues = self.identity_issues(item.identity, doc.body)
         if fact["ecomm_id"] != item.ecomm_id:
             issues.append("El hecho no pertenece a esta variante Ecomm-App.")
@@ -362,7 +371,7 @@ class Research:
         facts = deepcopy(item.facts)
         changed = False
         for fact in facts:
-            doc = self.db.get(Document, fact["document_id"])
+            doc = self._document(fact["document_id"])
             reason = (
                 "El documento cambió."
                 if doc.version != fact["document_version"]
