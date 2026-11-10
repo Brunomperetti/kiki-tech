@@ -1,5 +1,10 @@
 # Etapa 2J — Piloto comercial MAMA 350 g / 10 mm
 
+La [actualización de procedencia posterior](MAMA-PROVENANCE.md) registra Sheet1,
+celdas y SHA-256 con verificación externa confirmada, además de Barcode-List como
+referencia secundaria no oficial. Este documento conserva el resultado histórico
+de 2J, anterior a esa confirmación; sus bloqueos comerciales siguen vigentes.
+
 Base comprobada antes de modificar: `feature/kiki-tech-2-dashboard`,
 `ac3062d5d81b84bfe953eea8a2b3dfb4f7da1722`, árbol limpio.
 

@@ -5,6 +5,7 @@ approved facts, nutrition, or a commercial proposal for the real product.
 """
 
 import base64
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 import unittest
@@ -21,7 +22,16 @@ from app.database.models import (  # noqa: E402
     CatalogSnapshot,
 )
 from .research.storage import Dossier, Document, initialize, digest  # noqa: E402
-from .mama_reference import PILOT_ID, URL, NAME, EAN, CATALOG_NAME  # noqa: E402
+from .mama_reference import (  # noqa: E402
+    PILOT_ID,
+    URL,
+    NAME,
+    EAN,
+    CATALOG_NAME,
+    EXCEL_SHA256,
+    SOURCE_EVENT,
+    PROVENANCE_EVENT,
+)
 from .document_parser import parse  # noqa: E402
 from .research.service import Research  # noqa: E402
 
@@ -86,7 +96,37 @@ class MamaPostgreSQL(unittest.TestCase):
         self.assertTrue(x["ean_checksum_valid"])
         self.assertFalse(x["ean_official_correspondence_verified"])
         self.assertFalse(x["original_file_available"])
-        self.assertIsNone(x["original_file_sha256"])
+        self.assertEqual(x["original_file_sha256"], EXCEL_SHA256)
+        self.assertEqual(x["sheet_name"], "Sheet1")
+        self.assertEqual(
+            x["cells"],
+            {
+                "name": "B37",
+                "brand": "Y37",
+                "file_sku": "Q37",
+                "declared_ean": "R37",
+                "logistic_weight": "L37",
+                "description": "U37",
+                "seo_title": "W37",
+                "seo_description": "X37",
+            },
+        )
+        self.assertEqual(x["external_verification"]["scope"], "EXTERNAL_TO_CODEX")
+        self.assertFalse(x["external_verification"]["verified_in_codex"])
+        secondary = data["references"]["third_party_candidate"]
+        self.assertEqual(secondary["classification"], "NON_OFFICIAL")
+        self.assertEqual(
+            secondary["url"],
+            "https://barcode-list.com/barcode/EN/Search.htm?barcode=Rice",
+        )
+        self.assertEqual(
+            secondary["reported_entries"],
+            ["Mama Rice Noodles 350g", "MAMA RICE NOODLE 350G 10MM"],
+        )
+        self.assertFalse(secondary["official_ean_verification"])
+        self.assertFalse(secondary["composition_verified"])
+        self.assertFalse(secondary["authentic_ecomm_id_verified"])
+        self.assertFalse(secondary["downloaded"])
         self.assertEqual(data["references"]["manufacturer_candidate"]["url"], URL)
         self.assertFalse(data["references"]["manufacturer_candidate"]["downloaded"])
         self.assertEqual(data["reference_record_hash"], digest(data["references"]))
@@ -106,6 +146,78 @@ class MamaPostgreSQL(unittest.TestCase):
             self.assertEqual(
                 digest(db.scalar(select(CatalogSnapshot)).payload), original
             )
+
+    def test_existing_dossier_provenance_update_is_versioned_and_preserves_business_data(
+        self,
+    ):
+        self.prepare()
+        record = self.ok(self.client.get(WORKSPACE))
+        self.ok(
+            self.client.post(
+                WORKSPACE,
+                json={
+                    "expected_version": 0,
+                    "status": "DRAFT",
+                    "fields": {
+                        **record["fields"],
+                        "note": "Seguimiento existente que debe conservarse.",
+                    },
+                },
+            )
+        )
+        # Reconstruct the provenance snapshot of base commit 60f346e only in test PostgreSQL.
+        with SessionLocal() as db:
+            case = db.get(Dossier, PILOT_ID)
+            history = deepcopy(case.history)
+            initial = next(e["detail"] for e in history if e["action"] == SOURCE_EVENT)
+            old = deepcopy(initial["references"])
+            x = old["excel"]
+            for key in ("sheet_name", "cells", "external_verification", "source_type"):
+                x.pop(key, None)
+            x.update(
+                availability="USER_TRANSCRIPTION_ONLY",
+                original_file_sha256=None,
+                source="Mensaje del usuario de etapa 2J; archivo no suministrado al entorno",
+            )
+            old.pop("third_party_candidate", None)
+            initial["references"] = old
+            initial["reference_record_hash"] = digest(old)
+            case.history = history
+            db.commit()
+        before = self.case()
+        saved = self.ok(self.client.get(WORKSPACE))
+        old_report = self.ok(self.client.get(API))
+        self.assertIsNone(old_report["references"]["excel"]["original_file_sha256"])
+        self.assertEqual(
+            self.case()["version"], before["version"]
+        )  # GET does not apply the update
+        data = self.prepare()
+        after = self.case()
+        self.assertEqual(after["version"], before["version"] + 1)
+        self.assertEqual(after["facts"], before["facts"])
+        self.assertEqual(after["documents"], before["documents"])
+        self.assertEqual(data["initial_fields"], old_report["initial_fields"])
+        self.assertEqual(self.ok(self.client.get(WORKSPACE)), saved)
+        events = [e for e in after["history"] if e["action"] == PROVENANCE_EVENT]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(
+            events[0]["detail"]["previous_reference_record_hash"], digest(old)
+        )
+        self.assertEqual(
+            next(e["detail"] for e in after["history"] if e["action"] == SOURCE_EVENT)[
+                "references"
+            ],
+            old,
+        )
+        self.assertEqual(
+            data["references"]["excel"]["original_file_sha256"], EXCEL_SHA256
+        )
+        self.assertEqual(data["reference_record_hash"], digest(data["references"]))
+        self.assertEqual(data["approved_fact_count"], 0)
+        self.assertEqual(data["proposed_fields_preview"], {})
+        self.assertEqual(len(data["blocked_fields"]), 9)
+        self.prepare()
+        self.assertEqual(self.case()["version"], after["version"])
 
     def test_missing_documents_block_extraction_generation_and_all_commercial_fields(
         self,

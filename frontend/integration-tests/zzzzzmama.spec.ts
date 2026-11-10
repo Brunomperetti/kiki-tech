@@ -54,7 +54,18 @@ test("referencias separadas, identidad sintética y catálogo intacto con URL y 
   await expect(panel).toContainText("Ecomm ID auténtico: pendiente");
   await expect(panel).toContainText("Sin vinculación por SKU o EAN");
   await expect(panel).toContainText("fila 37");
-  await expect(panel).toContainText("No se recibió el archivo original");
+  await expect(panel).toContainText("Sheet1");
+  await expect(panel).toContainText("Verificación externa al entorno de Codex");
+  await expect(panel).toContainText("No calculado por Codex");
+  for (const cell of ["B37", "Y37", "Q37", "R37", "L37", "U37", "W37", "X37"])
+    await expect(panel).toContainText(cell);
+  await expect(panel).toContainText(
+    "Evidencia secundaria no oficial · Barcode-List",
+  );
+  await expect(panel).toContainText("MAMA RICE NOODLE 350G 10MM");
+  await expect(panel).toContainText(
+    "No acredita composición, origen oficial del EAN ni Ecomm ID auténtico",
+  );
   await expect(panel).toContainText("8851876201433");
   await expect(panel).toContainText(
     "Correspondencia oficial con esta variante: pendiente",
@@ -64,7 +75,18 @@ test("referencias separadas, identidad sintética y catálogo intacto con URL y 
   await expect(panel).toContainText("0 hechos aprobados");
   await expect(page.locator(`[data-ecomm-id="${id}"]`)).toHaveCount(0);
   const report = await (await page.request.get(api)).json();
-  expect(report.references.excel.original_file_sha256).toBeNull();
+  expect(report.references.excel.original_file_sha256).toBe(
+    "03c6b219335ee1dad31f8bc2c1cbd51d12f416fbe25bd9a26ece8350c30c414f",
+  );
+  expect(report.references.excel.external_verification.scope).toBe(
+    "EXTERNAL_TO_CODEX",
+  );
+  expect(report.references.excel.external_verification.verified_in_codex).toBe(
+    false,
+  );
+  expect(report.references.third_party_candidate.classification).toBe(
+    "NON_OFFICIAL",
+  );
   expect(report.proposed_fields_preview).toEqual({});
   expect(report.blocked_fields).toHaveLength(9);
   await panel.scrollIntoViewIfNeeded();

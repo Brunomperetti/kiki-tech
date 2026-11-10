@@ -82,7 +82,8 @@ export function MamaPilotSummary({ revision = 0 }: { revision?: number }) {
   if (!data?.available)
     return <p role="status">Consultando expediente MAMA…</p>;
   const excel = data.references.excel,
-    candidate = data.references.manufacturer_candidate;
+    candidate = data.references.manufacturer_candidate,
+    secondary = data.references.third_party_candidate;
   return (
     <section
       className="r-document"
@@ -98,30 +99,78 @@ export function MamaPilotSummary({ revision = 0 }: { revision?: number }) {
       <details open>
         <summary>Datos de identificación y procedencia</summary>
         <p>
-          {excel.file_name}, fila {excel.row} · {excel.source}. No se recibió el
-          archivo original: sin hash del Excel.
+          {excel.file_name}, {excel.sheet_name ? `${excel.sheet_name}, ` : ""}
+          fila {excel.row} · {excel.source}.
+          {excel.external_verification
+            ? " Verificación externa al entorno de Codex confirmada por el usuario; original no disponible ni comprobado localmente."
+            : " No se recibió el archivo original: sin verificación externa registrada."}
+        </p>
+        {excel.original_file_sha256 && (
+          <p>
+            SHA-256 original, con verificación externa:{" "}
+            <code>{excel.original_file_sha256}</code>. No calculado por Codex.
+          </p>
+        )}
+        <p>
+          Nombre {excel.cells?.name ? `(${excel.cells.name})` : ""}:{" "}
+          {excel.name} · Marca declarada{" "}
+          {excel.cells?.brand ? `(${excel.cells.brand})` : ""}: {excel.brand}
         </p>
         <p>
-          Nombre: {excel.name} · Marca declarada: {excel.brand}
-        </p>
-        <p>
-          EAN declarado: {excel.declared_ean} · Comprobación matemática:{" "}
+          EAN declarado{" "}
+          {excel.cells?.declared_ean ? `(${excel.cells.declared_ean})` : ""}:{" "}
+          {excel.declared_ean} · Comprobación matemática:{" "}
           {excel.ean_checksum_valid ? "válida" : "inválida"}. Correspondencia
           oficial con esta variante: pendiente.
         </p>
         <p>
-          SKU del archivo: {excel.file_sku} · Sólo referencia; no identifica ni
-          vincula la variante.
+          SKU del archivo{" "}
+          {excel.cells?.file_sku ? `(${excel.cells.file_sku})` : ""}:{" "}
+          {excel.file_sku} · Sólo referencia; no identifica ni vincula la
+          variante.
         </p>
         <p>
           Presentación declarada: {excel.declared_presentation} · Ancho
           declarado: {excel.declared_width}.
         </p>
         <p>
-          Peso logístico: {excel.logistic_weight}. No es contenido neto
-          verificado.
+          Peso logístico{" "}
+          {excel.cells?.logistic_weight
+            ? `(${excel.cells.logistic_weight})`
+            : ""}
+          : {excel.logistic_weight}. No es contenido neto verificado.
         </p>
+        {excel.cells && (
+          <p>
+            Descripción comercial ({excel.cells.description}), título SEO (
+            {excel.cells.seo_title}) y descripción SEO (
+            {excel.cells.seo_description}): vacíos en el Excel; no se completan
+            automáticamente.
+          </p>
+        )}
       </details>
+      {secondary && (
+        <details open>
+          <summary>
+            Evidencia secundaria no oficial · {secondary.site_name}
+          </summary>
+          <p style={{ overflowWrap: "anywhere" }}>{secondary.url}</p>
+          <p>
+            EAN referido: {secondary.reported_ean}. Registros informados:{" "}
+            {secondary.reported_entries
+              .map((entry) => `«${entry}»`)
+              .join(" y ")}
+            .
+          </p>
+          <p>
+            {secondary.source}. {secondary.reported_claim}
+          </p>
+          <p>
+            No acredita composición, origen oficial del EAN ni Ecomm ID
+            auténtico. Sin consulta externa ni aprobación automática.
+          </p>
+        </details>
+      )}
       <details open>
         <summary>Referencia oficial candidata · Sin descargar</summary>
         <p>

@@ -11,6 +11,8 @@ URL = (
 EAN = "8851876201433"
 SKU_MARKER = "SYNTHETIC-LOCAL-PILOT-NOT-A-SKU-LINK"
 SOURCE_EVENT = "MAMA_PILOT_REFERENCE_REGISTERED"
+PROVENANCE_EVENT = "MAMA_PILOT_PROVENANCE_UPDATED"
+EXCEL_SHA256 = "03c6b219335ee1dad31f8bc2c1cbd51d12f416fbe25bd9a26ece8350c30c414f"
 
 
 def references():
@@ -22,11 +24,31 @@ def references():
         "network_enabled": False,
         "excel": {
             "file_name": "productos.xlsx",
+            "sheet_name": "Sheet1",
             "row": 37,
-            "availability": "USER_TRANSCRIPTION_ONLY",
+            "availability": "EXTERNALLY_VERIFIED_ORIGINAL_NOT_IN_CODEX",
             "original_file_available": False,
-            "original_file_sha256": None,
-            "source": "Mensaje del usuario de etapa 2J; archivo no suministrado al entorno",
+            "original_file_sha256": EXCEL_SHA256,
+            "external_verification": {
+                "status": "CONFIRMED_BY_USER",
+                "scope": "EXTERNAL_TO_CODEX",
+                "verified_in_codex": False,
+                "row_and_hash_match": True,
+                "verification_date": None,
+                "source": "El usuario confirma comprobación externa del original, fila 37 y SHA-256; no se atribuye esa comprobación a Codex.",
+            },
+            "source_type": "CLIENT_SPREADSHEET_AUXILIARY",
+            "source": "Extracción directa de productos.xlsx, Sheet1, fila 37, comprobada externamente y confirmada por el usuario",
+            "cells": {
+                "name": "B37",
+                "brand": "Y37",
+                "file_sku": "Q37",
+                "declared_ean": "R37",
+                "logistic_weight": "L37",
+                "description": "U37",
+                "seo_title": "W37",
+                "seo_description": "X37",
+            },
             "name": NAME,
             "brand": "Mama",
             "declared_ean": EAN,
@@ -55,6 +77,26 @@ def references():
             "document_sha256": None,
             "provenance_reviewed": False,
             "ean_confirmed": False,
+        },
+        "third_party_candidate": {
+            "classification": "NON_OFFICIAL",
+            "source_status": "REPORTED_BY_USER_NOT_REVIEWED",
+            "site_name": "Barcode-List",
+            "url": "https://barcode-list.com/barcode/EN/Search.htm?barcode=Rice",
+            "url_kind": "SEARCH_RESULTS_PAGE",
+            "reported_ean": EAN,
+            "reported_entries": [
+                "Mama Rice Noodles 350g",
+                "MAMA RICE NOODLE 350G 10MM",
+            ],
+            "reported_claim": "Registros asociados al EAN informados por el usuario; evidencia secundaria no oficial, no verificación del fabricante.",
+            "source": "URL y registros suministrados por el usuario; no consultados por Codex",
+            "official_ean_verification": False,
+            "authentic_ecomm_id_verified": False,
+            "composition_verified": False,
+            "downloaded": False,
+            "provenance_reviewed": False,
+            "document_sha256": None,
         },
         "missing_evidence": [
             "Copia auténtica de etiqueta o ficha técnica del fabricante, con original y procedencia revisable.",

@@ -6,7 +6,16 @@ from sqlalchemy.orm import Session
 from app.core.security import require_csrf, require_session
 from app.database.session import get_db
 from app.services.ecomm_api_product_workspace_service import blank_fields
-from .mama_reference import PILOT_ID, SOURCE_EVENT, references, reference, URL, NAME
+from .mama_reference import (
+    PILOT_ID,
+    SOURCE_EVENT,
+    PROVENANCE_EVENT,
+    references,
+    reference,
+    URL,
+    NAME,
+)
+from copy import deepcopy
 from .research.service import Research, identity_digest
 from .research.storage import Dossier, digest
 from .research.routes import execute
@@ -28,7 +37,12 @@ def report(db, session):
     if db.get(Dossier, PILOT_ID) is None:
         return {"available": False, "test_id": PILOT_ID, "network_enabled": False}
     item = research.dossier(PILOT_ID)
-    registered = next(e["detail"] for e in item.history if e["action"] == SOURCE_EVENT)
+    initial = next(e["detail"] for e in item.history if e["action"] == SOURCE_EVENT)
+    registered = next(
+        e["detail"]
+        for e in reversed(item.history)
+        if e["action"] in {SOURCE_EVENT, PROVENANCE_EVENT}
+    )
     edit, _, approved, fingerprint = Proposals(db, session).context(PILOT_ID)
     proposed, missing = Proposals.generate_fields(approved)
     requested = [
@@ -50,7 +64,7 @@ def report(db, session):
         "binding_status": "PENDING",
         "references": registered["references"],
         "reference_record_hash": registered["reference_record_hash"],
-        "initial_fields": registered["initial_fields"],
+        "initial_fields": initial["initial_fields"],
         "current_fields": edit["fields"],
         "workspace_version": edit["version"],
         "approved_fact_count": len(approved),
@@ -113,6 +127,27 @@ def prepare(db, session):
             ),
             None,
         )
+    else:
+        registered = next(
+            e["detail"]
+            for e in reversed(item.history)
+            if e["action"] in {SOURCE_EVENT, PROVENANCE_EVENT}
+        )
+        updated = references()
+        if registered["reference_record_hash"] != digest(updated):
+            research.commit_change(
+                item,
+                deepcopy(item.facts),
+                PROVENANCE_EVENT,
+                {
+                    "references": updated,
+                    "reference_record_hash": digest(updated),
+                    "previous_reference_record_hash": registered[
+                        "reference_record_hash"
+                    ],
+                    "reason": "Actualización de procedencia autorizada: Excel comprobado externamente y referencia secundaria no oficial. Sin aprobar hechos ni modificar ficha comercial.",
+                },
+            )
     return report(db, session)
 
 

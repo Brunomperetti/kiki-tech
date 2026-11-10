@@ -18,6 +18,14 @@ export type MamaReport = {
   references: {
     excel: {
       file_name: string;
+      sheet_name?: string;
+      original_file_sha256?: string | null;
+      cells?: Record<string, string>;
+      external_verification?: {
+        scope: "EXTERNAL_TO_CODEX";
+        verified_in_codex: false;
+        status: string;
+      };
       row: number;
       source: string;
       name: string;
@@ -34,6 +42,15 @@ export type MamaReport = {
       url: string;
       catalog_item_reported: string;
       source: string;
+    };
+    third_party_candidate?: {
+      classification: "NON_OFFICIAL";
+      site_name: string;
+      url: string;
+      reported_ean: string;
+      reported_entries: string[];
+      source: string;
+      reported_claim: string;
     };
     missing_evidence: string[];
   };
