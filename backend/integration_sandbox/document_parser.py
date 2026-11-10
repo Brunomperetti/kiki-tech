@@ -17,6 +17,17 @@ MIMES = {
     ".json": "application/json",
 }
 ALIASES = {
+    "valor energetico": "nutrition.energy",
+    "hidratos de carbono": "nutrition.carbohydrates",
+    "carbohidratos": "nutrition.carbohydrates",
+    "azucares": "nutrition.sugars",
+    "grasas totales": "nutrition.total_fat",
+    "grasas saturadas": "nutrition.saturated_fat",
+    "fibra alimentaria": "nutrition.fiber",
+    "fibra": "nutrition.fiber",
+    "sodio": "nutrition.sodium",
+    "certificacion": "certification",
+    "respaldo de certificacion": "certification_evidence",
     "nombre": "product_name",
     "nombre comercial": "product_name",
     "product_name": "product_name",
@@ -319,6 +330,18 @@ def parse(name, mime, encoded):
             if ":" in line
         ]
     )
+    if json_values is None:
+        # A bounded single row of a passive HTML/PDF nutritional table, never pair unrelated lines.
+        for loc, line in sections.items():
+            if ":" in line:
+                continue
+            row = re.fullmatch(
+                r"(.+?)\s+(\d+(?:[.,]\d+)?\s*(?:kcal|kj|g|mg|µg)(?:\s*/\s*(?:100\s*(?:g|ml)|porci[oó]n))?)",
+                line,
+                re.IGNORECASE,
+            )
+            if row and ALIASES.get(normalized(row[1]), "").startswith("nutrition."):
+                entries.append((row[1], row[2], None, loc, line))
     values, warnings, ambiguous = {}, [], set()
     for label, literal, unit, location, quote in entries:
         field = ALIASES.get(normalized(label))
@@ -333,7 +356,8 @@ def parse(name, mime, encoded):
             field.startswith("nutrition.")
             and unit
             and not re.fullmatch(
-                r"(?:kcal|kj|g|mg|µg)(?:\s*/\s*(?:100\s*(?:g|ml)|porci[oó]n))?",
+                (r"(?:kcal|kj)" if field == "nutrition.energy" else r"(?:g|mg|µg)")
+                + r"(?:\s*/\s*(?:100\s*(?:g|ml)|porci[oó]n))?",
                 unit,
                 re.IGNORECASE,
             )

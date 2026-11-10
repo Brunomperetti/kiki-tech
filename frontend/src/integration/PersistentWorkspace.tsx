@@ -67,6 +67,7 @@ export function PersistentWorkspace({
   const [password, setPassword] = useState("");
   const [loadRevision, reload] = useState(0);
   const [researchBusy, setResearchBusy] = useState(false);
+  const [researchStart, setResearchStart] = useState(0);
   const [proposalBusy, setProposalBusy] = useState(false),
     [proposalDirty, setProposalDirty] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -366,6 +367,24 @@ export function PersistentWorkspace({
             )}
             {tab === "Ficha" && (
               <>
+                <button
+                  className="d-primary"
+                  disabled={
+                    dirty ||
+                    saving ||
+                    researchBusy ||
+                    proposalBusy ||
+                    identityBlocked ||
+                    reauth ||
+                    !!remote
+                  }
+                  onClick={() => {
+                    setResearchStart(1);
+                    onTab("Evidencias");
+                  }}
+                >
+                  Investigar producto
+                </button>
                 <ResearchSummary
                   id={variant.id}
                   revision={record.version}
@@ -450,6 +469,9 @@ export function PersistentWorkspace({
                   id={variant.id}
                   csrf={csrf}
                   onBusy={setResearchBusy}
+                  workspaceVersion={record.version}
+                  autoStart={researchStart}
+                  onStarted={() => setResearchStart(0)}
                 />
                 <h3>Fuentes registradas en KIKI</h3>
                 <p>

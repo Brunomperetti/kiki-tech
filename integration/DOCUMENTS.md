@@ -1,5 +1,9 @@
 # Etapa 2G — Documentación local y revisión de procedencia
 
+La [etapa 2H](ASSISTED.md) amplía este lector con nutrientes y respaldo de
+certificaciones, y agrega un recolector independiente exclusivamente simulado.
+Los resultados y límites descritos abajo corresponden a la entrega histórica 2G.
+
 Base verificada: `feature/kiki-tech-2-dashboard`, HEAD
 `1dfb12cc5fcb71e530951d2b99a4924a649240e8`, árbol limpio antes de modificar.
 

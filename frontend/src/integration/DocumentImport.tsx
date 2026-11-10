@@ -224,6 +224,18 @@ export function DocumentImport({
           aria-label="Procedencia del documento local"
         >
           <h4>Procedencia y original conservado</h4>
+          {document.body.retrieval?.simulated && (
+            <p className="r-notice">
+              <strong>Fuente SIMULADA</strong> · Transferencia de prueba, no
+              documentación auténtica. La revisión de procedencia es humana
+              sobre este ejemplo.
+              <br />
+              URL inicial: {document.body.retrieval.requested_url}
+              <br />
+              Destino final simulado: {document.body.retrieval.final_url} ·{" "}
+              {captureDate(document.body.retrieval.acquired_at)}
+            </p>
+          )}
           <details>
             <summary>
               Identidad extraída y ubicación · Sin aprobación automática

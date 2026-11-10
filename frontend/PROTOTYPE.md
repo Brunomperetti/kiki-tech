@@ -1,5 +1,10 @@
 # KIKI Tech 2.0 · Demo y catálogo de integración
 
+La etapa 2H agrega «Investigar producto» en la ficha lateral del modo integración:
+candidatos sintéticos, contraste de identidad, selección e incorporación mediante
+el lector existente. No consulta Internet ni aprueba fuentes automáticamente.
+Ver [arquitectura, límites y validación](../integration/ASSISTED.md).
+
 La etapa 2G permite incorporar archivos locales autorizados, contrastar identidad
 y revisar procedencia sin consultas externas: [documentación](../integration/DOCUMENTS.md).
 

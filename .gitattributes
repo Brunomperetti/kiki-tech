@@ -1,2 +1,3 @@
 # Preserve PDF fixture bytes, including required cross-reference formatting.
 frontend/integration-fixtures/*.pdf binary
+backend/integration_sandbox/discovery-fixtures/*.pdf binary

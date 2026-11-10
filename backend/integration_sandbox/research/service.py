@@ -293,6 +293,54 @@ class Research:
                 )
         if fact["presentation"] != item.identity["presentation"]:
             issues.append("La presentación del hecho no corresponde a la variante.")
+        if fact["field"] == "certification_evidence" and not re.search(
+            r"\d", fact["value"]
+        ):
+            issues.append(
+                "El respaldo de certificación requiere una referencia específica identificable; no basta una declaración genérica."
+            )
+        property_claim = fact["field"] in {
+            "commercial_claim",
+            "characteristics",
+        } and bool(
+            re.search(r"sin\s+gluten|org[aá]nic[oa]", fact["value"], re.IGNORECASE)
+        )
+        if fact["field"] == "certification" or property_claim:
+            support = next(
+                (
+                    f
+                    for f in item.facts
+                    if f["document_id"] == fact["document_id"]
+                    and f["field"] == "certification_evidence"
+                    and f["state"] == "APPROVED"
+                    and not self.blockers(item, f, include_conflicts=False)
+                ),
+                None,
+            )
+            if not support:
+                issues.append(
+                    "Certificación sin respaldo documental específico aprobado vigente; no se puede afirmar la propiedad."
+                )
+            if property_claim:
+                certificate = next(
+                    (
+                        f
+                        for f in item.facts
+                        if f["document_id"] == fact["document_id"]
+                        and f["field"] == "certification"
+                        and f["state"] == "APPROVED"
+                        and not self.blockers(item, f, include_conflicts=False)
+                    ),
+                    None,
+                )
+                if (
+                    not certificate
+                    or fact["value"].strip().casefold()
+                    != certificate["value"].strip().casefold()
+                ):
+                    issues.append(
+                        "La propiedad requiere su certificación específica aprobada; no se infiere desde otra característica."
+                    )
         if include_conflicts:
             for other in item.facts:
                 if (
@@ -341,6 +389,9 @@ class Research:
 
     def serialize(self, item):
         from ..local_documents import public_body
+        from ..assisted_research import assisted_view
+
+        assisted = assisted_view(self, item)
 
         facts = []
         for original in item.facts:
@@ -384,6 +435,7 @@ class Research:
             "isolated_only": True,
             "external_writes_enabled": False,
             "commercial_fields_applied": False,
+            "assisted": assisted,
         }
         self.db.commit()
         return result

@@ -15,6 +15,18 @@ LABELS = {
 REQUIRED = tuple(LABELS)
 LABELS.update(
     {
+        "nutrition.carbohydrates": "Hidratos de carbono",
+        "nutrition.sugars": "Azúcares",
+        "nutrition.total_fat": "Grasas totales",
+        "nutrition.saturated_fat": "Grasas saturadas",
+        "nutrition.fiber": "Fibra alimentaria",
+        "nutrition.sodium": "Sodio",
+        "certification": "Certificación declarada",
+        "certification_evidence": "Respaldo documental de certificación",
+    }
+)
+LABELS.update(
+    {
         "storage_conditions": "Conservación",
         "characteristics": "Características verificables",
         "formulation": "Formulación",

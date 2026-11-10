@@ -1,6 +1,10 @@
-# Integración local aislada: etapas 2B–2G
+# Integración local aislada: etapas 2B–2H
 
-La etapa actual agrega [documentos locales autorizados y revisión de procedencia 2G](DOCUMENTS.md),
+La etapa actual incorpora [investigación asistida de fabricantes 2H](ASSISTED.md),
+con recolector separado, HTTP/DNS exclusivamente simulados y transferencia al
+lector 2G. No habilita investigación en Internet ni valida fuentes auténticas.
+
+La etapa 2G agregó [documentos locales autorizados y revisión de procedencia](DOCUMENTS.md),
 con lector separado sin red y preservación del original. El catálogo continúa sintético;
 no hay conexión productiva ni investigación externa.
 

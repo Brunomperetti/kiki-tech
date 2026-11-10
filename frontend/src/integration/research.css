@@ -152,3 +152,18 @@
 .p-field select {
   max-width: 100%;
 }
+.a-research,
+.a-candidates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+}
+.a-research > *,
+.a-candidates > * {
+  min-width: 0;
+}
+.a-research pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

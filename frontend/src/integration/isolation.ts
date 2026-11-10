@@ -30,6 +30,10 @@ export function installIntegrationIsolation() {
           /^\/api\/ecomm-app\/workspace\/90000[1-6]$/.test(url.pathname)) ||
         (method === "GET" &&
           /^\/api\/test-research\/90000[1-6]$/.test(url.pathname)) ||
+        (method === "POST" &&
+          /^\/api\/test-discovery\/90000[1-6]\/(?:start|candidates\/[a-f0-9]{24}\/(?:decision|acquire))$/.test(
+            url.pathname,
+          )) ||
         (method === "GET" &&
           /^\/api\/test-documents\/90000[1-6]\/local-[a-f0-9]{32}\/original\/[1-8]$/.test(
             url.pathname,

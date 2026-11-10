@@ -1,4 +1,55 @@
 import { CatalogError, request } from "./catalog-adapter";
+export type AssistedCandidate = {
+  id: string;
+  source_id: string;
+  title: string;
+  kind: string;
+  url: string;
+  priority: number;
+  declared_official: boolean;
+  simulated: true;
+  version: number;
+  decision: string;
+  document_id: string | null;
+  identity_state: string;
+  provenance_state: string;
+  comparisons: Record<
+    string,
+    {
+      expected: string | boolean | null;
+      found: string | boolean | null;
+      status: string;
+    }
+  >;
+  history: {
+    at: string;
+    actor: string;
+    decision: string;
+    reason?: string;
+    version: number;
+    document_id?: string;
+  }[];
+};
+export type AssistedRun = {
+  run_id: string;
+  ecomm_id: string;
+  state: string;
+  current: boolean;
+  created_at: string;
+  actor: string;
+  simulated_only: true;
+  network_enabled: false;
+  stale_reason?: string;
+  candidates: AssistedCandidate[];
+  query_context: {
+    query: Record<string, string | boolean | null>;
+    provenance: Record<string, string>;
+    workspace_version: number;
+    missing: string[];
+    hash: string;
+  };
+  search_trace: Record<string, unknown>;
+};
 export type ResearchFact = {
   id: string;
   ecomm_id: string;
@@ -42,6 +93,15 @@ export type ResearchDocument = {
     kind: string;
     synthetic: boolean;
     origin_kind?: "FILE" | "URL";
+    retrieval?: {
+      simulated: true;
+      network_enabled: false;
+      requested_url: string;
+      final_url: string;
+      acquired_at: string;
+      sha256: string;
+      hops: unknown[];
+    };
     associated_ecomm_id?: string;
     parse_status?: string;
     parser_warnings?: string[];
@@ -79,6 +139,7 @@ export type ResearchDocument = {
   }[];
 };
 export type Dossier = {
+  assisted?: AssistedRun | null;
   ecomm_id: string;
   version: number;
   identity: Record<string, string | null> & {
@@ -121,6 +182,14 @@ function adapt(value: unknown, id: string): Dossier {
     !Array.isArray(data.documents) ||
     !Array.isArray(data.history) ||
     !Array.isArray(data.missing) ||
+    (data.assisted &&
+      (data.assisted.ecomm_id !== id ||
+        data.assisted.simulated_only !== true ||
+        data.assisted.network_enabled !== false ||
+        !Array.isArray(data.assisted.candidates) ||
+        data.assisted.candidates.some(
+          (c) => c.simulated !== true || !/^[a-f0-9]{24}$/.test(c.id),
+        ))) ||
     data.facts.some(
       (f) =>
         f.ecomm_id !== id ||

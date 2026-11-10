@@ -62,9 +62,9 @@ def compose(*arguments, capture=False, build=False):
 
 def verify_containers():
     ids = compose("ps", "-q", capture=True).stdout.split()
-    if len(ids) != 3:
+    if len(ids) != 4:
         raise RuntimeError(
-            "Se requieren PostgreSQL, backend y lector documental locales."
+            "Se requieren PostgreSQL, backend, lector y recolector simulado locales."
         )
     result = subprocess.run(
         ["docker", "--host=unix:///var/run/docker.sock", "inspect", *ids],
@@ -75,6 +75,14 @@ def verify_containers():
     )
     for container in json.loads(result.stdout):
         host = container["HostConfig"]
+        if container["Config"]["Labels"].get(
+            "com.docker.compose.service"
+        ) == "collector" and (
+            host["Memory"] != 128 * 1024 * 1024
+            or host["PidsLimit"] != 16
+            or host["NanoCpus"] != 1_000_000_000
+        ):
+            raise RuntimeError("Recolector sin límites esperados.")
         if container["Config"]["Labels"].get(
             "com.docker.compose.service"
         ) == "parser" and (
@@ -104,7 +112,7 @@ def verify_containers():
 def runtime_directory():
     directory = ROOT / ".integration-runtime"
     api = directory / "api"
-    for path in (directory, api, directory / "documents"):
+    for path in (directory, api, directory / "documents", directory / "discovery"):
         if path.is_symlink():
             raise RuntimeError("Directorio de ejecución simbólico rechazado.")
         path.mkdir(mode=0o700, exist_ok=True)
@@ -199,6 +207,15 @@ def main():
                         "python",
                         "-m",
                         "integration_sandbox.document_checks",
+                    )
+                    compose(
+                        "run",
+                        "--rm",
+                        "--no-deps",
+                        "backend",
+                        "python",
+                        "-m",
+                        "integration_sandbox.assisted_checks",
                     )
                     subprocess.run(
                         [sys.executable, str(ROOT / "integration/test_gateway.py")],

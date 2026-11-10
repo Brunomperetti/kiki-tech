@@ -99,7 +99,7 @@ class LocalDocuments:
         doc.body, doc.digest = body, digest(body)
         self.db.flush()
 
-    def incorporate(self, ident, body, parsed):
+    def incorporate(self, ident, body, parsed, *, acquisition=None):
         case = self.research.dossier(ident)
         self.research.expect(case, body.expected_version)
         valid_url(body.reference_url)
@@ -190,6 +190,13 @@ class LocalDocuments:
                 "review_reason": None,
             },
         }
+        if acquisition:
+            content["retrieval"] = {
+                **acquisition["trace"],
+                "run_id": acquisition["run_snapshot"]["run_id"],
+                "candidate_id": acquisition["candidate_id"],
+                "acquired_at": now(),
+            }
         if doc:
             self.store_revision(doc, content, "REPLACE_DOCUMENT")
         else:
@@ -204,6 +211,28 @@ class LocalDocuments:
             "DOCUMENT_INCORPORATED",
             {"document_id": key, "version": doc.version},
         )
+        if acquisition:
+            run = deepcopy(acquisition["run_snapshot"])
+            candidate = next(
+                c for c in run["candidates"] if c["id"] == acquisition["candidate_id"]
+            )
+            candidate.update(
+                document_id=key,
+                decision="TRANSFERRED",
+                version=candidate["version"] + 1,
+            )
+            candidate["history"].append(
+                {
+                    "at": now(),
+                    "actor": self.research.actor,
+                    "decision": "TRANSFERRED",
+                    "document_id": key,
+                    "version": candidate["version"],
+                }
+            )
+            self.research.commit_change(
+                case, deepcopy(case.facts), "ASSISTED_TRANSFER", run
+            )
         self.research.refresh(case)
         result = self.research.serialize(case)
         result["incorporated_document_id"] = key

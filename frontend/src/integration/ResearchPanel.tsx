@@ -10,6 +10,7 @@ import {
 } from "./research-adapter";
 import "./research.css";
 import { DocumentImport } from "./DocumentImport";
+import { AssistedResearch } from "./AssistedResearch";
 
 export function ResearchSummary({
   id,
@@ -72,10 +73,16 @@ export function ResearchPanel({
   id,
   csrf,
   onBusy,
+  workspaceVersion,
+  autoStart,
+  onStarted,
 }: {
   id: string;
   csrf: string;
   onBusy: (busy: boolean) => void;
+  workspaceVersion: number;
+  autoStart: number;
+  onStarted: () => void;
 }) {
   const [data, setData] = useState<Dossier>();
   const [error, setError] = useState("");
@@ -199,6 +206,23 @@ export function ResearchPanel({
         </button>
       ) : (
         <>
+          <AssistedResearch
+            id={id}
+            csrf={csrf}
+            data={data}
+            workspaceVersion={workspaceVersion}
+            autoStart={autoStart}
+            onStarted={onStarted}
+            busy={busy}
+            onBusy={setBusy}
+            onError={setError}
+            onResult={(value, message) => {
+              setData(value);
+              setMessage(message);
+              if (value.incorporated_document_id)
+                select(value.incorporated_document_id);
+            }}
+          />
           <DocumentImport
             id={id}
             csrf={csrf}
