@@ -40,11 +40,43 @@ export type ResearchDocument = {
   body: {
     title: string;
     kind: string;
-    synthetic: true;
+    synthetic: boolean;
+    origin_kind?: "FILE" | "URL";
+    associated_ecomm_id?: string;
+    parse_status?: string;
+    parser_warnings?: string[];
+    original?: {
+      filename: string | null;
+      content_type: string | null;
+      size: number;
+      sha256: string;
+    };
+    source?: {
+      declared_official: boolean;
+      note: string;
+      reference_url: string;
+      registered_at: string;
+      registered_by: string;
+      review_state: string;
+      reviewer: string | null;
+      reviewed_at: string | null;
+      review_reason: string | null;
+    };
     provenance: string;
     identity: Record<string, string>;
     sections: Record<string, string>;
+    identity_evidence?: Record<
+      string,
+      { value: string; location: string; quote: string }
+    >;
   };
+  history: {
+    at: string;
+    actor: string;
+    version: number;
+    action?: string;
+    body: ResearchDocument["body"];
+  }[];
 };
 export type Dossier = {
   ecomm_id: string;
@@ -62,7 +94,9 @@ export type Dossier = {
     action: string;
     detail: unknown;
   }[];
-  synthetic_only: true;
+  synthetic_only: boolean;
+  isolated_only: true;
+  incorporated_document_id?: string;
   commercial_fields_applied: false;
   external_writes_enabled: false;
 };
@@ -79,7 +113,7 @@ function adapt(value: unknown, id: string): Dossier {
   if (
     !data ||
     data.ecomm_id !== id ||
-    data.synthetic_only !== true ||
+    data.isolated_only !== true ||
     data.commercial_fields_applied !== false ||
     data.external_writes_enabled !== false ||
     !Number.isSafeInteger(data.version) ||
@@ -98,8 +132,18 @@ function adapt(value: unknown, id: string): Dossier {
     ) ||
     data.documents.some(
       (d) =>
-        d.body.synthetic !== true ||
-        !d.body.provenance.startsWith("fixture://"),
+        !(
+          d.body.synthetic === true &&
+          d.body.provenance.startsWith("fixture://")
+        ) &&
+        !(
+          d.body.synthetic === false &&
+          d.body.associated_ecomm_id === id &&
+          /^local-[a-f0-9]{32}$/.test(d.id) &&
+          d.body.provenance.startsWith("local://sha256/") &&
+          !!d.body.original &&
+          !!d.body.source
+        ),
     )
   )
     throw new CatalogError(

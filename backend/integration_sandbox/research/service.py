@@ -115,10 +115,25 @@ class Research:
             issues.append(
                 "La presentación editorial KIKI difiere de la captura Ecomm-App."
             )
+        if body.get("associated_ecomm_id"):
+            if body["associated_ecomm_id"] != reference["ecomm_id"]:
+                issues.append(
+                    "Documento asociado a otro Ecomm ID; no se reutiliza por SKU/EAN."
+                )
+            if (
+                body["identity"].get("is_combo") is None
+                or body["identity"]["is_combo"] != reference["is_combo"]
+            ):
+                issues.append("Tipo de venta (unidad/pack) ausente o incompatible.")
         return issues
 
-    def documents(self):
-        return self.db.scalars(select(Document).order_by(Document.id)).all()
+    def documents(self, ident=None):
+        return [
+            d
+            for d in self.db.scalars(select(Document).order_by(Document.id))
+            if not d.body.get("associated_ecomm_id")
+            or d.body["associated_ecomm_id"] == ident
+        ]
 
     def dossier(self, ident):
         item = self.db.get(Dossier, ident)
@@ -219,6 +234,14 @@ class Research:
     def blockers(self, item, fact, *, include_conflicts=True):
         doc = self.db.get(Document, fact["document_id"])
         issues = self.identity_issues(item.identity, doc.body)
+        if fact["ecomm_id"] != item.ecomm_id:
+            issues.append("El hecho no pertenece a esta variante Ecomm-App.")
+        if doc.body.get("associated_ecomm_id"):
+            if doc.body["source"]["review_state"] != "REVIEWED":
+                issues.append(
+                    "Procedencia sin revisión vigente. Declarar oficial una fuente no la autentica."
+                )
+            issues.extend(doc.body.get("parser_blockers", []))
         if (
             doc.version != fact["document_version"]
             or doc.digest != fact["document_hash"]
@@ -317,6 +340,8 @@ class Research:
             )
 
     def serialize(self, item):
+        from ..local_documents import public_body
+
         facts = []
         for original in item.facts:
             fact = deepcopy(original)
@@ -344,14 +369,19 @@ class Research:
                     "id": doc.id,
                     "version": doc.version,
                     "hash": doc.digest,
-                    "body": doc.body,
+                    "body": public_body(doc.body),
                     "issues": self.identity_issues(item.identity, doc.body),
-                    "versions": [v["version"] for v in FIXTURES[doc.id]],
-                    "history": doc.history,
+                    "versions": [v["version"] for v in FIXTURES.get(doc.id, [])],
+                    "history": [
+                        {**h, "body": public_body(h["body"])} for h in doc.history
+                    ],
                 }
-                for doc in self.documents()
+                for doc in self.documents(item.ecomm_id)
             ],
-            "synthetic_only": True,
+            "synthetic_only": not any(
+                d.body.get("associated_ecomm_id") for d in self.documents(item.ecomm_id)
+            ),
+            "isolated_only": True,
             "external_writes_enabled": False,
             "commercial_fields_applied": False,
         }
@@ -364,6 +394,15 @@ class Research:
         doc = self.db.get(Document, document_id)
         if not doc or doc.version != document_version:
             raise ValueError("La versión del documento cambió o no existe.")
+        if doc.body.get("associated_ecomm_id") not in (None, ident):
+            raise ValueError("El documento local pertenece a otro Ecomm ID.")
+        if (
+            doc.body.get("associated_ecomm_id")
+            and doc.body.get("parse_status") != "TEXT_EXTRACTED"
+        ):
+            raise ValueError(
+                "Sin datos accesibles para extraer: referencia sin descarga, información insuficiente o PDF que requiere OCR."
+            )
         facts = deepcopy(item.facts)
         changed = False
         for claim in doc.body["claims"]:

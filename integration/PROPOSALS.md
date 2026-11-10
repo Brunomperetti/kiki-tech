@@ -1,5 +1,8 @@
 # Etapa 2F — Propuestas comerciales documentadas, exclusivamente de prueba
 
+La etapa 2G incorpora [archivos locales autorizados y procedencia revisada](DOCUMENTS.md),
+reutilizando estas propuestas y guardado, sin habilitar IA ni proveedores reales.
+
 Base verificada antes de modificar: rama `feature/kiki-tech-2-dashboard`, HEAD
 `075664c46f0f3bf4b55b3afcb69e4b845052d3a1`, árbol limpio.
 

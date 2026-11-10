@@ -120,6 +120,24 @@
 .p-panel {
   grid-template-columns: minmax(0, 1fr);
 }
+.r-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.r-upload input:not([type="checkbox"]) {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.r-upload .r-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.r-upload > * {
+  min-width: 0;
+}
 .p-panel > * {
   min-width: 0;
 }

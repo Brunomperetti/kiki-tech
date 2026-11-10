@@ -17,6 +17,7 @@ from integration_sandbox.policy import (
     is_workspace_route,
     is_research_route,
     is_proposal_route,
+    is_document_route,
     CSP,
     install_network_guard,
 )  # noqa: E402
@@ -75,6 +76,7 @@ class Handler(BaseHTTPRequestHandler):
                     is_workspace_route(self.command, path.path)
                     or is_research_route(self.command, path.path)
                     or is_proposal_route(self.command, path.path)
+                    or is_document_route(self.command, path.path)
                 )
                 else 16_384
             )

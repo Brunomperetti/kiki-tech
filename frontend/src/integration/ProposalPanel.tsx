@@ -216,8 +216,11 @@ export function ProposalPanel({
       <div className="r-notice">
         <strong>Demostración determinista · Sin IA real</strong>
         <p>
-          Usa sólo hechos aprobados de documentos sintéticos. No representa
-          investigación oficial. No completa datos desconocidos.
+          Usa sólo hechos aprobados de documentos{" "}
+          {data?.synthetic_only === false
+            ? "locales autorizados"
+            : "sintéticos"}
+          . No representa investigación oficial. No completa datos desconocidos.
         </p>
       </div>
       {error && <p role="alert">{error}</p>}

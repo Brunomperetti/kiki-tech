@@ -1,6 +1,10 @@
-# Integración local sintética: etapas 2B–2F
+# Integración local aislada: etapas 2B–2G
 
-La etapa actual agrega [propuestas comerciales documentadas 2F](PROPOSALS.md), con
+La etapa actual agrega [documentos locales autorizados y revisión de procedencia 2G](DOCUMENTS.md),
+con lector separado sin red y preservación del original. El catálogo continúa sintético;
+no hay conexión productiva ni investigación externa.
+
+La etapa 2F agregó [propuestas comerciales documentadas](PROPOSALS.md), con
 generación determinista, revisión individual y guardado mediante el editor existente.
 
 La etapa 2E agregó [investigación documental sintética y trazabilidad](RESEARCH.md),

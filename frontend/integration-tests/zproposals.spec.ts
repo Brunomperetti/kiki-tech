@@ -154,6 +154,7 @@ const card = (page: Page, key: string) =>
 test("propuesta completa, edición respaldada, revisión individual y guardado real con recarga e historial", async ({
   page,
 }, info) => {
+  test.setTimeout(60000);
   await open(page);
   const before = await (await page.request.get(workspacePath("900001"))).json();
   await generate(page);

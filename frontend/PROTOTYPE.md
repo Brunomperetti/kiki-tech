@@ -1,5 +1,8 @@
 # KIKI Tech 2.0 · Demo y catálogo de integración
 
+La etapa 2G permite incorporar archivos locales autorizados, contrastar identidad
+y revisar procedencia sin consultas externas: [documentación](../integration/DOCUMENTS.md).
+
 La etapa 2F conecta hechos aprobados con propuestas deterministas de prueba y
 guardado individual en el editor: [documentación](../integration/PROPOSALS.md).
 

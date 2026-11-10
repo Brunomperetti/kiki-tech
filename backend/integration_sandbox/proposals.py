@@ -26,6 +26,9 @@ TEXT = {
     "nutrition.protein": "Proteínas",
     "net_weight": "Contenido neto",
     "commercial_claim": "Declaración comercial",
+    "storage_conditions": "Conservación",
+    "characteristics": "Características verificables",
+    "formulation": "Formulación",
 }
 
 
@@ -226,7 +229,11 @@ class Proposals:
         result = EcommAiEditor._serialize(record, current=not reasons)
         result.update(
             {
-                "synthetic_only": True,
+                "synthetic_only": all(
+                    f["provenance"].startswith("fixture://")
+                    for f in record.source_facts
+                ),
+                "isolated_only": True,
                 "generator": MODEL,
                 "workspace_version": meta["workspace_version"],
                 "revision": len(record.history),
@@ -259,7 +266,10 @@ class Proposals:
             self.db.commit()
             return {
                 "available": False,
-                "synthetic_only": True,
+                "synthetic_only": all(
+                    f["provenance"].startswith("fixture://") for f in facts
+                ),
+                "isolated_only": True,
                 "ecomm_id": ident,
                 "external_writes_enabled": False,
                 "authorized_facts": facts,

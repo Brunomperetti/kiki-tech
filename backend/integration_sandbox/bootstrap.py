@@ -40,10 +40,12 @@ def create_sandbox_app():
     from .research.storage import initialize as initialize_research
     from .research.routes import router as research_router
     from .proposal_routes import router as proposal_router, editor_router
+    from .document_routes import router as document_router
 
     application = create_app(settings)
     application.include_router(research_router)
     application.include_router(proposal_router)
+    application.include_router(document_router)
     # Same contract and service; sandbox-only preconditions precede the old route.
     # Production router, DTO and service remain untouched.
     application.router.routes[0:0] = editor_router.routes

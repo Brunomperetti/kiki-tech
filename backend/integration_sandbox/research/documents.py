@@ -15,6 +15,13 @@ LABELS = {
 REQUIRED = tuple(LABELS)
 LABELS.update(
     {
+        "storage_conditions": "Conservación",
+        "characteristics": "Características verificables",
+        "formulation": "Formulación",
+    }
+)
+LABELS.update(
+    {
         "product_name": "Nombre del alimento",
         "brand": "Marca",
         "manufacturer": "Fabricante",

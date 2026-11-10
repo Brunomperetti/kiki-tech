@@ -9,6 +9,7 @@ import {
   type ResearchFact,
 } from "./research-adapter";
 import "./research.css";
+import { DocumentImport } from "./DocumentImport";
 
 export function ResearchSummary({
   id,
@@ -178,9 +179,10 @@ export function ResearchPanel({
       className="r-research"
       aria-label="Investigación documental de prueba"
     >
-      <h3>Investigar con documentos de prueba</h3>
+      <h3>Documentos y evidencias</h3>
       <p className="r-notice">
-        <strong>Documentación 100% sintética.</strong> Sin búsquedas externas,
+        <strong>Entorno documental aislado.</strong> Fixtures sintéticos y
+        archivos locales expresamente autorizados. Sin búsquedas externas,
         scraping ni IA. Extraer datos no los verifica ni cambia tu ficha
         comercial.
       </p>
@@ -197,6 +199,22 @@ export function ResearchPanel({
         </button>
       ) : (
         <>
+          <DocumentImport
+            id={id}
+            csrf={csrf}
+            data={data}
+            document={document}
+            busy={busy}
+            onBusy={setBusy}
+            onError={setError}
+            onResult={(value, message) => {
+              setData(value);
+              setMessage(message);
+              setError("");
+              if (value.incorporated_document_id)
+                select(value.incorporated_document_id);
+            }}
+          />
           <details className="r-reference">
             <summary>
               Identidad y referencias de contraste · Ecomm ID {id}
@@ -238,9 +256,9 @@ export function ResearchPanel({
             {data.missing.join(", ") || "Ninguno"}.
           </p>
           <label>
-            Documento sintético
+            Documento disponible
             <select
-              aria-label="Documento sintético"
+              aria-label="Documento disponible"
               value={selected}
               disabled={busy}
               onChange={(event) => select(event.target.value)}
@@ -286,7 +304,14 @@ export function ResearchPanel({
               </details>
               <div className="r-actions">
                 <button
-                  disabled={busy}
+                  disabled={
+                    busy ||
+                    [
+                      "NEEDS_OCR",
+                      "REFERENCE_ONLY",
+                      "INSUFFICIENT_DATA",
+                    ].includes(document.body.parse_status || "")
+                  }
                   onClick={() =>
                     mutate(`${researchPath(id)}/extract`, {
                       expected_version: data.version,

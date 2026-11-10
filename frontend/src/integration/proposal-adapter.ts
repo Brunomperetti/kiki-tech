@@ -13,7 +13,8 @@ export type Decisions = Partial<
 >;
 export type Proposal = {
   available: boolean;
-  synthetic_only: true;
+  synthetic_only: boolean;
+  isolated_only: true;
   external_writes_enabled: false;
   ecomm_id: string;
   draft_id: number;
@@ -51,7 +52,7 @@ async function read(id: string, init?: RequestInit, suffix = "") {
   if (
     !data ||
     data.ecomm_id !== id ||
-    data.synthetic_only !== true ||
+    data.isolated_only !== true ||
     data.external_writes_enabled !== false ||
     typeof data.available !== "boolean" ||
     !Array.isArray(data.authorized_facts) ||

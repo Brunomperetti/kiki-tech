@@ -31,6 +31,14 @@ export function installIntegrationIsolation() {
         (method === "GET" &&
           /^\/api\/test-research\/90000[1-6]$/.test(url.pathname)) ||
         (method === "GET" &&
+          /^\/api\/test-documents\/90000[1-6]\/local-[a-f0-9]{32}\/original\/[1-8]$/.test(
+            url.pathname,
+          )) ||
+        (method === "POST" &&
+          /^\/api\/test-documents\/90000[1-6]\/(?:import|local-[a-f0-9]{32}\/provenance)$/.test(
+            url.pathname,
+          )) ||
+        (method === "GET" &&
           /^\/api\/test-proposals\/90000[1-6]$/.test(url.pathname)) ||
         (method === "POST" &&
           /^\/api\/test-proposals\/90000[1-6]\/(?:generate|[1-9][0-9]{0,9}\/review)$/.test(

@@ -1,5 +1,8 @@
 # Etapa 2E — Investigación documental sintética
 
+La etapa 2G amplía estos contratos a [documentación local autorizada](DOCUMENTS.md)
+en el mismo esquema de pruebas, con procedencia y originales versionados.
+
 La etapa 2F reutiliza estos expedientes para propuestas deterministas sin aplicar
 campos automáticamente: [contratos, guardado y límites actuales](PROPOSALS.md).
 

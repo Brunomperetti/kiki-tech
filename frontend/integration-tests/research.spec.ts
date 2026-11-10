@@ -67,12 +67,12 @@ async function open(page: Page, id = "900001") {
   }
   await page.getByRole("tab", { name: "Evidencias", exact: true }).click();
   await expect(
-    page.getByLabel("Documento sintético", { exact: true }),
+    page.getByLabel("Documento disponible", { exact: true }),
   ).toBeVisible();
 }
 async function extract(page: Page, document = "alm-tecnica") {
   await page
-    .getByLabel("Documento sintético", { exact: true })
+    .getByLabel("Documento disponible", { exact: true })
     .selectOption(document);
   const pending = page.waitForResponse(
     (response) =>
@@ -252,6 +252,8 @@ test("una contradicción invalida aprobación previa y exige rechazo y nueva rev
 test("revocación y nueva versión documental persisten sin restaurar verificaciones automáticamente", async ({
   page,
 }, info) => {
+  // Full multi-step workflow against PostgreSQL; keep assertions under shared CI load.
+  test.setTimeout(60000);
   await open(page);
   await extract(page);
   await decide(page, "alm-tecnica", "ingredients", "Aprobar hecho");

@@ -357,8 +357,11 @@ export function IntegrationCatalog() {
         <div className="d-sidebar-bottom">
           <Icon name="shield" />
           <strong>Entorno aislado</strong>
-          <p>Datos inventados. Ninguna operación comercial está habilitada.</p>
-          <span>Etapa 2C · Sólo lectura</span>
+          <p>
+            Catálogo sintético y archivos locales autorizados. Sin publicaciones
+            externas.
+          </p>
+          <span>Trabajo local · Sin conexión productiva</span>
         </div>
       </aside>
       <div className="d-body">
@@ -368,7 +371,7 @@ export function IntegrationCatalog() {
           </span>
           <div>
             <span className="d-demo-dot" />
-            Integración sintética{" "}
+            Integración aislada{" "}
             <button onClick={logout} disabled={busy}>
               Cerrar sesión
             </button>

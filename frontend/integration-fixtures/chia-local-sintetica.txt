@@ -1,0 +1,17 @@
+Nombre: Semillas de chía sintéticas
+Marca: Marca sintética KIKI
+Fabricante: Fabricante de prueba
+EAN: 12345670
+Presentación: 250 g
+Tipo de venta: Unidad
+Ingredientes: Semillas de chía
+Alérgenos: Contiene semillas de chía
+Energía: 600 kcal/100 g
+Proteínas: 20 g/100 g
+Contenido neto: 250 g
+Declaración comercial: Sin sal agregada
+Características: Tostadas
+Conservación: Mantener en lugar fresco y seco
+Formulación: F-PRUEBA-A
+Categoría: Dietética
+Subcategoría: Frutos secos

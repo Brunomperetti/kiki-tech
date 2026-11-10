@@ -11,6 +11,7 @@ DATABASE_URL = (
 )
 MARKER = "KIKI_LOCAL_SYNTHETIC_2B"
 PG_SOCKET = "/var/run/postgresql/.s.PGSQL.5432"
+PARSER_SOCKET = "/document-parser/parser.sock"
 ALLOWED_ROUTES = frozenset(
     {
         ("GET", "/health"),
@@ -35,6 +36,18 @@ def route_allowed(method: str, path: str) -> bool:
         or is_workspace_route(method, path)
         or is_research_route(method, path)
         or is_proposal_route(method, path)
+        or is_document_route(method, path)
+    )
+
+
+def is_document_route(method: str, path: str) -> bool:
+    prefix = r"/api/test-documents/90000[1-6]/"
+    if method == "POST":
+        return bool(
+            re.fullmatch(prefix + r"(?:import|local-[a-f0-9]{32}/provenance)", path)
+        )
+    return method == "GET" and bool(
+        re.fullmatch(prefix + r"local-[a-f0-9]{32}/original/[1-8]", path)
     )
 
 
@@ -132,7 +145,12 @@ def install_network_guard(*, unix_socket: str = PG_SOCKET) -> None:
     def guard(event, args):
         if event == "socket.connect":
             address = args[1]
-            if address != unix_socket:
+            permitted = (
+                {unix_socket, PARSER_SOCKET}
+                if unix_socket == PG_SOCKET
+                else {unix_socket}
+            )
+            if address not in permitted:
                 raise IsolationError("Conexión de salida bloqueada.")
         if event in {
             "socket.getaddrinfo",
