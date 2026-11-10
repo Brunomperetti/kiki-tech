@@ -17,6 +17,7 @@ MIMES = {
     ".json": "application/json",
 }
 ALIASES = {
+    "ancho": "width",
     "valor energetico": "nutrition.energy",
     "hidratos de carbono": "nutrition.carbohydrates",
     "carbohidratos": "nutrition.carbohydrates",
@@ -348,7 +349,7 @@ def parse(name, mime, encoded):
         if not field or not literal.strip():
             continue
         value = literal.strip()
-        if field.startswith("nutrition.") or field == "net_weight":
+        if field.startswith("nutrition.") or field in {"net_weight", "width"}:
             match = re.fullmatch(r"(\d+(?:[.,]\d+)?)\s*(.*)", value)
             if match and unit is None:
                 value, unit = match[1], match[2] or None

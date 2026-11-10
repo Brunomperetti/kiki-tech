@@ -4,7 +4,7 @@ import re
 from sqlalchemy import select
 from app.core.config import get_settings
 from app.database.models import EcommApiProductEdit
-from app.services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
+from ..workspace import EcommApiProductWorkspace
 from .documents import BRAND, MANUFACTURER, FIXTURES, REQUIRED, LABELS
 from .storage import Control, Document, Dossier, digest
 
@@ -65,6 +65,10 @@ class Research:
         return self._document_refs[document_id]
 
     def reference(self, ident):
+        from ..mama_reference import PILOT_ID, reference
+
+        if ident == PILOT_ID:
+            return reference(EcommApiProductWorkspace(self.db).get(ident)["fields"])
         source = EcommApiProductWorkspace(self.db)._source(ident)
         edit = self.db.scalar(
             select(EcommApiProductEdit).where(EcommApiProductEdit.ecomm_id == ident)
@@ -102,6 +106,10 @@ class Research:
     @staticmethod
     def identity_issues(reference, body):
         issues = []
+        if reference.get("commercial_pilot"):
+            from ..mama_reference import identity_issues
+
+            issues.extend(identity_issues(reference, body))
         for key, label in [
             ("name", "Nombre"),
             ("presentation", "Presentación"),
@@ -109,6 +117,8 @@ class Research:
             ("brand", "Marca"),
             ("manufacturer", "Fabricante"),
         ]:
+            if reference.get("commercial_pilot") and key == "name":
+                continue  # aliases still require explicit EAN/brand/width/net content
             expected, actual = reference.get(key), body["identity"].get(key)
             if expected and (
                 not actual
@@ -129,19 +139,23 @@ class Research:
                 issues.append(
                     "Documento asociado a otro Ecomm ID; no se reutiliza por SKU/EAN."
                 )
-            if (
-                body["identity"].get("is_combo") is None
-                or body["identity"]["is_combo"] != reference["is_combo"]
+            if body["identity"].get("is_combo") is None or (
+                not (
+                    reference.get("commercial_pilot") and reference["is_combo"] is None
+                )
+                and body["identity"]["is_combo"] != reference["is_combo"]
             ):
                 issues.append("Tipo de venta (unidad/pack) ausente o incompatible.")
         return issues
 
     def documents(self, ident=None):
+        from ..mama_reference import PILOT_ID
+
         return [
             d
             for d in self.db.scalars(select(Document).order_by(Document.id))
-            if not d.body.get("associated_ecomm_id")
-            or d.body["associated_ecomm_id"] == ident
+            if (ident != PILOT_ID and not d.body.get("associated_ecomm_id"))
+            or d.body.get("associated_ecomm_id") == ident
         ]
 
     def dossier(self, ident):
@@ -453,6 +467,16 @@ class Research:
         item = self.dossier(ident)
         self.expect(item, expected_version)
         doc = self.db.get(Document, document_id)
+        from ..mama_reference import PILOT_ID
+
+        if (
+            ident == PILOT_ID
+            and doc
+            and doc.body.get("associated_ecomm_id") != PILOT_ID
+        ):
+            raise ValueError(
+                "El piloto MAMA no utiliza fixtures sintéticos de otros productos como documentación auténtica."
+            )
         if not doc or doc.version != document_version:
             raise ValueError("La versión del documento cambió o no existe.")
         if doc.body.get("associated_ecomm_id") not in (None, ident):

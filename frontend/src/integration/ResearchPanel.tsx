@@ -11,6 +11,8 @@ import {
 import "./research.css";
 import { DocumentImport } from "./DocumentImport";
 import { AssistedResearch } from "./AssistedResearch";
+import { MamaPilotSummary } from "./MamaPilot";
+import { mamaPilotId } from "./mama-pilot";
 
 export function ResearchSummary({
   id,
@@ -103,7 +105,15 @@ export function ResearchPanel({
     const controller = new AbortController();
     loadResearch(id, controller.signal)
       .then((value) => {
-        if (!controller.signal.aborted) setData(value);
+        if (!controller.signal.aborted) {
+          setData(value);
+          if (id === mamaPilotId)
+            select((current) =>
+              value.documents.some((doc) => doc.id === current)
+                ? current
+                : value.documents[0]?.id || "",
+            );
+        }
       })
       .catch((err) => {
         if (!controller.signal.aborted) setError(err.message);
@@ -206,23 +216,27 @@ export function ResearchPanel({
         </button>
       ) : (
         <>
-          <AssistedResearch
-            id={id}
-            csrf={csrf}
-            data={data}
-            workspaceVersion={workspaceVersion}
-            autoStart={autoStart}
-            onStarted={onStarted}
-            busy={busy}
-            onBusy={setBusy}
-            onError={setError}
-            onResult={(value, message) => {
-              setData(value);
-              setMessage(message);
-              if (value.incorporated_document_id)
-                select(value.incorporated_document_id);
-            }}
-          />
+          {id === mamaPilotId ? (
+            <MamaPilotSummary revision={data.version} />
+          ) : (
+            <AssistedResearch
+              id={id}
+              csrf={csrf}
+              data={data}
+              workspaceVersion={workspaceVersion}
+              autoStart={autoStart}
+              onStarted={onStarted}
+              busy={busy}
+              onBusy={setBusy}
+              onError={setError}
+              onResult={(value, message) => {
+                setData(value);
+                setMessage(message);
+                if (value.incorporated_document_id)
+                  select(value.incorporated_document_id);
+              }}
+            />
+          )}
           <DocumentImport
             id={id}
             csrf={csrf}

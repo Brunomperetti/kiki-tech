@@ -12,6 +12,8 @@ import {
 import "./integration.css";
 import { PersistentWorkspace } from "./PersistentWorkspace";
 import { stateLabels } from "./workspace-adapter";
+import { MamaPilotLauncher } from "./MamaPilot";
+import { mamaPilotId, type MamaReport } from "./mama-pilot";
 import type { EcommApiProductEdit } from "../types/ecomm-app";
 
 type Session = { username: string; csrf_token: string };
@@ -66,9 +68,12 @@ export function IntegrationCatalog() {
     (params.has("product") &&
       !/^[A-Za-z0-9_-]{1,120}$/.test(params.get("product")!));
   const [search, setSearch] = useState(q);
-  const selected = data?.items.find(
-    (item) => item.id === params.get("product"),
-  );
+  const [mama, setMama] = useState<MamaReport>();
+  const selected =
+    data?.items.find((item) => item.id === params.get("product")) ||
+    (params.get("product") === mamaPilotId && mama?.available
+      ? mama.variant
+      : undefined);
   const tab = tabs.includes(params.get("tab") || "")
     ? params.get("tab")!
     : "Ficha";
@@ -445,6 +450,17 @@ export function IntegrationCatalog() {
               </div>
             ))}
           </section>
+          {data && (
+            <MamaPilotLauncher
+              csrf={session.csrf_token}
+              disabled={dirty || editorBusy}
+              onLoaded={setMama}
+              onOpen={(value) => {
+                setMama(value);
+                update({ product: mamaPilotId, tab: "Ficha" });
+              }}
+            />
+          )}
           <section className="d-catalog" aria-label="Catálogo Ecomm-App">
             <div className="i-catalog-heading">
               <div>
@@ -683,8 +699,10 @@ export function IntegrationCatalog() {
               <div>
                 <h2>{selected.name ?? "Nombre no disponible"}</h2>
                 <p>
-                  Ecomm ID: {selected.id} ·{" "}
-                  {selected.presentation ?? unavailable}
+                  {selected.id === mamaPilotId
+                    ? "ID SINTÉTICO de pruebas (sin Ecomm ID real): "
+                    : "Ecomm ID: "}
+                  {selected.id} · {selected.presentation ?? unavailable}
                 </p>
               </div>
             </div>

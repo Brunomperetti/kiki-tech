@@ -11,6 +11,7 @@ import {
 } from "./proposal-adapter";
 import "./research.css";
 import { GenerationReadiness } from "./GenerationReadiness";
+import { mamaPilotId } from "./mama-pilot";
 
 const labels: Record<string, string> = {
   brand: "Marca",
@@ -219,12 +220,18 @@ export function ProposalPanel({
         id={record.ecomm_id}
       />
       <div className="r-notice">
-        <strong>Demostración determinista · Sin IA real</strong>
+        <strong>
+          {record.ecomm_id === mamaPilotId
+            ? "Propuesta documental local · Sin IA real"
+            : "Demostración determinista · Sin IA real"}
+        </strong>
         <p>
           Usa sólo hechos aprobados de documentos{" "}
-          {data?.synthetic_only === false
-            ? "locales autorizados"
-            : "sintéticos"}
+          {record.ecomm_id === mamaPilotId
+            ? "suministrados manualmente y revisados; las referencias informadas no bastan"
+            : data?.synthetic_only === false
+              ? "locales autorizados"
+              : "sintéticos"}
           . No representa investigación oficial. No completa datos desconocidos.
         </p>
       </div>

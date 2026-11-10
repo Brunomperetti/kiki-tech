@@ -10,9 +10,9 @@ from sqlalchemy import select
 from app.database.models import KikiAiEditorialDraft, EcommApiProductEdit
 from app.services.ecomm_ai_editor_service import EcommAiEditor
 from app.services.ecomm_api_product_workspace_service import (
-    EcommApiProductWorkspace,
     TEXT_LIMITS,
 )
+from .workspace import EcommApiProductWorkspace
 from .research.service import Research, now, fact_digest
 from .research.storage import digest
 from .research.documents import LABELS
@@ -20,6 +20,7 @@ from .research.documents import LABELS
 MODEL = "deterministic-synthetic-evidence-v1"
 EVENT = "SYNTHETIC_EVIDENCE_PROPOSAL"
 TEXT = {
+    "width": "Ancho documentado",
     "nutrition.carbohydrates": "Hidratos de carbono",
     "nutrition.sugars": "Azúcares",
     "nutrition.total_fat": "Grasas totales",
@@ -286,6 +287,12 @@ class Proposals:
 
     def generate(self, ident, expected_version):
         edit, item, facts, fingerprint = self.context(ident)
+        from .mama_reference import PILOT_ID
+
+        if ident == PILOT_ID and not facts:
+            raise ValueError(
+                "Propuesta bloqueada: faltan documentos específicos con EAN, marca, ancho 10 mm y contenido neto 350 g, procedencia revisada y hechos aprobados. La URL candidata y el Excel informado no bastan."
+            )
         if edit["version"] != expected_version:
             raise ValueError(
                 "La ficha cambió. Recuperá la versión nueva antes de generar."

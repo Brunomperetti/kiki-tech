@@ -1,4 +1,8 @@
-# Integración local aislada: etapas 2B–2I
+# Integración local aislada: etapas 2B–2J
+
+La etapa 2J incorpora el [expediente comercial MAMA 350 g / 10 mm](MAMA-PILOT.md),
+con ID de pruebas explícito, referencias auxiliares separadas y propuesta bloqueada
+hasta disponer de documentación auténtica suficiente. No altera el catálogo maestro.
 
 La etapa 2I prepara el [conector HTTPS y piloto documental](PILOT.md), con bloqueo
 de red real, manifiesto vacío y contrato de hechos aprobados para IA futura.

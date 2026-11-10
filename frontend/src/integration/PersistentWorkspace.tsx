@@ -26,6 +26,8 @@ import {
 } from "./workspace-adapter";
 import { ResearchPanel, ResearchSummary } from "./ResearchPanel";
 import { ProposalPanel } from "./ProposalPanel";
+import { MamaPilotSummary } from "./MamaPilot";
+import { mamaPilotId } from "./mama-pilot";
 
 type Props = {
   variant: Variant;
@@ -379,12 +381,15 @@ export function PersistentWorkspace({
                     !!remote
                   }
                   onClick={() => {
-                    setResearchStart(1);
+                    setResearchStart(variant.id === mamaPilotId ? 0 : 1);
                     onTab("Evidencias");
                   }}
                 >
                   Investigar producto
                 </button>
+                {variant.id === mamaPilotId && (
+                  <MamaPilotSummary revision={record.version} />
+                )}
                 <ResearchSummary
                   id={variant.id}
                   revision={record.version}
@@ -392,19 +397,43 @@ export function PersistentWorkspace({
                 />
                 <details className="i-source" open>
                   <summary>
-                    Datos originales de Ecomm-App · Sólo lectura
+                    {variant.id === mamaPilotId
+                      ? "Referencia auxiliar del cliente · No es captura Ecomm-App"
+                      : "Datos originales de Ecomm-App · Sólo lectura"}
                   </summary>
                   <dl className="i-details">
                     {[
-                      ["Ecomm ID", record.source.ecomm_id],
-                      ["SKU", record.source.sku],
-                      ["Nombre original", record.source.product_name],
                       [
-                        "Presentación original",
+                        variant.id === mamaPilotId
+                          ? "ID SINTÉTICO de pruebas; Ecomm real pendiente"
+                          : "Ecomm ID",
+                        record.source.ecomm_id,
+                      ],
+                      [
+                        variant.id === mamaPilotId
+                          ? "Marcador local; no es SKU del archivo"
+                          : "SKU",
+                        record.source.sku,
+                      ],
+                      [
+                        variant.id === mamaPilotId
+                          ? "Nombre declarado por cliente"
+                          : "Nombre original",
+                        record.source.product_name,
+                      ],
+                      [
+                        variant.id === mamaPilotId
+                          ? "Presentación declarada por cliente"
+                          : "Presentación original",
                         record.source.variant_description,
                       ],
                       ["Stock de captura", record.source.stock_at_capture],
-                      ["EAN original", record.source.gtin],
+                      [
+                        variant.id === mamaPilotId
+                          ? "EAN del catálogo maestro (pendiente)"
+                          : "EAN original",
+                        record.source.gtin,
+                      ],
                       [
                         "Fecha de captura",
                         captureDate(record.source.captured_at),

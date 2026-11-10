@@ -1,5 +1,9 @@
 # KIKI Tech 2.0 · Demo y catálogo de integración
 
+La etapa 2J abre el [piloto comercial MAMA 350 g / 10 mm](../integration/MAMA-PILOT.md)
+en el panel existente: referencias separadas, ID sintético sin vínculo real,
+documentos pendientes y seguimiento persistente. No genera información no respaldada.
+
 La etapa 2I muestra la preparación del piloto documental, la procedencia declarada
 frente a la revisada y un contrato de hechos aprobados para IA futura. Fabricantes
 y OpenAI permanecen desconectados: [documentación](../integration/PILOT.md).

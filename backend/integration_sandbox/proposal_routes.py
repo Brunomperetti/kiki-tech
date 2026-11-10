@@ -7,13 +7,19 @@ from sqlalchemy.orm import Session
 from app.core.security import require_csrf, require_session
 from app.database.session import get_db
 from app.api.routes.ecomm_api_workspace import SaveProductEdit
-from app.services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
+from .workspace import EcommApiProductWorkspace
 from .proposals import Proposals
 from .research.routes import execute
 from .generation_contract import generation_context
+from .mama_reference import PILOT_ID
 
 router = APIRouter(prefix="/api/test-proposals", tags=["synthetic-proposals-only"])
 editor_router = APIRouter()
+
+
+@editor_router.get("/api/ecomm-app/workspace/" + PILOT_ID)
+def get_editor(db: Session = Depends(get_db), session=Depends(require_session)):
+    return execute(db, lambda: EcommApiProductWorkspace(db).get(PILOT_ID))
 
 
 @router.get("/{ecomm_id}/generation-context")

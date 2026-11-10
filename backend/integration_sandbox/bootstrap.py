@@ -42,12 +42,14 @@ def create_sandbox_app():
     from .proposal_routes import router as proposal_router, editor_router
     from .document_routes import router as document_router
     from .assisted_routes import router as assisted_router
+    from .mama_routes import router as mama_router
 
     application = create_app(settings)
     application.include_router(research_router)
     application.include_router(proposal_router)
     application.include_router(document_router)
     application.include_router(assisted_router)
+    application.include_router(mama_router)
     # Same contract and service; sandbox-only preconditions precede the old route.
     # Production router, DTO and service remain untouched.
     application.router.routes[0:0] = editor_router.routes

@@ -10,6 +10,7 @@ DATABASE_URL = (
     "?host=/var/run/postgresql&port=5432"
 )
 MARKER = "KIKI_LOCAL_SYNTHETIC_2B"
+LOCAL_EDITOR_ID = r"(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)"
 PG_SOCKET = "/var/run/postgresql/.s.PGSQL.5432"
 PARSER_SOCKET = "/document-parser/parser.sock"
 COLLECTOR_SOCKET = "/discovery-collector/collector.sock"
@@ -25,9 +26,9 @@ ALLOWED_ROUTES = frozenset(
 
 
 def is_workspace_route(method: str, path: str) -> bool:
-    # Deliberately only the six synthetic variants; no reserved/AI/bulk subroutes.
+    # Six fixtures plus one explicitly synthetic pilot alias; no arbitrary IDs.
     return method in {"GET", "POST"} and bool(
-        re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]", path)
+        re.fullmatch(r"/api/ecomm-app/workspace/" + LOCAL_EDITOR_ID, path)
     )
 
 
@@ -39,6 +40,11 @@ def route_allowed(method: str, path: str) -> bool:
         or is_proposal_route(method, path)
         or is_document_route(method, path)
         or is_assisted_route(method, path)
+        or (method, path)
+        in {
+            ("GET", "/api/test-commercial-pilot/mama-350"),
+            ("POST", "/api/test-commercial-pilot/mama-350/prepare"),
+        }
     )
 
 
@@ -54,7 +60,7 @@ def is_assisted_route(method: str, path: str) -> bool:
 
 
 def is_document_route(method: str, path: str) -> bool:
-    prefix = r"/api/test-documents/90000[1-6]/"
+    prefix = r"/api/test-documents/" + LOCAL_EDITOR_ID + "/"
     if method == "POST":
         return bool(
             re.fullmatch(prefix + r"(?:import|local-[a-f0-9]{32}/provenance)", path)
@@ -68,24 +74,30 @@ def is_proposal_route(method: str, path: str) -> bool:
     if method == "GET":
         return bool(
             re.fullmatch(
-                r"/api/test-proposals/90000[1-6](?:/generation-context)?", path
+                r"/api/test-proposals/" + LOCAL_EDITOR_ID + r"(?:/generation-context)?",
+                path,
             )
         )
     return method == "POST" and bool(
         re.fullmatch(
-            r"/api/test-proposals/90000[1-6]/(?:generate|[1-9][0-9]{0,9}/review)", path
+            r"/api/test-proposals/"
+            + LOCAL_EDITOR_ID
+            + r"/(?:generate|[1-9][0-9]{0,9}/review)",
+            path,
         )
     )
 
 
 def is_research_route(method: str, path: str) -> bool:
     if method == "GET":
-        return bool(re.fullmatch(r"/api/test-research/90000[1-6]", path))
+        return bool(re.fullmatch(r"/api/test-research/" + LOCAL_EDITOR_ID, path))
     if method != "POST":
         return False
     return bool(
         re.fullmatch(
-            r"/api/test-research/90000[1-6]/(?:extract|facts/[a-z0-9.:-]{1,160}/review)",
+            r"/api/test-research/"
+            + LOCAL_EDITOR_ID
+            + r"/(?:extract|facts/[a-z0-9.:-]{1,160}/review)",
             path,
         )
         or re.fullmatch(r"/api/test-research/documents/[a-z0-9-]{1,80}/revision", path)

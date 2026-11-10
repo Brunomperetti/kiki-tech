@@ -15,6 +15,7 @@ LABELS = {
 REQUIRED = tuple(LABELS)
 LABELS.update(
     {
+        "width": "Ancho documentado",
         "nutrition.carbohydrates": "Hidratos de carbono",
         "nutrition.sugars": "Azúcares",
         "nutrition.total_fat": "Grasas totales",

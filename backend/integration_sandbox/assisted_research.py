@@ -9,7 +9,7 @@ import struct
 from sqlalchemy import select
 from app.database.models import EcommApiProductEdit
 from uuid import uuid4
-from app.services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
+from .workspace import EcommApiProductWorkspace
 from .research.service import Research, now, fact_digest
 from .research.storage import digest
 from .local_documents import LocalDocuments, parse_local
