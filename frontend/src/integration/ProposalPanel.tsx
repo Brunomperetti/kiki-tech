@@ -11,7 +11,7 @@ import {
 } from "./proposal-adapter";
 import "./research.css";
 import { GenerationReadiness } from "./GenerationReadiness";
-import { mamaPilotId } from "./mama-pilot";
+import { isAuxiliaryPilot } from "./hileret-pilot";
 
 const labels: Record<string, string> = {
   brand: "Marca",
@@ -221,13 +221,13 @@ export function ProposalPanel({
       />
       <div className="r-notice">
         <strong>
-          {record.ecomm_id === mamaPilotId
+          {isAuxiliaryPilot(record.ecomm_id)
             ? "Propuesta documental local · Sin IA real"
             : "Demostración determinista · Sin IA real"}
         </strong>
         <p>
           Usa sólo hechos aprobados de documentos{" "}
-          {record.ecomm_id === mamaPilotId
+          {isAuxiliaryPilot(record.ecomm_id)
             ? "suministrados manualmente y revisados; las referencias informadas no bastan"
             : data?.synthetic_only === false
               ? "locales autorizados"

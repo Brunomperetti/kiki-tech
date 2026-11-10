@@ -362,7 +362,10 @@ export function DocumentImport({
             {document.body.original!.filename || "Referencia URL reproducible"}{" "}
             · {document.body.original!.size} bytes
             <br />
-            SHA-256: <code>{document.body.original!.sha256}</code>
+            {document.body.origin_kind === "URL"
+              ? "SHA-256 de la URL (no del PDF)"
+              : "SHA-256 del archivo"}
+            : <code>{document.body.original!.sha256}</code>
           </p>
           <button
             disabled={busy}

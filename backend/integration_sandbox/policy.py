@@ -10,7 +10,7 @@ DATABASE_URL = (
     "?host=/var/run/postgresql&port=5432"
 )
 MARKER = "KIKI_LOCAL_SYNTHETIC_2B"
-LOCAL_EDITOR_ID = r"(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)"
+LOCAL_EDITOR_ID = r"(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)"
 PG_SOCKET = "/var/run/postgresql/.s.PGSQL.5432"
 PARSER_SOCKET = "/document-parser/parser.sock"
 COLLECTOR_SOCKET = "/discovery-collector/collector.sock"
@@ -26,7 +26,7 @@ ALLOWED_ROUTES = frozenset(
 
 
 def is_workspace_route(method: str, path: str) -> bool:
-    # Six fixtures plus one explicitly synthetic pilot alias; no arbitrary IDs.
+    # Six fixtures and explicit synthetic pilot aliases; no arbitrary IDs.
     return method in {"GET", "POST"} and bool(
         re.fullmatch(r"/api/ecomm-app/workspace/" + LOCAL_EDITOR_ID, path)
     )
@@ -44,6 +44,8 @@ def route_allowed(method: str, path: str) -> bool:
         in {
             ("GET", "/api/test-commercial-pilot/mama-350"),
             ("POST", "/api/test-commercial-pilot/mama-350/prepare"),
+            ("GET", "/api/test-commercial-pilot/hileret-200"),
+            ("POST", "/api/test-commercial-pilot/hileret-200/prepare"),
         }
     )
 

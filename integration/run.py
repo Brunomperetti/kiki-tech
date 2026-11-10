@@ -217,7 +217,12 @@ def main():
                         "-m",
                         "integration_sandbox.assisted_checks",
                     )
-                    for checks in ("connector_checks", "pilot_checks", "mama_checks"):
+                    for checks in (
+                        "connector_checks",
+                        "pilot_checks",
+                        "mama_checks",
+                        "hileret_checks",
+                    ):
                         compose(
                             "run",
                             "--rm",

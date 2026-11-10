@@ -66,7 +66,12 @@ class Research:
 
     def reference(self, ident):
         from ..mama_reference import PILOT_ID, reference
+        from ..hileret_reference import PILOTS, reference as hileret_reference
 
+        if ident in PILOTS:
+            return hileret_reference(
+                ident, EcommApiProductWorkspace(self.db).get(ident)["fields"]
+            )
         if ident == PILOT_ID:
             return reference(EcommApiProductWorkspace(self.db).get(ident)["fields"])
         source = EcommApiProductWorkspace(self.db)._source(ident)
@@ -106,6 +111,10 @@ class Research:
     @staticmethod
     def identity_issues(reference, body):
         issues = []
+        if reference.get("hileret_pilot"):
+            from ..hileret_reference import identity_issues as hileret_issues
+
+            issues.extend(hileret_issues(reference, body))
         if reference.get("commercial_pilot"):
             from ..mama_reference import identity_issues
 
@@ -117,7 +126,9 @@ class Research:
             ("brand", "Marca"),
             ("manufacturer", "Fabricante"),
         ]:
-            if reference.get("commercial_pilot") and key == "name":
+            if (
+                reference.get("commercial_pilot") or reference.get("hileret_pilot")
+            ) and key == "name":
                 continue  # aliases still require explicit EAN/brand/width/net content
             expected, actual = reference.get(key), body["identity"].get(key)
             if expected and (
@@ -150,11 +161,16 @@ class Research:
 
     def documents(self, ident=None):
         from ..mama_reference import PILOT_ID
+        from ..hileret_reference import PILOTS
 
         return [
             d
             for d in self.db.scalars(select(Document).order_by(Document.id))
-            if (ident != PILOT_ID and not d.body.get("associated_ecomm_id"))
+            if (
+                ident != PILOT_ID
+                and ident not in PILOTS
+                and not d.body.get("associated_ecomm_id")
+            )
             or d.body.get("associated_ecomm_id") == ident
         ]
 
@@ -257,6 +273,13 @@ class Research:
     def blockers(self, item, fact, *, include_conflicts=True):
         doc = self._document(fact["document_id"])
         issues = self.identity_issues(item.identity, doc.body)
+        if item.identity.get("hileret_pilot") and (
+            doc.body.get("origin_kind") != "FILE"
+            or doc.body.get("original", {}).get("content_type") != "application/pdf"
+        ):
+            issues.append(
+                "Piloto Hileret: requiere PDF original; una transcripción o URL no sustituye al folleto."
+            )
         if fact["ecomm_id"] != item.ecomm_id:
             issues.append("El hecho no pertenece a esta variante Ecomm-App.")
         if doc.body.get("associated_ecomm_id"):
@@ -468,14 +491,17 @@ class Research:
         self.expect(item, expected_version)
         doc = self.db.get(Document, document_id)
         from ..mama_reference import PILOT_ID
+        from ..hileret_reference import PILOTS
 
         if (
-            ident == PILOT_ID
+            (ident == PILOT_ID or ident in PILOTS)
             and doc
-            and doc.body.get("associated_ecomm_id") != PILOT_ID
+            and doc.body.get("associated_ecomm_id") != ident
         ):
             raise ValueError(
                 "El piloto MAMA no utiliza fixtures sintéticos de otros productos como documentación auténtica."
+                if ident == PILOT_ID
+                else "El piloto Hileret no utiliza fixtures ni documentos de otras variantes como documentación auténtica."
             )
         if not doc or doc.version != document_version:
             raise ValueError("La versión del documento cambió o no existe.")

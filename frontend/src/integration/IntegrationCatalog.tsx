@@ -14,6 +14,8 @@ import { PersistentWorkspace } from "./PersistentWorkspace";
 import { stateLabels } from "./workspace-adapter";
 import { MamaPilotLauncher } from "./MamaPilot";
 import { mamaPilotId, type MamaReport } from "./mama-pilot";
+import { HileretPilotLauncher } from "./HileretPilot";
+import { isAuxiliaryPilot, type HileretReport } from "./hileret-pilot";
 import type { EcommApiProductEdit } from "../types/ecomm-app";
 
 type Session = { username: string; csrf_token: string };
@@ -69,11 +71,13 @@ export function IntegrationCatalog() {
       !/^[A-Za-z0-9_-]{1,120}$/.test(params.get("product")!));
   const [search, setSearch] = useState(q);
   const [mama, setMama] = useState<MamaReport>();
+  const [hileret, setHileret] = useState<HileretReport>();
   const selected =
     data?.items.find((item) => item.id === params.get("product")) ||
     (params.get("product") === mamaPilotId && mama?.available
       ? mama.variant
-      : undefined);
+      : undefined) ||
+    hileret?.cases.find((c) => c.test_id === params.get("product"))?.variant;
   const tab = tabs.includes(params.get("tab") || "")
     ? params.get("tab")!
     : "Ficha";
@@ -461,6 +465,17 @@ export function IntegrationCatalog() {
               }}
             />
           )}
+          {data && (
+            <HileretPilotLauncher
+              csrf={session.csrf_token}
+              disabled={dirty || editorBusy}
+              onLoaded={setHileret}
+              onOpen={(value, id) => {
+                setHileret(value);
+                update({ product: id, tab: "Ficha" });
+              }}
+            />
+          )}
           <section className="d-catalog" aria-label="Catálogo Ecomm-App">
             <div className="i-catalog-heading">
               <div>
@@ -699,7 +714,7 @@ export function IntegrationCatalog() {
               <div>
                 <h2>{selected.name ?? "Nombre no disponible"}</h2>
                 <p>
-                  {selected.id === mamaPilotId
+                  {isAuxiliaryPilot(selected.id)
                     ? "ID SINTÉTICO de pruebas (sin Ecomm ID real): "
                     : "Ecomm ID: "}
                   {selected.id} · {selected.presentation ?? unavailable}

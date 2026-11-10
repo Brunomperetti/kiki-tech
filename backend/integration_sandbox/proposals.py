@@ -288,7 +288,12 @@ class Proposals:
     def generate(self, ident, expected_version):
         edit, item, facts, fingerprint = self.context(ident)
         from .mama_reference import PILOT_ID
+        from .hileret_reference import PILOTS
 
+        if ident in PILOTS and not facts:
+            raise ValueError(
+                "Propuesta Hileret bloqueada: falta PDF original con procedencia revisada, identidad compatible y hechos aprobados. Excel, URL y datos comunicados no bastan. Unidad, pack x6 y caja x9 no son intercambiables."
+            )
         if ident == PILOT_ID and not facts:
             raise ValueError(
                 "Propuesta bloqueada: faltan documentos específicos con EAN, marca, ancho 10 mm y contenido neto 350 g, procedencia revisada y hechos aprobados. La URL candidata y el Excel informado no bastan."

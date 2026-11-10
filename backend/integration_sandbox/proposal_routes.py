@@ -12,6 +12,7 @@ from .proposals import Proposals
 from .research.routes import execute
 from .generation_contract import generation_context
 from .mama_reference import PILOT_ID
+from .hileret_reference import UNIT_ID, PACK_ID
 
 router = APIRouter(prefix="/api/test-proposals", tags=["synthetic-proposals-only"])
 editor_router = APIRouter()
@@ -20,6 +21,16 @@ editor_router = APIRouter()
 @editor_router.get("/api/ecomm-app/workspace/" + PILOT_ID)
 def get_editor(db: Session = Depends(get_db), session=Depends(require_session)):
     return execute(db, lambda: EcommApiProductWorkspace(db).get(PILOT_ID))
+
+
+@editor_router.get("/api/ecomm-app/workspace/" + UNIT_ID)
+def get_hileret_unit(db: Session = Depends(get_db), session=Depends(require_session)):
+    return execute(db, lambda: EcommApiProductWorkspace(db).get(UNIT_ID))
+
+
+@editor_router.get("/api/ecomm-app/workspace/" + PACK_ID)
+def get_hileret_pack(db: Session = Depends(get_db), session=Depends(require_session)):
+    return execute(db, lambda: EcommApiProductWorkspace(db).get(PACK_ID))
 
 
 @router.get("/{ecomm_id}/generation-context")

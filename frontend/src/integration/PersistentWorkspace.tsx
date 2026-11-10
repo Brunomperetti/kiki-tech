@@ -28,6 +28,8 @@ import { ResearchPanel, ResearchSummary } from "./ResearchPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import { MamaPilotSummary } from "./MamaPilot";
 import { mamaPilotId } from "./mama-pilot";
+import { HileretPilotSummary } from "./HileretPilot";
+import { isAuxiliaryPilot, isHileret } from "./hileret-pilot";
 
 type Props = {
   variant: Variant;
@@ -381,7 +383,7 @@ export function PersistentWorkspace({
                     !!remote
                   }
                   onClick={() => {
-                    setResearchStart(variant.id === mamaPilotId ? 0 : 1);
+                    setResearchStart(isAuxiliaryPilot(variant.id) ? 0 : 1);
                     onTab("Evidencias");
                   }}
                 >
@@ -390,6 +392,12 @@ export function PersistentWorkspace({
                 {variant.id === mamaPilotId && (
                   <MamaPilotSummary revision={record.version} />
                 )}
+                {isHileret(variant.id) && (
+                  <HileretPilotSummary
+                    id={variant.id}
+                    revision={record.version}
+                  />
+                )}
                 <ResearchSummary
                   id={variant.id}
                   revision={record.version}
@@ -397,39 +405,39 @@ export function PersistentWorkspace({
                 />
                 <details className="i-source" open>
                   <summary>
-                    {variant.id === mamaPilotId
+                    {isAuxiliaryPilot(variant.id)
                       ? "Referencia auxiliar del cliente · No es captura Ecomm-App"
                       : "Datos originales de Ecomm-App · Sólo lectura"}
                   </summary>
                   <dl className="i-details">
                     {[
                       [
-                        variant.id === mamaPilotId
+                        isAuxiliaryPilot(variant.id)
                           ? "ID SINTÉTICO de pruebas; Ecomm real pendiente"
                           : "Ecomm ID",
                         record.source.ecomm_id,
                       ],
                       [
-                        variant.id === mamaPilotId
+                        isAuxiliaryPilot(variant.id)
                           ? "Marcador local; no es SKU del archivo"
                           : "SKU",
                         record.source.sku,
                       ],
                       [
-                        variant.id === mamaPilotId
+                        isAuxiliaryPilot(variant.id)
                           ? "Nombre declarado por cliente"
                           : "Nombre original",
                         record.source.product_name,
                       ],
                       [
-                        variant.id === mamaPilotId
+                        isAuxiliaryPilot(variant.id)
                           ? "Presentación declarada por cliente"
                           : "Presentación original",
                         record.source.variant_description,
                       ],
                       ["Stock de captura", record.source.stock_at_capture],
                       [
-                        variant.id === mamaPilotId
+                        isAuxiliaryPilot(variant.id)
                           ? "EAN del catálogo maestro (pendiente)"
                           : "EAN original",
                         record.source.gtin,

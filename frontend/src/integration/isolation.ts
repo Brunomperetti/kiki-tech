@@ -8,6 +8,8 @@ const allowed = new Set([
   "GET /api/test-discovery/pilot-status",
   "GET /api/test-commercial-pilot/mama-350",
   "POST /api/test-commercial-pilot/mama-350/prepare",
+  "GET /api/test-commercial-pilot/hileret-200",
+  "POST /api/test-commercial-pilot/hileret-200/prepare",
 ]);
 
 export function installIntegrationIsolation() {
@@ -30,11 +32,11 @@ export function installIntegrationIsolation() {
       !(
         allowed.has(`${method} ${url.pathname}`) ||
         (["GET", "POST"].includes(method) &&
-          /^\/api\/ecomm-app\/workspace\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)$/.test(
+          /^\/api\/ecomm-app\/workspace\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)$/.test(
             url.pathname,
           )) ||
         (method === "GET" &&
-          /^\/api\/test-research\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)$/.test(
+          /^\/api\/test-research\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)$/.test(
             url.pathname,
           )) ||
         (method === "POST" &&
@@ -42,23 +44,23 @@ export function installIntegrationIsolation() {
             url.pathname,
           )) ||
         (method === "GET" &&
-          /^\/api\/test-documents\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)\/local-[a-f0-9]{32}\/original\/[1-8]$/.test(
+          /^\/api\/test-documents\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)\/local-[a-f0-9]{32}\/original\/[1-8]$/.test(
             url.pathname,
           )) ||
         (method === "POST" &&
-          /^\/api\/test-documents\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)\/(?:import|local-[a-f0-9]{32}\/provenance)$/.test(
+          /^\/api\/test-documents\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)\/(?:import|local-[a-f0-9]{32}\/provenance)$/.test(
             url.pathname,
           )) ||
         (method === "GET" &&
-          /^\/api\/test-proposals\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)(?:\/generation-context)?$/.test(
+          /^\/api\/test-proposals\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)(?:\/generation-context)?$/.test(
             url.pathname,
           )) ||
         (method === "POST" &&
-          /^\/api\/test-proposals\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)\/(?:generate|[1-9][0-9]{0,9}\/review)$/.test(
+          /^\/api\/test-proposals\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)\/(?:generate|[1-9][0-9]{0,9}\/review)$/.test(
             url.pathname,
           )) ||
         (method === "POST" &&
-          /^\/api\/test-research\/(?:(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC)\/(?:extract|facts\/[a-z0-9.:%-]{1,200}\/review)|documents\/[a-z0-9-]{1,80}\/revision)$/.test(
+          /^\/api\/test-research\/(?:(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)\/(?:extract|facts\/[a-z0-9.:%-]{1,200}\/review)|documents\/[a-z0-9-]{1,80}\/revision)$/.test(
             url.pathname,
           ))
       )

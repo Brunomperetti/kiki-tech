@@ -13,6 +13,8 @@ import { DocumentImport } from "./DocumentImport";
 import { AssistedResearch } from "./AssistedResearch";
 import { MamaPilotSummary } from "./MamaPilot";
 import { mamaPilotId } from "./mama-pilot";
+import { HileretPilotSummary } from "./HileretPilot";
+import { isAuxiliaryPilot, isHileret } from "./hileret-pilot";
 
 export function ResearchSummary({
   id,
@@ -107,7 +109,7 @@ export function ResearchPanel({
       .then((value) => {
         if (!controller.signal.aborted) {
           setData(value);
-          if (id === mamaPilotId)
+          if (isAuxiliaryPilot(id))
             select((current) =>
               value.documents.some((doc) => doc.id === current)
                 ? current
@@ -218,6 +220,8 @@ export function ResearchPanel({
         <>
           {id === mamaPilotId ? (
             <MamaPilotSummary revision={data.version} />
+          ) : isHileret(id) ? (
+            <HileretPilotSummary id={id} revision={data.version} />
           ) : (
             <AssistedResearch
               id={id}

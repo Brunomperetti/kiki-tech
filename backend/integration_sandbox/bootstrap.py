@@ -43,6 +43,7 @@ def create_sandbox_app():
     from .document_routes import router as document_router
     from .assisted_routes import router as assisted_router
     from .mama_routes import router as mama_router
+    from .hileret_routes import router as hileret_router
 
     application = create_app(settings)
     application.include_router(research_router)
@@ -50,6 +51,7 @@ def create_sandbox_app():
     application.include_router(document_router)
     application.include_router(assisted_router)
     application.include_router(mama_router)
+    application.include_router(hileret_router)
     # Same contract and service; sandbox-only preconditions precede the old route.
     # Production router, DTO and service remain untouched.
     application.router.routes[0:0] = editor_router.routes
