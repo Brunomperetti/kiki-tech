@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from integration_sandbox.policy import (
     route_allowed,
     is_workspace_route,
+    is_research_route,
     CSP,
     install_network_guard,
 )  # noqa: E402
@@ -68,7 +69,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0"))
             max_body = (
-                1_048_576 if is_workspace_route(self.command, path.path) else 16_384
+                1_048_576
+                if (
+                    is_workspace_route(self.command, path.path)
+                    or is_research_route(self.command, path.path)
+                )
+                else 16_384
             )
             if not 0 <= length <= max_body:
                 self.deny(413)
@@ -104,6 +110,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
+            # A cancelled browser request is not an upstream failure; don't write
+            # another response on the already closed TLS connection.
+            pass
         except (OSError, http.client.HTTPException):
             self.deny(502)
         finally:

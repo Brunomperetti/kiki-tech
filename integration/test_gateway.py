@@ -200,11 +200,19 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(json.loads(body)["fields"]["attributes"], fields["attributes"])
         self.assertEqual(
             self.request(
-                "POST", "/api/ecomm-app/workspace/900006", "X" * 1048577, auth
+                "POST",
+                "/api/ecomm-app/workspace/900006",
+                "",
+                {**auth, "Content-Length": "1048577"},
             )[0],
             413,
         )
-        self.assertEqual(self.request("POST", "/api/auth/login", "X" * 16385)[0], 413)
+        # Reject the declared size before transmitting a body; avoids a platform-
+        # dependent BrokenPipe when the server correctly closes an oversized stream.
+        self.assertEqual(
+            self.request("POST", "/api/auth/login", "", {"Content-Length": "16385"})[0],
+            413,
+        )
 
 
 if __name__ == "__main__":

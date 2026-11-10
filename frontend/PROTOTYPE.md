@@ -1,5 +1,8 @@
 # KIKI Tech 2.0 · Demo y catálogo de integración
 
+La etapa 2E incorpora documentos sintéticos, evidencias por dato y revisión humana
+en el mismo panel, preservando la edición 2D: [documentación](../integration/RESEARCH.md).
+
 La etapa 2D incorpora el editor comercial existente en el panel del modo
 integración, con guardado individual en PostgreSQL descartable, versiones e
 historial: [documentación de la etapa](../integration/EDITOR.md). El modo demo

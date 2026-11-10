@@ -1,5 +1,8 @@
 # Etapa 2D — Editor comercial persistente de pruebas
 
+La etapa 2E agrega investigación documental en Evidencias sin aplicar hechos a
+los campos de este editor: [arquitectura y límites de investigación](RESEARCH.md).
+
 Base verificada: rama `feature/kiki-tech-2-dashboard`, HEAD
 `c463f87366726564da9d8e026bb3967016864132`, árbol limpio antes de modificar.
 

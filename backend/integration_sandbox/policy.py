@@ -30,7 +30,25 @@ def is_workspace_route(method: str, path: str) -> bool:
 
 
 def route_allowed(method: str, path: str) -> bool:
-    return (method, path) in ALLOWED_ROUTES or is_workspace_route(method, path)
+    return (
+        (method, path) in ALLOWED_ROUTES
+        or is_workspace_route(method, path)
+        or is_research_route(method, path)
+    )
+
+
+def is_research_route(method: str, path: str) -> bool:
+    if method == "GET":
+        return bool(re.fullmatch(r"/api/test-research/90000[1-6]", path))
+    if method != "POST":
+        return False
+    return bool(
+        re.fullmatch(
+            r"/api/test-research/90000[1-6]/(?:extract|facts/[a-z0-9.:-]{1,160}/review)",
+            path,
+        )
+        or re.fullmatch(r"/api/test-research/documents/[a-z0-9-]{1,80}/revision", path)
+    )
 
 
 CSP = (

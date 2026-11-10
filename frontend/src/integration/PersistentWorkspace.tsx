@@ -24,6 +24,7 @@ import {
   saveWorkspace,
   stateLabels,
 } from "./workspace-adapter";
+import { ResearchPanel, ResearchSummary } from "./ResearchPanel";
 
 type Props = {
   variant: Variant;
@@ -64,6 +65,7 @@ export function PersistentWorkspace({
     [reauth, setReauth] = useState(false);
   const [password, setPassword] = useState("");
   const [loadRevision, reload] = useState(0);
+  const [researchBusy, setResearchBusy] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (error || remote || reauth) contentRef.current?.scrollTo({ top: 0 });
@@ -78,9 +80,9 @@ export function PersistentWorkspace({
     return () => onDirty(false);
   }, [dirty, onDirty]);
   useEffect(() => {
-    onBusy(saving);
+    onBusy(saving || researchBusy);
     return () => onBusy(false);
-  }, [saving, onBusy]);
+  }, [saving, researchBusy, onBusy]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -217,6 +219,7 @@ export function PersistentWorkspace({
         {tabs.map((label) => (
           <button
             role="tab"
+            disabled={saving || researchBusy}
             key={label}
             aria-selected={tab === label}
             onClick={() => onTab(label)}
@@ -358,6 +361,11 @@ export function PersistentWorkspace({
             )}
             {tab === "Ficha" && (
               <>
+                <ResearchSummary
+                  id={variant.id}
+                  revision={record.version}
+                  onOpen={() => onTab("Evidencias")}
+                />
                 <details className="i-source" open>
                   <summary>
                     Datos originales de Ecomm-App · Sólo lectura
@@ -433,6 +441,11 @@ export function PersistentWorkspace({
             )}
             {tab === "Evidencias" && (
               <>
+                <ResearchPanel
+                  id={variant.id}
+                  csrf={csrf}
+                  onBusy={setResearchBusy}
+                />
                 <h3>Fuentes registradas en KIKI</h3>
                 <p>
                   Origen Ecomm-App: {captureDate(record.source.captured_at)}. La

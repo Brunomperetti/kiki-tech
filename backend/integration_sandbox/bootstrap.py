@@ -37,13 +37,17 @@ def create_sandbox_app():
     from contextlib import asynccontextmanager
     from fastapi.responses import JSONResponse
     from .fixtures import seed
+    from .research.storage import initialize as initialize_research
+    from .research.routes import router as research_router
 
     application = create_app(settings)
+    application.include_router(research_router)
 
     @asynccontextmanager
     async def synthetic_lifespan(app):
         async with original_lifespan(app):
             seed(SessionLocal)
+            initialize_research(engine, SessionLocal)
             try:
                 yield
             finally:

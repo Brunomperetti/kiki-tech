@@ -163,6 +163,15 @@ def main():
                         "-m",
                         "integration_sandbox.editor_checks",
                     )
+                    compose(
+                        "run",
+                        "--rm",
+                        "--no-deps",
+                        "backend",
+                        "python",
+                        "-m",
+                        "integration_sandbox.research_checks",
+                    )
                     subprocess.run(
                         [sys.executable, str(ROOT / "integration/test_gateway.py")],
                         check=True,

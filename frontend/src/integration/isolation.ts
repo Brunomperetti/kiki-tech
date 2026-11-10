@@ -27,7 +27,13 @@ export function installIntegrationIsolation() {
       !(
         allowed.has(`${method} ${url.pathname}`) ||
         (["GET", "POST"].includes(method) &&
-          /^\/api\/ecomm-app\/workspace\/90000[1-6]$/.test(url.pathname))
+          /^\/api\/ecomm-app\/workspace\/90000[1-6]$/.test(url.pathname)) ||
+        (method === "GET" &&
+          /^\/api\/test-research\/90000[1-6]$/.test(url.pathname)) ||
+        (method === "POST" &&
+          /^\/api\/test-research\/(?:90000[1-6]\/(?:extract|facts\/[a-z0-9.:%-]{1,200}\/review)|documents\/[a-z0-9-]{1,80}\/revision)$/.test(
+            url.pathname,
+          ))
       )
     ) {
       throw new Error("Integración aislada: solicitud no autorizada.");
