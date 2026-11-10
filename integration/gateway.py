@@ -16,6 +16,7 @@ from integration_sandbox.policy import (
     route_allowed,
     is_workspace_route,
     is_research_route,
+    is_proposal_route,
     CSP,
     install_network_guard,
 )  # noqa: E402
@@ -73,6 +74,7 @@ class Handler(BaseHTTPRequestHandler):
                 if (
                     is_workspace_route(self.command, path.path)
                     or is_research_route(self.command, path.path)
+                    or is_proposal_route(self.command, path.path)
                 )
                 else 16_384
             )
@@ -86,7 +88,14 @@ class Handler(BaseHTTPRequestHandler):
         headers = {
             key: value
             for key, value in self.headers.items()
-            if key.lower() in {"content-type", "cookie", "x-csrf-token"}
+            if key.lower()
+            in {
+                "content-type",
+                "cookie",
+                "x-csrf-token",
+                "x-kiki-proposal-id",
+                "x-kiki-proposal-revision",
+            }
         }
         headers["Host"] = "localhost"
         connection = UnixHTTPConnection("localhost", timeout=10)

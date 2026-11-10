@@ -48,7 +48,7 @@ export async function request(path: string, options: RequestInit = {}) {
   }
   if (!response.ok) {
     if (
-      /^\/api\/(?:ecomm-app\/workspace|test-research)\//.test(path) &&
+      /^\/api\/(?:ecomm-app\/workspace|test-research|test-proposals)\//.test(path) &&
       [409, 422].includes(response.status)
     ) {
       const body = await response.json().catch(() => null);

@@ -13,6 +13,16 @@ LABELS = {
     "commercial_claim": "Declaración comercial",
 }
 REQUIRED = tuple(LABELS)
+LABELS.update(
+    {
+        "product_name": "Nombre del alimento",
+        "brand": "Marca",
+        "manufacturer": "Fabricante",
+        "presentation": "Presentación documentada",
+        "category": "Categoría validada",
+        "subcategory": "Subcategoría validada",
+    }
+)
 
 
 def document(
@@ -206,3 +216,64 @@ ALT_V2["claims"][0].update(
 )
 ALT_V2["sections"]["datos/nutrition.energy"] = ALT_V2["claims"][0]["quote"]
 FIXTURES["alm-nutricion-conflicto"].append(ALT_V2)
+for revision, energy in [(3, "612"), (4, "613")]:
+    revised = deepcopy(ALT_V2)
+    revised.update(
+        version=revision,
+        provenance=f"fixture://kiki-research/alm-nutricion-conflicto/v{revision}",
+    )
+    revised["claims"][0].update(
+        value=energy,
+        quote=f"Tabla sintética alternativa revisada: {energy} kcal/100 g.",
+    )
+    revised["sections"]["datos/nutrition.energy"] = revised["claims"][0]["quote"]
+    FIXTURES["alm-nutricion-conflicto"].append(revised)
+
+# Optional approved identity/classification facts for the deterministic 2F generator.
+# Identity metadata alone remains an unverified reference, never an approved fact.
+FIXTURES["alm-clasificacion"] = [
+    document(
+        "alm-clasificacion",
+        "Identidad y clasificación validable · PRUEBA",
+        "Clasificación",
+        [
+            (
+                key,
+                value,
+                None,
+                f"{LABELS[key]}: {value}. Clasificación sintética de prueba.",
+            )
+            for key, value in [
+                ("product_name", "Almendras sintéticas"),
+                ("brand", BRAND),
+                ("manufacturer", MANUFACTURER),
+                ("presentation", "250 g"),
+                ("category", "Dietética"),
+                ("subcategory", "Frutos secos"),
+            ]
+        ],
+    )
+]
+FIXTURES["alm-pack-x2"] = [
+    document(
+        "alm-pack-x2",
+        "Pack documentado x2 · PRUEBA",
+        "Presentación",
+        [
+            (
+                "product_name",
+                "Almendras sintéticas",
+                None,
+                "Nombre: Almendras sintéticas.",
+            ),
+            (
+                "presentation",
+                "Pack x2 de 250 g",
+                None,
+                "Presentación: Pack x2 de 250 g. Ejemplo sintético explícito.",
+            ),
+        ],
+        presentation="Pack x2 de 250 g",
+        ean="12345685",
+    )
+]

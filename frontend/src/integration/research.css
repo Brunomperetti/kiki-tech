@@ -117,3 +117,20 @@
     white-space: normal;
   }
 }
+.p-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+.p-panel > * {
+  min-width: 0;
+}
+.p-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.p-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+}
+.p-field select {
+  max-width: 100%;
+}

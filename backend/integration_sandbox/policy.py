@@ -34,6 +34,17 @@ def route_allowed(method: str, path: str) -> bool:
         (method, path) in ALLOWED_ROUTES
         or is_workspace_route(method, path)
         or is_research_route(method, path)
+        or is_proposal_route(method, path)
+    )
+
+
+def is_proposal_route(method: str, path: str) -> bool:
+    if method == "GET":
+        return bool(re.fullmatch(r"/api/test-proposals/90000[1-6]", path))
+    return method == "POST" and bool(
+        re.fullmatch(
+            r"/api/test-proposals/90000[1-6]/(?:generate|[1-9][0-9]{0,9}/review)", path
+        )
     )
 
 

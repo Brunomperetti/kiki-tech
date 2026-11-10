@@ -1,5 +1,8 @@
 # KIKI Tech 2.0 · Demo y catálogo de integración
 
+La etapa 2F conecta hechos aprobados con propuestas deterministas de prueba y
+guardado individual en el editor: [documentación](../integration/PROPOSALS.md).
+
 La etapa 2E incorpora documentos sintéticos, evidencias por dato y revisión humana
 en el mismo panel, preservando la edición 2D: [documentación](../integration/RESEARCH.md).
 

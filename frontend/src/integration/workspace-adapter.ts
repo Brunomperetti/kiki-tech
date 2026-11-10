@@ -105,12 +105,22 @@ export async function saveWorkspace(
   status: EcommEditStatus,
   version: number,
   csrf: string,
+  proposal?: { id: number; revision: number },
 ) {
   return adapt(
     await (
       await request(workspacePath(id), {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrf,
+          ...(proposal
+            ? {
+                "X-Kiki-Proposal-Id": String(proposal.id),
+                "X-Kiki-Proposal-Revision": String(proposal.revision),
+              }
+            : {}),
+        },
         body: JSON.stringify({ expected_version: version, status, fields }),
       })
     ).json(),

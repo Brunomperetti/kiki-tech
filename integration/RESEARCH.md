@@ -1,5 +1,8 @@
 # Etapa 2E — Investigación documental sintética
 
+La etapa 2F reutiliza estos expedientes para propuestas deterministas sin aplicar
+campos automáticamente: [contratos, guardado y límites actuales](PROPOSALS.md).
+
 Base verificada antes de modificar: `feature/kiki-tech-2-dashboard`, HEAD
 `691b9a93ed47a9deb6498f01a3ef5510e095e0ff`, árbol limpio.
 

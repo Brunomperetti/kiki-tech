@@ -1,10 +1,13 @@
-# Integración local sintética: etapas 2B–2E
+# Integración local sintética: etapas 2B–2F
 
-La etapa actual agrega [investigación documental sintética y trazabilidad 2E](RESEARCH.md),
+La etapa actual agrega [propuestas comerciales documentadas 2F](PROPOSALS.md), con
+generación determinista, revisión individual y guardado mediante el editor existente.
+
+La etapa 2E agregó [investigación documental sintética y trazabilidad](RESEARCH.md),
 en un esquema de pruebas independiente. Ver también su
 [plan de migración separado, no ejecutado](RESEARCH-MIGRATION-PLAN.md).
 
-La etapa actual agrega el editor comercial existente y persistencia interna
+La etapa 2D agregó el editor comercial existente y persistencia interna
 individual. Ver [Editor persistente 2D](EDITOR.md) para los contratos habilitados,
 concurrencia, seguridad y validación. El resto de este documento conserva la
 infraestructura de aislamiento y el registro histórico de 2B/2C.

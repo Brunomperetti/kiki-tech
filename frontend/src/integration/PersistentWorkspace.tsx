@@ -25,6 +25,7 @@ import {
   stateLabels,
 } from "./workspace-adapter";
 import { ResearchPanel, ResearchSummary } from "./ResearchPanel";
+import { ProposalPanel } from "./ProposalPanel";
 
 type Props = {
   variant: Variant;
@@ -66,6 +67,8 @@ export function PersistentWorkspace({
   const [password, setPassword] = useState("");
   const [loadRevision, reload] = useState(0);
   const [researchBusy, setResearchBusy] = useState(false);
+  const [proposalBusy, setProposalBusy] = useState(false),
+    [proposalDirty, setProposalDirty] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (error || remote || reauth) contentRef.current?.scrollTo({ top: 0 });
@@ -76,13 +79,13 @@ export function PersistentWorkspace({
     (JSON.stringify(record.fields) !== JSON.stringify(fields) ||
       status !== (record.status === "NOT_STARTED" ? "DRAFT" : record.status));
   useEffect(() => {
-    onDirty(dirty);
+    onDirty(dirty || proposalDirty);
     return () => onDirty(false);
-  }, [dirty, onDirty]);
+  }, [dirty, proposalDirty, onDirty]);
   useEffect(() => {
-    onBusy(saving || researchBusy);
+    onBusy(saving || researchBusy || proposalBusy);
     return () => onBusy(false);
-  }, [saving, researchBusy, onBusy]);
+  }, [saving, researchBusy, proposalBusy, onBusy]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -208,7 +211,9 @@ export function PersistentWorkspace({
         </span>
         <span>
           Versión {record?.version ?? "—"} ·{" "}
-          {dirty ? "Cambios sin guardar" : "Sin cambios pendientes"}
+          {dirty || proposalDirty
+            ? "Cambios sin guardar"
+            : "Sin cambios pendientes"}
         </span>
       </div>
       <div
@@ -219,7 +224,7 @@ export function PersistentWorkspace({
         {tabs.map((label) => (
           <button
             role="tab"
-            disabled={saving || researchBusy}
+            disabled={saving || researchBusy || proposalBusy}
             key={label}
             aria-selected={tab === label}
             onClick={() => onTab(label)}
@@ -506,13 +511,27 @@ export function PersistentWorkspace({
                 )}
               </>
             )}
-            {(tab === "IA" || tab === "Canales") && (
+            <div hidden={tab !== "IA"}>
+              <ProposalPanel
+                record={record}
+                csrf={csrf}
+                active={tab === "IA"}
+                blocked={
+                  dirty ||
+                  identityBlocked ||
+                  !!remote ||
+                  reauth ||
+                  saving ||
+                  researchBusy
+                }
+                onBusy={setProposalBusy}
+                onDirty={setProposalDirty}
+                onSaved={adopt}
+              />
+            </div>
+            {tab === "Canales" && (
               <>
-                <h3>
-                  {tab === "IA"
-                    ? "Propuestas de IA"
-                    : "Mercado Libre y Tiendanube"}
-                </h3>
+                <h3>Mercado Libre y Tiendanube</h3>
                 <p>
                   {unavailable}. No se habilitaron generación, preparación ni
                   publicaciones.
@@ -530,7 +549,12 @@ export function PersistentWorkspace({
               <button
                 className="d-primary"
                 disabled={
-                  !dirty || saving || !!remote || identityBlocked || reauth
+                  !dirty ||
+                  saving ||
+                  proposalBusy ||
+                  !!remote ||
+                  identityBlocked ||
+                  reauth
                 }
                 onClick={() => persist("DRAFT")}
               >
@@ -538,7 +562,12 @@ export function PersistentWorkspace({
               </button>
               <button
                 disabled={
-                  !dirty || saving || !!remote || identityBlocked || reauth
+                  !dirty ||
+                  saving ||
+                  proposalBusy ||
+                  !!remote ||
+                  identityBlocked ||
+                  reauth
                 }
                 onClick={() => persist(status)}
               >

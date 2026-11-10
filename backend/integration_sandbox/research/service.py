@@ -34,6 +34,15 @@ def fact_digest(fact):
     )
 
 
+def identity_digest(reference):
+    # Provenance display and copying the exact canonical presentation to the editor
+    # do not change the variant. Genuine contradictory editorial values still do.
+    values = {k: v for k, v in reference.items() if k != "provenance"}
+    if values.get("editorial_presentation") == values.get("presentation"):
+        values["editorial_presentation"] = None
+    return digest(values)
+
+
 class Research:
     def __init__(self, db, session):
         self.db = db
@@ -133,13 +142,13 @@ class Research:
                 ecomm_id=ident,
                 version=0,
                 identity=reference,
-                identity_digest=digest(reference),
+                identity_digest=identity_digest(reference),
                 facts=[],
                 history=[],
             )
             self.db.add(item)
             self.db.flush()
-        if item.identity_digest != digest(reference):
+        if item.identity_digest != identity_digest(reference):
             facts = deepcopy(item.facts)
             for fact in facts:
                 self.event(
@@ -151,13 +160,15 @@ class Research:
                 )
             previous = item.identity
             item.identity = reference
-            item.identity_digest = digest(reference)
+            item.identity_digest = identity_digest(reference)
             self.commit_change(
                 item,
                 facts,
                 "IDENTITY_CHANGED",
                 {"before": previous, "after": reference},
             )
+        elif item.identity != reference:
+            item.identity = reference  # same identity, updated visible provenance only
         self.refresh(item)
         return item
 
