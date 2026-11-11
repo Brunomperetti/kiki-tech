@@ -140,7 +140,11 @@ def main():
             "status",
         ],
     )
-    command = parser.parse_args().command
+    parser.add_argument("--channels", action="store_true", help="Cargar escenario de canales sintético (sólo up/browser-test).")
+    arguments = parser.parse_args()
+    command = arguments.command
+    if arguments.channels and command not in {"up", "browser-test"}:
+        parser.error("--channels sólo es válido para up o browser-test en el entorno descartable.")
     if command == "build":
         subprocess.run(
             ["npm", "run", "build:integration"],
@@ -160,6 +164,8 @@ def main():
         try:
             compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "90")
             verify_containers()
+            if arguments.channels:
+                compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.channel_fixtures")
             if command in {"test", "legacy-test"}:
                 module = "verify" if command == "test" else "legacy_tests"
                 compose(
@@ -219,6 +225,7 @@ def main():
                     )
                     for checks in (
                         "dashboard_checks",
+                        "channel_checks",
                         "documental_workspace_checks",
                         "connector_checks",
                         "pilot_checks",
@@ -243,7 +250,7 @@ def main():
             elif command == "browser-test":
                 # Runs its own gateway and Playwright against the actual isolated backend.
                 subprocess.run(
-                    [sys.executable, str(ROOT / "integration/browser_tests.py")],
+                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--channels"] if arguments.channels else [])],
                     check=True,
                     env=clean_environment(),
                 )

@@ -102,7 +102,7 @@ def _channel_result(rows, *, snapshot_available, original_name, sku, is_combo,
     }
 
 
-def build_channel_coverage(db, pages):
+def build_channel_coverage(db, pages, *, api_validation=False, edits=None, now=None):
     """Map all API variant IDs to independently classified channel evidence."""
     ml_snap = db.scalar(select(CatalogSnapshot).where(
         CatalogSnapshot.source == "MERCADOLIBRE_API"
@@ -114,6 +114,14 @@ def build_channel_coverage(db, pages):
     tn_rows = tn_snap.payload if tn_snap and isinstance(tn_snap.payload, list) else []
     ml_available = bool(ml_rows)
     tn_available = bool(tn_rows)
+
+    if api_validation:
+        from datetime import datetime, timezone
+        from .ecomm_api_channel_evidence import load_reviews, source_identity, enrich, row_key
+        reviews = load_reviews(db)
+        reviews["row_counts"] = {"ml": Counter(row_key("ml", r) for r in ml_rows if isinstance(r, dict)), "tn": Counter(row_key("tn", r) for r in tn_rows if isinstance(r, dict))}
+        now = now or datetime.now(timezone.utc)
+        edits = edits or {}
 
     sku_owners = Counter()
     for page in pages:
@@ -181,6 +189,10 @@ def build_channel_coverage(db, pages):
                     snapshot_at=tn_snap.updated_at.isoformat() if tn_snap else None,
                     source="TIENDANUBE_CSV",
                 )
+                if api_validation:
+                    identity = source_identity(parent, var, page.get("captured_at"), edits.get(ident))
+                    ml = enrich(ml, "ml", ml_index.get(_sku(sku), []), identity, reviews, now)
+                    tn = enrich(tn, "tn", tn_index.get(_sku(sku), []), identity, reviews, now)
                 both_candidate = ml["status"] == "SKU_CANDIDATE" and tn["status"] == "SKU_CANDIDATE"
                 neither_exact = (
                     ml["status"] == "NO_EXACT_SKU_IN_SNAPSHOT"
@@ -205,17 +217,22 @@ def build_channel_coverage(db, pages):
                 totals["combined"][combined] += 1
                 records[ident] = {
                     "ecomm_id": ident, "sku": sku, "ml": ml, "tn": tn,
+                    **({"identity": identity} if api_validation else {}),
                     "combined": combined, "review_required": risk,
                     "never_confirmed_by_sku_alone": True,
                 }
 
     return {
         "items_by_id": records,
+        "api_validation_enabled": api_validation,
         "summary": {
             "api_variants": len(records),
             "ml": dict(totals["ml"]), "tn": dict(totals["tn"]),
             "combined": dict(totals["combined"]),
             "ml_rows_unmatchable_variation_sku": ml_variations_missing_sku,
+            "confirmed_ml_listings": sum(r["ml"].get("confirmed_listing_count", 0) for r in records.values()),
+            "verified_tn_rows": sum(sum(c["identity_verified"] for c in r["tn"].get("candidates", [])) for r in records.values()),
+            "tn_publication_observable": False,
         },
         "sources": {
             "ecomm": STAGE_SOURCE,

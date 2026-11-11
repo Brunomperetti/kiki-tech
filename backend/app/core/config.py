@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     kiki_refresh_token: str = ""
     kiki_ai_api_key: str = ""
     kiki_ai_model: str = "gpt-4.1-mini"
+    kiki_channel_workspace_enabled: bool = False
     kiki_document_workspace_enabled: bool = False
     kiki_ai_enabled: bool = False
 

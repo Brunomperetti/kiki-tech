@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
+from ..core.config import get_settings
 from ..database.models import CatalogSnapshot, EcommApiProductEdit
 from ..integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
 from ..integrations.ecomm_app.api_catalog_browser import api_variant_row
@@ -19,7 +20,9 @@ FILTERS = {
     "missing_title", "missing_brand", "missing_description", "missing_gtin",
     "ready_for_channels", "needs_completion", "review_due", "missing_source_name",
     "ml_candidate", "tn_candidate", "ml_no_exact", "tn_no_exact",
-    "both_candidates", "channel_review", "neither_sku_in_snapshots"
+    "both_candidates", "channel_review", "neither_sku_in_snapshots",
+    "ml_confirmed", "tn_confirmed", "tn_verified", "channel_candidates",
+    "channel_conflicts", "channel_no_evidence", "channel_stale"
 }
 
 
@@ -75,15 +78,37 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
         flags.append("needs_completion")
     ml = (coverage or {}).get("ml") or {"status": "UNAVAILABLE"}
     tn = (coverage or {}).get("tn") or {"status": "UNAVAILABLE"}
-    if ml["status"] == "SKU_CANDIDATE":
+    for channel, evidence in (("ml", ml), ("tn", tn)):
+        if evidence.get("confirmed_listing"):
+            flags.append(channel + "_confirmed")
+    if tn.get("identity_verified"):
+        flags.append("tn_verified")
+    for flag, states in {
+        "channel_candidates": {"CANDIDATE", "PENDING_VALIDATION"},
+        "channel_conflicts": {"IDENTITY_CONFLICT"},
+        "channel_no_evidence": {"INSUFFICIENT_EVIDENCE"},
+        "channel_stale": {"STALE"},
+    }.items():
+        if any(c.get("evidence_state") in states for c in (ml, tn)) or (
+            flag == "channel_candidates" and any(
+                not r["identity_verified"] and r.get("review_state") != "REVOKED"
+                for c in (ml, tn) for r in c.get("candidates", [])
+            )
+        ) or (
+            flag == "channel_stale" and any(c.get("snapshot_available") and c.get("freshness", {}).get("fresh") is False for c in (ml, tn))
+        ) or (
+            flag == "channel_no_evidence" and any(not c.get("snapshot_available") or c.get("candidates_total") == 0 for c in (ml, tn))
+        ):
+            flags.append(flag)
+    if ml["status"] == "SKU_CANDIDATE" and not ml.get("identity_verified"):
         flags.append("ml_candidate")
-    if tn["status"] == "SKU_CANDIDATE":
+    if tn["status"] == "SKU_CANDIDATE" and not tn.get("identity_verified"):
         flags.append("tn_candidate")
     if ml["status"] == "NO_EXACT_SKU_IN_SNAPSHOT":
         flags.append("ml_no_exact")
     if tn["status"] == "NO_EXACT_SKU_IN_SNAPSHOT":
         flags.append("tn_no_exact")
-    if ml["status"] == "SKU_CANDIDATE" and tn["status"] == "SKU_CANDIDATE":
+    if ml["status"] == "SKU_CANDIDATE" and tn["status"] == "SKU_CANDIDATE" and not ml.get("identity_verified") and not tn.get("identity_verified"):
         flags.append("both_candidates")
     if (coverage or {}).get("review_required"):
         flags.append("channel_review")
@@ -171,7 +196,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="prio
     edits = {
         x.ecomm_id: x for x in db.scalars(select(EcommApiProductEdit)).all()
     }
-    channel_matrix = build_channel_coverage(db, pages)
+    channel_matrix = build_channel_coverage(db, pages, api_validation=get_settings().kiki_channel_workspace_enabled, edits=edits)
     sku_owners = Counter(
         _value(v.get("sku")).casefold()
         for p in pages for parent in p.get("items") or []
@@ -233,6 +258,16 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="prio
     if sort == "priority":
         rows.sort(key=lambda x: (x["priority"], x["sku"].casefold(), x["ecomm_id"]))
     offset = (page - 1) * limit
+    visible = rows[offset:offset + limit]
+    # The table needs states/metadata, not every row's document-sized review history.
+    # Full candidates and history are read once when the selected variant opens Canales.
+    for item in visible:
+        coverage = item["channel_coverage"]
+        item["channel_coverage"] = {
+            **{key: value for key, value in coverage.items() if key != "identity"},
+            **{channel: {key: value for key, value in coverage[channel].items() if key != "candidates"}
+               for channel in ("ml", "tn")},
+        }
     return {
         "source": STAGE_SOURCE,
         "source_snapshot_at": pages[-1].get("captured_at") if pages else None,
@@ -253,6 +288,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="prio
             "gtin_unavailable_in_api_capture": counts["gtin_unavailable_in_api_capture"],
         },
         "channel_coverage": {
+            "api_validation_enabled": channel_matrix["api_validation_enabled"],
             "summary": channel_matrix["summary"],
             "sources": channel_matrix["sources"],
             "policy": channel_matrix["policy"],
@@ -270,7 +306,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="prio
                 "a validación de códigos originales de producto."
             ),
         },
-        "items": rows[offset:offset + limit],
+        "items": visible,
         "policy": (
             "La cola se deriva exclusivamente de la copia Ecomm-App por API y "
             "de fichas guardadas en KIKI PostgreSQL. Un GTIN que no aparece en "

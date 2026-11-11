@@ -37,6 +37,8 @@ def route_allowed(method: str, path: str) -> bool:
     return (
         (method, path) in ALLOWED_ROUTES
         or is_workspace_route(method, path)
+        or (method == "GET" and bool(re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/channels", path)))
+        or (method == "POST" and bool(re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/channels/review", path)))
         or is_documental_workspace_route(method, path)
         or is_research_route(method, path)
         or is_proposal_route(method, path)

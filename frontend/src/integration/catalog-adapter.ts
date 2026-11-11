@@ -1,3 +1,4 @@
+import { channelLabels } from "./channel-labels";
 export const catalogPath = "/api/ecomm-app/stage/catalog";
 export const captureSource = "ECOMM_APP_API_STAGE";
 export const unavailable = "Sin datos disponibles";
@@ -18,7 +19,10 @@ export type Variant = {
   commercialName?: string | null;
   editorialStatus?: string;
   editVersion?: number;
-  channels?: Record<"ml" | "tn", { status: string; note: string }>;
+  channels?: Record<
+    "ml" | "tn",
+    { status: string; note: string; evidenceState?: string }
+  >;
   reason?: string;
 };
 export type CatalogPage = {
@@ -31,6 +35,14 @@ export type CatalogPage = {
   lastAt: string | null;
   source: typeof captureSource;
   summary?: Record<string, number>;
+  channelOverview?: {
+    validated: boolean;
+    confirmedMlListings: number;
+    sources: Record<
+      "ml" | "tn",
+      { available: boolean; updatedAt: string | null }
+    >;
+  };
 };
 export class CatalogError extends Error {
   constructor(
@@ -224,6 +236,13 @@ export const queueFilters = {
   tn_candidate: "Candidatos Tiendanube",
   channel_review: "Revisar canales",
   missing_gtin: "Código no disponible en la captura",
+  ml_confirmed: "Publicación ML confirmada en captura",
+  tn_confirmed: "Publicación TN sin contrato verificable",
+  tn_verified: "Vínculos TN verificados (no publicación actual)",
+  channel_candidates: "Candidatos de canal pendientes",
+  channel_conflicts: "Conflictos de identidad en canales",
+  channel_no_evidence: "Sin evidencia suficiente de canal",
+  channel_stale: "Capturas de canal desactualizadas",
 } as const;
 export type QueueFilter = keyof typeof queueFilters;
 export const queuePath = "/api/ecomm-app/workspace/queue";
@@ -314,11 +333,18 @@ export function adaptQueue(
             "PRESENTATION_CONFLICT",
             "GTIN_CONFLICT",
           ].includes(String(v.status)) ||
-          (v.confirmed_listing !== undefined && v.confirmed_listing !== false)
+          (v.evidence_state !== undefined &&
+            !(String(v.evidence_state) in channelLabels)) ||
+          (v.confirmed_listing === true &&
+            (v.evidence_state !== "CONFIRMED_CAPTURE" ||
+              key !== "ml" ||
+              v.identity_verified !== true))
         )
           throw new Error("Canal no verificable");
         return {
           status: String(v.status),
+          evidenceState:
+            typeof v.evidence_state === "string" ? v.evidence_state : undefined,
           note: text(v.note) ?? "Sin evidencia suficiente de publicación.",
         };
       };
@@ -345,7 +371,26 @@ export function adaptQueue(
         Math.max(0, Math.min(limit, matches - (page - 1) * limit))
     )
       throw new Error("Página incompatible");
-    return { ...capture, items, matches, summary: counts };
+    const coverage = object(data.channel_coverage),
+      overview = object(coverage.summary),
+      sources = object(coverage.sources);
+    const source = (key: "ml" | "tn") => {
+      const v = object(sources[key]);
+      if (typeof v.available !== "boolean")
+        throw new Error("Fuente de canal inválida");
+      return { available: v.available, updatedAt: date(v.updated_at) };
+    };
+    return {
+      ...capture,
+      items,
+      matches,
+      summary: counts,
+      channelOverview: {
+        validated: coverage.api_validation_enabled === true,
+        confirmedMlListings: count(overview.confirmed_ml_listings ?? 0),
+        sources: { ml: source("ml"), tn: source("tn") },
+      },
+    };
   } catch {
     throw new CatalogError(
       0,

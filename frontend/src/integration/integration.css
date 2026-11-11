@@ -380,3 +380,32 @@
     width: 100%;
   }
 }
+.c-panel p,
+.c-panel li {
+  overflow-wrap: anywhere;
+}
+.c-panel fieldset {
+  min-width: 0;
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid #d6e2db;
+  border-radius: 12px;
+}
+.c-panel .r-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: 10px;
+}
+.c-panel .r-check input {
+  width: auto;
+  margin: 0;
+}
+.c-panel input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #ccd9ce;
+  border-radius: 7px;
+  font: inherit;
+}

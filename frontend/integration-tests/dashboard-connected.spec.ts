@@ -280,7 +280,7 @@ test("sin resultados de filtro no se confunde con catálogo vacío ni se inventa
   ).toBeVisible();
   await expect(page.getByTestId("total").locator("strong")).toHaveText("6");
   await expect(
-    page.getByLabel("Indicadores sin fuente integrada"),
+    page.getByLabel("Alcance de la evidencia de canales"),
   ).toContainText("Sin datos disponibles");
   await page
     .getByRole("button", { name: "Limpiar filtro", exact: true })

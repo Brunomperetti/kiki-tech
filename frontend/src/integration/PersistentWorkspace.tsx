@@ -1,3 +1,4 @@
+import { ChannelsPanel } from "./ChannelsPanel";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   CommercialBackofficeFields,
@@ -39,6 +40,7 @@ type Props = {
   onTab: (tab: string) => void;
   onDirty: (value: boolean) => void;
   onBusy: (value: boolean) => void;
+  onChannelsReviewed: () => void;
   onRecord: (record: EcommApiProductEdit) => void;
   onAuthenticated: (value: unknown) => void;
   onClose: () => void;
@@ -55,6 +57,7 @@ export function PersistentWorkspace({
   onDirty,
   onBusy,
   onRecord,
+  onChannelsReviewed,
   onAuthenticated,
   onClose,
 }: Props) {
@@ -70,6 +73,7 @@ export function PersistentWorkspace({
     [reauth, setReauth] = useState(false);
   const [password, setPassword] = useState("");
   const [loadRevision, reload] = useState(0);
+  const [channelBusy, setChannelBusy] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
   const [researchStart, setResearchStart] = useState(0);
   const [proposalBusy, setProposalBusy] = useState(false),
@@ -88,9 +92,9 @@ export function PersistentWorkspace({
     return () => onDirty(false);
   }, [dirty, proposalDirty, onDirty]);
   useEffect(() => {
-    onBusy(saving || researchBusy || proposalBusy);
+    onBusy(saving || researchBusy || proposalBusy || channelBusy);
     return () => onBusy(false);
-  }, [saving, researchBusy, proposalBusy, onBusy]);
+  }, [saving, researchBusy, proposalBusy, channelBusy, onBusy]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -599,13 +603,22 @@ export function PersistentWorkspace({
               />
             </div>
             {tab === "Canales" && (
-              <>
-                <h3>Mercado Libre y Tiendanube</h3>
-                <p>
-                  {unavailable}. No se habilitaron generación, preparación ni
-                  publicaciones.
-                </p>
-              </>
+              <ChannelsPanel
+                id={variant.id}
+                csrf={csrf}
+                blocked={
+                  dirty ||
+                  proposalDirty ||
+                  identityBlocked ||
+                  !!remote ||
+                  reauth ||
+                  saving ||
+                  researchBusy ||
+                  proposalBusy
+                }
+                onBusy={setChannelBusy}
+                onReviewed={onChannelsReviewed}
+              />
             )}
             <div className="i-save-bar">
               <span aria-live="polite">

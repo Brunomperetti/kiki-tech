@@ -1,3 +1,4 @@
+import { channelLabels } from "./channel-labels";
 import {
   CatalogFrame,
   CatalogTable,
@@ -444,19 +445,83 @@ export function IntegrationCatalog() {
         puede necesitar varias tareas. La ficha editorial y la publicación de
         cada canal son estados distintos.
       </p>
+      <CatalogMetrics
+        label="Cobertura por canal"
+        cards={[
+          ["ml_confirmed", "Variantes con ML confirmado"],
+          ["tn_verified", "Vínculos TN verificados"],
+          ["channel_candidates", "Candidatos pendientes"],
+          ["channel_conflicts", "Conflictos de canal"],
+          ["channel_no_evidence", "Sin evidencia suficiente"],
+          ["channel_stale", "Capturas desactualizadas"],
+        ].map(([key, title]) => ({
+          id: key,
+          title,
+          value:
+            data?.channelOverview?.validated &&
+            !(
+              key === "ml_confirmed" &&
+              !data.channelOverview.sources.ml.available
+            ) &&
+            !(
+              key === "tn_verified" &&
+              !data.channelOverview.sources.tn.available
+            )
+              ? (data.summary?.[key] ?? "—")
+              : unavailable,
+          note:
+            key === "ml_confirmed"
+              ? "Publicación en captura ML revisada; no es estado en vivo"
+              : key === "tn_verified"
+                ? "Vínculos revisados; el CSV no confirma publicación actual"
+                : "Variantes únicas; las tareas pueden superponerse",
+          active: filter === key,
+          onClick: () =>
+            update({
+              filter: filter === key ? "" : key,
+              page: "",
+              product: "",
+              tab: "",
+            }),
+        }))}
+      />
       <section
         className="i-coverage"
-        aria-label="Indicadores sin fuente integrada"
+        aria-label="Alcance de la evidencia de canales"
       >
-        {[
-          "Publicaciones Mercado Libre",
-          "Publicaciones Tiendanube",
-          "Cobertura confirmada",
-          "Preparación por canal",
-        ].map((label) => (
-          <div key={label}>
-            <span>{label}</span>
-            <strong>{unavailable}</strong>
+        <div>
+          <span>Publicación Tiendanube</span>
+          <strong>Sin dato verificable de publicación</strong>
+          <small>
+            El contrato CSV no demuestra publicación actual. No se inventa un
+            total.
+          </small>
+        </div>
+        <div>
+          <span>Publicaciones ML confirmadas en captura</span>
+          <strong>
+            {data?.channelOverview?.validated &&
+            data.channelOverview.sources.ml.available
+              ? data.channelOverview.confirmedMlListings
+              : unavailable}
+          </strong>
+          <small>Publicaciones y variantes son entidades diferentes.</small>
+        </div>
+        {(["ml", "tn"] as const).map((c) => (
+          <div key={c}>
+            <span>
+              {c === "ml"
+                ? "Captura Mercado Libre"
+                : "Importación CSV Tiendanube"}
+            </span>
+            <strong>
+              {captureDate(data?.channelOverview?.sources[c].updatedAt ?? null)}
+            </strong>
+            <small>
+              {data?.channelOverview?.sources[c].available
+                ? "Copia disponible; consultar vigencia por producto"
+                : "Sin captura disponible; no demuestra ausencia de publicación"}
+            </small>
           </div>
         ))}
       </section>
@@ -633,8 +698,9 @@ export function IntegrationCatalog() {
                   </td>
                   {(["ml", "tn"] as const).map((channel) => {
                     const state = item.channels?.[channel];
-                    const label =
-                      !state || state.status === "UNAVAILABLE"
+                    const label = state?.evidenceState
+                      ? channelLabels[state.evidenceState]
+                      : !state || state.status === "UNAVAILABLE"
                         ? unavailable
                         : state.status === "NO_EXACT_SKU_IN_SNAPSHOT"
                           ? "Sin publicación confirmada"
@@ -789,6 +855,10 @@ export function IntegrationCatalog() {
             onBusy={setEditorBusy}
             onClose={close}
             onAuthenticated={(value) => setSession(sessionData(value))}
+            onChannelsReviewed={() => {
+              setPinned(selected);
+              retry((value) => value + 1);
+            }}
             onRecord={(value: EcommApiProductEdit) => {
               const row = dataRef.current?.items.find(
                 (item) => item.id === value.ecomm_id,

@@ -108,7 +108,7 @@ test("seis variantes persistidas, indicadores del backend y capturas", async ({
     ),
   ).toEqual(["900001", "900002", "900003", "900004", "900005", "900006"]);
   await expect(
-    page.getByLabel("Indicadores sin fuente integrada"),
+    page.getByLabel("Alcance de la evidencia de canales"),
   ).toContainText("Sin datos disponibles");
   expect(
     await page.evaluate(

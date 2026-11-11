@@ -30,6 +30,7 @@ def create_sandbox_app():
         kiki_ai_api_key="",
         kiki_ai_enabled=False,
         kiki_document_workspace_enabled=True,
+        kiki_channel_workspace_enabled=True,
     )
     # Harness-only binding, before any service imports. Production get_settings is unchanged.
     config.get_settings = lambda: settings

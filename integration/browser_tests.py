@@ -48,23 +48,25 @@ def main():
             if result.returncode == 0 or "Configuración ambigua" not in result.stderr:
                 raise RuntimeError("El build no rechazó configuración ambigua.")
         subprocess.run(
-            ["npm", "run", "test:integration"],
+            ["npm", "run", "test:integration", *(["--", "channels-connected.spec.ts"] if "--channels" in sys.argv[1:] else [])],
             cwd=ROOT / "frontend",
             env={
                 **clean_environment(),
                 "NODE_EXTRA_CA_CERTS": str(directory / "tls-cert.pem"),
+                **({"KIKI_CHANNEL_SCENARIO": "synthetic-captures"} if "--channels" in sys.argv[1:] else {}),
             },
             check=True,
         )
-        subprocess.run(
-            ["npm", "run", "test:pilot"],
-            cwd=ROOT / "frontend",
-            env={
-                **clean_environment(),
-                "NODE_EXTRA_CA_CERTS": str(directory / "tls-cert.pem"),
-            },
-            check=True,
-        )
+        if "--channels" not in sys.argv[1:]:
+            subprocess.run(
+                ["npm", "run", "test:pilot"],
+                cwd=ROOT / "frontend",
+                env={
+                    **clean_environment(),
+                    "NODE_EXTRA_CA_CERTS": str(directory / "tls-cert.pem"),
+                },
+                check=True,
+            )
     finally:
         process.terminate()
         process.wait(timeout=5)
