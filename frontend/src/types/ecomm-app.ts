@@ -125,6 +125,9 @@ export interface EcommStageStatus {
 }
 
 export interface EcommApiCatalogRow {
+  barcode?: string | null;
+  gtin_raw?: string | null;
+  identity_blockers?: string[];
   ecomm_id:string|null;
   sku:string|null;
   product_name:string|null;
@@ -661,6 +664,8 @@ export interface EcommApiProductEdit {
   ecomm_id:string;
   source:{
     ecomm_id:string; sku:string; product_name:string;
+    barcode?:string|null; gtin_raw?:string|null;
+    parent_is_combo?:boolean|null; identity_blockers?:string[];
     variant_description:string|null; is_combo:boolean|null;
     gtin:string|null; stock_at_capture:number|string|null; captured_at:string|null;
   };
@@ -768,6 +773,7 @@ export interface KikiCoverageOverview {
   policy:string;
 }
 export interface EcommQueueRow {
+  source?:EcommApiCatalogRow;
   ecomm_id:string;
   sku:string;
   product_name:string;
@@ -787,6 +793,7 @@ export interface EcommQueueRow {
   last_edited_at:string|null;
 }
 export interface EcommWorkQueue {
+  sort?:'priority'|'capture';
   source:'ECOMM_APP_API_STAGE';
   source_snapshot_at:string|null;
   generated_at:string;

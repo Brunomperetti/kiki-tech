@@ -1,6 +1,57 @@
 .i-metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+.i-app .d-metric:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.i-app [data-metric="capture"] strong {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.i-identity-warning {
+  color: #9a412d;
+  font-size: 12px;
+}
+.i-presentation {
+  margin-top: 10px;
+  font-weight: 600;
+}
+.i-capture-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: #52685b;
+  margin: 0 0 18px;
+}
+.i-app .c-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.i-app .c-metrics > .d-metric:nth-child(n) {
+  grid-column: auto;
+  min-height: 115px;
+}
+.i-app .c-metrics > .c-central:nth-child(n) {
+  grid-column: span 2;
+}
+.i-app .c-metrics .d-metric > span {
+  min-height: 24px;
+}
+@media (max-width: 1000px) {
+  .i-app .c-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .i-app .c-metrics > .d-metric:nth-child(n) {
+    min-height: 95px;
+    padding: 12px;
+  }
+  .i-app .c-metrics .d-metric strong {
+    font-size: 28px;
+    margin: 8px 0;
+  }
+}
 .i-metrics .i-text-metric {
   font-size: 22px;
   min-height: 52px;
@@ -99,6 +150,9 @@
 .i-table td small {
   display: block;
   line-height: 1.6;
+}
+.i-app .d-table td:nth-child(6) > small {
+  display: block;
 }
 .i-pagination {
   gap: 16px;
@@ -298,7 +352,7 @@
     overflow-wrap: anywhere;
   }
   .i-table td:first-child,
-  .i-table td:nth-child(5),
+  .i-table td:nth-child(6),
   .i-table td:last-child {
     grid-column: 1/-1;
   }

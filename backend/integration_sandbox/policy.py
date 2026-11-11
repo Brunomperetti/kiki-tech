@@ -21,6 +21,7 @@ ALLOWED_ROUTES = frozenset(
         ("GET", "/api/auth/me"),
         ("POST", "/api/auth/logout"),
         ("GET", "/api/ecomm-app/stage/catalog"),
+        ("GET", "/api/ecomm-app/workspace/queue"),
     }
 )
 

@@ -3,7 +3,13 @@ import type {
   EcommEditableFields,
   EcommEditStatus,
 } from "../types/ecomm-app";
-import { CatalogError, request, type Variant } from "./catalog-adapter";
+import {
+  CatalogError,
+  adaptVariant,
+  request,
+  validVariantId,
+  type Variant,
+} from "./catalog-adapter";
 
 export const textFields = [
   "brand",
@@ -44,6 +50,7 @@ function adapt(value: unknown, id: string): EcommApiProductEdit {
   const fields = data?.fields;
   if (
     !data ||
+    !validVariantId(id) ||
     data.ecomm_id !== id ||
     data.source?.ecomm_id !== id ||
     typeof data.source.sku !== "string" ||
@@ -94,6 +101,14 @@ function adapt(value: unknown, id: string): EcommApiProductEdit {
       "La ficha recibida no coincide con el contrato completo. No se omitió ni reemplazó ningún campo.",
     );
   }
+  try {
+    adaptVariant(data.source);
+  } catch {
+    throw new CatalogError(
+      0,
+      "La fuente de la ficha contiene metadatos inválidos. No se habilitó el guardado.",
+    );
+  }
   return data;
 }
 export async function getWorkspace(id: string, signal?: AbortSignal) {
@@ -127,6 +142,8 @@ export async function saveWorkspace(
     id,
   );
 }
+const optionalText = (value: string | null | undefined) =>
+  value === "" || value == null ? null : value;
 export function sameIdentity(
   a: EcommApiProductEdit["source"],
   b: EcommApiProductEdit["source"],
@@ -134,23 +151,43 @@ export function sameIdentity(
   return (
     a.ecomm_id === b.ecomm_id &&
     a.sku === b.sku &&
-    a.variant_description === b.variant_description &&
+    optionalText(a.variant_description) ===
+      optionalText(b.variant_description) &&
     a.is_combo === b.is_combo &&
-    a.gtin === b.gtin &&
-    a.product_name === b.product_name
+    optionalText(a.gtin) === optionalText(b.gtin) &&
+    optionalText(a.barcode) === optionalText(b.barcode) &&
+    optionalText(a.gtin_raw) === optionalText(b.gtin_raw) &&
+    a.parent_is_combo === b.parent_is_combo &&
+    optionalText(a.product_name) === optionalText(b.product_name)
   );
 }
 export function compatibleWithRow(
   record: EcommApiProductEdit,
   variant: Variant,
 ) {
+  // The wire may encode a missing optional code as null, absent, or "".
+  // Preserve source values; only compare these absent representations equally.
   return (
     !record.source_sku_changed &&
+    optionalText(record.source.barcode) === optionalText(variant.barcode) &&
+    optionalText(record.source.gtin_raw) === optionalText(variant.gtinRaw) &&
+    (variant.parentIsCombo === undefined ||
+      (record.source.parent_is_combo ?? null) === variant.parentIsCombo) &&
+    !(
+      record.source.identity_blockers?.length ||
+      variant.identityBlockers?.length
+    ) &&
+    !(
+      record.source.barcode &&
+      record.source.gtin_raw &&
+      record.source.barcode !== record.source.gtin_raw
+    ) &&
     record.ecomm_id === variant.id &&
     record.source.sku === variant.sku &&
-    record.source.variant_description === variant.presentation &&
-    record.source.product_name === variant.name &&
-    record.source.gtin === variant.gtin &&
+    optionalText(record.source.variant_description) ===
+      optionalText(variant.presentation) &&
+    optionalText(record.source.product_name) === optionalText(variant.name) &&
+    optionalText(record.source.gtin) === optionalText(variant.gtin) &&
     record.source.is_combo === variant.isCombo
   );
 }

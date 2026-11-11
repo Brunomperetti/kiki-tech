@@ -128,9 +128,9 @@ export function PersistentWorkspace({
   async function persist(nextStatus: EcommEditStatus) {
     if (!record || !fields || saving || remote || identityBlocked) return;
     if (
-      nextStatus !== "DRAFT" &&
+      (nextStatus !== "DRAFT" || record.status === "READY_FOR_CHANNELS") &&
       !window.confirm(
-        `¿Guardar como «${stateLabels[nextStatus]}»? Es un estado interno; no publica productos.`,
+        `${record.status === "READY_FOR_CHANNELS" ? "La ficha estaba marcada como lista para canales. " : ""}¿Guardar como «${stateLabels[nextStatus]}»? Es un estado interno; no publica productos.`,
       )
     )
       return;
@@ -437,6 +437,11 @@ export function PersistentWorkspace({
                       ],
                       ["Stock de captura", record.source.stock_at_capture],
                       [
+                        "Barcode original",
+                        record.source.barcode ?? unavailable,
+                      ],
+                      ["GTIN original", record.source.gtin_raw ?? unavailable],
+                      [
                         isAuxiliaryPilot(variant.id)
                           ? "EAN del catálogo maestro (pendiente)"
                           : "EAN original",
@@ -502,14 +507,19 @@ export function PersistentWorkspace({
             )}
             {tab === "Evidencias" && (
               <>
-                <ResearchPanel
-                  id={variant.id}
-                  csrf={csrf}
-                  onBusy={setResearchBusy}
-                  workspaceVersion={record.version}
-                  autoStart={researchStart}
-                  onStarted={() => setResearchStart(0)}
-                />
+                <fieldset
+                  className="i-editor-fields"
+                  disabled={identityBlocked || !!remote || reauth}
+                >
+                  <ResearchPanel
+                    id={variant.id}
+                    csrf={csrf}
+                    onBusy={setResearchBusy}
+                    workspaceVersion={record.version}
+                    autoStart={researchStart}
+                    onStarted={() => setResearchStart(0)}
+                  />
+                </fieldset>
                 <h3>Fuentes registradas en KIKI</h3>
                 <p>
                   Origen Ecomm-App: {captureDate(record.source.captured_at)}. La

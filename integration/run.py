@@ -218,6 +218,7 @@ def main():
                         "integration_sandbox.assisted_checks",
                     )
                     for checks in (
+                        "dashboard_checks",
                         "connector_checks",
                         "pilot_checks",
                         "mama_checks",

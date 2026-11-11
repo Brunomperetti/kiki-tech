@@ -1,6 +1,10 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { adaptCatalog, catalogPath } from "../src/integration/catalog-adapter";
+import {
+  adaptCatalog,
+  catalogPath,
+  queuePath,
+} from "../src/integration/catalog-adapter";
 
 const rows = (page: Page) => page.locator("tbody tr");
 const sourceHeaders = {
@@ -38,6 +42,47 @@ async function payload(page: Page) {
   return result.json();
 }
 async function mockCatalog(page: Page, body: unknown, status = 200) {
+  // A local catalog double must agree with the separately authenticated queue.
+  // Runtime code never invents queue rows or uses this test-only mapping.
+  const catalog = body as {
+    items?: Record<string, unknown>[];
+    total_matches?: number;
+    total_variants_in_capture?: number;
+    capture_last_at?: string | null;
+  };
+  if (status === 200 && Array.isArray(catalog.items)) {
+    const response = await page.request.get(
+      `${queuePath}?sort=capture&limit=6`,
+    );
+    const queue = await response.json();
+    const rows = queue.items;
+    queue.total = catalog.total_matches;
+    queue.source_snapshot_at = catalog.capture_last_at;
+    queue.summary = Object.fromEntries(
+      Object.entries(queue.summary).map(([key, value]) => [
+        key,
+        key === "total"
+          ? catalog.total_variants_in_capture
+          : Math.min(Number(value), catalog.total_variants_in_capture ?? 0),
+      ]),
+    );
+    queue.items = catalog.items.map((source) => ({
+      ...(rows.find(
+        (x: { ecomm_id: unknown }) => x.ecomm_id === source.ecomm_id,
+      ) || rows[0]),
+      source,
+      ecomm_id: source.ecomm_id,
+      sku: source.sku ?? "",
+      product_name: source.product_name ?? "",
+    }));
+    await page.route(`**${queuePath}?*`, (route) =>
+      route.fulfill({
+        status: 200,
+        headers: sourceHeaders,
+        body: JSON.stringify(queue),
+      }),
+    );
+  }
   await page.route(`**${catalogPath}?*`, (route) =>
     route.fulfill({
       status,

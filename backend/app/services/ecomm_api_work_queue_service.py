@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from ..database.models import CatalogSnapshot, EcommApiProductEdit
 from ..integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
+from ..integrations.ecomm_app.api_catalog_browser import api_variant_row
 from .ecomm_api_product_workspace_service import _readiness, blank_fields, review_schedule
 from .ecomm_channel_coverage_service import build_channel_coverage
 
@@ -33,7 +34,7 @@ def _date(raw):
 
 
 def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
-                edit, duplicate_sku, coverage):
+                edit, duplicate_sku, coverage, identity_blockers=()):
     saved = bool(edit)
     fields = edit.fields or {} if saved else {}
     source_sku_changed = bool(saved and edit.source_sku != sku)
@@ -55,7 +56,7 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
             _value(source_gtin) or _value(fields.get("proposed_gtin"))
         ),
     }
-    identity_issue = duplicate_sku or source_sku_changed or not id_value or not sku
+    identity_issue = duplicate_sku or source_sku_changed or not id_value or not sku or bool(identity_blockers)
     flags = [k for k, enabled in missing.items() if enabled]
     if is_combo:
         flags.append("pack")
@@ -152,7 +153,9 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     }
 
 
-def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
+def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="priority"):
+    if sort not in {"priority", "capture"}:
+        raise ValueError("Orden de catálogo inválido.")
     if filter_name not in FILTERS:
         raise ValueError("Filtro de cola desconocido.")
     if page < 1 or page > 100000 or limit < 1 or limit > 50 or len(query) > 80:
@@ -187,6 +190,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
                     continue
                 ecomm_id = _value(variant.get("id"))
                 sku = _value(variant.get("sku"))
+                source = api_variant_row(parent, variant, p.get("captured_at"))
                 item = _queue_item(
                     ecomm_id, sku, _value(parent.get("description")),
                     variant.get("gtin") or variant.get("barcode"),
@@ -194,7 +198,9 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
                     p.get("captured_at"), edits.get(ecomm_id),
                     bool(sku and sku_owners[sku.casefold()] > 1),
                     channel_matrix["items_by_id"].get(ecomm_id),
+                    source["identity_blockers"],
                 )
+                item["source"] = source
                 counts["total"] += 1
                 counts["source_name_present"] += int(item["source_name_present"])
                 counts["source_name_missing"] += int(not item["source_name_present"])
@@ -215,6 +221,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
                                     for field in (
                                         ecomm_id, sku, item["product_name"],
                                         item["proposed_brand"], item["proposed_title"]
+                                        , source["variant_description"], source["barcode"], source["gtin_raw"]
                                     )):
                     continue
                 if filter_name != "all" and filter_name not in item["flags"]:
@@ -223,7 +230,8 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
     # Existing triage priorities remain intact; ai_eligible bypasses the 
     # initial list of packs and exposes simple variants immediately.
     # Identity safety first; saved drafts next; packs before untouched simples.
-    rows.sort(key=lambda x: (x["priority"], x["sku"].casefold(), x["ecomm_id"]))
+    if sort == "priority":
+        rows.sort(key=lambda x: (x["priority"], x["sku"].casefold(), x["ecomm_id"]))
     offset = (page - 1) * limit
     return {
         "source": STAGE_SOURCE,
@@ -232,7 +240,7 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25):
         "mode": "KIKI_INTERNAL_READ_ONLY_TRIAGE",
         "external_writes_enabled": False,
         "total": len(rows), "page": page, "limit": limit,
-        "filter": filter_name, "query": query.strip(),
+        "filter": filter_name, "query": query.strip(), "sort": sort,
         "summary": {key:counts[key] for key in sorted(FILTERS - {"all"})} | {
             "total": counts["total"],
             "source_name_present": counts["source_name_present"],

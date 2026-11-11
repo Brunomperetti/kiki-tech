@@ -1,3 +1,10 @@
+import {
+  CatalogFrame,
+  CatalogTable,
+  CatalogMetrics,
+  CatalogSearch,
+  ProductDrawer,
+} from "../prototype/CatalogView";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { KikiIcon as Icon } from "../components/KikiIcon";
@@ -5,13 +12,18 @@ import {
   CatalogError,
   type CatalogPage,
   captureDate,
-  loadCatalog,
+  loadDashboard,
+  adaptVariant,
+  validVariantId,
+  queueFilters,
+  type QueueFilter,
+  type Variant,
   request,
   unavailable,
 } from "./catalog-adapter";
 import "./integration.css";
 import { PersistentWorkspace } from "./PersistentWorkspace";
-import { stateLabels } from "./workspace-adapter";
+import { stateLabels, getWorkspace } from "./workspace-adapter";
 import { MamaPilotLauncher } from "./MamaPilot";
 import { mamaPilotId, type MamaReport } from "./mama-pilot";
 import { HileretPilotLauncher } from "./HileretPilot";
@@ -20,8 +32,6 @@ import type { EcommApiProductEdit } from "../types/ecomm-app";
 
 type Session = { username: string; csrf_token: string };
 const tabs = ["Ficha", "Evidencias", "IA", "Canales", "Historial"];
-const blocked =
-  "Esta operación todavía no está conectada en el entorno de prueba.";
 function sessionData(value: unknown): Session {
   const data = value as Record<string, unknown> | null;
   if (
@@ -39,41 +49,47 @@ export function IntegrationCatalog() {
   const [params, setAcceptedParams] = useState(urlParams);
   const [dirty, setDirty] = useState(false);
   const [editorBusy, setEditorBusy] = useState(false);
-  const [editorStates, setEditorStates] = useState<Record<string, string>>({});
+  const [pinned, setPinned] = useState<Variant>();
+  const [selectionError, setSelectionError] = useState("");
+  const dataRef = useRef<CatalogPage>();
   const [session, setSession] = useState<Session | null>();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [authError, setAuthError] = useState("");
   const [data, setData] = useState<CatalogPage>();
+  dataRef.current = data;
   const [error, setError] = useState<CatalogError>();
   const [loading, setLoading] = useState(false);
   const [revision, retry] = useState(0);
   const q = params.get("q") || "";
+  const filter = (params.get("filter") || "all") as QueueFilter;
   const rawPage = params.get("page") || "1",
     rawSize = params.get("limit") || "6";
   const page = Number(rawPage),
     pageSize = Number(rawSize);
   const invalid =
     q.length > 80 ||
+    !(filter in queueFilters) ||
     !/^[1-9]\d*$/.test(rawPage) ||
     page > 100000 ||
-    ![3, 6, 25].includes(pageSize) ||
+    ![3, 6, 25, 50].includes(pageSize) ||
     String(pageSize) !== rawSize ||
-    ["q", "page", "limit", "product", "tab"].some(
+    ["q", "page", "limit", "product", "tab", "filter"].some(
       (key) => params.getAll(key).length > 1,
     ) ||
     Array.from(params.keys()).some(
-      (key) => !["q", "page", "limit", "product", "tab"].includes(key),
+      (key) =>
+        !["q", "page", "limit", "product", "tab", "filter"].includes(key),
     ) ||
     (params.has("tab") && !tabs.includes(params.get("tab")!)) ||
-    (params.has("product") &&
-      !/^[A-Za-z0-9_-]{1,120}$/.test(params.get("product")!));
+    (params.has("product") && !validVariantId(params.get("product")));
   const [search, setSearch] = useState(q);
   const [mama, setMama] = useState<MamaReport>();
   const [hileret, setHileret] = useState<HileretReport>();
   const selected =
     data?.items.find((item) => item.id === params.get("product")) ||
+    (pinned?.id === params.get("product") ? pinned : undefined) ||
     (params.get("product") === mamaPilotId && mama?.available
       ? mama.variant
       : undefined) ||
@@ -91,7 +107,7 @@ export function IntegrationCatalog() {
     Object.entries(values).forEach(([key, value]) =>
       value ? next.set(key, value) : next.delete(key),
     );
-    const leaving = ["product", "q", "page", "limit"].some(
+    const leaving = ["product", "q", "page", "limit", "filter"].some(
       (key) => next.get(key) !== params.get(key),
     );
     // Confirm before pushing history; cancel must not leave a duplicate URL entry.
@@ -119,7 +135,7 @@ export function IntegrationCatalog() {
     }
     if (navigationAttempt.current === urlParams.toString()) return;
     navigationAttempt.current = urlParams.toString();
-    const leaving = ["product", "q", "page", "limit"].some(
+    const leaving = ["product", "q", "page", "limit", "filter"].some(
       (key) => urlParams.get(key) !== params.get(key),
     );
     if (
@@ -175,12 +191,13 @@ export function IntegrationCatalog() {
     }
     const controller = new AbortController();
     setLoading(true);
-    loadCatalog(q, page, pageSize, controller.signal)
+    loadDashboard(q, page, pageSize, filter, controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) setData(result);
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
+        setPinned(undefined);
         const failure =
           err instanceof CatalogError
             ? err
@@ -197,7 +214,32 @@ export function IntegrationCatalog() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [!!session, q, page, pageSize, invalid, revision]);
+  }, [!!session, q, page, pageSize, filter, invalid, revision]);
+  useEffect(() => {
+    if (pinned?.id !== params.get("product")) setPinned(undefined);
+    setSelectionError("");
+  }, [params.get("product")]);
+  useEffect(() => {
+    const id = params.get("product");
+    if (!id || !session || invalid || !data || selected || isAuxiliaryPilot(id))
+      return;
+    const controller = new AbortController();
+    getWorkspace(id, controller.signal)
+      .then((record) => {
+        if (!controller.signal.aborted)
+          setPinned({
+            ...adaptVariant(record.source),
+            brand: record.fields.brand,
+            commercialName: record.fields.title,
+            editorialStatus: record.status,
+            editVersion: record.version,
+          });
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) setSelectionError(err.message);
+      });
+    return () => controller.abort();
+  }, [params.get("product"), !!session, invalid, data]);
   useEffect(() => {
     if (!selected) {
       originRef.current?.focus();
@@ -269,11 +311,13 @@ export function IntegrationCatalog() {
       });
       setSession(null);
       setData(undefined);
+      setPinned(undefined);
       setAuthError("");
     } catch (err) {
       if (err instanceof CatalogError && err.status === 401) {
         setSession(null);
         setData(undefined);
+        setPinned(undefined);
         setAuthError(err.message);
       } else setError(err as CatalogError);
     } finally {
@@ -330,420 +374,433 @@ export function IntegrationCatalog() {
       </main>
     );
   return (
-    <div className="d-app i-app">
-      <aside className="d-sidebar">
-        <a href="/" className="d-brand">
-          <span>k.</span>
+    <CatalogFrame
+      mode="integration"
+      onCatalog={() => document.getElementById("integration-search")?.focus()}
+      onHistory={selected ? () => update({ tab: "Historial" }) : undefined}
+      onLogout={logout}
+      busy={busy}
+    >
+      <div className="i-capture-strip" aria-label="Información de captura">
+        <span data-testid="shown">
+          En esta página: <strong>{data ? data.items.length : "—"}</strong> ·{" "}
+          {data ? `${data.matches} resultados` : unavailable}
+        </span>
+        <span data-testid="capture">
+          Captura:{" "}
           <strong>
-            KIKI<span>TECH 2.0</span>
-          </strong>
-        </a>
-        <div className="d-workspace">
-          <span className="d-avatar">K</span>
-          <div>
-            KIKI Market<small>Integración de prueba</small>
+            {data
+              ? "Completa"
+              : error?.status === 409
+                ? "Incompleta o no disponible"
+                : unavailable}
+          </strong>{" "}
+          · {captureDate(data?.lastAt ?? null)}
+        </span>
+      </div>
+      <CatalogMetrics
+        label="Resumen del catálogo"
+        cards={[
+          {
+            id: "all",
+            testId: "total",
+            title: "Variantes Ecomm-App",
+            value: data?.total ?? "—",
+            note: "Total informado por el backend",
+            active: filter === "all" && !q,
+            onClick: () =>
+              update({ filter: "", q: "", page: "", product: "", tab: "" }),
+          },
+          ...(
+            [
+              "identity",
+              "untouched",
+              "draft",
+              "ready",
+              "ready_for_channels",
+              "pack",
+            ] as const
+          ).map((key) => ({
+            id: key,
+            title: queueFilters[key],
+            value: data?.summary?.[key] ?? "—",
+            note:
+              key === "ready_for_channels"
+                ? "No confirma publicación en canales"
+                : "Calculado sobre el catálogo completo",
+            active: filter === key,
+            onClick: () =>
+              update({
+                filter: filter === key ? "" : key,
+                page: "",
+                product: "",
+                tab: "",
+              }),
+          })),
+        ]}
+      />
+      <p className="s-count-note">
+        Totales del catálogo completo, no sólo de esta página. Una variante
+        puede necesitar varias tareas. La ficha editorial y la publicación de
+        cada canal son estados distintos.
+      </p>
+      <section
+        className="i-coverage"
+        aria-label="Indicadores sin fuente integrada"
+      >
+        {[
+          "Publicaciones Mercado Libre",
+          "Publicaciones Tiendanube",
+          "Cobertura confirmada",
+          "Preparación por canal",
+        ].map((label) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{unavailable}</strong>
           </div>
-        </div>
-        <small className="d-nav-label">TU ESPACIO DE TRABAJO</small>
-        <nav aria-label="Navegación del catálogo">
-          <button
-            className="d-active"
-            onClick={() =>
-              document.getElementById("integration-search")?.focus()
-            }
-          >
-            <Icon name="box" />
-            Mi catálogo
-          </button>
-          <button disabled title={blocked}>
-            <Icon name="clock" />
-            Historial
-          </button>
-          <button disabled title={blocked}>
-            <Icon name="layers" />
-            Configuración
-          </button>
-        </nav>
-        <div className="d-sidebar-bottom">
-          <Icon name="shield" />
-          <strong>Entorno aislado</strong>
-          <p>
-            Catálogo sintético y archivos locales autorizados. Sin publicaciones
-            externas.
-          </p>
-          <span>Trabajo local · Sin conexión productiva</span>
-        </div>
-      </aside>
-      <div className="d-body">
-        <header className="d-topbar">
-          <span>
-            Espacio de trabajo / <strong>Mi catálogo</strong>
-          </span>
+        ))}
+      </section>
+      <section className="d-catalog" aria-label="Catálogo Ecomm-App">
+        <div className="i-catalog-heading">
           <div>
-            <span className="d-demo-dot" />
-            Integración aislada{" "}
-            <button onClick={logout} disabled={busy}>
-              Cerrar sesión
+            <h2>Mi catálogo</h2>
+            <p>
+              Una fila por variante. El SKU puede repetirse; el Ecomm ID
+              conserva la identidad.
+            </p>
+          </div>
+          <button
+            onClick={() => retry((value) => value + 1)}
+            disabled={loading || editorBusy || dirty}
+          >
+            Volver a consultar
+          </button>
+        </div>
+        <form
+          className="d-filters i-filters"
+          onSubmit={(event) => {
+            event.preventDefault();
+            update({ q: search.trim(), page: "", product: "", tab: "" });
+          }}
+        >
+          <CatalogSearch
+            id="integration-search"
+            value={search}
+            onChange={setSearch}
+            placeholder="Nombre, marca editada, SKU, presentación o Ecomm ID"
+            maxLength={80}
+          />
+          <button className="d-primary">Buscar</button>
+          <label>
+            Estado y siguiente paso
+            <select
+              aria-label="Filtrar catálogo"
+              value={filter}
+              onChange={(event) =>
+                update({
+                  filter:
+                    event.target.value === "all" ? "" : event.target.value,
+                  page: "",
+                  product: "",
+                  tab: "",
+                })
+              }
+            >
+              {Object.entries(queueFilters).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {filter !== "all" && (
+            <button
+              type="button"
+              onClick={() =>
+                update({ filter: "", page: "", product: "", tab: "" })
+              }
+            >
+              Limpiar filtro
+            </button>
+          )}
+
+          <label>
+            Por página
+            <select
+              aria-label="Variantes por página"
+              value={pageSize}
+              onChange={(event) =>
+                update({
+                  limit: event.target.value,
+                  page: "",
+                  product: "",
+                  tab: "",
+                })
+              }
+            >
+              {[3, 6, 25, 50].map((size) => (
+                <option key={size}>{size}</option>
+              ))}
+            </select>
+          </label>
+          {q && (
+            <button
+              type="button"
+              onClick={() => update({ q: "", page: "", product: "", tab: "" })}
+            >
+              Limpiar búsqueda
+            </button>
+          )}
+        </form>
+        {invalid && (
+          <div className="i-message" role="alert">
+            <h3>Filtros de URL inválidos</h3>
+            <p>
+              No se consultó el backend. Revisá la búsqueda y la paginación.
+            </p>
+            <button onClick={() => setParams({})}>Restablecer filtros</button>
+          </div>
+        )}
+        {loading && (
+          <p className="i-message" role="status">
+            Consultando catálogo de prueba…
+          </p>
+        )}
+        {error && (
+          <div className="i-message" role="alert">
+            <h3>No se pudo cargar el catálogo</h3>
+            <p>{error.message}</p>
+            <p>
+              No se utilizan cifras ni productos de demostración como reemplazo.
+            </p>
+            <button onClick={() => retry((value) => value + 1)}>
+              Reintentar
             </button>
           </div>
-        </header>
-        <main className="d-main">
-          <div className="d-heading">
-            <div>
-              <div className="d-eyebrow">TU CATÁLOGO CENTRAL</div>
-              <h1>
-                Tu catálogo, en un solo lugar<span>.</span>
-              </h1>
-              <p>
-                Consultá las variantes del backend de pruebas sin modificar tus
-                sistemas.
-              </p>
-            </div>
-          </div>
-          <div className="d-demo">
-            <Icon name="shield" />
-            <span>
-              <strong>Modo integración · Edición interna de prueba.</strong>{" "}
-              Variantes sintéticas guardadas en PostgreSQL descartable. Sin
-              conexión a proveedores.
-            </span>
-          </div>
-          <section
-            className="d-metrics i-metrics"
-            aria-label="Resumen del catálogo"
-          >
-            <div className="d-metric c-central" data-testid="total">
-              <span>Variantes Ecomm-App</span>
-              <strong>{data?.total ?? "—"}</strong>
-              <small>Total informado por el backend</small>
-            </div>
-            <div className="d-metric" data-testid="shown">
-              <span>Registros mostrados</span>
-              <strong>{data ? data.items.length : "—"}</strong>
-              <small>
-                {data ? `${data.matches} resultados de búsqueda` : unavailable}
-              </small>
-            </div>
-            <div className="d-metric" data-testid="capture">
-              <span>Estado de captura</span>
-              <strong className="i-text-metric">
-                {data
-                  ? "Completa"
-                  : error?.status === 409
-                    ? "Incompleta o no disponible"
-                    : unavailable}
-              </strong>
-              <small>
-                Última actualización: {captureDate(data?.lastAt ?? null)}
-              </small>
-            </div>
-          </section>
-          <section
-            className="i-coverage"
-            aria-label="Indicadores sin fuente integrada"
-          >
-            {[
-              "Publicaciones Mercado Libre",
-              "Publicaciones Tiendanube",
-              "Cobertura confirmada",
-              "Preparación por canal",
-              "Necesitan revisión",
-            ].map((label) => (
-              <div key={label}>
-                <span>{label}</span>
-                <strong>{unavailable}</strong>
-              </div>
-            ))}
-          </section>
-          {data && (
-            <MamaPilotLauncher
-              csrf={session.csrf_token}
-              disabled={dirty || editorBusy}
-              onLoaded={setMama}
-              onOpen={(value) => {
-                setMama(value);
-                update({ product: mamaPilotId, tab: "Ficha" });
-              }}
-            />
-          )}
-          {data && (
-            <HileretPilotLauncher
-              csrf={session.csrf_token}
-              disabled={dirty || editorBusy}
-              onLoaded={setHileret}
-              onOpen={(value, id) => {
-                setHileret(value);
-                update({ product: id, tab: "Ficha" });
-              }}
-            />
-          )}
-          <section className="d-catalog" aria-label="Catálogo Ecomm-App">
-            <div className="i-catalog-heading">
-              <div>
-                <h2>Mi catálogo</h2>
-                <p>
-                  Una fila por variante. El SKU puede repetirse; el Ecomm ID
-                  conserva la identidad.
-                </p>
-              </div>
-              <button
-                onClick={() => retry((value) => value + 1)}
-                disabled={loading || editorBusy || dirty}
-              >
-                Volver a consultar
-              </button>
-            </div>
-            <form
-              className="d-filters i-filters"
-              onSubmit={(event) => {
-                event.preventDefault();
-                update({ q: search.trim(), page: "", product: "", tab: "" });
-              }}
+        )}
+        {data && (
+          <>
+            <CatalogTable
+              className="i-table"
+              headings={[
+                "Producto / Presentación / Ecomm ID",
+                "SKU / Marca / Códigos",
+                "Stock de captura",
+                "Mercado Libre",
+                "Tiendanube",
+                "Ficha y siguiente paso",
+                "Acción",
+              ]}
             >
-              <label className="d-search">
-                <Icon name="search" />
-                <input
-                  id="integration-search"
-                  aria-label="Buscar productos"
-                  placeholder="Nombre, SKU, presentación o Ecomm ID"
-                  maxLength={80}
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </label>
-              <button className="d-primary">Buscar</button>
-              <label>
-                Por página
-                <select
-                  aria-label="Variantes por página"
-                  value={pageSize}
-                  onChange={(event) =>
-                    update({
-                      limit: event.target.value,
-                      page: "",
-                      product: "",
-                      tab: "",
-                    })
-                  }
-                >
-                  {[3, 6, 25].map((size) => (
-                    <option key={size}>{size}</option>
-                  ))}
-                </select>
-              </label>
-              {q && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    update({ q: "", page: "", product: "", tab: "" })
-                  }
-                >
-                  Limpiar búsqueda
-                </button>
-              )}
-            </form>
-            {invalid && (
-              <div className="i-message" role="alert">
-                <h3>Filtros de URL inválidos</h3>
+              {data.items.map((item) => (
+                <tr key={item.id} data-ecomm-id={item.id}>
+                  <td data-label="Producto">
+                    <strong>
+                      {item.commercialName ||
+                        item.name ||
+                        "Nombre no disponible"}
+                    </strong>
+                    <small>Catálogo Ecomm-App · Datos sintéticos</small>
+                    <small>Original: {item.name ?? unavailable}</small>
+                    <div className="i-presentation">
+                      {item.presentation ?? unavailable}
+                      <small>
+                        {item.isCombo === true || item.parentIsCombo === true
+                          ? "Pack / combo: revisar composición"
+                          : item.isCombo === false &&
+                              item.parentIsCombo === false
+                            ? "Sin marca de combo · Cantidad por verificar"
+                            : "Condición de combo no informada"}
+                      </small>
+                    </div>
+                  </td>
+                  <td data-label="Identidad">
+                    <strong>{item.sku ?? unavailable}</strong>
+                    <small>Ecomm ID: {item.id}</small>
+                    <small>Marca KIKI: {item.brand || unavailable}</small>
+                    <small>Barcode: {item.barcode ?? unavailable}</small>
+                    <small>GTIN: {item.gtinRaw ?? unavailable}</small>
+                    {!!item.identityBlockers?.length && (
+                      <strong className="i-identity-warning">
+                        Barcode y GTIN contradictorios · Guardado bloqueado
+                      </strong>
+                    )}
+                  </td>
+
+                  <td data-label="Stock de captura">
+                    {item.stock ?? unavailable}
+                    <small>{captureDate(item.capturedAt)}</small>
+                  </td>
+                  {(["ml", "tn"] as const).map((channel) => {
+                    const state = item.channels?.[channel];
+                    const label =
+                      !state || state.status === "UNAVAILABLE"
+                        ? unavailable
+                        : state.status === "NO_EXACT_SKU_IN_SNAPSHOT"
+                          ? "Sin publicación confirmada"
+                          : state.status === "SKU_CANDIDATE"
+                            ? "Vinculación por revisar"
+                            : "Revisión necesaria";
+                    return (
+                      <td
+                        key={channel}
+                        data-channel={channel}
+                        data-label={
+                          channel === "ml" ? "Mercado Libre" : "Tiendanube"
+                        }
+                      >
+                        <strong>{label}</strong>
+                        <small>
+                          {state?.note ??
+                            "Sin evidencia suficiente. No implica que no esté publicado."}
+                        </small>
+                      </td>
+                    );
+                  })}
+                  <td data-label="Ficha y siguiente paso">
+                    <strong>
+                      {stateLabels[item.editorialStatus || ""] ?? unavailable}
+                    </strong>
+                    <small>{item.reason}</small>
+                  </td>
+                  <td data-label="Acción">
+                    <button
+                      onClick={(event) => {
+                        originRef.current = event.currentTarget;
+                        update({ product: item.id, tab: "Ficha" });
+                      }}
+                    >
+                      Ver ficha
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </CatalogTable>
+            {!data.items.length && (
+              <div className="i-message" role="status">
+                <h3>
+                  {data.total === 0 ? "Catálogo vacío" : "Sin resultados"}
+                </h3>
                 <p>
-                  No se consultó el backend. Revisá la búsqueda y la paginación.
+                  {data.total === 0
+                    ? "La captura no contiene variantes."
+                    : "No encontramos variantes para esta búsqueda o página. Conservamos tus filtros."}
                 </p>
-                <button onClick={() => setParams({})}>
-                  Restablecer filtros
-                </button>
               </div>
             )}
-            {loading && (
-              <p className="i-message" role="status">
-                Consultando catálogo de prueba…
-              </p>
-            )}
-            {error && (
-              <div className="i-message" role="alert">
-                <h3>No se pudo cargar el catálogo</h3>
-                <p>{error.message}</p>
-                <p>
-                  No se utilizan cifras ni productos de demostración como
-                  reemplazo.
-                </p>
-                <button onClick={() => retry((value) => value + 1)}>
-                  Reintentar
-                </button>
-              </div>
-            )}
-            {data && (
-              <>
-                <div className="d-table-scroll">
-                  <table className="d-table i-table">
-                    <thead>
-                      <tr>
-                        <th>Producto</th>
-                        <th>SKU / Ecomm ID</th>
-                        <th>Presentación</th>
-                        <th>Stock de captura</th>
-                        <th>Estados comerciales</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.items.map((item) => (
-                        <tr key={item.id} data-ecomm-id={item.id}>
-                          <td data-label="Producto">
-                            <strong>
-                              {item.name ?? "Nombre no disponible"}
-                            </strong>
-                            <small>Catálogo Ecomm-App · Datos sintéticos</small>
-                          </td>
-                          <td data-label="Identidad">
-                            <strong>{item.sku ?? unavailable}</strong>
-                            <small>Ecomm ID: {item.id}</small>
-                          </td>
-                          <td data-label="Presentación">
-                            {item.presentation ?? unavailable}
-                          </td>
-                          <td data-label="Stock de captura">
-                            {item.stock ?? unavailable}
-                            <small>{captureDate(item.capturedAt)}</small>
-                          </td>
-                          <td data-label="Estados comerciales">
-                            <small>
-                              Editorial:{" "}
-                              {editorStates[item.id]
-                                ? stateLabels[editorStates[item.id]]
-                                : unavailable}
-                            </small>
-                            <small>ML: {unavailable}</small>
-                            <small>TN: {unavailable}</small>
-                          </td>
-                          <td data-label="Acción">
-                            <button
-                              onClick={(event) => {
-                                originRef.current = event.currentTarget;
-                                update({ product: item.id, tab: "Ficha" });
-                              }}
-                            >
-                              Ver ficha
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {!data.items.length && (
-                  <div className="i-message" role="status">
-                    <h3>
-                      {data.total === 0 ? "Catálogo vacío" : "Sin resultados"}
-                    </h3>
-                    <p>
-                      {data.total === 0
-                        ? "La captura no contiene variantes."
-                        : "No encontramos variantes para esta búsqueda o página. Conservamos tus filtros."}
-                    </p>
-                  </div>
-                )}
-                <footer className="d-table-footer i-pagination">
-                  <span>
-                    {data.items.length} mostrados · {data.matches} resultados ·{" "}
-                    {data.total} variantes en la captura
-                  </span>
-                  <div>
-                    <button
-                      disabled={page <= 1 || loading}
-                      onClick={() =>
-                        update({ page: String(page - 1), product: "", tab: "" })
-                      }
-                    >
-                      Anterior
-                    </button>
-                    <span>
-                      Página {page} de{" "}
-                      {Math.max(1, Math.ceil(data.matches / pageSize))}
-                    </span>
-                    <button
-                      disabled={page * pageSize >= data.matches || loading}
-                      onClick={() =>
-                        update({ page: String(page + 1), product: "", tab: "" })
-                      }
-                    >
-                      Siguiente
-                    </button>
-                  </div>
-                </footer>
-              </>
-            )}
-            {data && params.get("product") && !selected && (
-              <p role="alert" className="i-message">
-                La variante seleccionada no está en esta página. No se sustituyó
-                por un producto con el mismo SKU.
-                <button onClick={close}>Volver a la tabla</button>
-              </p>
-            )}
-          </section>
-          <p className="d-footnote">
-            <Icon name="help" />
-            Origen: {data?.source ?? unavailable}. El stock corresponde a la
-            captura, no está en vivo.
-          </p>
-        </main>
-      </div>
-      {selected && (
-        <>
-          <div className="d-backdrop" onClick={close} />
-          <section
-            ref={panelRef}
-            className="d-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Ficha ${selected.id}`}
-          >
-            <div className="d-drawer-top">
-              <span>CONSULTA DE VARIANTE</span>
-              <button
-                ref={closeRef}
-                onClick={close}
-                disabled={editorBusy}
-                aria-label="Cerrar ficha"
-              >
-                ×
-              </button>
-            </div>
-            <div className="d-drawer-title">
-              <span className="d-thumbnail">
-                <Icon name="box" size={32} />
+            <footer className="d-table-footer i-pagination">
+              <span>
+                {data.items.length} mostrados · {data.matches} resultados ·{" "}
+                {data.total} variantes en la captura
               </span>
               <div>
-                <h2>{selected.name ?? "Nombre no disponible"}</h2>
-                <p>
-                  {isAuxiliaryPilot(selected.id)
-                    ? "ID SINTÉTICO de pruebas (sin Ecomm ID real): "
-                    : "Ecomm ID: "}
-                  {selected.id} · {selected.presentation ?? unavailable}
-                </p>
+                <button
+                  disabled={page <= 1 || loading}
+                  onClick={() =>
+                    update({ page: String(page - 1), product: "", tab: "" })
+                  }
+                >
+                  Anterior
+                </button>
+                <span>
+                  Página {page} de{" "}
+                  {Math.max(1, Math.ceil(data.matches / pageSize))}
+                </span>
+                <button
+                  disabled={page * pageSize >= data.matches || loading}
+                  onClick={() =>
+                    update({ page: String(page + 1), product: "", tab: "" })
+                  }
+                >
+                  Siguiente
+                </button>
               </div>
-            </div>
-            <PersistentWorkspace
-              key={selected.id}
-              variant={selected}
-              csrf={session.csrf_token}
-              username={session.username}
-              tab={tab}
-              onTab={(value) => update({ tab: value })}
-              onDirty={setDirty}
-              onBusy={setEditorBusy}
-              onClose={close}
-              onAuthenticated={(value) => setSession(sessionData(value))}
-              onRecord={(value: EcommApiProductEdit) =>
-                setEditorStates((previous) =>
-                  previous[value.ecomm_id] === value.status
-                    ? previous
-                    : { ...previous, [value.ecomm_id]: value.status },
-                )
-              }
-            />
-          </section>
-        </>
+            </footer>
+          </>
+        )}
+        {data && params.get("product") && !selected && (
+          <p role="alert" className="i-message">
+            {isAuxiliaryPilot(params.get("product")!)
+              ? "Expediente auxiliar de pruebas: Ecomm ID auténtico pendiente. Usá los controles del piloto para abrirlo."
+              : selectionError ||
+                "Consultando la variante seleccionada por su Ecomm ID, sin cambiar la página ni sustituirla por SKU."}
+            <button onClick={close}>Volver a la tabla</button>
+          </p>
+        )}
+      </section>
+      {data && (
+        <MamaPilotLauncher
+          csrf={session.csrf_token}
+          disabled={dirty || editorBusy}
+          onLoaded={setMama}
+          onOpen={(value) => {
+            setMama(value);
+            update({ product: mamaPilotId, tab: "Ficha" });
+          }}
+        />
       )}
-    </div>
+      {data && (
+        <HileretPilotLauncher
+          csrf={session.csrf_token}
+          disabled={dirty || editorBusy}
+          onLoaded={setHileret}
+          onOpen={(value, id) => {
+            setHileret(value);
+            update({ product: id, tab: "Ficha" });
+          }}
+        />
+      )}
+      <p className="d-footnote">
+        <Icon name="help" />
+        Origen: {data?.source ?? unavailable}. El stock corresponde a la
+        captura, no está en vivo.
+      </p>
+      {selected && (
+        <ProductDrawer
+          id={selected.id}
+          title={selected.name ?? "Nombre no disponible"}
+          subtitle={
+            <>
+              {isAuxiliaryPilot(selected.id)
+                ? "ID SINTÉTICO de pruebas (sin Ecomm ID real): "
+                : "Ecomm ID: "}
+              {selected.id} · {selected.presentation ?? unavailable}
+            </>
+          }
+          thumbnail={
+            <span className="d-thumbnail">
+              <Icon name="box" size={32} />
+            </span>
+          }
+          onClose={close}
+          closeRef={closeRef}
+          panelRef={panelRef}
+          busy={editorBusy}
+          caption="CONSULTA DE VARIANTE"
+        >
+          <PersistentWorkspace
+            key={selected.id}
+            variant={selected}
+            csrf={session.csrf_token}
+            username={session.username}
+            tab={tab}
+            onTab={(value) => update({ tab: value })}
+            onDirty={setDirty}
+            onBusy={setEditorBusy}
+            onClose={close}
+            onAuthenticated={(value) => setSession(sessionData(value))}
+            onRecord={(value: EcommApiProductEdit) => {
+              const row = dataRef.current?.items.find(
+                (item) => item.id === value.ecomm_id,
+              );
+              if (row && row.editVersion !== value.version) {
+                setPinned(row);
+                retry((revision) => revision + 1);
+              }
+            }}
+          />
+        </ProductDrawer>
+      )}
+    </CatalogFrame>
   );
 }

@@ -138,12 +138,13 @@ def work_queue(
     filter: str = Query(default="all", max_length=35),
     page: int = Query(default=1, ge=1, le=100000),
     limit: int = Query(default=25, ge=1, le=50),
+    sort: Literal["priority", "capture"] = "priority",
     db: Session = Depends(get_db),
     _session=Depends(require_session),
 ):
     """API-only prioritized editorial queue; no AI calls, external writes or approvals."""
     try:
-        return build_queue(db, query=q, filter_name=filter, page=page, limit=limit)
+        return build_queue(db, query=q, filter_name=filter, page=page, limit=limit, sort=sort)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
