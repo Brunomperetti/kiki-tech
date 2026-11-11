@@ -1,7 +1,7 @@
 """Internal KIKI editor for Ecomm-App API variants; NO vendor writes."""
-from typing import Literal
+from typing import Literal, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -246,12 +246,22 @@ def get_edit(
 def save_edit(
     ecomm_id: str,
     body: SaveProductEdit,
+    proposal_id: Annotated[int | None, Header(alias="X-Kiki-Proposal-Id", ge=1)] = None,
+    proposal_revision: Annotated[int | None, Header(alias="X-Kiki-Proposal-Revision", ge=1)] = None,
     db: Session = Depends(get_db),
     _session=Depends(require_csrf),
 ):
     try:
+        if proposal_id is not None or proposal_revision is not None:
+            from .documental_workspace import enabled
+            from ...services.documental.proposals import Proposals
+            enabled()
+            if proposal_id is None or proposal_revision is None:
+                raise ValueError("Identificación y revisión de propuesta requeridas conjuntamente.")
+            return Proposals(db, _session).apply(ecomm_id, proposal_id, proposal_revision, body)
         return EcommApiProductWorkspace(db).save(
             ecomm_id, body.fields.model_dump(), body.status, body.expected_version
         )
     except ValueError as exc:
+        db.rollback()
         raise HTTPException(409, str(exc)) from None

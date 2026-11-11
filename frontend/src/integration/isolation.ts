@@ -32,6 +32,14 @@ export function installIntegrationIsolation() {
       url.password ||
       !(
         allowed.has(`${method} ${url.pathname}`) ||
+        (method === "GET" &&
+          /^\/api\/ecomm-app\/workspace\/90000[1-6]\/(?:evidence|proposals(?:\/generation-context)?|documents\/local-[a-f0-9]{32}\/original\/[1-8])$/.test(
+            url.pathname,
+          )) ||
+        (method === "POST" &&
+          /^\/api\/ecomm-app\/workspace\/90000[1-6]\/(?:evidence\/(?:extract|facts\/[a-f0-9]{24}\/review)|documents\/(?:import|local-[a-f0-9]{32}\/provenance)|proposals\/(?:generate|[1-9][0-9]{0,9}\/review))$/.test(
+            url.pathname,
+          )) ||
         (["GET", "POST"].includes(method) &&
           /^\/api\/ecomm-app\/workspace\/(?:90000[1-6]|PILOT-MAMA-350-SYNTHETIC|PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC)$/.test(
             url.pathname,

@@ -1,3 +1,4 @@
+import { documentalPath } from "./documental-paths";
 import { useState } from "react";
 import { request, captureDate } from "./catalog-adapter";
 import {
@@ -11,7 +12,7 @@ import {
   type ResearchDocument,
 } from "./research-adapter";
 
-const basePath = (id: string) => `/api/test-documents/${id}`;
+const basePath = (id: string) => documentalPath(id, "documents");
 export function DocumentImport({
   id,
   csrf,

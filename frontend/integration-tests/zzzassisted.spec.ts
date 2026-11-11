@@ -1,3 +1,4 @@
+import { legacyDocumental } from "./legacy-documental";
 import { test, expect, type Page } from "@playwright/test";
 import type {
   Dossier,
@@ -360,4 +361,8 @@ test("otra sesión decide primero: 409, motivo conservado e historial sin sobres
     .getByText("Decisiones anteriores de la fuente", { exact: false })
     .click();
   await expect(card).toContainText("Otra sesión rechazó primero");
+});
+
+test.beforeEach(async ({ page }) => {
+  await legacyDocumental(page);
 });

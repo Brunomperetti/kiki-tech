@@ -1,3 +1,4 @@
+import { documentalPath } from "./documental-paths";
 import { CatalogError, request } from "./catalog-adapter";
 import type { ResearchFact } from "./research-adapter";
 import { fieldKeys } from "./workspace-adapter";
@@ -14,7 +15,8 @@ export type Decisions = Partial<
 export type Proposal = {
   available: boolean;
   synthetic_only: boolean;
-  isolated_only: true;
+  isolated_only: boolean;
+  internal_only?: boolean;
   external_writes_enabled: false;
   ecomm_id: string;
   draft_id: number;
@@ -44,7 +46,7 @@ export type Proposal = {
     selected_fields?: string[];
   }[];
 };
-export const proposalPath = (id: string) => `/api/test-proposals/${id}`;
+export const proposalPath = (id: string) => documentalPath(id, "proposals");
 async function read(id: string, init?: RequestInit, suffix = "") {
   const data = (await (
     await request(proposalPath(id) + suffix, init)
@@ -52,10 +54,13 @@ async function read(id: string, init?: RequestInit, suffix = "") {
   if (
     !data ||
     data.ecomm_id !== id ||
-    data.isolated_only !== true ||
+    (data.internal_only !== true && data.isolated_only !== true) ||
     data.external_writes_enabled !== false ||
     typeof data.available !== "boolean" ||
     !Array.isArray(data.authorized_facts) ||
+    data.authorized_facts.some(
+      (f) => f.ecomm_id !== id || f.state !== "APPROVED",
+    ) ||
     (data.available &&
       (!Number.isSafeInteger(data.draft_id) ||
         !Number.isSafeInteger(data.revision) ||
@@ -64,6 +69,9 @@ async function read(id: string, init?: RequestInit, suffix = "") {
           (k) => !fieldKeys.includes(k as ProposalField),
         ) ||
         !Array.isArray(data.evidence) ||
+        data.evidence.some(
+          (f) => f.ecomm_id !== id || f.state !== "APPROVED",
+        ) ||
         !Array.isArray(data.history) ||
         !Array.isArray(data.blockers)))
   )

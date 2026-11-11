@@ -1,3 +1,4 @@
+import { documentalPath } from "./documental-paths";
 import { CatalogError, request } from "./catalog-adapter";
 export type AssistedCandidate = {
   id: string;
@@ -158,12 +159,13 @@ export type Dossier = {
     detail: unknown;
   }[];
   synthetic_only: boolean;
-  isolated_only: true;
+  isolated_only: boolean;
+  internal_only?: boolean;
   incorporated_document_id?: string;
   commercial_fields_applied: false;
   external_writes_enabled: false;
 };
-export const researchPath = (id: string) => `/api/test-research/${id}`;
+export const researchPath = (id: string) => documentalPath(id, "evidence");
 export const evidenceLabels = {
   PENDING: "Pendiente de revisión",
   APPROVED: "Aprobada",
@@ -176,7 +178,7 @@ function adapt(value: unknown, id: string): Dossier {
   if (
     !data ||
     data.ecomm_id !== id ||
-    data.isolated_only !== true ||
+    (data.internal_only !== true && data.isolated_only !== true) ||
     data.commercial_fields_applied !== false ||
     data.external_writes_enabled !== false ||
     !Number.isSafeInteger(data.version) ||
@@ -204,6 +206,7 @@ function adapt(value: unknown, id: string): Dossier {
     data.documents.some(
       (d) =>
         !(
+          data.isolated_only === true &&
           d.body.synthetic === true &&
           d.body.provenance.startsWith("fixture://")
         ) &&

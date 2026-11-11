@@ -51,6 +51,8 @@ def create_app(settings=None) -> FastAPI:
     application.include_router(duplicate_review_router)
     application.include_router(ecomm_app_router)
     application.include_router(ecomm_api_workspace_router)
+    from .api.routes.documental_workspace import router as documental_router
+    application.include_router(documental_router)
 
     @application.get("/health")
     def health():

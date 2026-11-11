@@ -1,13 +1,12 @@
+import { researchPath } from "./legacy-documental";
+import { legacyDocumental } from "./legacy-documental";
 import {
   test,
   expect,
   type Page,
   type APIRequestContext,
 } from "@playwright/test";
-import {
-  researchPath,
-  type Dossier,
-} from "../src/integration/research-adapter";
+import { type Dossier } from "../src/integration/research-adapter";
 import { workspacePath } from "../src/integration/workspace-adapter";
 
 const outside = new WeakMap<Page, string[]>();
@@ -367,4 +366,8 @@ test("409 de una decisión en otra sesión conserva el motivo y no reintenta apr
   ).toHaveValue(
     "Contrasté el fragmento y la variante de prueba de forma explícita.",
   );
+});
+
+test.beforeEach(async ({ page }) => {
+  await legacyDocumental(page);
 });

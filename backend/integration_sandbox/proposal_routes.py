@@ -1,12 +1,12 @@
 """Installed only by checked sandbox bootstrap, never production app.main."""
 
-from typing import Literal, Annotated
+from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from app.core.security import require_csrf, require_session
 from app.database.session import get_db
 from app.api.routes.ecomm_api_workspace import SaveProductEdit
+from app.services.documental.contracts import Generate, Review
 from .workspace import EcommApiProductWorkspace
 from .proposals import Proposals
 from .research.routes import execute
@@ -38,23 +38,6 @@ def context_for_future_generation(
     ecomm_id: str, db: Session = Depends(get_db), session=Depends(require_session)
 ):
     return execute(db, lambda: generation_context(db, session, ecomm_id))
-
-
-class Generate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    expected_version: int = Field(ge=0)
-
-
-class Decision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    decision: Literal["ACCEPTED", "REJECTED"]
-    value: str | list[dict[str, str]]
-
-
-class Review(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    expected_revision: int = Field(ge=1)
-    decisions: dict[str, Decision] = Field(max_length=18)
 
 
 @router.get("/{ecomm_id}")
@@ -107,6 +90,16 @@ def save_editor(
     session=Depends(require_csrf),
 ):
     try:
+        if proposal_id is not None:
+            from app.database.models import KikiAiEditorialDraft
+            from app.services.documental.proposals import MODEL as SHARED_MODEL
+            from app.api.routes.ecomm_api_workspace import save_edit
+
+            record = db.get(KikiAiEditorialDraft, proposal_id)
+            if record and record.model == SHARED_MODEL:
+                return save_edit(
+                    ecomm_id, body, proposal_id, proposal_revision, db, session
+                )
         if proposal_id is None and proposal_revision is None:
             return EcommApiProductWorkspace(db).save(
                 ecomm_id,

@@ -14,7 +14,7 @@ import { AssistedResearch } from "./AssistedResearch";
 import { MamaPilotSummary } from "./MamaPilot";
 import { mamaPilotId } from "./mama-pilot";
 import { HileretPilotSummary } from "./HileretPilot";
-import { isAuxiliaryPilot, isHileret } from "./hileret-pilot";
+import { isHileret } from "./hileret-pilot";
 
 export function ResearchSummary({
   id,
@@ -109,7 +109,7 @@ export function ResearchPanel({
       .then((value) => {
         if (!controller.signal.aborted) {
           setData(value);
-          if (isAuxiliaryPilot(id))
+          if (!value.documents.some((doc) => doc.id === selected))
             select((current) =>
               value.documents.some((doc) => doc.id === current)
                 ? current
@@ -222,7 +222,7 @@ export function ResearchPanel({
             <MamaPilotSummary revision={data.version} />
           ) : isHileret(id) ? (
             <HileretPilotSummary id={id} revision={data.version} />
-          ) : (
+          ) : data.documents.some((doc) => doc.body.synthetic) ? (
             <AssistedResearch
               id={id}
               csrf={csrf}
@@ -240,6 +240,12 @@ export function ResearchPanel({
                   select(value.incorporated_document_id);
               }}
             />
+          ) : (
+            <p role="note">
+              Investigación externa deshabilitada. Incorporá documentación local
+              autorizada, revisá su procedencia y aprobá cada hecho. No se
+              reutilizan documentos de otras variantes.
+            </p>
           )}
           <DocumentImport
             id={id}

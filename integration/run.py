@@ -219,6 +219,7 @@ def main():
                     )
                     for checks in (
                         "dashboard_checks",
+                        "documental_workspace_checks",
                         "connector_checks",
                         "pilot_checks",
                         "mama_checks",

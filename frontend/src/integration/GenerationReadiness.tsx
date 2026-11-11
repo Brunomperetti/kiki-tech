@@ -1,3 +1,4 @@
+import { proposalPath } from "./proposal-adapter";
 import { useState } from "react";
 import { request } from "./catalog-adapter";
 
@@ -29,7 +30,7 @@ export function GenerationReadiness({ id }: { id: string }) {
     setError("");
     try {
       const v = (await (
-        await request(`/api/test-proposals/${id}/generation-context`)
+        await request(`${proposalPath(id)}/generation-context`)
       ).json()) as Contract;
       if (
         v.schema_version !== "kiki-evidence-generation-v1" ||

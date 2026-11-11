@@ -1,10 +1,12 @@
-from typing import Literal
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import Field
 from sqlalchemy.orm import Session
 from app.core.security import require_session, require_csrf
 from app.database.session import get_db
+from app.services.documental.contracts import (
+    Incorporate as CommonIncorporate,
+    Provenance,
+)
 from .local_documents import LocalDocuments, parse_local
 from .research.routes import execute
 from .hileret_brochure import ENCODED_SIZE, validate_encoding
@@ -13,37 +15,9 @@ from .hileret_reference import PILOTS
 router = APIRouter(prefix="/api/test-documents", tags=["isolated-local-documents"])
 
 
-class Incorporate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    kind: Literal["FILE", "URL"]
-    expected_version: int = Field(ge=0)
-    filename: str = Field(default="", max_length=120)
-    content_type: str = Field(default="", max_length=80)
+class Incorporate(CommonIncorporate):
+    # Only sandbox pilot routes retain the hash-checked Hileret size profile.
     content_base64: str = Field(default="", max_length=ENCODED_SIZE)
-    provenance_note: str = Field(min_length=10, max_length=600)
-    reference_url: str = Field(default="", max_length=1000)
-    declared_official: bool = False
-    declared_manufacturer: str = Field(default="", max_length=180)
-    declared_consulted_at: datetime | None = None
-    authorized_local_processing: Literal[True]
-    document_id: str | None = Field(default=None, pattern=r"^local-[a-f0-9]{32}$")
-    expected_document_version: int | None = Field(default=None, ge=1)
-
-    @field_validator("declared_consulted_at")
-    @classmethod
-    def consulted_date(cls, value):
-        if value and (value.tzinfo is None or value > datetime.now(timezone.utc)):
-            raise ValueError(
-                "Fecha de consulta requiere zona horaria y no puede ser futura."
-            )
-        return value
-
-
-class Provenance(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    expected_document_version: int = Field(ge=1)
-    decision: Literal["REVIEWED", "REJECTED", "REVOKED"]
-    reason: str = Field(min_length=10, max_length=600)
 
 
 @router.post("/{ecomm_id}/import")

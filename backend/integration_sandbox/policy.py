@@ -37,6 +37,7 @@ def route_allowed(method: str, path: str) -> bool:
     return (
         (method, path) in ALLOWED_ROUTES
         or is_workspace_route(method, path)
+        or is_documental_workspace_route(method, path)
         or is_research_route(method, path)
         or is_proposal_route(method, path)
         or is_document_route(method, path)
@@ -49,6 +50,14 @@ def route_allowed(method: str, path: str) -> bool:
             ("POST", "/api/test-commercial-pilot/hileret-200/prepare"),
         }
     )
+
+
+def is_documental_workspace_route(method: str, path: str) -> bool:
+    prefix = r"/api/ecomm-app/workspace/90000[1-6]/"
+    suffix = (r"(?:evidence|proposals(?:/generation-context)?|documents/local-[a-f0-9]{32}/original/[1-8])"
+              if method == "GET" else
+              r"(?:evidence/(?:extract|facts/[a-f0-9]{24}/review)|documents/(?:import|local-[a-f0-9]{32}/provenance)|proposals/(?:generate|[1-9][0-9]{0,9}/review))")
+    return method in {"GET", "POST"} and bool(re.fullmatch(prefix + suffix, path))
 
 
 def is_assisted_route(method: str, path: str) -> bool:

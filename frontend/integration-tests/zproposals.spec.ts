@@ -1,3 +1,4 @@
+import { legacyDocumental } from "./legacy-documental";
 import {
   test,
   expect,
@@ -419,4 +420,8 @@ test("SKU compartido no reutiliza hechos de 250 g para la presentación 1 kg", a
   expect(proposal.missing).toContain(
     "Títulos: falta nombre o presentación con respaldo aprobado.",
   );
+});
+
+test.beforeEach(async ({ page }) => {
+  await legacyDocumental(page);
 });

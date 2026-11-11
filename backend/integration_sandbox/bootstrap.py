@@ -29,6 +29,7 @@ def create_sandbox_app():
         kiki_refresh_token="",
         kiki_ai_api_key="",
         kiki_ai_enabled=False,
+        kiki_document_workspace_enabled=True,
     )
     # Harness-only binding, before any service imports. Production get_settings is unchanged.
     config.get_settings = lambda: settings
@@ -61,6 +62,13 @@ def create_sandbox_app():
         async with original_lifespan(app):
             seed(SessionLocal)
             initialize_research(engine, SessionLocal)
+            # Explicit additive migration ONLY after preflight + verified disposable database.
+            from sqlalchemy import inspect, text
+            from app.services.documental.migration import UP
+            with engine.begin() as connection:
+                if not inspect(connection).has_table("kiki_evidence_control"):
+                    for statement in UP:
+                        connection.execute(text(statement))
             try:
                 yield
             finally:

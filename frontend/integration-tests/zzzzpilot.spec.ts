@@ -1,3 +1,4 @@
+import { legacyDocumental } from "./legacy-documental";
 import { expect, test, type Page } from "@playwright/test";
 import type { Dossier } from "../src/integration/research-adapter";
 const id = "900006",
@@ -252,4 +253,8 @@ test("una respuesta que pretende activar Internet se rechaza en el dashboard", a
     "Estado de aislamiento incompatible",
   );
   await expect(panel.getByRole("button")).toBeDisabled();
+});
+
+test.beforeEach(async ({ page }) => {
+  await legacyDocumental(page);
 });

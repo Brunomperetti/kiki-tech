@@ -1,33 +1,13 @@
-from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from app.core.security import require_session, require_csrf
 from app.database.session import get_db
 from .service import Research
+from app.services.documental.contracts import Extract, FactReview as Review, Revision
 
 router = APIRouter(prefix="/api/test-research", tags=["synthetic-research-only"])
 
 
-class Extract(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    expected_version: int = Field(ge=0)
-    document_id: str = Field(pattern=r"^[a-z0-9-]{1,80}$")
-    document_version: int = Field(ge=1)
-
-
-class Review(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    expected_version: int = Field(ge=0)
-    expected_fact_version: int = Field(ge=1)
-    decision: Literal["APPROVED", "REJECTED", "REVOKED"]
-    reason: str = Field(min_length=10, max_length=600)
-
-
-class Revision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    expected_version: int = Field(ge=1)
-    new_version: int = Field(ge=1)
 
 
 def execute(db, operation):

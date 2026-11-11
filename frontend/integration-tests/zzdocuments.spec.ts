@@ -1,3 +1,4 @@
+import { legacyDocumental } from "./legacy-documental";
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import type { Dossier } from "../src/integration/research-adapter";
@@ -440,4 +441,8 @@ test("reemplazo conserva original y vuelve obsoleta una propuesta; versión viej
   await expect(
     page.getByLabel("Procedencia del documento local"),
   ).toContainText("Pendiente de revisión");
+});
+
+test.beforeEach(async ({ page }) => {
+  await legacyDocumental(page);
 });
