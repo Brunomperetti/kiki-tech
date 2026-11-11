@@ -31,6 +31,7 @@ def create_sandbox_app():
         kiki_ai_enabled=False,
         kiki_document_workspace_enabled=True,
         kiki_channel_workspace_enabled=True,
+        kiki_editorial_batches_enabled=True,
     )
     # Harness-only binding, before any service imports. Production get_settings is unchanged.
     config.get_settings = lambda: settings
@@ -69,6 +70,11 @@ def create_sandbox_app():
             with engine.begin() as connection:
                 if not inspect(connection).has_table("kiki_evidence_control"):
                     for statement in UP:
+                        connection.execute(text(statement))
+            from app.services.editorial_batches.migration import UP as EDITORIAL_UP
+            with engine.begin() as connection:
+                if not inspect(connection).has_table("kiki_editorial_batches"):
+                    for statement in EDITORIAL_UP:
                         connection.execute(text(statement))
             try:
                 yield

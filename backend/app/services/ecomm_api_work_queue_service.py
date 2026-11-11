@@ -22,7 +22,8 @@ FILTERS = {
     "ml_candidate", "tn_candidate", "ml_no_exact", "tn_no_exact",
     "both_candidates", "channel_review", "neither_sku_in_snapshots",
     "ml_confirmed", "tn_confirmed", "tn_verified", "channel_candidates",
-    "channel_conflicts", "channel_no_evidence", "channel_stale"
+    "channel_conflicts", "channel_no_evidence", "channel_stale",
+    "evidence_approved", "needs_research", "evidence_revoked", "documents_changed", "review_soon"
 }
 
 
@@ -178,7 +179,7 @@ def _queue_item(id_value, sku, product_name, source_gtin, is_combo, captured_at,
     }
 
 
-def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="priority"):
+def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="priority", selection_ids_only=False):
     if sort not in {"priority", "capture"}:
         raise ValueError("Orden de catálogo inválido.")
     if filter_name not in FILTERS:
@@ -193,9 +194,10 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="prio
     if not status["complete"] or status["quality"].get("duplicate_variant_ids"):
         raise ValueError("La copia API Ecomm está incompleta o contiene IDs de variante duplicados.")
 
-    edits = {
-        x.ecomm_id: x for x in db.scalars(select(EcommApiProductEdit)).all()
-    }
+    from .editorial_batches.queue_projection import queue_edits, editorial_flags
+    editorial_available = get_settings().kiki_editorial_batches_enabled and db.bind.dialect.name == "postgresql"
+    edits = queue_edits(db) if editorial_available else {x.ecomm_id: x for x in db.scalars(select(EcommApiProductEdit))}
+    editorial = editorial_flags(db, edits, get_settings().kiki_editorial_review_soon_days) if editorial_available else {}
     channel_matrix = build_channel_coverage(db, pages, api_validation=get_settings().kiki_channel_workspace_enabled, edits=edits)
     sku_owners = Counter(
         _value(v.get("sku")).casefold()
@@ -225,6 +227,10 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="prio
                     channel_matrix["items_by_id"].get(ecomm_id),
                     source["identity_blockers"],
                 )
+                extra_flags = editorial.get(ecomm_id, [])
+                item["flags"].extend(extra_flags)
+                if editorial_available and "evidence_approved" not in extra_flags:
+                    item["flags"].append("needs_research")
                 item["source"] = source
                 counts["total"] += 1
                 counts["source_name_present"] += int(item["source_name_present"])
@@ -257,6 +263,8 @@ def build_queue(db, *, query="", filter_name="all", page=1, limit=25, sort="prio
     # Identity safety first; saved drafts next; packs before untouched simples.
     if sort == "priority":
         rows.sort(key=lambda x: (x["priority"], x["sku"].casefold(), x["ecomm_id"]))
+    if selection_ids_only:
+        return {"selected_ids": [row["ecomm_id"] for row in rows]}
     offset = (page - 1) * limit
     visible = rows[offset:offset + limit]
     # The table needs states/metadata, not every row's document-sized review history.

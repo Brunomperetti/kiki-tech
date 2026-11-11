@@ -49,6 +49,14 @@ class Research:
     fixtures = {}
     isolated_only = False
 
+    def edit_record(self, ident):
+        return self.db.scalar(
+            select(EcommApiProductEdit).where(EcommApiProductEdit.ecomm_id == ident)
+        )
+
+    def source_record(self, ident):
+        return self.workspace_type(self.db)._source(ident)
+
     def additional_blockers(self, item, doc):
         issues = []
         if (
@@ -58,11 +66,7 @@ class Research:
             issues.append(
                 "Falta identidad de presentación o tipo de venta en la captura."
             )
-        edit = self.db.scalar(
-            select(EcommApiProductEdit).where(
-                EcommApiProductEdit.ecomm_id == item.ecomm_id
-            )
-        )
+        edit = self.edit_record(item.ecomm_id)
         fields = edit.fields if edit else {}
         for key in ("brand", "manufacturer"):
             if (
@@ -94,12 +98,10 @@ class Research:
         )
 
     def reference(self, ident):
-        source = self.workspace_type(self.db)._source(ident)
+        source = self.source_record(ident)
         if source.get("identity_blockers"):
             raise ValueError("Identidad bloqueada: barcode y gtin discrepan.")
-        edit = self.db.scalar(
-            select(EcommApiProductEdit).where(EcommApiProductEdit.ecomm_id == ident)
-        )
+        edit = self.edit_record(ident)
         fields = edit.fields if edit else {}
         return {
             "ecomm_id": ident,

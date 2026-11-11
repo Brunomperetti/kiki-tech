@@ -32,6 +32,7 @@ const show = (v: unknown) =>
   typeof v === "string" ? v : JSON.stringify(v, null, 2);
 export function ProposalPanel({
   record,
+  draftId,
   csrf,
   blocked,
   active,
@@ -40,6 +41,7 @@ export function ProposalPanel({
   onSaved,
 }: {
   record: EcommApiProductEdit;
+  draftId?: number;
   csrf: string;
   blocked: boolean;
   active: boolean;
@@ -85,7 +87,7 @@ export function ProposalPanel({
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    loadProposal(record.ecomm_id, controller.signal)
+    loadProposal(record.ecomm_id, controller.signal, draftId)
       .then((value) => {
         if (!controller.signal.aborted) {
           if (changed) setData(value);
@@ -96,7 +98,7 @@ export function ProposalPanel({
         if (!controller.signal.aborted) setError(err.message);
       });
     return () => controller.abort();
-  }, [record.ecomm_id, record.version, active]);
+  }, [record.ecomm_id, record.version, active, draftId]);
   async function act(action: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -109,7 +111,7 @@ export function ProposalPanel({
           " Tu selección local se conserva; no se reintentó el guardado.",
       );
       try {
-        setData(await loadProposal(record.ecomm_id));
+        setData(await loadProposal(record.ecomm_id, undefined, draftId));
       } catch {
         /* keep original error */
       }
@@ -198,7 +200,7 @@ export function ProposalPanel({
       setMessage(
         `Selección guardada en PostgreSQL de pruebas · Versión ${saved.version}.`,
       );
-      adopt(await loadProposal(record.ecomm_id));
+      adopt(await loadProposal(record.ecomm_id, undefined, draftId));
     });
   }
   const stale =
@@ -215,6 +217,12 @@ export function ProposalPanel({
       aria-label="Propuestas comerciales documentadas"
     >
       <h3>Propuesta comercial desde evidencias</h3>
+      {draftId && (
+        <p>
+          Propuesta #{draftId} abierta desde el lote. Se revisa esta versión
+          exacta.
+        </p>
+      )}
       <GenerationReadiness
         key={`${record.ecomm_id}:${record.version}:${active}`}
         id={record.ecomm_id}
@@ -245,7 +253,7 @@ export function ProposalPanel({
       )}
       <button
         className="d-primary"
-        disabled={busy || blocked}
+        disabled={busy || blocked || !!draftId}
         onClick={generate}
       >
         Generar propuesta de prueba
@@ -259,7 +267,9 @@ export function ProposalPanel({
               "¿Descartar la selección local y recuperar la revisión guardada?",
             )
           )
-            void act(async () => adopt(await loadProposal(record.ecomm_id)));
+            void act(async () =>
+              adopt(await loadProposal(record.ecomm_id, undefined, draftId)),
+            );
         }}
       >
         Recuperar propuesta guardada

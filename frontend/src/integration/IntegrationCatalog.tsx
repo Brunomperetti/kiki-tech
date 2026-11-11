@@ -1,3 +1,4 @@
+import { BatchPanel } from "./BatchPanel";
 import { channelLabels } from "./channel-labels";
 import {
   CatalogFrame,
@@ -48,6 +49,7 @@ function sessionData(value: unknown): Session {
 export function IntegrationCatalog() {
   const [urlParams, setParams] = useSearchParams();
   const [params, setAcceptedParams] = useState(urlParams);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [dirty, setDirty] = useState(false);
   const [editorBusy, setEditorBusy] = useState(false);
   const [pinned, setPinned] = useState<Variant>();
@@ -76,15 +78,26 @@ export function IntegrationCatalog() {
     page > 100000 ||
     ![3, 6, 25, 50].includes(pageSize) ||
     String(pageSize) !== rawSize ||
-    ["q", "page", "limit", "product", "tab", "filter"].some(
+    ["q", "page", "limit", "product", "tab", "filter", "proposal"].some(
       (key) => params.getAll(key).length > 1,
     ) ||
     Array.from(params.keys()).some(
       (key) =>
-        !["q", "page", "limit", "product", "tab", "filter"].includes(key),
+        ![
+          "q",
+          "page",
+          "limit",
+          "product",
+          "tab",
+          "filter",
+          "proposal",
+        ].includes(key),
     ) ||
     (params.has("tab") && !tabs.includes(params.get("tab")!)) ||
-    (params.has("product") && !validVariantId(params.get("product")));
+    (params.has("product") && !validVariantId(params.get("product"))) ||
+    (params.has("proposal") &&
+      (!/^[1-9]\d{0,9}$/.test(params.get("proposal")!) ||
+        !params.has("product")));
   const [search, setSearch] = useState(q);
   const [mama, setMama] = useState<MamaReport>();
   const [hileret, setHileret] = useState<HileretReport>();
@@ -108,9 +121,21 @@ export function IntegrationCatalog() {
     Object.entries(values).forEach(([key, value]) =>
       value ? next.set(key, value) : next.delete(key),
     );
-    const leaving = ["product", "q", "page", "limit", "filter"].some(
-      (key) => next.get(key) !== params.get(key),
-    );
+    if (
+      (values.product !== undefined &&
+        values.product !== params.get("product")) ||
+      (values.tab && values.tab !== "IA")
+    ) {
+      if (!("proposal" in values)) next.delete("proposal");
+    }
+    const leaving = [
+      "product",
+      "q",
+      "page",
+      "limit",
+      "filter",
+      "proposal",
+    ].some((key) => next.get(key) !== params.get(key));
     // Confirm before pushing history; cancel must not leave a duplicate URL entry.
     if (
       leaving &&
@@ -136,9 +161,14 @@ export function IntegrationCatalog() {
     }
     if (navigationAttempt.current === urlParams.toString()) return;
     navigationAttempt.current = urlParams.toString();
-    const leaving = ["product", "q", "page", "limit", "filter"].some(
-      (key) => urlParams.get(key) !== params.get(key),
-    );
+    const leaving = [
+      "product",
+      "q",
+      "page",
+      "limit",
+      "filter",
+      "proposal",
+    ].some((key) => urlParams.get(key) !== params.get(key));
     if (
       leaving &&
       navigationPermit.current !== urlParams.toString() &&
@@ -645,6 +675,28 @@ export function IntegrationCatalog() {
         )}
         {data && (
           <>
+            <BatchPanel
+              ids={checked}
+              query={q}
+              filter={filter}
+              matches={data.matches}
+              csrf={session.csrf_token}
+              disabled={dirty || editorBusy || loading}
+              onClear={() => setChecked(new Set())}
+              onPage={() =>
+                setChecked(
+                  (current) =>
+                    new Set([...current, ...data.items.map((i) => i.id)]),
+                )
+              }
+              onOpen={(id, proposal) =>
+                update({
+                  product: id,
+                  tab: proposal ? "IA" : "Ficha",
+                  proposal: proposal ? String(proposal) : "",
+                })
+              }
+            />
             <CatalogTable
               className="i-table"
               headings={[
@@ -660,6 +712,23 @@ export function IntegrationCatalog() {
               {data.items.map((item) => (
                 <tr key={item.id} data-ecomm-id={item.id}>
                   <td data-label="Producto">
+                    <label className="b-checkbox">
+                      <input
+                        type="checkbox"
+                        aria-label={`Seleccionar ${item.id}`}
+                        checked={checked.has(item.id)}
+                        disabled={dirty || editorBusy}
+                        onChange={(event) =>
+                          setChecked((current) => {
+                            const next = new Set(current);
+                            if (event.target.checked) next.add(item.id);
+                            else next.delete(item.id);
+                            return next;
+                          })
+                        }
+                      />
+                      Seleccionar variante
+                    </label>
                     <strong>
                       {item.commercialName ||
                         item.name ||
@@ -846,6 +915,11 @@ export function IntegrationCatalog() {
         >
           <PersistentWorkspace
             key={selected.id}
+            proposalId={
+              params.has("proposal")
+                ? Number(params.get("proposal"))
+                : undefined
+            }
             variant={selected}
             csrf={session.csrf_token}
             username={session.username}

@@ -33,6 +33,7 @@ import { HileretPilotSummary } from "./HileretPilot";
 import { isAuxiliaryPilot, isHileret } from "./hileret-pilot";
 
 type Props = {
+  proposalId?: number;
   variant: Variant;
   csrf: string;
   username: string;
@@ -50,6 +51,7 @@ const show = (value: unknown) =>
   typeof value === "string" ? value || "Sin valor" : JSON.stringify(value);
 export function PersistentWorkspace({
   variant,
+  proposalId,
   csrf,
   username,
   tab,
@@ -586,6 +588,7 @@ export function PersistentWorkspace({
             )}
             <div hidden={tab !== "IA"}>
               <ProposalPanel
+                draftId={proposalId}
                 record={record}
                 csrf={csrf}
                 active={tab === "IA"}

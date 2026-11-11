@@ -81,8 +81,11 @@ async function read(id: string, init?: RequestInit, suffix = "") {
     );
   return data;
 }
-export const loadProposal = (id: string, signal?: AbortSignal) =>
-  read(id, { signal });
+export const loadProposal = (
+  id: string,
+  signal?: AbortSignal,
+  draftId?: number,
+) => read(id, { signal }, draftId ? `?draft_id=${draftId}` : "");
 export const mutateProposal = (
   id: string,
   suffix: string,

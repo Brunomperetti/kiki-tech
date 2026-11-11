@@ -60,7 +60,7 @@ class Proposals:
         )  # same mutex as evidence/revocations
         self.workspace = self.workspace_type(db)
 
-    def context(self, ident):
+    def lock_edit(self, ident):
         # Serialize against existing commercial saves before checking their fields.
         self.db.scalar(
             select(EcommApiProductEdit)
@@ -68,6 +68,9 @@ class Proposals:
             .with_for_update()
             .execution_options(populate_existing=True)
         )
+
+    def context(self, ident):
+        self.lock_edit(ident)
         item = self.research.dossier(ident)
         edit = self.workspace.get(ident)
         if edit["source_sku_changed"]:
@@ -301,7 +304,9 @@ class Proposals:
             }
         return self.serialize(record, edit, item, facts, fingerprint)
 
-    def generate(self, ident, expected_version):
+    def generate(
+        self, ident, expected_version, *, only_missing=False, batch_reference=None
+    ):
         edit, item, facts, fingerprint = self.context(ident)
         self.before_generate(ident, facts)
         if edit["version"] != expected_version:
@@ -309,6 +314,16 @@ class Proposals:
                 "La ficha cambió. Recuperá la versión nueva antes de generar."
             )
         fields, missing = self.generate_fields(facts)
+        if only_missing:
+            fields = {
+                key: value
+                for key, value in fields.items()
+                if not edit["fields"].get(key)
+            }
+            if not fields:
+                raise ValueError(
+                    "No hay campos incompletos que puedan recibir una propuesta respaldada."
+                )
         meta = {
             "workspace_version": edit["version"],
             "identity_hash": item.identity_digest,
@@ -333,6 +348,7 @@ class Proposals:
                     "at": now(),
                     "actor": self.research.actor,
                     "proposal": meta,
+                    **({"batch_reference": batch_reference} if batch_reference else {}),
                     "quality_warnings": [
                         "Redacción determinista desde hechos de documentos locales revisados; sin IA real. Las decisiones de un operador de prueba no son aprobación efectiva del cliente."
                         if any(

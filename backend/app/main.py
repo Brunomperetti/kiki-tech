@@ -56,6 +56,9 @@ def create_app(settings=None) -> FastAPI:
     from .api.routes.ecomm_api_channels import router as channel_router
     application.include_router(channel_router)
 
+    from .api.routes.editorial_batches import router as editorial_router
+    application.include_router(editorial_router)
+
     @application.get("/health")
     def health():
         try:

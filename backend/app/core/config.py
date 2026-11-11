@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic import field_validator
+from pydantic import field_validator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     kiki_refresh_token: str = ""
     kiki_ai_api_key: str = ""
     kiki_ai_model: str = "gpt-4.1-mini"
+    kiki_editorial_batches_enabled: bool = False
+    kiki_editorial_batch_max_items: int = Field(default=5000, ge=100, le=10000)
+    kiki_editorial_step_seconds: int = Field(default=10, ge=1, le=30)
+    kiki_editorial_step_size: int = Field(default=5, ge=1, le=20)
+    kiki_editorial_max_attempts: int = Field(default=3, ge=1, le=3)
+    kiki_editorial_context_bytes: int = Field(default=2_000_000, ge=65536, le=8_000_000)
+    kiki_editorial_review_soon_days: int = Field(default=7, ge=1, le=30)
     kiki_channel_workspace_enabled: bool = False
     kiki_document_workspace_enabled: bool = False
     kiki_ai_enabled: bool = False

@@ -1,0 +1,131 @@
+.b-work {
+  padding: 20px;
+  background: #f4f8f5;
+  border: 1px solid #d3dfd7;
+  border-radius: 14px;
+  margin: 16px 0;
+  color: #20352d;
+}
+.b-work h3 {
+  margin: 0 0 8px;
+}
+.b-work p {
+  max-width: 85ch;
+  line-height: 1.5;
+}
+.b-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: start;
+}
+.b-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.b-actions label {
+  display: grid;
+  gap: 5px;
+  font-size: 0.85rem;
+}
+.b-actions select {
+  max-width: 100%;
+  padding: 10px;
+  background: white;
+  border: 1px solid #bacabd;
+  border-radius: 8px;
+}
+.b-work button {
+  min-height: 42px;
+}
+.b-detail {
+  padding: 18px;
+  background: white;
+  border: 1px solid #d3dfd7;
+  border-radius: 10px;
+  margin-top: 16px;
+}
+.b-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.b-summary > div {
+  padding: 12px;
+  background: #f4f8f5;
+  border-radius: 9px;
+}
+.b-summary dt {
+  font-size: 0.85rem;
+}
+.b-summary dd {
+  font-size: 1.6rem;
+  margin: 6px 0 0;
+  font-weight: 700;
+}
+.b-items {
+  max-height: 480px;
+  overflow: auto;
+}
+.b-items article {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 0;
+  border-bottom: 1px solid #e0e7e2;
+}
+.b-items small {
+  display: block;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.b-items button {
+  align-self: start;
+}
+.b-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+.b-checkbox input {
+  width: 20px;
+  height: 20px;
+}
+.b-work details {
+  margin-top: 10px;
+}
+.b-work summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+@media (max-width: 650px) {
+  .b-work,
+  .b-detail {
+    padding: 12px;
+  }
+  .b-heading {
+    display: block;
+  }
+  .b-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .b-items article {
+    display: block;
+  }
+  .b-actions > button,
+  .b-actions > label {
+    width: 100%;
+  }
+  .b-items button {
+    margin-top: 8px;
+    width: 100%;
+  }
+  .b-work small {
+    overflow-wrap: anywhere;
+  }
+}

@@ -37,9 +37,22 @@ def route_allowed(method: str, path: str) -> bool:
     return (
         (method, path) in ALLOWED_ROUTES
         or is_workspace_route(method, path)
-        or (method == "GET" and bool(re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/channels", path)))
-        or (method == "POST" and bool(re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/channels/review", path)))
+        or (
+            method == "GET"
+            and bool(
+                re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/channels", path)
+            )
+        )
+        or (
+            method == "POST"
+            and bool(
+                re.fullmatch(
+                    r"/api/ecomm-app/workspace/90000[1-6]/channels/review", path
+                )
+            )
+        )
         or is_documental_workspace_route(method, path)
+        or is_editorial_batch_route(method, path)
         or is_research_route(method, path)
         or is_proposal_route(method, path)
         or is_document_route(method, path)
@@ -56,9 +69,11 @@ def route_allowed(method: str, path: str) -> bool:
 
 def is_documental_workspace_route(method: str, path: str) -> bool:
     prefix = r"/api/ecomm-app/workspace/90000[1-6]/"
-    suffix = (r"(?:evidence|proposals(?:/generation-context)?|documents/local-[a-f0-9]{32}/original/[1-8])"
-              if method == "GET" else
-              r"(?:evidence/(?:extract|facts/[a-f0-9]{24}/review)|documents/(?:import|local-[a-f0-9]{32}/provenance)|proposals/(?:generate|[1-9][0-9]{0,9}/review))")
+    suffix = (
+        r"(?:evidence|proposals(?:/generation-context)?|documents/local-[a-f0-9]{32}/original/[1-8])"
+        if method == "GET"
+        else r"(?:evidence/(?:extract|facts/[a-f0-9]{24}/review)|documents/(?:import|local-[a-f0-9]{32}/provenance)|proposals/(?:generate|[1-9][0-9]{0,9}/review))"
+    )
     return method in {"GET", "POST"} and bool(re.fullmatch(prefix + suffix, path))
 
 
@@ -251,3 +266,16 @@ def preflight() -> None:
         sslmode="disable",
     ) as connection:
         validate_database_identity(connection)
+
+
+def is_editorial_batch_route(method: str, path: str) -> bool:
+    if method == "GET":
+        return bool(
+            re.fullmatch(r"/api/ecomm-app/editorial-batches(?:/[a-f0-9-]{36})?", path)
+        )
+    return method == "POST" and bool(
+        re.fullmatch(
+            r"/api/ecomm-app/editorial-batches/(?:preview|[a-f0-9-]{36}/(?:start|step|cancel|retry))",
+            path,
+        )
+    )

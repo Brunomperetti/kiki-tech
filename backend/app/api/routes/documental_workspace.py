@@ -1,6 +1,6 @@
 """Authenticated documental workspace. No provider clients or startup DDL."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.security import require_session, require_csrf
@@ -134,9 +134,21 @@ def original(
 
 @router.get("/{ecomm_id}/proposals")
 def proposals(
-    ecomm_id: str, db: Session = Depends(get_db), session=Depends(require_session)
+    ecomm_id: str,
+    draft_id: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
 ):
-    return execute(db, lambda: Proposals(db, session).latest(ecomm_id))
+    def operation():
+        service = Proposals(db, session)
+        if draft_id is None:
+            return service.latest(ecomm_id)
+        edit, item, facts, fingerprint = service.context(ecomm_id)
+        return service.serialize(
+            service.get_record(ecomm_id, draft_id), edit, item, facts, fingerprint
+        )
+
+    return execute(db, operation)
 
 
 @router.post("/{ecomm_id}/proposals/generate")

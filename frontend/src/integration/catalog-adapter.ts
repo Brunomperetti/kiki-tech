@@ -71,7 +71,7 @@ export async function request(path: string, options: RequestInit = {}) {
   }
   if (!response.ok) {
     if (
-      /^\/api\/(?:ecomm-app\/workspace|test-research|test-proposals|test-documents|test-discovery|test-commercial-pilot)\//.test(
+      /^\/api\/(?:ecomm-app\/(?:workspace|editorial-batches)|test-research|test-proposals|test-documents|test-discovery|test-commercial-pilot)\//.test(
         path,
       ) &&
       [409, 422].includes(response.status)
@@ -223,6 +223,11 @@ export function adaptCatalog(
 }
 
 export const queueFilters = {
+  review_soon: "Próximos a revisión mensual",
+  evidence_approved: "Con aprobaciones documentales (verificar vigencia)",
+  needs_research: "Requieren investigación",
+  evidence_revoked: "Con evidencia revocada",
+  documents_changed: "Con documentación modificada",
   all: "Todo el catálogo",
   identity: "Identidad por revisar",
   untouched: "Sin trabajar",

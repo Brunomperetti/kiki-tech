@@ -140,9 +140,12 @@ def main():
             "status",
         ],
     )
+    parser.add_argument("--batches", action="store_true", help="Escenario documental sintético para lotes (up/browser-test).")
     parser.add_argument("--channels", action="store_true", help="Cargar escenario de canales sintético (sólo up/browser-test).")
     arguments = parser.parse_args()
     command = arguments.command
+    if arguments.batches and (command not in {"up", "browser-test"} or arguments.channels):
+        parser.error("--batches requiere up/browser-test y no se combina con --channels.")
     if arguments.channels and command not in {"up", "browser-test"}:
         parser.error("--channels sólo es válido para up o browser-test en el entorno descartable.")
     if command == "build":
@@ -164,14 +167,17 @@ def main():
         try:
             compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "90")
             verify_containers()
+            if arguments.batches:
+                compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.editorial_fixtures")
             if arguments.channels:
                 compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.channel_fixtures")
             if command in {"test", "legacy-test"}:
+                # Fresh guarded Python processes inside the already verified offline backend.
+                # Avoid starting another identical container for each test module.
                 module = "verify" if command == "test" else "legacy_tests"
                 compose(
-                    "run",
-                    "--rm",
-                    "--no-deps",
+                    "exec",
+                    "-T",
                     "backend",
                     "python",
                     "-m",
@@ -179,45 +185,40 @@ def main():
                 )
                 if command == "test":
                     compose(
-                        "run",
-                        "--rm",
-                        "--no-deps",
+                        "exec",
+                        "-T",
                         "backend",
                         "python",
                         "-m",
                         "integration_sandbox.editor_checks",
                     )
                     compose(
-                        "run",
-                        "--rm",
-                        "--no-deps",
+                        "exec",
+                        "-T",
                         "backend",
                         "python",
                         "-m",
                         "integration_sandbox.research_checks",
                     )
                     compose(
-                        "run",
-                        "--rm",
-                        "--no-deps",
+                        "exec",
+                        "-T",
                         "backend",
                         "python",
                         "-m",
                         "integration_sandbox.proposal_checks",
                     )
                     compose(
-                        "run",
-                        "--rm",
-                        "--no-deps",
+                        "exec",
+                        "-T",
                         "backend",
                         "python",
                         "-m",
                         "integration_sandbox.document_checks",
                     )
                     compose(
-                        "run",
-                        "--rm",
-                        "--no-deps",
+                        "exec",
+                        "-T",
                         "backend",
                         "python",
                         "-m",
@@ -226,6 +227,7 @@ def main():
                     for checks in (
                         "dashboard_checks",
                         "channel_checks",
+                        "editorial_checks",
                         "documental_workspace_checks",
                         "connector_checks",
                         "pilot_checks",
@@ -234,14 +236,14 @@ def main():
                         "hileret_authentic_checks",
                     ):
                         compose(
-                            "run",
-                            "--rm",
-                            "--no-deps",
+                            "exec",
+                            "-T",
                             "backend",
                             "python",
                             "-m",
                             "integration_sandbox." + checks,
                         )
+                    subprocess.run([sys.executable, str(ROOT / "integration/test_batch_restart.py")], check=True, env=clean_environment())
                     subprocess.run(
                         [sys.executable, str(ROOT / "integration/test_gateway.py")],
                         check=True,
@@ -250,7 +252,7 @@ def main():
             elif command == "browser-test":
                 # Runs its own gateway and Playwright against the actual isolated backend.
                 subprocess.run(
-                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--channels"] if arguments.channels else [])],
+                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--channels"] if arguments.channels else ["--batches"] if arguments.batches else [])],
                     check=True,
                     env=clean_environment(),
                 )

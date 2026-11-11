@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 from threading import Barrier
 from time import perf_counter
 import unittest
+from unittest.mock import patch as patch_setting
 from .editor_checks import application, operator
 from fastapi.testclient import TestClient
 from sqlalchemy import select, delete, event
@@ -481,7 +482,12 @@ class Channels(unittest.TestCase):
                 event.listen(engine, "before_cursor_execute", count)
                 try:
                     started = perf_counter()
-                    data = build_queue(db, limit=25, sort="capture")
+                    # Preserve the stage-2P budget with the new feature off (production default).
+                    # Stage 2Q measures its own enabled documentary queries independently.
+                    with patch_setting.object(
+                        get_settings(), "kiki_editorial_batches_enabled", False
+                    ):
+                        data = build_queue(db, limit=25, sort="capture")
                     elapsed = perf_counter() - started
                 finally:
                     event.remove(engine, "before_cursor_execute", count)

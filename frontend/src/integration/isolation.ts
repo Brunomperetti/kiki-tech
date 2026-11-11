@@ -33,6 +33,14 @@ export function installIntegrationIsolation() {
       !(
         allowed.has(`${method} ${url.pathname}`) ||
         (method === "GET" &&
+          /^\/api\/ecomm-app\/editorial-batches(?:\/[a-f0-9-]{36})?$/.test(
+            url.pathname,
+          )) ||
+        (method === "POST" &&
+          /^\/api\/ecomm-app\/editorial-batches\/(?:preview|[a-f0-9-]{36}\/(?:start|step|cancel|retry))$/.test(
+            url.pathname,
+          )) ||
+        (method === "GET" &&
           /^\/api\/ecomm-app\/workspace\/90000[1-6]\/channels$/.test(
             url.pathname,
           )) ||
