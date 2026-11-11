@@ -1,6 +1,6 @@
-"""Actual HTTP GET codec exercised only with injected offline TLS/socket doubles.
+"""Bounded HTTP GET codec shared by offline doubles and authorized native HTTPS.
 
-No system socket factory, URL opener, redirects, cookie jar or real resolver.
+No default live factory, URL opener, redirects, cookie jar or backend imports.
 """
 
 from dataclasses import dataclass, field
@@ -15,6 +15,7 @@ from .policy import (
     check_context,
     strict_context,
     public_addresses,
+    page_url,
 )
 from .safety import Code, Failure
 
@@ -31,6 +32,18 @@ class Credential:
             or any(ord(c) <= 32 or ord(c) == 127 for c in self.value)
         ):
             raise Failure(Code.CREDENTIAL)
+
+
+def get_bytes(request, credential):
+    checked_request(request)
+    if type(credential) is not Credential:
+        raise Failure(Code.CREDENTIAL)
+    target = request.url.split(HOST, 1)[1]
+    return (
+        f"GET {target} HTTP/1.1\r\nHost: {HOST}\r\n"
+        "Accept: application/json\r\nAccept-Encoding: identity\r\n"
+        "Connection: close\r\nAuthorization: Bearer " + credential.value + "\r\n\r\n"
+    ).encode("ascii")
 
 
 def remaining(deadline, clock):
@@ -67,12 +80,34 @@ def peer(channel, pinned):
 class PinnedGetWire:
     simulated = True
 
-    def __init__(self, *, socket_factory=None, context=None, clock=time.monotonic):
+    def __init__(
+        self,
+        *,
+        socket_factory=None,
+        context=None,
+        clock=time.monotonic,
+        authorization=None,
+    ):
         if (
             socket_factory is None
             or getattr(socket_factory, "simulated", False) is not True
         ):
+            from .authorization import QueryAuthorization
+            from .native import NativeSocketFactory, NativeTlsContext, require_grant
+
+            if (
+                type(authorization) is not QueryAuthorization
+                or type(socket_factory) is not NativeSocketFactory
+                or socket_factory.grant is not authorization
+                or type(context) is not NativeTlsContext
+                or context.grant is not authorization
+            ):
+                raise Failure(Code.OFFLINE_ONLY)
+            require_grant(authorization)
+            self.simulated = False
+        elif authorization is not None:
             raise Failure(Code.OFFLINE_ONLY)
+        self.authorization = authorization
         self.factory = socket_factory
         self.context = context if context is not None else strict_context()
         check_context(self.context)
@@ -80,12 +115,19 @@ class PinnedGetWire:
 
     def exchange(self, request, pinned, deadline, credential, revalidate_dns):
         checked_request(request)
+        headers = get_bytes(request, credential)
+        if not self.simulated:
+            if credential is not self.authorization.credential:
+                raise Failure(Code.CREDENTIAL)
+            self.authorization.validate()
+            if request.url == page_url(2) and self.authorization.max_pages < 2:
+                raise Failure(Code.REQUEST)
         public_addresses([pinned])
         check_context(self.context)
         channel = tls = response = None
         try:
             remaining(deadline, self.clock)
-            channel = self.factory()
+            channel = self.factory() if self.simulated else self.factory.open(pinned)
             channel.settimeout(remaining(deadline, self.clock))
             channel.connect((pinned, 443))  # numeric pinned destination, not DNS again
             peer(channel, pinned)
@@ -97,16 +139,8 @@ class PinnedGetWire:
                 raise Failure(Code.TLS)
             revalidate_dns()  # must still match the original public DNS set BEFORE bearer
             peer(tls, pinned)
-            target = request.url.split(HOST, 1)[1]
-            headers = (
-                f"GET {target} HTTP/1.1\r\nHost: {HOST}\r\n"
-                "Accept: application/json\r\nAccept-Encoding: identity\r\n"
-                "Connection: close\r\nAuthorization: Bearer "
-                + credential.value
-                + "\r\n\r\n"
-            )
             tls.settimeout(remaining(deadline, self.clock))
-            tls.sendall(headers.encode("ascii"))
+            tls.sendall(headers)
             stream = io.BufferedReader(DeadlineStream(tls, deadline, self.clock), 4096)
 
             class ResponseSocket:

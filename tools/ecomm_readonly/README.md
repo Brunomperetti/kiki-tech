@@ -1,4 +1,10 @@
-# Lector Ecomm-App: preparación exclusivamente offline
+# Lector Ecomm-App: modo offline y adaptador preparado en 2M
+
+La etapa 2M agregó un adaptador nativo HTTPS sin ejecutarlo. Véase
+[PREPARED-QUERY-2M.md](PREPARED-QUERY-2M.md) para autorización, credenciales,
+comando futuro, pruebas y límites de despliegue. **Codex/proxies se rechazan antes
+de leer credenciales: este transporte no permite verificar su destino final.**
+Los comandos `run.py plan/demo/test` conservan su operación sin red.
 
 Base comprobada antes de modificar archivos: rama
 `feature/kiki-tech-2-dashboard`, HEAD
@@ -21,19 +27,23 @@ activa, expediente, documento, decisiones ni aprobaciones de KIKI.
   La copia usa Python `-I -S`; no ejecuta el backend del donante. La compilación
   tiene `--network=none`, `--pull=false` y se detiene si falta la imagen local.
 - `entrypoint.py`/`ecomm_reader/safety.py`: Python aislado, sin bytecode, hook de
-  auditoría irreversible para sockets/DNS, escrituras, subprocesos e importaciones
+  auditoría irreversible con rechazo por defecto de sockets/DNS, escrituras, subprocesos e importaciones
   de backend/DB/ctypes. Se bloquea el inicio si el proceso ya importó esos módulos.
-  Es defensa adicional; el límite de sistema operativo es el contenedor sin red.
+  Es defensa adicional; el límite de sistema operativo del modo offline es el
+  contenedor sin red. En 2M sólo el adaptador autorizado puede abrir un permiso
+  temporal para una operación nativa fija, sin relajar las demás prohibiciones.
 - El contenedor no tiene montajes, puertos publicados, privilegios o capacidades;
   raíz readonly, UID/GID 1000, `no-new-privileges`, 192 MiB, un CPU y 16 procesos.
   El lector limita memoria virtual a 160 MiB y CPU a 5/6 s. Sólo devuelve resultados
   por stdout; no escribe archivos, sesiones, referencias, decisiones o fichas.
 - `policy.py`/`wire.py`: política cerrada de GET y codec HTTP real, ejercitado con
-  sockets/TLS de memoria. No existe resolver ni fábrica de sockets reales, opción
-  `--live`, entrada CLI de credenciales, lectura de `.env` o fallback de red.
+  sockets/TLS de memoria. El CLI offline no admite `--live`, credenciales, `.env`
+  o fallback de red. `native.py` agrega en 2M resolver y sockets nativos a través
+  del mismo codec, sólo mediante el comando independiente `query.py` y su
+  autorización explícita. Ese comando no se ejecutó contra ningún servicio.
 - `catalog.py`/`reader.py`: validación de respuesta, identidad y paginación. Los
   dobles están separados en `simulated.py`; sus IDs y SKU son explícitamente
-  ficticios y nunca se guardan en KIKI. `authentic_ecomm_id` siempre es `null` y
+  ficticios y nunca se guardan en KIKI. `authentic_ecomm_id` permanece `null` y
   `binding_permitted` siempre es `false`.
 
 ## Contrato de consulta preparado, no ejecutado
@@ -131,13 +141,13 @@ No se ejecutaron suites de backend, frontend ni PostgreSQL: esos componentes no
 cambiaron y no se iniciaron para esta tarea. El PDF Hileret conserva SHA-256
 `bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291`.
 
-La primera consulta auténtica **sigue sin estar habilitada**. Faltan autorización
-explícita para cuenta/filtro/presupuesto; provisión segura y verificación de scope
-`inventario:leer`; adaptador real de red revisado independientemente; garantía de
-TLS/DNS/destino final compatible con el proxy y las reglas efectivas de la
-plataforma; procedencia/cuenta/fecha, almacenamiento restringido y minimización
-de la respuesta. Si el entorno no permite esas garantías, detenerse y solicitar
-una referencia/exportación autorizada, sin abrir Internet al backend.
+La primera consulta auténtica **sigue sin estar autorizada**. El adaptador directo
+está preparado en 2M, con pruebas exclusivamente simuladas. Faltan autorización
+explícita, provisión segura y revisión de scopes de una credencial concreta.
+En Codex faltan además acceso permitido al host y un transporte compatible con
+el proxy que garantice TLS/DNS/destino final. El adaptador directo rechaza ese
+entorno; no se debe retirar el proxy para ejecutarlo. Véase el informe 2M para
+la alternativa de ejecución futura en un entorno directo revisado y autorizado.
 
 La forma exacta de IDs, paginación y campos nativos de la cuenta no fue comprobada
 en vivo. Si difiere, se rechaza; no se relajan reglas ni se completan con Excel o

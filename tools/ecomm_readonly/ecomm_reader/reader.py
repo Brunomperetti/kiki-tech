@@ -1,4 +1,4 @@
-"""Bounded simulated query state machine. No binding, persistence or backend."""
+"""Shared bounded query state machine. No binding, persistence or backend."""
 
 import time
 from .catalog import decode, pagination, candidates
@@ -47,10 +47,42 @@ class InventoryReader:
         )
         self._requests = 0
         self._second_authorized = False
+        self._max_pages = MAX_REQUESTS
+        self._authorization = None
+
+    @classmethod
+    def authorized_query(cls, authorization, resolver, wire):
+        from .authorization import QueryAuthorization
+        from .native import NativeResolver, require_grant
+        from .wire import PinnedGetWire
+
+        if (
+            type(authorization) is not QueryAuthorization
+            or type(resolver) is not NativeResolver
+            or type(wire) is not PinnedGetWire
+            or wire.simulated is not False
+            or resolver.grant is not authorization
+            or wire.authorization is not authorization
+        ):
+            raise Failure(Code.AUTHORIZATION)
+        require_grant(authorization)
+        instance = cls.__new__(cls)
+        instance.resolver, instance.wire, instance.credential, instance.clock = (
+            resolver,
+            wire,
+            authorization.credential,
+            time.monotonic,
+        )
+        instance._requests, instance._second_authorized = 0, False
+        instance._max_pages, instance._authorization = (
+            authorization.max_pages,
+            authorization,
+        )
+        return instance
 
     def _page(self, number):
         if (
-            self._requests >= MAX_REQUESTS
+            self._requests >= self._max_pages
             or number != self._requests + 1
             or (number == 2 and not self._second_authorized)
         ):
@@ -84,7 +116,7 @@ class InventoryReader:
             seen = set()
             rows = candidates(data, 1, seen)
             traces = [{"page": 1, "response_sha256": digest}]
-            if first is not None and first.total_pages >= 2:
+            if first is not None and first.total_pages >= 2 and self._max_pages >= 2:
                 self._second_authorized = True
                 body, digest = self._page(2)
                 data = decode(body, sensitive_value=self.credential.value)
@@ -94,8 +126,10 @@ class InventoryReader:
             scope = (
                 "PAGINATION_UNCONFIRMED"
                 if first is None
-                else "QUERY_TRUNCATED_AT_TWO_PAGES"
-                if first.total_pages > 2
+                else "QUERY_TRUNCATED_AT_"
+                + ("TWO" if self._max_pages == 2 else "ONE")
+                + "_PAGES"
+                if first.total_pages > self._max_pages
                 else "FILTERED_QUERY_COMPLETE"
             )
             eligible = [r for r in rows if r["eligible_for_human_review"]]
@@ -107,7 +141,7 @@ class InventoryReader:
                         else "QUERY_SCOPE_UNCONFIRMED"
                     )
                     row["eligible_for_human_review"] = False
-            return {
+            result = {
                 "mode": "SIMULATED_RESPONSES_ONLY",
                 "real_requests": 0,
                 "simulated_gets": self._requests,
@@ -120,6 +154,23 @@ class InventoryReader:
                 "human_approval_required": True,
                 "external_writes": False,
             }
+            if self._authorization is not None:
+                from .authorization import utcnow
+
+                result.update(
+                    mode="AUTHORIZED_PROVIDER_RESPONSE",
+                    real_requests=self._requests,
+                    origin=page_url(1).split("?", 1)[0],
+                    authorized_max_pages=self._max_pages,
+                    read_at=utcnow().isoformat(),
+                    scope_verification="OWNER_ATTESTED_NOT_SERVER_VERIFIED",
+                    scope_evidence_sha256=self._authorization.evidence_sha256,
+                    requested_provider_mutations=False,
+                    provider_side_effects="NOT_VERIFIED_LOGGING_OR_METERING_POSSIBLE",
+                )
+                del result["simulated_gets"]
+                del result["external_writes"]
+            return result
         except Failure:
             raise
         except Exception:

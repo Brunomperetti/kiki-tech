@@ -1,6 +1,8 @@
-"""Offline process boundary. No application, database or environment imports."""
+"""Default-deny boundary with scoped native calls for an authorized query only."""
 
 from enum import Enum
+from contextlib import contextmanager
+from contextvars import ContextVar
 import sys
 
 
@@ -23,6 +25,9 @@ class Code(str, Enum):
     CREDENTIAL = "INVALID_CREDENTIAL"
     COMMAND = "UNSUPPORTED_OFFLINE_COMMAND"
     INTERNAL = "OFFLINE_READER_FAILED"
+    AUTHORIZATION = "MISSING_OR_INVALID_SCOPE_ATTESTATION"
+    SECRET_FILE = "PRIVATE_CREDENTIAL_FILE_REQUIRED"
+    ENVIRONMENT = "DIRECT_VERIFIED_TRANSPORT_UNAVAILABLE"
 
 
 class Failure(ValueError):
@@ -45,6 +50,50 @@ FORBIDDEN_IMPORTS = (
     "_ctypes",
 )
 _installed = False
+_network_call = ContextVar("ecomm_single_native_call", default=None)
+
+
+@contextmanager
+def native_call(grant, operation, *, channel=None, address=None, family=None):
+    """One closed native operation, never a process-wide/network environment flag.
+
+    Imported lazily so offline import installs the default-deny guard first.
+    Both the authority and the deployment environment are checked at every call.
+    """
+    from .authorization import QueryAuthorization
+    from .native import require_direct_environment
+
+    if type(grant) is not QueryAuthorization:
+        raise Failure(Code.AUTHORIZATION)
+    grant.validate()
+    require_direct_environment()
+    if operation not in {"dns", "open", "connect", "tls"}:
+        raise Failure(Code.IO)
+    token = _network_call.set((operation, channel, address, family))
+    try:
+        yield
+    finally:
+        _network_call.reset(token)
+
+
+def permitted_socket_event(event, args):
+    from .policy import HOST, public_addresses
+
+    scope = _network_call.get()
+    if scope is None:
+        return False
+    operation, channel, address, family = scope
+    if event == "socket.getaddrinfo" and operation == "dns":
+        # AF_UNSPEC=0, SOCK_STREAM=1, IPPROTO_TCP=6, flags=0, fixed host/port.
+        return args == (HOST, 443, 0, 1, 6, 0)
+    if event == "socket.__new__" and operation in {"open", "tls"}:
+        return args[1:] == (family, 1, 6) and family in (2, 10)
+    if event == "socket.connect" and operation == "connect":
+        if args[0] is not channel or args[1] != address:
+            return False
+        public_addresses([address[0]])
+        return address[1] == 443
+    return False
 
 
 def forbidden_module(name):
@@ -58,11 +107,15 @@ def install():
     if _installed:
         return
 
-    # No mutable "live" flag is consulted by this irreversible audit hook.
+    # No environment/CLI "live" flag relaxes this irreversible audit hook.
+    # A typed, validated grant permits only the exact native call in its scope.
     def guard(event, args):
         if event == "import" and forbidden_module(args[0]):
             raise Failure(Code.CONTEXT)
-        if event.startswith("socket.") or event in {
+        if event.startswith("socket."):
+            if not permitted_socket_event(event, args):
+                raise Failure(Code.IO)
+        if event in {
             "subprocess.Popen",
             "os.system",
             "os.exec",

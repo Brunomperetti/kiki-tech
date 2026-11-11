@@ -1,4 +1,4 @@
-"""Only offline, standalone inventory preparation. Never import from KIKI."""
+"""Standalone reader with default-deny I/O. Never import from KIKI."""
 
 from .safety import install
 
