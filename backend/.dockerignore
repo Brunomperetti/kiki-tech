@@ -1,0 +1,16 @@
+**
+!Dockerfile
+!requirements.txt
+!requirements-reader.txt
+!start.py
+!reader_launcher.py
+!app/
+!app/**
+!document_reader/
+!document_reader/**
+**/__pycache__/
+**/*.pyc
+**/.env*
+**/*.pem
+**/*.key
+**/*.p12

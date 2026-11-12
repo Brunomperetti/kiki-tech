@@ -79,6 +79,20 @@ test("cinco vistas, calidad, URL, conexiones sin sincronizaciones", async ({
   await expect(page).toHaveURL(/filter=ean_missing/);
   await page.reload();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
+  await page.getByText("Calidad del catálogo", { exact: true }).click();
+  await page
+    .getByRole("button", { name: /SKU repetido · no confirma duplicados/ })
+    .click();
+  await expect(page).toHaveURL(/filter=sku_repeated/);
+  await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
+  await page
+    .getByRole("button", { name: /EAN repetido · revisar presentaciones/ })
+    .click();
+  await expect(page.locator("[data-ecomm-id]")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: /EAN no informado en Ecomm-App/ })
+    .click();
+  await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
   await page
     .getByRole("button", { name: "Centro de conexiones", exact: true })
     .click();
@@ -310,6 +324,9 @@ test("error de catálogo no usa fallback y permite regresar a la interfaz anteri
     .click();
   await expect(page).toHaveURL(/dashboard-classic/);
   await expect(
+    page.getByText("Ecomm API: copia completa", { exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByText("KIKI Tech 2.0 no disponible", { exact: true }),
   ).toHaveCount(0);
 });
@@ -360,6 +377,104 @@ test("OpenAI existente: transporte simulado, versión visible y bloqueo por edic
     .getByLabel("Título completo", { exact: true })
     .fill("Cambios sin guardar para comprobar bloqueo IA");
   await page.getByRole("tab", { name: "IA", exact: true }).click();
-  await page.getByText("Servicios IA existentes y límites", { exact: true }).click();
+  await page
+    .getByText("Servicios IA existentes y límites", { exact: true })
+    .click();
   await expect(generate).toBeDisabled();
+});
+
+test("raíz original, sesión compartida y reversión de v2 sin bloquear la aplicación anterior", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/dashboard-classic/);
+  await expect(
+    page.getByText("Ecomm API: copia completa", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Abrir KIKI Tech 2.0", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Iniciar sesión", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.route("**/api/ui/v2", (r) =>
+    r.fulfill({
+      status: 404,
+      headers: { "X-Kiki-UI-Contract": "kiki-same-origin-v2-1" },
+      json: { detail: "KIKI Tech 2.0 deshabilitado" },
+    }),
+  );
+  await page
+    .getByRole("link", { name: "Abrir KIKI Tech 2.0", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "KIKI Tech 2.0 no disponible",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator("[data-ecomm-id]")).toHaveCount(0);
+  await page
+    .getByRole("link", { name: "Volver a la interfaz anterior", exact: true })
+    .click();
+  await expect(page).toHaveURL(/dashboard-classic/);
+  await expect(
+    page.getByText("Ecomm API: copia completa", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Abrir KIKI Tech 2.0", exact: true }),
+  ).toBeVisible();
+});
+
+test("lote desde v2: seis Ecomm ID exactos, previsualización, confirmación y tareas sin cambios comerciales", async ({
+  page,
+}) => {
+  const before = await (
+    await page.request.get("/api/ecomm-app/workspace/900001")
+  ).json();
+  await page
+    .getByRole("button", { name: "Seleccionar esta página", exact: true })
+    .click();
+  await expect(page.getByTestId("selected-count")).toHaveText(
+    "6 variantes seleccionadas",
+  );
+  await page.getByRole("button", { name: "Operaciones", exact: true }).click();
+  await page
+    .getByLabel("Operación del lote", { exact: true })
+    .selectOption("REVIEW_TASKS");
+  await page
+    .getByRole("button", { name: "Previsualizar selección", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Revisá antes de iniciar", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByTestId("batch-progress")).toContainText(
+    "Pendiente: 6",
+  );
+  await page
+    .getByRole("button", { name: "Confirmar e iniciar lote", exact: true })
+    .click();
+  await expect(page.getByTestId("batch-progress")).toContainText(
+    "Completado: 6",
+  );
+  const after = await (
+    await page.request.get("/api/ecomm-app/workspace/900001")
+  ).json();
+  expect(after.fields).toEqual(before.fields);
+  expect(after.version).toBe(before.version);
+  const jobs = await (
+    await page.request.get("/api/ecomm-app/editorial-batches?page=1&limit=10")
+  ).json();
+  const job = jobs.items.find(
+    (j: { operation: string }) => j.operation === "REVIEW_TASKS",
+  );
+  expect(job).toBeTruthy();
+  const detail = await (
+    await page.request.get(
+      `/api/ecomm-app/editorial-batches/${job.id}?page=1&limit=25`,
+    )
+  ).json();
+  expect(
+    detail.items.map((i: { ecomm_id: string }) => i.ecomm_id).sort(),
+  ).toEqual(["900001", "900002", "900003", "900004", "900005", "900006"]);
 });

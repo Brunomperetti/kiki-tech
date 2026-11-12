@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     configure_logging()
     # A v2 rollout requires an explicitly reviewed schema; never performs DDL.
     # Preserve the historical bootstrap when v2 is disabled.
-    if not get_settings().kiki_v2_enabled:
+    if get_settings().kiki_auto_create_schema and not get_settings().kiki_v2_enabled:
         Base.metadata.create_all(engine)
     from .database.session import SessionLocal
     from .services.v2_lifecycle import start_executor, stop_executor

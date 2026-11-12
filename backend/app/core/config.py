@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     kiki_document_workspace_enabled: bool = False
     kiki_ai_enabled: bool = False
     # Default-off UI controls; existing provider/worker flags remain required.
+    kiki_auto_create_schema: bool = True
+    kiki_document_parser_kernel_required: bool = False
+    kiki_document_parser_socket: str = "/document-parser/parser.sock"
     kiki_v2_enabled: bool = False
     kiki_v2_writes_enabled: bool = False
     kiki_v2_connections_enabled: bool = False

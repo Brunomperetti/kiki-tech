@@ -1,5 +1,7 @@
 # Integración productiva de KIKI Tech 2.0: preparación y activación controlada
 
+> Informe histórico de la preparación `3500c4b`. El empaquetado del lector y el cierre técnico posterior se describen en [ACTIVATION-CHECKLIST.md](ACTIVATION-CHECKLIST.md); sus resultados y gates de despliegue tienen precedencia sobre las limitaciones históricas de este documento.
+
 Base: `235b4f0fb5daf7399f2142b962841760a6d7934b`, rama `feature/kiki-tech-2-dashboard`, árbol inicialmente limpio. Preparado el 12/11/2026 para revisión. **No hubo consultas a producción, sincronizaciones, OpenAI real, cambios en Render, push, PR, merge ni despliegue.**
 
 ## Qué implementa esta entrega

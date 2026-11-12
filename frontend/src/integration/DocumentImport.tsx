@@ -70,7 +70,10 @@ export function DocumentImport({
           !file ||
           !file.size ||
           (file.size > 524288 &&
-            !(isHileret(id) && file.size === hileretOriginalSize))
+            !(
+              (isHileret(id) || production) &&
+              file.size === hileretOriginalSize
+            ))
         )
           throw new Error("Elegí un archivo no vacío de hasta 512 KiB.");
         const bytes = new Uint8Array(await file.arrayBuffer());
@@ -190,7 +193,7 @@ export function DocumentImport({
           texto (máximo 10 páginas), TXT UTF-8, HTML pasivo sin atributos o JSON
           estructurado; hasta 512 KiB. Sin OCR ni búsquedas web.
         </p>
-        {isHileret(id) && (
+        {(isHileret(id) || production) && (
           <p>
             Excepción acotada: sólo el folleto Hileret original de 6.232.081
             bytes, identificado por SHA-256, admite su tamaño completo y

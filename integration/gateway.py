@@ -93,6 +93,8 @@ class Handler(BaseHTTPRequestHandler):
                 r"/api/test-documents/" + HILERET_ID + "/import", path.path
             ):
                 max_body = MAX_HTTP_BODY
+            if PRODUCTION_COMPAT and self.command == "POST" and re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/documents/import", path.path):
+                max_body = MAX_HTTP_BODY
             if CONNECTIONS and self.command == "POST" and path.path == "/api/tiendanube/import-csv":
                 max_body = 15 * 1024 * 1024 + 65536  # existing CSV cap + multipart envelope
             if not 0 <= length <= max_body:
@@ -131,6 +133,8 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 else 2_000_000
             )
+            if PRODUCTION_COMPAT and self.command == "GET" and re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/documents/local-[a-f0-9]{32}/original/[1-8]",path.path):
+                max_response = MAX_HTTP_BODY
             body = upstream.read(max_response + 1)
             if len(body) > max_response:
                 raise OSError("Response too large")

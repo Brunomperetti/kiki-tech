@@ -252,6 +252,8 @@ def main():
                         "autonomous_checks",
                         "documental_workspace_checks",
                         "v2_checks",
+                        "activation_checks",
+                        "preflight_checks",
                         "connector_checks",
                         "connection_checks",
                         "pilot_checks",

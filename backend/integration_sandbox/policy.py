@@ -47,7 +47,7 @@ CONNECTION_ACTIONS = frozenset({
 
 def route_allowed(method: str, path: str, *, connections=False, production_compat=False) -> bool:
     return (
-        (production_compat and (method, path) == ("GET", "/api/ui/v2"))
+        (production_compat and (method, path) in {("GET", "/api/ui/v2"),("GET", "/api/ecomm-app/stage/status"),("GET", "/api/mercadolibre/status"),("GET", "/api/ecomm-app/stage/ml-reconciliation-preview")})
         or (connections and (method, path) in CONNECTION_ACTIONS)
         or
         (method, path) in ALLOWED_ROUTES

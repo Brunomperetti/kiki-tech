@@ -2,6 +2,9 @@
 !backend/
 !backend/requirements.txt
 !backend/requirements-dev.txt
+!backend/requirements-reader.txt
+!backend/document_reader/
+!backend/document_reader/**
 !backend/pyproject.toml
 !backend/app/
 !backend/app/**

@@ -23,12 +23,17 @@ def parse_local(body, *, max_request=MAX_REQUEST):
             for key in ("filename", "content_type", "content_base64")
         }
     ).encode()
+    if len(body.content_base64) > 699_052:
+        from document_reader.hileret_brochure import validate_encoding, MAX_REQUEST as PINNED_MAX
+        validate_encoding(body.content_base64)
+        max_request = PINNED_MAX
     if len(request) > max_request:
         raise ValueError("Archivo superior al límite de lectura.")
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.settimeout(10)
-            connection.connect(PARSER_SOCKET)
+            from app.core.config import get_settings
+            connection.connect(get_settings().kiki_document_parser_socket)
             connection.sendall(struct.pack("!I", len(request)) + request)
             with connection.makefile("rb") as stream:
                 header = stream.read(4)
@@ -38,7 +43,7 @@ def parse_local(body, *, max_request=MAX_REQUEST):
                 result = json.loads(stream.read(size))
     except (OSError, ValueError, struct.error):
         raise ValueError(
-            "Lector aislado no disponible o límite de tiempo/memoria excedido. No se importó el documento."
+            "Lector aislado no disponible o límite de tiempo/memoria excedido. No se importó el documento. Código: READER_LIMIT_OR_UNAVAILABLE."
         ) from None
     if not result.get("ok"):
         raise ValueError(result.get("error", "Documento rechazado."))
@@ -296,3 +301,23 @@ class LocalDocuments:
         }
         self.db.commit()
         return result
+
+
+def reader_available():
+    """Local UDS health only; never probes a provider or reads a document."""
+    from app.core.config import get_settings
+    config = get_settings()
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(1)
+            connection.connect(config.kiki_document_parser_socket)
+            body = b'{"operation":"health"}'
+            connection.sendall(struct.pack("!I", len(body)) + body)
+            with connection.makefile("rb") as stream:
+                size = struct.unpack("!I", stream.read(4))[0]
+                if not 0 < size < 4096: return False
+                result = json.loads(stream.read(size))
+        details = result.get("result", {})
+        return result.get("ok") is True and details.get("version") == "7.0.0" and (not config.kiki_document_parser_kernel_required or (details.get("kernel_guard") is True and details.get("native_network_denied") is True and details.get("backend_visible") is False and details.get("proc_visible") is False and details.get("secret_environment_present") is False))
+    except (OSError, ValueError, struct.error, TypeError):
+        return False

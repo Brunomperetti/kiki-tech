@@ -1,6 +1,5 @@
 """Same-origin UI capabilities. Reuses authentication; no DDL or provider calls."""
 
-from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
@@ -11,7 +10,8 @@ from app.database.session import get_db
 router = APIRouter(prefix="/api/ui/v2", tags=["v2-rollout"])
 
 
-def capabilities(db, synthetic=False):
+def capabilities(db, synthetic=False, *, reader_probe=False):
+    from app.services.documental.local_documents import reader_available
     from app.database.models import Base
     from app.services.documental.storage import ResearchBase, Control
     from app.services.editorial_batches.storage import EditorialBase
@@ -55,7 +55,7 @@ def capabilities(db, synthetic=False):
         "writes": config.kiki_v2_writes_enabled,
         "connections": config.kiki_v2_connections_enabled,
         "documents": documents,
-        "document_upload": documents and Path("/document-parser/parser.sock").is_socket(),
+        "document_upload": bool(documents and reader_probe and reader_available()),
         "channels": config.kiki_channel_workspace_enabled,
         "batches": documents and config.kiki_editorial_batches_enabled and not batches_missing,
         "executor": config.kiki_editorial_executor_enabled,
@@ -72,7 +72,7 @@ def capabilities(db, synthetic=False):
 def configuration(request: Request, db: Session = Depends(get_db), _session=Depends(require_session)):
     if not get_settings().kiki_v2_enabled:
         raise HTTPException(404, "KIKI Tech 2.0 no está habilitado en este backend.")
-    result = capabilities(db, getattr(request.app.state, "local_synthetic", False))
+    result = capabilities(db, getattr(request.app.state, "local_synthetic", False), reader_probe=True)
     if result["missing_schema"]["core"]:
         raise HTTPException(503, "Esquema original pendiente de validación; no se ejecutaron migraciones automáticas.")
     return result
