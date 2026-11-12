@@ -141,12 +141,15 @@ def main():
         ],
     )
     parser.add_argument("--presentation", action="store_true", help="Presentación: canales sintéticos y documentos pendientes de revisión.")
+    parser.add_argument("--production-compat", action="store_true", help="Build productivo contra PostgreSQL descartable; sin proveedores ni datos reales.")
     parser.add_argument("--connections", action="store_true", help="Conexiones: servicios originales con dobles locales, sin red.")
     parser.add_argument("--autonomous", action="store_true", help="Escenario 2R: 5000 variantes sintéticas y ejecución backend.")
     parser.add_argument("--batches", action="store_true", help="Escenario documental sintético para lotes (up/browser-test).")
     parser.add_argument("--channels", action="store_true", help="Cargar escenario de canales sintético (sólo up/browser-test).")
     arguments = parser.parse_args()
     command = arguments.command
+    if arguments.production_compat and (command not in {"up", "browser-test"} or any((arguments.connections,arguments.presentation,arguments.autonomous,arguments.batches,arguments.channels))):
+        parser.error("--production-compat requiere up/browser-test y escenario independiente.")
     if arguments.connections and (command not in {"up", "browser-test"} or any((arguments.presentation, arguments.autonomous, arguments.batches, arguments.channels))):
         parser.error("--connections requiere up/browser-test y un escenario independiente.")
     if arguments.presentation and (command not in {"up", "browser-test"} or arguments.autonomous or arguments.batches or arguments.channels):
@@ -173,6 +176,7 @@ def main():
                 "Falta el frontend de integración. Ejecutá primero integration/run.py build."
             )
         directory = runtime_directory()
+        (directory / "production-compat-mode").write_text("isolated-only" if arguments.production_compat else "off")
         (directory / "connections-mode").write_text("offline-fixtures" if arguments.connections else "off")
         (directory / "editorial-mode").write_text("backend" if command in {"up", "browser-test"} else "manual")
         (directory / "editorial-workers").write_text("1")
@@ -247,6 +251,7 @@ def main():
                         "editorial_checks",
                         "autonomous_checks",
                         "documental_workspace_checks",
+                        "v2_checks",
                         "connector_checks",
                         "connection_checks",
                         "pilot_checks",
@@ -272,7 +277,7 @@ def main():
             elif command == "browser-test":
                 # Runs its own gateway and Playwright against the actual isolated backend.
                 subprocess.run(
-                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--connections"] if arguments.connections else ["--presentation"] if arguments.presentation else ["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
+                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--production-compat"] if arguments.production_compat else ["--connections"] if arguments.connections else ["--presentation"] if arguments.presentation else ["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
                     check=True,
                     env=clean_environment(),
                 )
@@ -304,6 +309,7 @@ def main():
             # Only this fixed project. tmpfs data and sessions disappear when stopped.
             compose("down", "--volumes")
             (directory / "connections-mode").write_text("off")
+            (directory / "production-compat-mode").write_text("off")
     elif command == "down":
         compose("down", "--volumes")
     else:

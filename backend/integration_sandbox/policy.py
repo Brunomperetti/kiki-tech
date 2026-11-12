@@ -45,9 +45,10 @@ CONNECTION_ACTIONS = frozenset({
 })
 
 
-def route_allowed(method: str, path: str, *, connections=False) -> bool:
+def route_allowed(method: str, path: str, *, connections=False, production_compat=False) -> bool:
     return (
-        (connections and (method, path) in CONNECTION_ACTIONS)
+        (production_compat and (method, path) == ("GET", "/api/ui/v2"))
+        or (connections and (method, path) in CONNECTION_ACTIONS)
         or
         (method, path) in ALLOWED_ROUTES
         or is_workspace_route(method, path)

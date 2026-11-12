@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     kiki_channel_workspace_enabled: bool = False
     kiki_document_workspace_enabled: bool = False
     kiki_ai_enabled: bool = False
+    # Default-off UI controls; existing provider/worker flags remain required.
+    kiki_v2_enabled: bool = False
+    kiki_v2_writes_enabled: bool = False
+    kiki_v2_connections_enabled: bool = False
+    kiki_v2_ai_generation_enabled: bool = False
 
     @field_validator("database_url")
     @classmethod

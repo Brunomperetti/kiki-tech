@@ -26,6 +26,7 @@ from integration_sandbox.hileret_brochure import MAX_HTTP_BODY  # noqa: E402
 
 HILERET_ID = r"PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC"
 CONNECTIONS = False
+PRODUCTION_COMPAT = False
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.integration-dist"
 WEB_CSP = (
@@ -68,11 +69,11 @@ class Handler(BaseHTTPRequestHandler):
             self.deny(403)
             return
         if self.command == "GET" and (
-            path.path == "/" or path.path.startswith("/assets/")
+            path.path == "/" or (PRODUCTION_COMPAT and path.path in {"/v2", "/v2/", "/dashboard-classic"}) or path.path.startswith("/assets/")
         ):
             self.serve_static(path.path)
             return
-        if not route_allowed(self.command, path.path, connections=CONNECTIONS):
+        if not route_allowed(self.command, path.path, connections=CONNECTIONS, production_compat=PRODUCTION_COMPAT):
             self.deny(403)
             return
         try:
@@ -109,6 +110,7 @@ class Handler(BaseHTTPRequestHandler):
                 "content-type",
                 "cookie",
                 "x-csrf-token",
+                "x-kiki-ui",
                 "x-kiki-proposal-id",
                 "x-kiki-proposal-revision",
             }
@@ -140,6 +142,7 @@ class Handler(BaseHTTPRequestHandler):
                     "content-security-policy",
                     "cache-control",
                     "x-kiki-environment",
+                    "x-kiki-ui-contract",
                     "x-content-type-options",
                 }:
                     self.send_header(key, value)
@@ -156,8 +159,8 @@ class Handler(BaseHTTPRequestHandler):
             connection.close()
 
     def serve_static(self, path):
-        if path == "/":
-            file = WEB_ROOT / "integration.html"
+        if path == "/" or (PRODUCTION_COMPAT and path in {"/v2", "/v2/", "/dashboard-classic"}):
+            file = WEB_ROOT / ("index.html" if PRODUCTION_COMPAT else "integration.html")
             content_type = "text/html; charset=utf-8"
         elif re.fullmatch(r"/assets/[A-Za-z0-9_-]+\.(js|css)", path):
             file = WEB_ROOT / path.removeprefix("/")
@@ -212,6 +215,13 @@ if __name__ == "__main__":
     if connection_mode not in {"off", "offline-fixtures"}:
         raise RuntimeError("Modo de conexiones aisladas inválido.")
     CONNECTIONS = connection_mode == "offline-fixtures"
+    compat_flag = directory / "production-compat-mode"
+    compat_mode = compat_flag.read_text().strip() if compat_flag.exists() else "off"
+    if compat_mode not in {"off", "isolated-only"}:
+        raise RuntimeError("Modo de compatibilidad inválido.")
+    PRODUCTION_COMPAT = compat_mode == "isolated-only"
+    if PRODUCTION_COMPAT:
+        WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.production-dist"
     SOCKET = directory / "api.sock"
     os.umask(0o077)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

@@ -13,3 +13,6 @@ dist/
 frontend/.integration-dist/
 frontend/integration-test-results/
 frontend/pilot-test-results/
+
+frontend/.production-dist/
+frontend/production-test-results/

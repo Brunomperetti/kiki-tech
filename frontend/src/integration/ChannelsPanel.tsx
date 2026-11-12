@@ -1,3 +1,4 @@
+import { environmentText } from "./runtime";
 import { useEffect, useState } from "react";
 import { captureDate } from "./catalog-adapter";
 import {
@@ -70,7 +71,10 @@ export function ChannelsPanel({
     if (
       !window.confirm(
         decision === "APPROVED"
-          ? "¿Registrar esta vinculación interna por Ecomm ID? No publica ni modifica datos del canal. La revisión de prueba no es una aprobación auténtica del cliente."
+          ? environmentText(
+              "¿Registrar esta vinculación interna por Ecomm ID? No publica ni modifica datos del canal. La revisión de prueba no es una aprobación auténtica del cliente.",
+              "¿Registrar esta vinculación interna al Ecomm ID exacto tras contrastar identidad y presentación? No publica ni modifica datos del canal.",
+            )
           : "¿Revocar esta vinculación interna? Se conserva el historial; no modifica la publicación.",
       )
     )
@@ -113,10 +117,13 @@ export function ChannelsPanel({
     >
       <h3>Mercado Libre y Tiendanube</h3>
       <p className="r-notice">
-        Ecomm ID {id}. Lectura de copias y decisiones internas de prueba. Las
-        capturas y el CSV de este escenario son explícitamente sintéticos. Sin
-        consultas en vivo, sincronización ni publicaciones. Compartir SKU o EAN
-        no vincula variantes.
+        Ecomm ID {id}.{" "}
+        {environmentText(
+          "Lectura de copias y decisiones internas de prueba. Las capturas y el CSV de este escenario son explícitamente sintéticos.",
+          "Lectura de capturas existentes y revisión interna por variante.",
+        )}{" "}
+        Sin consultas en vivo, sincronización ni publicaciones. Compartir SKU o
+        EAN no vincula variantes.
       </p>
       {blocked && (
         <p role="alert">

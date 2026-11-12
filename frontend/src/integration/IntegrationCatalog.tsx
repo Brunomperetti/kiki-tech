@@ -1,3 +1,11 @@
+import {
+  production,
+  capabilities,
+  configureRuntime,
+  canWrite,
+  availableFeature,
+  environmentText,
+} from "./runtime";
 import { SettingsDialog } from "../prototype/SettingsDialog";
 import { ConnectionCenter } from "./ConnectionCenter";
 import { useConnections } from "./connections";
@@ -74,9 +82,34 @@ export function IntegrationCatalog() {
   const [selectionError, setSelectionError] = useState("");
   const dataRef = useRef<CatalogPage>();
   const [session, setSession] = useState<Session | null>();
+  const [runtimeReady, setRuntimeReady] = useState(!production);
+  const [runtimeError, setRuntimeError] = useState("");
+  useEffect(() => {
+    if (!production) return;
+    configureRuntime();
+    setRuntimeReady(false);
+    setRuntimeError("");
+    if (!session) return;
+    const c = new AbortController();
+    request("/api/ui/v2", { signal: c.signal })
+      .then((r) => r.json())
+      .then((value) => {
+        if (!c.signal.aborted) {
+          configureRuntime(value);
+          setRuntimeReady(true);
+        }
+      })
+      .catch((e) => {
+        if (!c.signal.aborted) setRuntimeError(e.message);
+      });
+    return () => {
+      c.abort();
+      configureRuntime();
+    };
+  }, [!!session]);
   const [connectionsOpened, setConnectionsOpened] = useState(false);
   const connections = useConnections(
-    !!session && connectionsOpened,
+    !!session && runtimeReady && connectionsOpened,
     session?.csrf_token,
     preferences,
   );
@@ -279,7 +312,7 @@ export function IntegrationCatalog() {
   }, []);
   useEffect(() => {
     setPreparation(undefined);
-    if (!session || invalid || !data) return;
+    if (!session || !runtimeReady || invalid || !data) return;
     const c = new AbortController();
     Promise.all(
       (["ml", "tn"] as const).map((channel) =>
@@ -312,10 +345,10 @@ export function IntegrationCatalog() {
         /* Unknown is displayed as —, never a fabricated zero. */
       });
     return () => c.abort();
-  }, [revision, session, invalid, data?.lastAt]);
+  }, [revision, session, runtimeReady, invalid, data?.lastAt]);
   useEffect(() => {
     setListingCounts(undefined);
-    if (!session || invalid) return;
+    if (!session || !runtimeReady || invalid) return;
     const c = new AbortController();
     Promise.all([
       loadListings("ml", "", 1, 3, "all", c.signal),
@@ -330,11 +363,11 @@ export function IntegrationCatalog() {
       })
       .catch(() => {});
     return () => c.abort();
-  }, [session, revision, invalid]);
+  }, [session, runtimeReady, revision, invalid]);
   useEffect(() => {
     setData(undefined);
     setError(undefined);
-    if (!session || invalid) {
+    if (!session || !runtimeReady || invalid) {
       setLoading(false);
       return;
     }
@@ -363,14 +396,22 @@ export function IntegrationCatalog() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [!!session, q, page, pageSize, filter, invalid, revision]);
+  }, [!!session, runtimeReady, q, page, pageSize, filter, invalid, revision]);
   useEffect(() => {
     if (pinned?.id !== params.get("product")) setPinned(undefined);
     setSelectionError("");
   }, [params.get("product")]);
   useEffect(() => {
     const id = params.get("product");
-    if (!id || !session || invalid || !data || selected || isAuxiliaryPilot(id))
+    if (
+      !id ||
+      !session ||
+      !runtimeReady ||
+      invalid ||
+      !data ||
+      selected ||
+      isAuxiliaryPilot(id)
+    )
       return;
     const controller = new AbortController();
     getWorkspace(id, controller.signal)
@@ -388,7 +429,7 @@ export function IntegrationCatalog() {
         if (!controller.signal.aborted) setSelectionError(err.message);
       });
     return () => controller.abort();
-  }, [params.get("product"), !!session, invalid, data]);
+  }, [params.get("product"), !!session, runtimeReady, invalid, data]);
   useEffect(() => {
     if (!selected) {
       originRef.current?.focus();
@@ -435,7 +476,10 @@ export function IntegrationCatalog() {
     } catch (err) {
       setAuthError(
         err instanceof CatalogError && err.status === 401
-          ? "Usuario o contraseña de prueba incorrectos."
+          ? environmentText(
+              "Usuario o contraseña de prueba incorrectos.",
+              "Usuario o contraseña incorrectos.",
+            )
           : (err as Error).message,
       );
     } finally {
@@ -476,23 +520,36 @@ export function IntegrationCatalog() {
   if (session === undefined)
     return (
       <main className="login-page" role="status">
-        Verificando sesión de prueba…
+        {environmentText(
+          "Verificando sesión de prueba…",
+          "Verificando sesión…",
+        )}
       </main>
     );
   if (!session)
     return (
       <main className="login-page">
         <section className="login-card">
-          <p className="eyebrow">KIKI TECH 2.0 · INTEGRACIÓN AISLADA</p>
-          <h1>Ingresá al catálogo de prueba</h1>
+          <p className="eyebrow">
+            {production
+              ? "KIKI TECH 2.0"
+              : "KIKI TECH 2.0 · INTEGRACIÓN AISLADA"}
+          </p>
+          <h1>
+            {environmentText(
+              "Ingresá al catálogo de prueba",
+              "Ingresá con tu usuario habitual",
+            )}
+          </h1>
           <p>
-            FastAPI y PostgreSQL descartable. Catálogo y usuarios de prueba;
-            documentos locales autorizados. Sin conexiones a proveedores
-            externos.
+            {environmentText(
+              "FastAPI y PostgreSQL descartable. Catálogo y usuarios de prueba; documentos locales autorizados. Sin conexiones a proveedores externos.",
+              "Acceso privado a las capturas y fichas existentes de KIKI. No se cargan productos de demostración.",
+            )}
           </p>
           <form className="login-form" onSubmit={login}>
             <label>
-              Usuario de prueba
+              {environmentText("Usuario de prueba", "Usuario")}
               <input
                 required
                 autoComplete="username"
@@ -501,7 +558,7 @@ export function IntegrationCatalog() {
               />
             </label>
             <label>
-              Contraseña de prueba
+              {environmentText("Contraseña de prueba", "Contraseña")}
               <input
                 required
                 type="password"
@@ -516,15 +573,35 @@ export function IntegrationCatalog() {
             </button>
           </form>
           <small>
-            Este acceso no admite cuentas productivas. No ingreses credenciales
-            reales.
+            {environmentText(
+              "Este acceso no admite cuentas productivas. No ingreses credenciales reales.",
+              "La sesión y los permisos se verifican con el backend de KIKI.",
+            )}
           </small>
+        </section>
+      </main>
+    );
+  if (!runtimeReady)
+    return (
+      <main className="login-page">
+        <section
+          className="login-card"
+          role={runtimeError ? "alert" : "status"}
+        >
+          <h1>
+            {runtimeError
+              ? "KIKI Tech 2.0 no disponible"
+              : "Verificando disponibilidad de KIKI Tech 2.0…"}
+          </h1>
+          <p>{runtimeError}</p>
+          <a href="/dashboard-classic">Volver a la interfaz anterior</a>
+          <button onClick={() => void logout()}>Cerrar sesión</button>
         </section>
       </main>
     );
   return (
     <CatalogFrame
-      mode="integration"
+      mode={production ? "production" : "integration"}
       onCatalog={() => document.getElementById("integration-search")?.focus()}
       onHistory={() =>
         selected ? update({ tab: "Historial" }) : setHistoryOpen(true)
@@ -575,6 +652,17 @@ export function IntegrationCatalog() {
             update({ product: id, tab: "Historial" });
           }}
         />
+      )}
+      {production && (
+        <p className="n-notice" role="status">
+          {capabilities?.synthetic
+            ? "VALIDACIÓN AISLADA · datos sintéticos de compatibilidad, no catálogo auténtico."
+            : "Catálogo capturado desde el backend de KIKI; no es stock en vivo."}{" "}
+          {canWrite()
+            ? "Edición interna habilitada; cada guardado requiere revisión."
+            : "Sólo lectura: guardados, importaciones, OAuth y consumos bloqueados."}{" "}
+          <a href="/dashboard-classic">Volver a la interfaz anterior</a>
+        </p>
       )}
       <div className="i-capture-strip" aria-label="Información de captura">
         <span data-testid="shown">
@@ -941,7 +1029,10 @@ export function IntegrationCatalog() {
         )}
         {loading && (
           <p className="i-message" role="status">
-            Consultando catálogo de prueba…
+            {environmentText(
+              "Consultando catálogo de prueba…",
+              "Consultando catálogo capturado…",
+            )}
           </p>
         )}
         {error && (
@@ -1006,7 +1097,11 @@ export function IntegrationCatalog() {
                         item.name ||
                         "Nombre no disponible"}
                     </strong>
-                    <small>Catálogo Ecomm-App · Datos sintéticos</small>
+                    <small>
+                      {production && !capabilities?.synthetic
+                        ? "Catálogo Ecomm-App · Captura guardada"
+                        : "Catálogo Ecomm-App · Datos sintéticos"}
+                    </small>
                     <small>Original: {item.name ?? unavailable}</small>
                     <div className="i-presentation">
                       {item.presentation ?? unavailable}
@@ -1138,28 +1233,37 @@ export function IntegrationCatalog() {
                 </button>
               </div>
             </footer>
-            <BatchPanel
-              ids={checked}
-              query={q}
-              filter={filter}
-              matches={data.matches}
-              csrf={session.csrf_token}
-              disabled={dirty || editorBusy || loading || !!selected}
-              onClear={() => setChecked(new Set())}
-              onPage={() =>
-                setChecked(
-                  (current) =>
-                    new Set([...current, ...data.items.map((i) => i.id)]),
-                )
-              }
-              onOpen={(id, proposal) =>
-                update({
-                  product: id,
-                  tab: proposal ? "IA" : "Ficha",
-                  proposal: proposal ? String(proposal) : "",
-                })
-              }
-            />
+            {availableFeature("batches") ? (
+              <BatchPanel
+                ids={checked}
+                query={q}
+                filter={filter}
+                matches={data.matches}
+                csrf={session.csrf_token}
+                disabled={
+                  !canWrite() || dirty || editorBusy || loading || !!selected
+                }
+                onClear={() => setChecked(new Set())}
+                onPage={() =>
+                  setChecked(
+                    (current) =>
+                      new Set([...current, ...data.items.map((i) => i.id)]),
+                  )
+                }
+                onOpen={(id, proposal) =>
+                  update({
+                    product: id,
+                    tab: proposal ? "IA" : "Ficha",
+                    proposal: proposal ? String(proposal) : "",
+                  })
+                }
+              />
+            ) : (
+              <p className="n-notice">
+                Lotes pendientes de habilitación y esquema validado. No se
+                inicia procesamiento.
+              </p>
+            )}
           </>
         )}
         {data && params.get("product") && !selected && (
@@ -1172,7 +1276,7 @@ export function IntegrationCatalog() {
           </p>
         )}
       </section>
-      {data && (
+      {!production && data && (
         <MamaPilotLauncher
           csrf={session.csrf_token}
           disabled={dirty || editorBusy}
@@ -1183,7 +1287,7 @@ export function IntegrationCatalog() {
           }}
         />
       )}
-      {data && (
+      {!production && data && (
         <HileretPilotLauncher
           csrf={session.csrf_token}
           disabled={dirty || editorBusy}
@@ -1220,7 +1324,11 @@ export function IntegrationCatalog() {
           closeRef={closeRef}
           panelRef={panelRef}
           busy={editorBusy}
-          caption="CONSULTA DE VARIANTE"
+          caption={
+            production && capabilities?.synthetic
+              ? "VALIDACIÓN SINTÉTICA · CONSULTA DE VARIANTE"
+              : "CONSULTA DE VARIANTE"
+          }
         >
           <PersistentWorkspace
             key={selected.id}

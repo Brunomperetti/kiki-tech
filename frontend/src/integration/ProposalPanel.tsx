@@ -1,3 +1,4 @@
+import { environmentText } from "./runtime";
 import { useEffect, useState } from "react";
 import type { EcommApiProductEdit } from "../types/ecomm-app";
 import { captureDate } from "./catalog-adapter";
@@ -137,7 +138,10 @@ export function ProposalPanel({
         ),
       );
       setMessage(
-        "Propuesta de prueba generada. Ningún campo comercial fue modificado.",
+        environmentText(
+          "Propuesta de prueba generada. Ningún campo comercial fue modificado.",
+          "Propuesta respaldada generada. Ningún campo comercial fue modificado.",
+        ),
       );
     });
   }
@@ -198,7 +202,10 @@ export function ProposalPanel({
       onSaved(saved);
       setChanged(false);
       setMessage(
-        `Selección guardada en PostgreSQL de pruebas · Versión ${saved.version}.`,
+        environmentText(
+          `Selección guardada en PostgreSQL de pruebas · Versión ${saved.version}.`,
+          `Selección guardada en KIKI PostgreSQL · Versión ${saved.version}.`,
+        ),
       );
       adopt(await loadProposal(record.ecomm_id, undefined, draftId));
     });
@@ -226,6 +233,8 @@ export function ProposalPanel({
       <GenerationReadiness
         key={`${record.ecomm_id}:${record.version}:${active}`}
         id={record.ecomm_id}
+        expectedVersion={record.version}
+        blocked={blocked}
       />
       <div className="r-notice">
         <strong>
@@ -256,7 +265,10 @@ export function ProposalPanel({
         disabled={busy || blocked || !!draftId}
         onClick={generate}
       >
-        Generar propuesta de prueba
+        {environmentText(
+          "Generar propuesta de prueba",
+          "Generar propuesta respaldada",
+        )}
       </button>
       <button
         disabled={busy}

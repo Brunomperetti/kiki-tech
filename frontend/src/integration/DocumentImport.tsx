@@ -1,3 +1,4 @@
+import { environmentText, production, capabilities } from "./runtime";
 import { documentalPath } from "./documental-paths";
 import { useState } from "react";
 import { request, captureDate } from "./catalog-adapter";
@@ -32,7 +33,9 @@ export function DocumentImport({
   onResult: (value: Dossier, message: string) => void;
   onError: (value: string) => void;
 }) {
-  const [kind, setKind] = useState("FILE"),
+  const [kind, setKind] = useState(
+      production && !capabilities?.document_upload ? "URL" : "FILE",
+    ),
     [file, setFile] = useState<File>();
   const [note, setNote] = useState(""),
     [url, setUrl] = useState("");
@@ -130,7 +133,10 @@ export function DocumentImport({
       setOriginalInfo("");
       onResult(
         value,
-        "Documento incorporado en PostgreSQL de pruebas. La procedencia y cada dato requieren revisión independiente.",
+        environmentText(
+          "Documento incorporado en PostgreSQL de pruebas. La procedencia y cada dato requieren revisión independiente.",
+          "Documento incorporado en KIKI PostgreSQL. La procedencia y cada dato requieren revisión independiente.",
+        ),
       );
     });
   }
@@ -199,10 +205,22 @@ export function DocumentImport({
             disabled={busy}
             onChange={(e) => setKind(e.target.value)}
           >
-            <option value="FILE">Archivo local</option>
+            <option
+              value="FILE"
+              disabled={production && !capabilities?.document_upload}
+            >
+              Archivo local
+            </option>
             <option value="URL">Referencia URL · sin descargar</option>
           </select>
         </label>
+        {production && !capabilities?.document_upload && (
+          <p role="status">
+            Carga de archivos bloqueada: falta el lector documental aislado.
+            Podés registrar una referencia URL sin descargar; no acredita hechos
+            ni procedencia oficial.
+          </p>
+        )}
         {kind === "FILE" && (
           <label>
             Archivo documental

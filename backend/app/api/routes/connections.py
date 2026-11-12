@@ -68,8 +68,8 @@ def status(
     return {
         "external_writes_enabled": False,
         "synthetic": isolated,
-        "actions_enabled": not isolated or test_actions,
-        "external_oauth_allowed": not isolated,
+        "actions_enabled": (settings.kiki_v2_writes_enabled and settings.kiki_v2_connections_enabled) if request.headers.get("X-Kiki-UI") == "v2" else not isolated or test_actions,
+        "external_oauth_allowed": not isolated and (settings.kiki_v2_connections_enabled if request.headers.get("X-Kiki-UI") == "v2" else True),
         "max_csv_bytes": min(settings.max_upload_mb, 20) * 1024 * 1024,
         "ecomm": {
             **ecomm_app_status(_session=_session),

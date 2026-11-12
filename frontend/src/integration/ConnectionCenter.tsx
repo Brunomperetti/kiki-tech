@@ -1,3 +1,4 @@
+import { production, capabilities, canWrite } from "./runtime";
 import { captureDate } from "./catalog-adapter";
 import type { ConnectionStatus } from "./connections";
 import "./connections.css";
@@ -25,7 +26,12 @@ export function ConnectionCenter({
   onReload?: () => void;
   onRefresh?: () => void;
 }) {
-  const enabled = !demo && !!data?.actions_enabled && !!onOperate;
+  const enabled =
+    !demo &&
+    !!data?.actions_enabled &&
+    !!onOperate &&
+    canWrite() &&
+    (!production || capabilities?.connections === true);
   const e = data?.ecomm,
     ml = data?.ml,
     tn = data?.tn;
@@ -37,16 +43,22 @@ export function ConnectionCenter({
       <p className="n-notice">
         {demo
           ? "Ejemplos sintéticos de la demo pública. No hay credenciales, tareas programadas ni conexiones reales. Las acciones están deshabilitadas."
-          : "Estado registrado en FastAPI de pruebas y PostgreSQL descartable. No se consulta ningún proveedor para mostrar estas tarjetas. Las operaciones usan únicamente dobles locales."}
+          : production
+            ? "Estado guardado en el backend de KIKI; mostrar estas tarjetas no consulta proveedores. Actualizar capturas requiere habilitación y confirmación explícitas."
+            : "Estado registrado en FastAPI de pruebas y PostgreSQL descartable. No se consulta ningún proveedor para mostrar estas tarjetas. Las operaciones usan únicamente dobles locales."}
       </p>
       {!demo && !data && !error && <p role="status">Consultando conexiones…</p>}
-      {!demo && data && !data.actions_enabled && (
-        <p className="n-notice">
-          Acciones bloqueadas en este entorno aislado. Para probarlas se
-          requiere el escenario explícito de conexiones con transportes
-          sintéticos; no se habilitan proveedores reales.
-        </p>
-      )}
+      {!demo &&
+        data &&
+        (!data.actions_enabled ||
+          !canWrite() ||
+          (production && !capabilities?.connections)) && (
+          <p className="n-notice">
+            {production
+              ? "Actualizaciones bloqueadas por configuración de KIKI Tech 2.0. Podés consultar las capturas existentes."
+              : "Acciones bloqueadas en este entorno aislado. Para probarlas se requiere el escenario explícito de conexiones con transportes sintéticos; no se habilitan proveedores reales."}
+          </p>
+        )}
       {error && (
         <p role="alert" className="n-error">
           {error}
@@ -221,9 +233,11 @@ export function ConnectionCenter({
             </button>
           )}
           <small>
-            OAuth externo bloqueado en el entorno de pruebas: preparar la
-            solicitud no conecta una cuenta. Actualizar lee y guarda una copia
-            interna; no publica, pausa ni modifica productos.
+            {production
+              ? "La autorización utiliza el OAuth original y su callback histórico. No reconectes una cuenta vigente innecesariamente."
+              : "OAuth externo bloqueado en el entorno de pruebas: preparar la solicitud no conecta una cuenta."}{" "}
+            Actualizar lee y guarda una copia interna; no publica, pausa ni
+            modifica productos.
           </small>
         </article>
         <article aria-label="Importación Tiendanube">

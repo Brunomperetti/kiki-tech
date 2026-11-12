@@ -1,3 +1,4 @@
+import { production, capabilities, canWrite, environmentText } from "./runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { request } from "./catalog-adapter";
 import { setConnectionActionsEnabled } from "./isolation";
@@ -55,8 +56,10 @@ export function connectionStatus(value: unknown): ConnectionStatus {
   if (
     !d ||
     d.external_writes_enabled !== false ||
-    d.synthetic !== true ||
-    d.external_oauth_allowed !== false ||
+    (production ? typeof d.synthetic !== "boolean" : d.synthetic !== true) ||
+    (production
+      ? typeof d.external_oauth_allowed !== "boolean"
+      : d.external_oauth_allowed !== false) ||
     typeof d.actions_enabled !== "boolean" ||
     !number(d.max_csv_bytes) ||
     d.max_csv_bytes > 20 * 1024 * 1024 ||
@@ -206,7 +209,14 @@ export function useConnections(
     if (visible && enabled) wake.current?.();
   }, [visible, enabled]);
   async function operate(kind: "ecomm" | "ml" | "oauth" | "tn", file?: File) {
-    if (inFlight.current || !data?.actions_enabled || !csrf) return;
+    if (
+      inFlight.current ||
+      !data?.actions_enabled ||
+      !csrf ||
+      !canWrite() ||
+      (production && !capabilities?.connections)
+    )
+      return;
     if (kind === "ecomm" && data.ecomm.refresh_in_progress) return;
     const prompts = {
       ecomm:
@@ -228,7 +238,15 @@ export function useConnections(
       );
       return;
     }
-    if (!window.confirm(prompts[kind])) return;
+    const realPrompts = {
+      ecomm:
+        "¿Leer Ecomm-App y renovar la captura interna? Usa el proveedor real, conserva la copia anterior hasta completar y no sobrescribe fichas.",
+      ml: "¿Leer Mercado Libre y renovar su captura interna? Puede refrescar el token existente. No publica ni modifica publicaciones.",
+      oauth:
+        "¿Abrir la autorización oficial de Mercado Libre para vincular la cuenta correcta? La vuelta utiliza el callback histórico de KIKI.",
+      tn: prompts.tn,
+    };
+    if (!window.confirm(production ? realPrompts[kind] : prompts[kind])) return;
     const operationEpoch = epoch.current;
     inFlight.current = true;
     setBusy(kind);
@@ -269,7 +287,15 @@ export function useConnections(
           throw new Error(
             "El servidor devolvió un destino OAuth no permitido.",
           );
-        // Keep all the existing isolation boundaries: no redirect, popup or external anchor.
+        if (
+          production &&
+          data.external_oauth_allowed &&
+          capabilities?.connections
+        ) {
+          location.assign(target.href);
+          return;
+        }
+        // Synthetic mode never opens a provider.
         setMessage(
           "Solicitud OAuth preparada con el servicio existente. Autorización externa bloqueada: no se abrió Mercado Libre ni se vinculó una cuenta.",
         );
@@ -287,7 +313,10 @@ export function useConnections(
           throw new Error("Resultado de actualización incompatible.");
         setRefreshSuggested(true);
         setMessage(
-          "Copia interna actualizada en el entorno sintético. Podés refrescar la tabla; no se modificaron productos externos.",
+          environmentText(
+            "Copia interna actualizada en el entorno sintético. Podés refrescar la tabla; no se modificaron productos externos.",
+            "Captura interna actualizada. Podés refrescar indicadores y tabla; no se modificaron productos externos.",
+          ),
         );
       }
       await load();

@@ -1,3 +1,4 @@
+import { production, environmentText } from "./runtime";
 import { useEffect, useRef, useState } from "react";
 import { CatalogError, captureDate, request } from "./catalog-adapter";
 import {
@@ -47,7 +48,8 @@ export function ResearchSummary({
         <>
           <p>
             {data.facts.filter((f) => f.verified).length} hechos con aprobación
-            vigente de prueba. Ninguno se aplica automáticamente a la ficha.
+            vigente{production ? "" : " de prueba"}. Ninguno se aplica
+            automáticamente a la ficha.
           </p>
           <ul>
             {data.facts
@@ -66,7 +68,13 @@ export function ResearchSummary({
           </p>
         </>
       ) : (
-        <p>{error || "Consultando evidencia de prueba…"}</p>
+        <p>
+          {error ||
+            environmentText(
+              "Consultando evidencia de prueba…",
+              "Consultando evidencias…",
+            )}
+        </p>
       )}
       <button onClick={onOpen}>Investigar y revisar fuentes</button>
     </section>
@@ -130,7 +138,10 @@ export function ResearchPanel({
     try {
       setData(await changeResearch(id, path, body, csrf));
       setMessage(
-        "Evidencia guardada en PostgreSQL de pruebas. La ficha comercial no se modificó.",
+        environmentText(
+          "Evidencia guardada en PostgreSQL de pruebas. La ficha comercial no se modificó.",
+          "Evidencia guardada en KIKI PostgreSQL. La ficha comercial no se modificó.",
+        ),
       );
     } catch (err) {
       const failure = err as CatalogError;
@@ -150,7 +161,7 @@ export function ResearchPanel({
     if (
       !data ||
       !window.confirm(
-        `¿${decision === "APPROVED" ? "Aprobar" : decision === "REVOKED" ? "Revocar" : "Rechazar"} este hecho? La decisión se registra sólo en la investigación de prueba.`,
+        `¿${decision === "APPROVED" ? "Aprobar" : decision === "REVOKED" ? "Revocar" : "Rechazar"} este hecho? ${production ? "La decisión se registra en la investigación de esta variante." : "La decisión se registra sólo en la investigación de prueba."}`,
       )
     )
       return;
@@ -196,14 +207,18 @@ export function ResearchPanel({
     <section
       ref={rootRef}
       className="r-research"
-      aria-label="Investigación documental de prueba"
+      aria-label={environmentText(
+        "Investigación documental de prueba",
+        "Investigación documental",
+      )}
     >
       <h3>Documentos y evidencias</h3>
       <p className="r-notice">
-        <strong>Entorno documental aislado.</strong> Fixtures sintéticos y
-        archivos locales expresamente autorizados. Sin búsquedas externas,
-        scraping ni IA. Extraer datos no los verifica ni cambia tu ficha
-        comercial.
+        {environmentText(
+          "Entorno documental aislado. Fixtures sintéticos y archivos locales expresamente autorizados. Sin búsquedas externas, scraping ni IA.",
+          "Documentos asociados exclusivamente a esta variante. Incorporación y procesamiento local; búsqueda automática externa deshabilitada.",
+        )}{" "}
+        Extraer datos no los verifica ni cambia tu ficha comercial.
       </p>
       {error && (
         <p role="alert" className="r-error">
@@ -222,7 +237,8 @@ export function ResearchPanel({
             <MamaPilotSummary revision={data.version} />
           ) : isHileret(id) ? (
             <HileretPilotSummary id={id} revision={data.version} />
-          ) : data.documents.some((doc) => doc.body.synthetic) ? (
+          ) : !production &&
+            data.documents.some((doc) => doc.body.synthetic) ? (
             <AssistedResearch
               id={id}
               csrf={csrf}

@@ -15,7 +15,7 @@ export function CatalogFrame({
   action,
   connectionStatus,
 }: {
-  mode: "demo" | "integration";
+  mode: "demo" | "integration" | "production";
   children: ReactNode;
   onCatalog: () => void;
   onHistory?: () => void;
@@ -25,7 +25,8 @@ export function CatalogFrame({
   action?: ReactNode;
   connectionStatus?: ReactNode;
 }) {
-  const connected = mode === "integration";
+  const connected = mode !== "demo";
+  const live = mode === "production";
   return (
     <div
       className={`d-app${connected ? " i-app" : ""}`}
@@ -43,7 +44,11 @@ export function CatalogFrame({
           <div>
             KIKI Market
             <small>
-              {connected ? "Integración de prueba" : "Espacio de trabajo"}
+              {live
+                ? "Catálogo conectado"
+                : connected
+                  ? "Integración de prueba"
+                  : "Espacio de trabajo"}
             </small>
           </div>
         </div>
@@ -82,17 +87,25 @@ export function CatalogFrame({
         <div className="d-sidebar-bottom">
           <Icon name="shield" />
           <strong>
-            {connected ? "Entorno aislado" : "Tu catálogo, bajo control"}
+            {live
+              ? "Tu catálogo, bajo control"
+              : connected
+                ? "Entorno aislado"
+                : "Tu catálogo, bajo control"}
           </strong>
           <p>
-            {connected
-              ? "Catálogo sintético y archivos locales autorizados. Sin publicaciones externas."
-              : "Vos revisás y decidís cada cambio."}
+            {live
+              ? "Capturas existentes e identidad por variante Ecomm-App. Cada decisión conserva su contexto."
+              : connected
+                ? "Catálogo sintético y archivos locales autorizados. Sin publicaciones externas."
+                : "Vos revisás y decidís cada cambio."}
           </p>
           <span>
-            {connected
-              ? "Trabajo local · Sin conexión productiva"
-              : "Demostración visual · Sin backend"}
+            {live
+              ? "Sin publicaciones automáticas"
+              : connected
+                ? "Trabajo local · Sin conexión productiva"
+                : "Demostración visual · Sin backend"}
           </span>
         </div>
       </aside>
@@ -112,9 +125,11 @@ export function CatalogFrame({
               </button>
             )}
             <span className="d-demo-dot" />
-            {connected
-              ? "Conectado · Entorno aislado"
-              : "Datos de demostración"}
+            {live
+              ? "KIKI Tech 2.0"
+              : connected
+                ? "Conectado · Entorno aislado"
+                : "Datos de demostración"}
             {onLogout && (
               <button onClick={onLogout} disabled={busy}>
                 Cerrar sesión
@@ -140,15 +155,21 @@ export function CatalogFrame({
             <Icon name="shield" />
             <span>
               <strong>
-                {connected
-                  ? "Modo integración · Conectado a FastAPI de pruebas."
-                  : "Modo demostración."}
+                {live
+                  ? "Catálogo conectado."
+                  : connected
+                    ? "Modo integración · Conectado a FastAPI de pruebas."
+                    : "Modo demostración."}
               </strong>{" "}
-              {connected
-                ? "Variantes sintéticas guardadas en PostgreSQL descartable. Sin conexión a proveedores."
-                : "Productos ficticios, sin conexiones ni cambios en tus sistemas."}
+              {live
+                ? "Datos del backend existente. Las acciones dependen de permisos y configuración."
+                : connected
+                  ? "Variantes sintéticas guardadas en PostgreSQL descartable. Sin conexión a proveedores."
+                  : "Productos ficticios, sin conexiones ni cambios en tus sistemas."}
             </span>
-            <span className="d-demo-tag">ENTORNO AISLADO</span>
+            <span className="d-demo-tag">
+              {live ? "ACCESO PRIVADO" : "ENTORNO AISLADO"}
+            </span>
           </div>
           {children}
         </main>

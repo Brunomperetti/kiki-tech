@@ -1,3 +1,4 @@
+import { environmentText } from "./runtime";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { ProductDrawer } from "../prototype/CatalogView";
@@ -332,9 +333,10 @@ export function BatchPanel({
                 </button>
               </div>
               <p>
-                Entorno aislado: productos y aprobaciones de prueba, sin
-                decisiones comerciales del cliente. Presupuesto de IA real: USD
-                0.
+                {environmentText(
+                  "Entorno aislado: productos y aprobaciones de prueba, sin decisiones comerciales del cliente. Presupuesto de IA real: USD 0.",
+                  "Generador determinista existente, sin consumo OpenAI. Cada propuesta requiere revisión humana individual; no se sobrescriben fichas aprobadas.",
+                )}
               </p>
               {error && <p role="alert">{error}</p>}
               {batch && (

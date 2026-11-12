@@ -3,6 +3,7 @@ import { useState } from "react";
 import { request } from "./catalog-adapter";
 import type { EcommAiLatest } from "../types/ecomm-app";
 import { isAuxiliaryPilot } from "./hileret-pilot";
+import { production, capabilities, canWrite } from "./runtime";
 
 type Contract = {
   schema_version: string;
@@ -23,11 +24,57 @@ type Contract = {
     automatic_retries: number;
   };
 };
-export function GenerationReadiness({ id }: { id: string }) {
+export function GenerationReadiness({
+  id,
+  expectedVersion,
+  blocked = false,
+}: {
+  id: string;
+  expectedVersion?: number;
+  blocked?: boolean;
+}) {
   const [context, setContext] = useState<Contract>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [legacy, setLegacy] = useState<EcommAiLatest>();
+  async function generateExisting() {
+    if (
+      !production ||
+      blocked ||
+      expectedVersion === undefined ||
+      !canWrite() ||
+      !capabilities?.openai_generation ||
+      !window.confirm(
+        "¿Generar título y descripción con el servicio OpenAI original? Consume su cuota y presupuesto existentes; no investiga la web ni aprueba o guarda la ficha.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    try {
+      const auth = await (await request("/api/auth/me")).json();
+      const draft = await (
+        await request(
+          `/api/ecomm-app/workspace/ai/${encodeURIComponent(id)}/suggest`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": auth.csrf_token,
+            },
+            body: JSON.stringify({ expected_version: expectedVersion }),
+          },
+        )
+      ).json();
+      if (draft.ecomm_id !== id || draft.saved_to_product_fields !== false)
+        throw new Error("Propuesta IA incompatible; no se aplicó contenido.");
+      await loadExisting();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function loadExisting() {
     setBusy(true);
     setError("");
@@ -83,13 +130,21 @@ export function GenerationReadiness({ id }: { id: string }) {
   }
   return (
     <details className="r-document">
-      <summary>Preparación avanzada para IA real · Desactivada</summary>
+      <summary>
+        {production
+          ? "Servicios IA existentes y límites"
+          : "Preparación avanzada para IA real · Desactivada"}
+      </summary>
       <p>
-        El contrato sólo reúne hechos aprobados vigentes con citas y versiones.
-        La generación con OpenAI sigue desactivada; presupuesto autorizado: USD
-        0,00. Consultarlo no genera ni guarda contenido.
+        {production
+          ? "El contrato respaldado reúne hechos aprobados con citas y versiones. Su proveedor sigue desactivado (USD 0); el servicio OpenAI histórico de abajo conserva su presupuesto y cuota propios existentes."
+          : "El contrato sólo reúne hechos aprobados vigentes con citas y versiones. La generación con OpenAI sigue desactivada; presupuesto autorizado: USD 0,00."}{" "}
+        Consultarlo no genera ni guarda contenido.
       </p>
-      <button disabled={busy} onClick={() => void load()}>
+      <button
+        disabled={busy || (production && !capabilities?.documents)}
+        onClick={() => void load()}
+      >
         Ver contrato de hechos aprobados
       </button>
       {!isAuxiliaryPilot(id) && (
@@ -102,6 +157,34 @@ export function GenerationReadiness({ id }: { id: string }) {
           <button disabled={busy} onClick={() => void loadExisting()}>
             Consultar servicio OpenAI existente (sin generar)
           </button>
+          {production && (
+            <>
+              <p>
+                OpenAI histórico:{" "}
+                {capabilities?.openai_configured
+                  ? "configurado"
+                  : "no disponible"}
+                . Generación para esta interfaz:{" "}
+                {capabilities?.openai_generation && canWrite()
+                  ? "habilitada con confirmación y cuota original"
+                  : "bloqueada por configuración"}
+                . No es investigación web ni una ficha de 18 campos respaldada
+                por citas.
+              </p>
+              <button
+                disabled={
+                  busy ||
+                  blocked ||
+                  expectedVersion === undefined ||
+                  !canWrite() ||
+                  !capabilities?.openai_generation
+                }
+                onClick={() => void generateExisting()}
+              >
+                Generar título y descripción con OpenAI existente
+              </button>
+            </>
+          )}
           {legacy && (
             <section aria-label="Servicio OpenAI existente">
               <p>
@@ -112,7 +195,10 @@ export function GenerationReadiness({ id }: { id: string }) {
               </p>
               <p>
                 Consulta de sólo lectura. No se invocó OpenAI ni se reservó
-                consumo. La generación real sigue bloqueada en este entorno.
+                consumo.{" "}
+                {production
+                  ? "Generar requiere habilitación, cuota disponible y confirmación explícita."
+                  : "La generación real sigue bloqueada en este entorno."}
               </p>
               {legacy.available && legacy.draft ? (
                 <>

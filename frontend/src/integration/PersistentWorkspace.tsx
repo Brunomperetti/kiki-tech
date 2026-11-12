@@ -1,3 +1,10 @@
+import {
+  production,
+  canWrite,
+  availableFeature,
+  environmentText,
+} from "./runtime";
+import { GenerationReadiness } from "./GenerationReadiness";
 import { ChannelsPanel } from "./ChannelsPanel";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
@@ -202,7 +209,10 @@ export function PersistentWorkspace({
       );
       adopt(saved);
       setMessage(
-        `Guardado en PostgreSQL de pruebas · Versión ${saved.version}.`,
+        environmentText(
+          `Guardado en PostgreSQL de pruebas · Versión ${saved.version}.`,
+          `Guardado en KIKI PostgreSQL · Versión ${saved.version}.`,
+        ),
       );
     } catch (err) {
       const failure = err as CatalogError;
@@ -286,7 +296,12 @@ export function PersistentWorkspace({
         aria-label={tab}
       >
         {loading && (
-          <p role="status">Cargando ficha desde PostgreSQL de pruebas…</p>
+          <p role="status">
+            {environmentText(
+              "Cargando ficha desde PostgreSQL de pruebas…",
+              "Cargando ficha de KIKI…",
+            )}
+          </p>
         )}
         {error && <p role="alert">{error}</p>}
         {message && (
@@ -300,12 +315,9 @@ export function PersistentWorkspace({
             className="i-reauth"
             aria-label="Restablecer sesión"
           >
-            <p>
-              Tu edición se conserva. Ingresá nuevamente con la cuenta de
-              prueba.
-            </p>
+            <p>Tu edición se conserva. Ingresá nuevamente con tu cuenta.</p>
             <label>
-              Contraseña de prueba
+              {environmentText("Contraseña de prueba", "Contraseña")}
               <input
                 type="password"
                 required
@@ -428,11 +440,13 @@ export function PersistentWorkspace({
                     revision={record.version}
                   />
                 )}
-                <ResearchSummary
-                  id={variant.id}
-                  revision={record.version}
-                  onOpen={() => onTab("Evidencias")}
-                />
+                {availableFeature("documents") && (
+                  <ResearchSummary
+                    id={variant.id}
+                    revision={record.version}
+                    onOpen={() => onTab("Evidencias")}
+                  />
+                )}
                 <details className="i-source" open>
                   <summary>
                     {isAuxiliaryPilot(variant.id)
@@ -494,7 +508,7 @@ export function PersistentWorkspace({
                   KIKI. No modifican el catálogo Ecomm-App ni publicaciones.
                 </p>
                 <fieldset
-                  disabled={saving || identityBlocked}
+                  disabled={!canWrite() || saving || identityBlocked}
                   className="i-editor-fields"
                 >
                   <legend>Ficha comercial editable de KIKI</legend>
@@ -539,16 +553,26 @@ export function PersistentWorkspace({
               <>
                 <fieldset
                   className="i-editor-fields"
-                  disabled={identityBlocked || !!remote || reauth}
+                  disabled={
+                    !canWrite() || identityBlocked || !!remote || reauth
+                  }
                 >
-                  <ResearchPanel
-                    id={variant.id}
-                    csrf={csrf}
-                    onBusy={setResearchBusy}
-                    workspaceVersion={record.version}
-                    autoStart={researchStart}
-                    onStarted={() => setResearchStart(0)}
-                  />
+                  {availableFeature("documents") ? (
+                    <ResearchPanel
+                      id={variant.id}
+                      csrf={csrf}
+                      onBusy={setResearchBusy}
+                      workspaceVersion={record.version}
+                      autoStart={researchStart}
+                      onStarted={() => setResearchStart(0)}
+                    />
+                  ) : (
+                    <p>
+                      Documentos pendientes de habilitación y migración
+                      validada; las fuentes de la ficha siguen disponibles
+                      debajo.
+                    </p>
+                  )}
                 </fieldset>
                 <h3>Fuentes registradas en KIKI</h3>
                 <p>
@@ -586,6 +610,7 @@ export function PersistentWorkspace({
                 {!isAuxiliaryPilot(variant.id) && (
                   <button
                     disabled={
+                      !canWrite() ||
                       dirty ||
                       saving ||
                       identityBlocked ||
@@ -637,6 +662,7 @@ export function PersistentWorkspace({
                 <button
                   className="d-primary"
                   disabled={
+                    !canWrite() ||
                     dirty ||
                     proposalDirty ||
                     saving ||
@@ -654,50 +680,74 @@ export function PersistentWorkspace({
                   Investigar y completar ficha con IA
                 </button>
                 <p className="r-notice">
-                  Investigación web real y OpenAI: bloqueados en este entorno.
-                  Se reutilizan fuentes de prueba o documentos locales
-                  autorizados y el generador determinista existente. Ninguna
-                  llamada externa ni consumo. Recorrido: identidad → Evidencias
-                  → hechos aprobados → propuesta → revisión por campo → guardado
-                  versionado.
+                  {environmentText(
+                    "Investigación web real y OpenAI: bloqueados en este entorno. Se reutilizan fuentes de prueba o documentos locales autorizados y el generador determinista existente. Ninguna llamada externa ni consumo.",
+                    "Investigación web automática aún no validada ni habilitada. Incorporá documentación autorizada, revisá sus hechos y utilizá las propuestas respaldadas existentes. OpenAI histórico se informa por separado con su cuota original.",
+                  )}{" "}
+                  Recorrido: identidad → Evidencias → hechos aprobados →
+                  propuesta → revisión por campo → guardado versionado.
                 </p>
               </section>
-              <ProposalPanel
-                draftId={proposalId}
-                record={record}
-                csrf={csrf}
-                active={tab === "IA"}
-                blocked={
-                  dirty ||
-                  identityBlocked ||
-                  !!remote ||
-                  reauth ||
-                  saving ||
-                  researchBusy
-                }
-                onBusy={setProposalBusy}
-                onDirty={setProposalDirty}
-                onSaved={adopt}
-              />
+              {availableFeature("documents") ? (
+                <ProposalPanel
+                  draftId={proposalId}
+                  record={record}
+                  csrf={csrf}
+                  active={tab === "IA"}
+                  blocked={
+                    !canWrite() ||
+                    dirty ||
+                    identityBlocked ||
+                    !!remote ||
+                    reauth ||
+                    saving ||
+                    researchBusy
+                  }
+                  onBusy={setProposalBusy}
+                  onDirty={setProposalDirty}
+                  onSaved={adopt}
+                />
+              ) : (
+                <>
+                  <p>
+                    Propuestas documentales pendientes de habilitación. Podés
+                    consultar el servicio IA original sin generar consumo.
+                  </p>
+                  <GenerationReadiness
+                    id={variant.id}
+                    expectedVersion={record.version}
+                    blocked={
+                      dirty || saving || identityBlocked || !!remote || reauth
+                    }
+                  />
+                </>
+              )}
             </div>
-            {tab === "Canales" && (
-              <ChannelsPanel
-                id={variant.id}
-                csrf={csrf}
-                blocked={
-                  dirty ||
-                  proposalDirty ||
-                  identityBlocked ||
-                  !!remote ||
-                  reauth ||
-                  saving ||
-                  researchBusy ||
-                  proposalBusy
-                }
-                onBusy={setChannelBusy}
-                onReviewed={onChannelsReviewed}
-              />
-            )}
+            {tab === "Canales" &&
+              (availableFeature("channels") ? (
+                <ChannelsPanel
+                  id={variant.id}
+                  csrf={csrf}
+                  blocked={
+                    !canWrite() ||
+                    dirty ||
+                    proposalDirty ||
+                    identityBlocked ||
+                    !!remote ||
+                    reauth ||
+                    saving ||
+                    researchBusy ||
+                    proposalBusy
+                  }
+                  onBusy={setChannelBusy}
+                  onReviewed={onChannelsReviewed}
+                />
+              ) : (
+                <p>
+                  Revisión de canales deshabilitada por configuración. Las
+                  capturas comerciales permanecen disponibles en la tabla.
+                </p>
+              ))}
             <div className="i-save-bar">
               <span aria-live="polite">
                 {saving
@@ -709,6 +759,7 @@ export function PersistentWorkspace({
               <button
                 className="d-primary"
                 disabled={
+                  !canWrite() ||
                   !dirty ||
                   saving ||
                   proposalBusy ||
@@ -722,6 +773,7 @@ export function PersistentWorkspace({
               </button>
               <button
                 disabled={
+                  !canWrite() ||
                   !dirty ||
                   saving ||
                   proposalBusy ||

@@ -13,7 +13,11 @@ def main():
     connection_mode = flag.read_text().strip() if flag.exists() else "off"
     if connection_mode not in {"off", "offline-fixtures"}:
         raise RuntimeError("Modo de conexiones aisladas inválido.")
-    application = create_sandbox_app(autonomous=mode()=="backend", connections=connection_mode=="offline-fixtures")
+    compat_flag = Path("/runtime/production-compat-mode")
+    compat_mode = compat_flag.read_text().strip() if compat_flag.exists() else "off"
+    if compat_mode not in {"off", "isolated-only"}:
+        raise RuntimeError("Modo de compatibilidad inválido.")
+    application = create_sandbox_app(production_compat=compat_mode=="isolated-only", autonomous=mode()=="backend", connections=connection_mode=="offline-fixtures")
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa

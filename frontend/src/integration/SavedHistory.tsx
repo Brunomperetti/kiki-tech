@@ -1,3 +1,4 @@
+import { environmentText } from "./runtime";
 import { useEffect, useRef, useState } from "react";
 import { request, captureDate, validVariantId } from "./catalog-adapter";
 type Saved = {
@@ -104,7 +105,10 @@ export function SavedHistory({
       <p>
         <a
           href="/api/ecomm-app/workspace/master-export"
-          download="fichas-kiki-pruebas.json"
+          download={environmentText(
+            "fichas-kiki-pruebas.json",
+            "fichas-kiki.json",
+          )}
           data-kiki-download="master-export"
         >
           Descargar fichas guardadas · JSON

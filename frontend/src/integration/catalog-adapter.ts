@@ -1,4 +1,5 @@
 import { channelLabels } from "./channel-labels";
+import { production, capabilities, environmentText } from "./runtime";
 export const catalogPath = "/api/ecomm-app/stage/catalog";
 export const captureSource = "ECOMM_APP_API_STAGE";
 export const unavailable = "Sin datos disponibles";
@@ -62,12 +63,45 @@ const messages: Record<number, string> = {
 export async function request(path: string, options: RequestInit = {}) {
   let response: Response;
   try {
+    if (production) {
+      const url = new URL(path, location.origin);
+      if (
+        !path.startsWith("/api/") ||
+        url.origin !== location.origin ||
+        url.username ||
+        url.password ||
+        url.hash ||
+        url.pathname.startsWith("/api/test-")
+      )
+        throw new Error("Destino no permitido");
+      const method = (options.method || "GET").toUpperCase();
+      if (!["GET", "POST"].includes(method))
+        throw new Error("Método no autorizado");
+      if (
+        method === "POST" &&
+        !["/api/auth/login", "/api/auth/logout"].includes(url.pathname) &&
+        !capabilities?.writes
+      )
+        throw new Error("Interfaz de sólo lectura");
+      const headers = new Headers(options.headers);
+      headers.set("X-Kiki-UI", "v2");
+      options = {
+        ...options,
+        headers,
+        credentials: "same-origin",
+        redirect: "error",
+        cache: "no-store",
+      };
+    }
     response = await fetch(path, options);
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") throw error;
     throw new CatalogError(
       0,
-      "No pudimos comunicarnos con el backend de pruebas. No se cargaron datos de demostración.",
+      environmentText(
+        "No pudimos comunicarnos con el backend de pruebas. No se cargaron datos de demostración.",
+        "No pudimos completar la solicitud al backend de KIKI. No se cargan datos alternativos; revisá la sesión y los permisos.",
+      ),
     );
   }
   if (!response.ok) {
@@ -103,13 +137,26 @@ export async function request(path: string, options: RequestInit = {}) {
     }
     throw new CatalogError(
       response.status,
-      messages[response.status] || "El backend de pruebas no está disponible.",
+      (production && response.status >= 500
+        ? "El backend de KIKI no está disponible."
+        : messages[response.status]) ||
+        environmentText(
+          "El backend de pruebas no está disponible.",
+          "El backend de KIKI no está disponible.",
+        ),
     );
   }
-  if (response.headers.get("X-Kiki-Environment") !== "local-synthetic")
+  if (
+    production
+      ? response.headers.get("X-Kiki-UI-Contract") !== "kiki-same-origin-v2-1"
+      : response.headers.get("X-Kiki-Environment") !== "local-synthetic"
+  )
     throw new CatalogError(
       0,
-      "Respuesta rechazada: el backend no acredita el entorno sintético.",
+      environmentText(
+        "Respuesta rechazada: el backend no acredita el entorno sintético.",
+        "Respuesta rechazada: contrato del backend 2.0 no acreditado.",
+      ),
     );
   return response;
 }

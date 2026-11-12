@@ -48,11 +48,12 @@ def main():
             if result.returncode == 0 or "Configuración ambigua" not in result.stderr:
                 raise RuntimeError("El build no rechazó configuración ambigua.")
         subprocess.run(
-            ["npm", "run", "test:integration", *(["--", "connections-connected.spec.ts"] if "--connections" in sys.argv[1:] else ["--", "presentation-connected.spec.ts", "functional-catalog.spec.ts"] if "--presentation" in sys.argv[1:] else ["--", "channels-connected.spec.ts"] if "--channels" in sys.argv[1:] else ["--", "batches-connected.spec.ts"] if "--batches" in sys.argv[1:] else ["--", "autonomous-connected.spec.ts"] if "--autonomous" in sys.argv[1:] else [])],
+            ["npm", "run", "test:integration", *(["--", "production-connected.spec.ts"] if "--production-compat" in sys.argv[1:] else ["--", "connections-connected.spec.ts"] if "--connections" in sys.argv[1:] else ["--", "presentation-connected.spec.ts", "functional-catalog.spec.ts"] if "--presentation" in sys.argv[1:] else ["--", "channels-connected.spec.ts"] if "--channels" in sys.argv[1:] else ["--", "batches-connected.spec.ts"] if "--batches" in sys.argv[1:] else ["--", "autonomous-connected.spec.ts"] if "--autonomous" in sys.argv[1:] else [])],
             cwd=ROOT / "frontend",
             env={
                 **clean_environment(),
                 "NODE_EXTRA_CA_CERTS": str(directory / "tls-cert.pem"),
+                **({"KIKI_PRODUCTION_COMPAT": "isolated-only"} if "--production-compat" in sys.argv[1:] else {}),
                 **({"KIKI_CONNECTION_SCENARIO": "offline-fixtures"} if "--connections" in sys.argv[1:] else {}),
                 **({"KIKI_PRESENTATION_SCENARIO": "local-synthetic"} if "--presentation" in sys.argv[1:] else {}),
                 **({"KIKI_AUTONOMOUS_SCENARIO":"5000-synthetic"} if "--autonomous" in sys.argv[1:] else {}),
@@ -61,7 +62,7 @@ def main():
             },
             check=True,
         )
-        if not any(flag in sys.argv[1:] for flag in ("--connections", "--channels", "--batches", "--autonomous", "--presentation")):
+        if not any(flag in sys.argv[1:] for flag in ("--production-compat", "--connections", "--channels", "--batches", "--autonomous", "--presentation")):
             subprocess.run(
                 ["npm", "run", "test:pilot"],
                 cwd=ROOT / "frontend",

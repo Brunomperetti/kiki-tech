@@ -1,7 +1,7 @@
 from .policy import route_allowed, CSP, preflight
 
 
-def create_sandbox_app(*, autonomous=False, connections=False):
+def create_sandbox_app(*, autonomous=False, connections=False, production_compat=False):
     preflight()
     # Import ONLY after configuration, socket guard and database identity checks.
     from argon2 import PasswordHasher
@@ -29,6 +29,8 @@ def create_sandbox_app(*, autonomous=False, connections=False):
         kiki_refresh_token="",
         kiki_ai_api_key="",
         kiki_ai_enabled=False,
+        kiki_v2_enabled=production_compat,
+        kiki_v2_writes_enabled=production_compat,
         kiki_document_workspace_enabled=True,
         kiki_channel_workspace_enabled=True,
         kiki_editorial_batches_enabled=True,
@@ -68,6 +70,10 @@ def create_sandbox_app(*, autonomous=False, connections=False):
 
     @asynccontextmanager
     async def synthetic_lifespan(app):
+        if production_compat:
+            # Explicit, disposable-only legacy structure preparation after preflight.
+            from app.database.models import Base
+            Base.metadata.create_all(engine)
         async with original_lifespan(app):
             seed(SessionLocal, allow_scaled=autonomous)
             initialize_research(engine, SessionLocal)
@@ -103,7 +109,7 @@ def create_sandbox_app(*, autonomous=False, connections=False):
 
     @application.middleware("http")
     async def isolation_boundary(request, call_next):
-        if not route_allowed(request.method, request.url.path, connections=connections):
+        if not route_allowed(request.method, request.url.path, connections=connections, production_compat=production_compat):
             response = JSONResponse(
                 status_code=403,
                 content={"detail": "Operación deshabilitada en etapa 2B sintética."},
