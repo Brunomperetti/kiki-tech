@@ -45,6 +45,23 @@ export const workspacePath = (id: string) =>
 export const cloneFields = (fields: EcommEditableFields): EcommEditableFields =>
   structuredClone(fields);
 
+export async function confirmMonthlyReview(
+  id: string,
+  version: number,
+  csrf: string,
+) {
+  return adapt(
+    await (
+      await request(workspacePath(id) + "/confirm-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+        body: JSON.stringify({ expected_version: version }),
+      })
+    ).json(),
+    id,
+  );
+}
+
 function adapt(value: unknown, id: string): EcommApiProductEdit {
   const data = value as EcommApiProductEdit;
   const fields = data?.fields;

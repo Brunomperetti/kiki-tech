@@ -1,4 +1,5 @@
 """Internal KIKI editor for Ecomm-App API variants; NO vendor writes."""
+
 from typing import Literal, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
@@ -135,7 +136,7 @@ def brand_hints(
 @router.get("/queue")
 def work_queue(
     q: str = Query(default="", max_length=80),
-    filter: str = Query(default="all", max_length=35),
+    filter: str = Query(default="all", max_length=100),
     page: int = Query(default=1, ge=1, le=100000),
     limit: int = Query(default=25, ge=1, le=50),
     sort: Literal["priority", "capture"] = "priority",
@@ -144,7 +145,9 @@ def work_queue(
 ):
     """API-only prioritized editorial queue; no AI calls, external writes or approvals."""
     try:
-        return build_queue(db, query=q, filter_name=filter, page=page, limit=limit, sort=sort)
+        return build_queue(
+            db, query=q, filter_name=filter, page=page, limit=limit, sort=sort
+        )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
@@ -247,7 +250,9 @@ def save_edit(
     ecomm_id: str,
     body: SaveProductEdit,
     proposal_id: Annotated[int | None, Header(alias="X-Kiki-Proposal-Id", ge=1)] = None,
-    proposal_revision: Annotated[int | None, Header(alias="X-Kiki-Proposal-Revision", ge=1)] = None,
+    proposal_revision: Annotated[
+        int | None, Header(alias="X-Kiki-Proposal-Revision", ge=1)
+    ] = None,
     db: Session = Depends(get_db),
     _session=Depends(require_csrf),
 ):
@@ -255,10 +260,15 @@ def save_edit(
         if proposal_id is not None or proposal_revision is not None:
             from .documental_workspace import enabled
             from ...services.documental.proposals import Proposals
+
             enabled()
             if proposal_id is None or proposal_revision is None:
-                raise ValueError("Identificación y revisión de propuesta requeridas conjuntamente.")
-            return Proposals(db, _session).apply(ecomm_id, proposal_id, proposal_revision, body)
+                raise ValueError(
+                    "Identificación y revisión de propuesta requeridas conjuntamente."
+                )
+            return Proposals(db, _session).apply(
+                ecomm_id, proposal_id, proposal_revision, body
+            )
         return EcommApiProductWorkspace(db).save(
             ecomm_id, body.fields.model_dump(), body.status, body.expected_version
         )

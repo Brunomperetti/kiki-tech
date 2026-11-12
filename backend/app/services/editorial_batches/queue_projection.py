@@ -82,7 +82,7 @@ def editorial_flags(db, edits, soon_days):
 
     rows = db.execute(
         text(
-            "SELECT ecomm_id, COALESCE((SELECT jsonb_agg(jsonb_build_object('state', f->>'state', 'document_id', f->>'document_id', 'document_version', f->'document_version', 'document_hash',f->>'document_hash')) FROM jsonb_array_elements(facts::jsonb) f), '[]'::jsonb) AS facts FROM kiki_evidence_dossiers"
+            "WITH latest AS (SELECT DISTINCT ON (product_key) product_key, review_status FROM kiki_ai_editorial_drafts WHERE product_key LIKE 'ECOMM_DOCUMENTAL:%' ORDER BY product_key, id DESC) SELECT d.ecomm_id, a.review_status, COALESCE((SELECT jsonb_agg(jsonb_build_object('state', f->>'state', 'document_id', f->>'document_id', 'document_version', f->'document_version', 'document_hash',f->>'document_hash')) FROM jsonb_array_elements(d.facts::jsonb) f), '[]'::jsonb) AS facts FROM kiki_evidence_dossiers d LEFT JOIN latest a ON a.product_key = 'ECOMM_DOCUMENTAL:' || d.ecomm_id"
         )
     )
     documents = {
@@ -91,7 +91,11 @@ def editorial_flags(db, edits, soon_days):
     }
     result = {}
     for row in rows:
-        flags = []
+        flags = (
+            ["proposals_pending"]
+            if row.review_status in {"PENDING_REVIEW", "REVIEWED"}
+            else []
+        )
         if any(f["state"] == "APPROVED" for f in row.facts):
             flags.append("evidence_approved")
         if any(f["state"] == "REVOKED" for f in row.facts):

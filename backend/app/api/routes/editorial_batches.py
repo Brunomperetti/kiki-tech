@@ -39,7 +39,7 @@ class Selection(Strict):
     kind: Literal["IDS", "FILTER"]
     ids: list[str] = Field(default_factory=list, max_length=10000)
     query: str = Field(default="", max_length=80)
-    filter: str = Field(default="all", max_length=35)
+    filter: str = Field(default="all", max_length=100)
 
 
 class Preview(Strict):

@@ -1,5 +1,9 @@
+import { assessCommercialReadiness } from "../components/CommercialBackofficeFields";
+import type { EcommEditableFields } from "../types/ecomm-app";
+import { fieldKeys } from "../integration/workspace-adapter";
 import { products, type Product } from "./data";
 export type Editorial = {
+  commercial: EcommEditableFields;
   name: string;
   description: string;
   features: string;
@@ -22,6 +26,8 @@ export type Decision = {
 };
 export type Item = Product &
   Editorial & {
+    ean?: string;
+    barcode?: string;
     family: string;
     conflict: boolean;
     decisions: Record<"ml" | "tn", Decision>;
@@ -33,20 +39,78 @@ export const now = () =>
   new Date().toLocaleString("es-AR", { timeZone: "America/Buenos_Aires" });
 export function snapshot(p: Editorial): Editorial {
   const { name, description, features, image, alt, seo, price, stock } = p;
-  return { name, description, features, image, alt, seo, price, stock };
+  return {
+    name,
+    description,
+    features,
+    image,
+    alt,
+    seo,
+    price,
+    stock,
+    commercial: structuredClone(p.commercial),
+  };
 }
 export function createCatalog(): Item[] {
   return products.map((p) => {
+    const commercial = Object.fromEntries(
+      fieldKeys.map((k) => [
+        k,
+        ["attributes", "media", "sources"].includes(k) ? [] : "",
+      ]),
+    ) as unknown as EcommEditableFields;
+    Object.assign(commercial, {
+      brand: p.brand,
+      title: p.name,
+      presentation: p.presentation,
+      category: p.category,
+      details: "Ingredientes, origen y alérgenos pendientes de verificación.",
+      seo_title: p.name,
+      description: `${p.name}, una opción de ${p.brand} para el uso cotidiano. Texto de demostración.`,
+    });
+    if (p.status === "Preparada" || p.id === "DEMO-1001")
+      Object.assign(commercial, {
+        short_title: p.name.slice(0, 100),
+        short_description: `${p.name}. Texto exclusivamente sintético.`,
+        subcategory: p.category,
+        seo_description: `Ejemplo de ficha de ${p.name}; datos inventados.`,
+        seo_keywords: "demostración, producto sintético",
+        attributes: [{ name: "Presentación de prueba", value: p.presentation }],
+        media: [
+          {
+            kind: "IMAGE",
+            url: "https://synthetic.invalid/demo-image.jpg",
+            alt: "Imagen ficticia no descargada",
+            source_url: "",
+          },
+        ],
+        sources: [
+          {
+            kind: "ETIQUETA",
+            name: "Fuente exclusivamente sintética",
+            url: "",
+            note: "Aprobación sintética del fixture, no verificación de fabricante real.",
+            verified: true,
+          },
+        ],
+      });
     const editorial = {
       ...p,
+      commercial,
       description: `${p.name}, una opción de ${p.brand} para el uso cotidiano. Texto de demostración.`,
-      features: "Ingredientes, origen y alérgenos pendientes de verificación.",
+      features: commercial.details,
       image: "Vista frontal de muestra",
       alt: `Vista de ${p.name}`,
       seo: p.name,
     };
     return {
       ...editorial,
+      ean: ["DEMO-1001", "DEMO-1006"].includes(p.id)
+        ? "12345670"
+        : p.id === "DEMO-1008"
+          ? "12345685"
+          : undefined,
+      barcode: p.id === "DEMO-1008" ? "12345670" : undefined,
       family: p.id === "DEMO-1006" ? "FAM-1001" : `FAM-${p.id.slice(5)}`,
       conflict: p.status === "Conflicto",
       decisions: {
@@ -57,6 +121,7 @@ export function createCatalog(): Item[] {
         ml: p.status === "Preparada",
         tn:
           p.status === "Preparada" &&
+          assessCommercialReadiness(commercial).ready &&
           !["DEMO-1005", "DEMO-1004"].includes(p.id),
       },
       ai: null,
@@ -79,6 +144,23 @@ export function change(
   reason = "Decisión de demostración",
 ): Item {
   const next = { ...p, ...patch };
+  if (patch.commercial) {
+    next.commercial = structuredClone(patch.commercial);
+    next.name = patch.commercial.title || p.history[0].snapshot.name;
+    next.description = patch.commercial.description;
+    next.features = patch.commercial.details;
+    next.seo = patch.commercial.seo_title;
+    next.brand = patch.commercial.brand;
+    next.category = patch.commercial.category;
+    next.presentation = patch.commercial.presentation;
+  } else {
+    next.commercial = { ...p.commercial };
+    if (patch.name !== undefined) next.commercial.title = patch.name;
+    if (patch.description !== undefined)
+      next.commercial.description = patch.description;
+    if (patch.features !== undefined) next.commercial.details = patch.features;
+    if (patch.seo !== undefined) next.commercial.seo_title = patch.seo;
+  }
   return {
     ...next,
     history: [
@@ -115,6 +197,7 @@ export function isReady(p: Item, c: "ml" | "tn") {
     !isConfirmed(p, c) &&
     p.evidence[c].freshness === "current" &&
     p.status === "Preparada" &&
+    assessCommercialReadiness(p.commercial).ready &&
     p.prepared[c] &&
     requirements(p).length === 0 &&
     (c !== "tn" || !!p.seo.trim())

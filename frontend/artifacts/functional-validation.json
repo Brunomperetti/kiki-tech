@@ -1,0 +1,91 @@
+{
+  "schema": "kiki-functional-validation-v1",
+  "date": "2026-11-12",
+  "base_commit": "7b903eeeaf69a54b409855b5868dcaaf68c955d3",
+  "branch": "feature/kiki-tech-2-dashboard",
+  "data_scope": "synthetic captures plus manually supplied public Hileret original; authentic Ecomm identity pending",
+  "core_backend_tests": 222,
+  "checks": {
+    "legacy": 484,
+    "connected_general": 138,
+    "authentic_pdf_separate": 2,
+    "connected_presentation": 12,
+    "connected_channels": 8,
+    "connected_batches": 8,
+    "connected_autonomous": 8,
+    "static_demo": 50
+  },
+  "backend_total": 706,
+  "browser_total": 226,
+  "skipped_in_general_suite": 36,
+  "incidents": [
+    {
+      "case": "concurrent UI suites",
+      "observed": "two mobile cases exceeded 30 seconds",
+      "final": "both passed in serial at 10.4 and 13.7 seconds, unchanged timeout; general suite 138 passed"
+    },
+    {
+      "case": "authentic Hileret PDF after long general run",
+      "observed": "desktop import rejected with 409 by isolated reader; mobile then passed",
+      "monolithic_command_exit": 1,
+      "final": "independent desktop and mobile pilot 2/2 passed with unchanged resource protections",
+      "limitation": "exact resource/availability cause not determined; no automatic retries or relaxed limits"
+    }
+  ],
+  "channel_service_performance": {
+    "master_variants": [
+      50,
+      5000
+    ],
+    "captured_ml_rows": 5,
+    "sql_queries": [
+      4,
+      4
+    ],
+    "seconds": [
+      0.009,
+      0.281
+    ],
+    "excludes": "HTTP authentication, TLS and browser"
+  },
+  "queue_service_performance": {
+    "variants": 5000,
+    "sql_queries": 8,
+    "seconds": 3.525,
+    "python_peak_mib": 28.89
+  },
+  "isolation": {
+    "docker_network": "none",
+    "external_provider_calls": 0,
+    "real_openai_enabled": false,
+    "production_changes": false,
+    "new_database_tables": 0,
+    "push": false,
+    "deployment": false
+  },
+  "authentic_hileret_sha256": "bd99c29548cbf683e57b1fd6f2973f37ccef76477e2f6bc45379017a63599291",
+  "screenshots": [
+    "functional-authentic-antes-desktop.png",
+    "functional-authentic-antes-mobile.png",
+    "functional-authentic-guardado-desktop.png",
+    "functional-authentic-guardado-mobile.png",
+    "functional-catalog-dashboard-desktop.png",
+    "functional-catalog-dashboard-mobile.png",
+    "functional-catalog-editor-desktop.png",
+    "functional-catalog-editor-mobile.png",
+    "functional-catalog-ml-desktop.png",
+    "functional-catalog-ml-mobile.png",
+    "functional-catalog-quality-desktop.png",
+    "functional-catalog-quality-mobile.png",
+    "functional-demo-dashboard-desktop.png",
+    "functional-demo-dashboard-mobile.png",
+    "functional-demo-editor-desktop.png",
+    "functional-demo-editor-mobile.png",
+    "functional-flow-hileret-desktop.png",
+    "functional-flow-hileret-mobile.png",
+    "functional-flow-lote-desktop.png",
+    "functional-flow-lote-mobile.png",
+    "functional-flow-propuesta-desktop.png",
+    "functional-flow-propuesta-mobile.png"
+  ]
+}

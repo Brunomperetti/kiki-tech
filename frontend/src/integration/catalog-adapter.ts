@@ -223,6 +223,26 @@ export function adaptCatalog(
 }
 
 export const queueFilters = {
+  ean_missing: "EAN no informado en Ecomm-App",
+  ean_repeated: "EAN repetido · revisar presentaciones",
+  sku_repeated: "SKU repetido · no confirma duplicados",
+  possible_duplicates: "Posibles duplicados · revisar códigos",
+  sku_family: "Familias SKU candidatas",
+  barcode_gtin_conflict: "Barcode y GTIN contradictorios",
+  short_description_missing: "Sin descripción corta",
+  long_description_missing: "Sin descripción larga",
+  commercial_title_missing: "Sin título comercial",
+  category_missing: "Sin categoría",
+  subcategory_missing: "Sin subcategoría",
+  attributes_missing: "Sin atributos",
+  images_missing: "Sin imágenes registradas",
+  video_unrecorded: "Sin video · revisar si corresponde",
+  seo_missing: "SEO incompleto",
+  ml_unconfirmed: "Sin publicación confirmada en ML",
+  tn_unconfirmed: "Sin publicación confirmada en TN",
+  proposals_pending: "Propuestas pendientes de revisión",
+  commercial_incomplete: "Ficha comercial incompleta",
+
   review_soon: "Próximos a revisión mensual",
   evidence_approved: "Con aprobaciones documentales (verificar vigencia)",
   needs_research: "Requieren investigación",
@@ -249,7 +269,18 @@ export const queueFilters = {
   channel_no_evidence: "Sin evidencia suficiente de canal",
   channel_stale: "Capturas de canal desactualizadas",
 } as const;
-export type QueueFilter = keyof typeof queueFilters;
+export type QueueFilterKey = keyof typeof queueFilters;
+export type QueueFilter =
+  | QueueFilterKey
+  | `${QueueFilterKey}+${QueueFilterKey}`;
+export function validQueueFilter(value: string): value is QueueFilter {
+  const parts = value.split("+");
+  return (
+    parts.length <= 2 &&
+    new Set(parts).size === parts.length &&
+    parts.every((p) => Object.prototype.hasOwnProperty.call(queueFilters, p))
+  );
+}
 export const queuePath = "/api/ecomm-app/workspace/queue";
 
 export function adaptQueue(
@@ -321,7 +352,10 @@ export function adaptQueue(
           "READY_FOR_CHANNELS",
         ].includes(String(row.status)) ||
         !Array.isArray(row.flags) ||
-        (filter !== "all" && !row.flags.includes(filter))
+        !filter
+          .split("+")
+          .filter((f) => f !== "all")
+          .every((f) => (row.flags as unknown[]).includes(f))
       )
         throw new Error("Fila incompatible");
       const channels = object(row.channel_coverage);
@@ -447,3 +481,25 @@ export function captureDate(value: string | null) {
       }).format(new Date(value))
     : unavailable;
 }
+
+export const qualityFilterKeys = [
+  "ean_missing",
+  "ean_repeated",
+  "sku_repeated",
+  "possible_duplicates",
+  "sku_family",
+  "barcode_gtin_conflict",
+  "short_description_missing",
+  "long_description_missing",
+  "commercial_title_missing",
+  "category_missing",
+  "subcategory_missing",
+  "attributes_missing",
+  "images_missing",
+  "video_unrecorded",
+  "seo_missing",
+  "ml_unconfirmed",
+  "tn_unconfirmed",
+  "proposals_pending",
+  "commercial_incomplete",
+] as const;

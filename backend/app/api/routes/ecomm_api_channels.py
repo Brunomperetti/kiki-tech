@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -79,6 +79,24 @@ def report(db, ident):
         "external_writes_enabled": False,
         "scope": "API_VARIANT_CAPTURE_REVIEW",
     }
+
+
+@router.get("/channels/listings")
+def captured_listings(
+    channel: Literal["ml", "tn"],
+    q: str = Query("", max_length=80),
+    page: int = Query(1, ge=1, le=100000),
+    limit: int = Query(25, ge=1, le=50),
+    linkage: Literal["all", "unlinked", "verified"] = "all",
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
+):
+    from ...services.ecomm_channel_listings import listings
+
+    try:
+        return listings(db, channel, query=q, page=page, limit=limit, linkage=linkage)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get("/{ecomm_id}/channels")

@@ -290,7 +290,7 @@ class BApplication(unittest.TestCase):
             ("POST", "/api/mercadolibre/sync"),
             ("GET", "/api/mercadolibre/callback?code=synthetic&state=synthetic"),
             ("POST", "/api/tiendanube/import-csv"),
-            ("POST", "/api/ecomm-app/workspace/900001/confirm-review"),
+            ("POST", "/api/ecomm-app/workspace/900007/confirm-review"),
             ("POST", "/api/ecomm-app/workspace/ai/900001/suggest"),
             ("POST", "/api/prepublication/metadata/analyze"),
             ("GET", "/docs"),

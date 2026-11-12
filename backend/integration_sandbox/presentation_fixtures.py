@@ -1,6 +1,7 @@
 """One presentation scenario, using existing services. No approvals or provider IO."""
 
 import base64
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -27,6 +28,34 @@ def install(factory):
     # This existing installer refuses an occupied/unknown catalogue before writing.
     channels(factory)
     with factory() as db:
+        # Unlinked channel records are deliberate fixtures, never master variants.
+        from sqlalchemy import select
+        from app.database.models import CatalogSnapshot
+
+        for source, extra in [
+            (
+                "MERCADOLIBRE_API",
+                {
+                    "external_id": "MLA999000001",
+                    "title": "Legumbres sintéticas sin vincular",
+                    "sku": "SIN-MAESTRO",
+                    "status": "active",
+                },
+            ),
+            (
+                "TIENDANUBE",
+                {
+                    "slug": "registro-tn-sin-vinculo",
+                    "name": "Legumbres sintéticas sin vincular",
+                    "sku": "SIN-MAESTRO",
+                },
+            ),
+        ]:
+            snapshot = db.scalar(
+                select(CatalogSnapshot).where(CatalogSnapshot.source == source)
+            )
+            snapshot.payload = [*deepcopy(snapshot.payload), extra]
+        db.commit()
         research = Research(db, ACTOR)
         case = research.dossier("900003")
         body = Incorporate(

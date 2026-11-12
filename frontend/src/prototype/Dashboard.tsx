@@ -1,4 +1,15 @@
 import {
+  CommercialViews,
+  ChannelListings,
+  type CommercialView,
+  commercialViews,
+} from "../integration/CommercialViews";
+import {
+  qualityFilterKeys,
+  queueFilters,
+} from "../integration/catalog-adapter";
+import { demoListings, demoQuality } from "./commercial-demo";
+import {
   CatalogFrame,
   CatalogTable,
   CatalogMetrics,
@@ -71,6 +82,11 @@ function DemoDashboard() {
   const closeRef = useRef<HTMLButtonElement>(null);
   const originRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const view = (params.get("view") || "ecomm") as CommercialView;
+  const external = view === "ml" || view === "tn";
+  const quality = params.get("quality") || "";
+  const listingPage = Number(params.get("listingPage") || "1");
+  const linkage = params.get("linkage") || "all";
   const selected = rows.find((p) => p.id === params.get("product"));
   const tab = tabs.includes(params.get("tab") || "")
     ? params.get("tab")!
@@ -85,6 +101,11 @@ function DemoDashboard() {
     mlFilter = params.get("mlState") || "",
     tnFilter = params.get("tnState") || "";
   function update(values: Record<string, string>) {
+    if (
+      !("view" in values) &&
+      ["mlState", "tnState", "work"].some((k) => k in values)
+    )
+      values = { ...values, view: "", linkage: "", listingPage: "" };
     const run = () =>
       setParams((previous) => {
         const next = new URLSearchParams(previous);
@@ -147,15 +168,16 @@ function DemoDashboard() {
   const filtered = rows
     .filter(
       (p) =>
-        [p.name, p.sku, p.brand, p.id]
+        [p.name, p.sku, p.brand, p.id, p.ean || "", p.barcode || ""]
           .join(" ")
           .toLocaleLowerCase()
           .includes(q.toLocaleLowerCase()) &&
         (!status ||
           (status === "Conflicto" ? p.conflict : p.status === status)) &&
+        (!quality || demoQuality(p, rows).includes(quality)) &&
         inWorkState(p, work) &&
         channelMatches(p, "ml", mlFilter) &&
-        channelMatches(p, "tn", tnFilter) &&
+        (view === "tn_unconfirmed" || channelMatches(p, "tn", tnFilter)) &&
         (!brand || p.brand === brand) &&
         (!channel ||
           (channel === "candidate"
@@ -254,6 +276,16 @@ function DemoDashboard() {
     const click = (e: MouseEvent) => {
       const anchor =
         e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (anchor instanceof HTMLAnchorElement) {
+        const target = new URL(anchor.href);
+        if (
+          target.hash &&
+          target.origin === location.origin &&
+          target.pathname === location.pathname &&
+          target.search === location.search
+        )
+          return; // A jump inside the same editor keeps the current draft.
+      }
       if (
         anchor instanceof HTMLAnchorElement &&
         new URL(anchor.href).origin === location.origin
@@ -303,54 +335,125 @@ function DemoDashboard() {
         </button>
       }
     >
-      <CatalogMetrics
-        label="Cobertura comercial por canal"
-        cards={indicators.map((card) => ({
-          ...card,
-          active:
-            card.id === "all"
-              ? !mlFilter &&
-                !tnFilter &&
-                !work &&
-                !q &&
-                !status &&
-                !brand &&
-                !channel &&
-                !conflict &&
-                !action
-              : Object.entries(card.filter).every(
-                  ([k, v]) => params.get(k) === v,
-                ),
-          onClick: () => {
-            if (card.id === "all")
-              update({
-                mlState: "",
-                tnState: "",
-                work: "",
-                status: "",
-                channel: "",
-                conflict: "",
-                action: "",
-                brand: "",
-                q: "",
-              });
-            else {
-              const entries = Object.entries(card.filter);
-              const active = entries.every(([k, v]) => params.get(k) === v);
-              update(
-                Object.fromEntries(
-                  entries.map(([k, v]) => [k, active ? "" : v]),
-                ),
-              );
-            }
-          },
-        }))}
+      <CommercialViews
+        value={view}
+        counts={{
+          ecomm: rows.length,
+          ml: demoListings(rows, "ml").distinct_publications,
+          tn: demoListings(rows, "tn").distinct_publications,
+          ml_unconfirmed: ml.unconfirmed,
+          tn_unconfirmed: rows.length,
+        }}
+        onChange={(next) =>
+          update({
+            view: next === "ecomm" ? "" : next,
+            mlState: next === "ml_unconfirmed" ? "unconfirmed" : "",
+            tnState: next === "tn_unconfirmed" ? "unconfirmed" : "",
+            quality: "",
+            q: "",
+            listingPage: "",
+            linkage: "",
+            product: "",
+            tab: "",
+          })
+        }
       />
+      <details className="i-more-metrics">
+        <summary>Más indicadores comerciales y de preparación</summary>
+        <CatalogMetrics
+          label="Cobertura comercial por canal"
+          cards={indicators.map((card) => ({
+            ...card,
+            active:
+              card.id === "all"
+                ? !mlFilter &&
+                  !tnFilter &&
+                  !work &&
+                  !q &&
+                  !status &&
+                  !brand &&
+                  !channel &&
+                  !conflict &&
+                  !action
+                : Object.entries(card.filter).every(
+                    ([k, v]) => params.get(k) === v,
+                  ),
+            onClick: () => {
+              if (card.id === "all")
+                update({
+                  mlState: "",
+                  tnState: "",
+                  work: "",
+                  status: "",
+                  channel: "",
+                  conflict: "",
+                  action: "",
+                  brand: "",
+                  q: "",
+                });
+              else {
+                const entries = Object.entries(card.filter);
+                const active = entries.every(([k, v]) => params.get(k) === v);
+                update(
+                  Object.fromEntries(
+                    entries.map(([k, v]) => [k, active ? "" : v]),
+                  ),
+                );
+              }
+            },
+          }))}
+        />
+      </details>
+      <details className="i-more-metrics">
+        <summary>Calidad del catálogo · demostración</summary>
+        <p>
+          Filtros calculados sobre fixtures. El formulario compartido de 18
+          campos se puede editar en memoria; el guardado persistente requiere el
+          backend aislado.
+        </p>
+        <div
+          className="k-quality-metrics"
+          role="group"
+          aria-label="Calidad de la demostración"
+        >
+          {qualityFilterKeys
+            .filter(
+              (k) =>
+                ![
+                  "ml_unconfirmed",
+                  "tn_unconfirmed",
+                  "proposals_pending",
+                ].includes(k),
+            )
+            .map((key) => (
+              <button
+                key={key}
+                aria-pressed={quality === key}
+                onClick={() =>
+                  update({
+                    view: external ? "" : view,
+                    quality: quality === key ? "" : key,
+                    product: "",
+                    tab: "",
+                  })
+                }
+              >
+                {queueFilters[key]}{" "}
+                <strong>
+                  {
+                    rows.filter((p) => demoQuality(p, rows).includes(key))
+                      .length
+                  }
+                </strong>
+              </button>
+            ))}
+        </div>
+      </details>
       <p className="s-count-note">
-        Totales del catálogo completo. Ecomm-App cuenta variantes; cada canal
-        cuenta publicaciones únicas con evidencia vigente. Una variante puede
-        tener varias publicaciones: no sumamos esas cantidades. Los filtros de
-        ML y TN se combinan.
+        Ecomm-App cuenta variantes; las vistas ML y TN muestran los registros
+        sintéticos del canal, incluso sin vinculación. Esos totales no se suman.
+        Una coincidencia no confirma publicación; un CSV no acredita vigencia
+        actual. Los filtros de ML y TN se combinan.
       </p>
       <div
         className="s-toolbar"
@@ -506,7 +609,14 @@ function DemoDashboard() {
             revisar. No confirman publicación.
           </p>
         </details>
-        {(q || work || status || brand || channel || conflict || action) && (
+        {(q ||
+          quality ||
+          work ||
+          status ||
+          brand ||
+          channel ||
+          conflict ||
+          action) && (
           <div className="d-active-filters">
             {work
               ? workLabels[work as WorkState] || "Filtros activos"
@@ -514,6 +624,8 @@ function DemoDashboard() {
             <button
               onClick={() =>
                 update({
+                  quality: "",
+                  view: "",
                   work: "",
                   mlState: "",
                   tnState: "",
@@ -530,111 +642,130 @@ function DemoDashboard() {
             </button>
           </div>
         )}
-        <CatalogTable
-          headings={[
-            "Producto / Presentación / Ecomm ID",
-            "SKU / Marca",
-            showPrices ? "Precio / Stock" : "Disponibilidad",
-            "Mercado Libre",
-            "Tiendanube",
-            "Ficha y siguiente paso",
-            <span className="d-sr">Acciones</span>,
-          ]}
-        >
-          {filtered.map((p) => (
-            <tr
-              key={p.id}
-              className={selected?.id === p.id ? "d-selected" : ""}
+        {external ? (
+          <ChannelListings
+            channel={view}
+            q={q}
+            page={listingPage}
+            limit={6}
+            linkage={linkage}
+            local={demoListings(rows, view, q, listingPage, 6, linkage)}
+            onChange={(v) => update({ ...v, listingPage: v.page ?? "" })}
+            onOpen={(id) => update({ product: id, tab: "Canales" })}
+          />
+        ) : (
+          <>
+            <CatalogTable
+              headings={[
+                "Producto / Presentación / Ecomm ID",
+                "SKU / Marca",
+                showPrices ? "Precio / Stock" : "Disponibilidad",
+                "Mercado Libre",
+                "Tiendanube",
+                "Ficha y siguiente paso",
+                <span className="d-sr">Acciones</span>,
+              ]}
             >
-              <td>
-                <button
-                  className="d-product"
-                  onClick={() => update({ product: p.id, tab: "Ficha" })}
+              {filtered.map((p) => (
+                <tr
+                  key={p.id}
+                  className={selected?.id === p.id ? "d-selected" : ""}
                 >
-                  <span className={`d-thumbnail ${p.color}`}>{p.initials}</span>
-                  <span>
-                    <strong>{p.name}</strong>
-                    <small>
-                      {p.presentation} · {p.sku} · {p.id}
-                    </small>
-                    <span className="s-mobile-channels">
-                      <span>ML · {channelState(p, "ml")}</span>
-                      <span>TN · {channelState(p, "tn")}</span>
-                    </span>
-                  </span>
-                </button>
-              </td>
-              <td>
-                <strong className="d-sku">{p.sku}</strong>
-                <small>{p.brand}</small>
-              </td>
-              <td>
-                {showPrices && <strong>{money(p.price)}</strong>}
-                <small>{p.stock} disponibles</small>
-              </td>
-              {(["ml", "tn"] as const).map((c) => (
-                <td key={c} data-channel={c}>
-                  <Pill value={channelState(p, c)} />
-                  <small>{channelDetail(p, c)}</small>
-                </td>
+                  <td>
+                    <button
+                      className="d-product"
+                      onClick={() => update({ product: p.id, tab: "Ficha" })}
+                    >
+                      <span className={`d-thumbnail ${p.color}`}>
+                        {p.initials}
+                      </span>
+                      <span>
+                        <strong>{p.name}</strong>
+                        <small>
+                          {p.presentation} · {p.sku} · {p.id}
+                        </small>
+                        <span className="s-mobile-channels">
+                          <span>ML · {channelState(p, "ml")}</span>
+                          <span>TN · {channelState(p, "tn")}</span>
+                        </span>
+                      </span>
+                    </button>
+                  </td>
+                  <td>
+                    <strong className="d-sku">{p.sku}</strong>
+                    <small>{p.brand}</small>
+                  </td>
+                  <td>
+                    {showPrices && <strong>{money(p.price)}</strong>}
+                    <small>{p.stock} disponibles</small>
+                  </td>
+                  {(["ml", "tn"] as const).map((c) => (
+                    <td key={c} data-channel={c}>
+                      <Pill value={channelState(p, c)} />
+                      <small>{channelDetail(p, c)}</small>
+                    </td>
+                  ))}
+                  <td>
+                    <Pill value={editorialState(p)} />
+                    <small>{nextAction(p)}</small>
+                    <button
+                      className="o-quick"
+                      onClick={() =>
+                        update({
+                          product: p.id,
+                          tab: actionTab(p),
+                        })
+                      }
+                    >
+                      {nextAction(p)}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="d-open"
+                      aria-label={`Abrir ${p.id}`}
+                      onClick={() => update({ product: p.id, tab: "Ficha" })}
+                    >
+                      <Icon name="arrow-right" size={16} />
+                    </button>
+                  </td>
+                </tr>
               ))}
-              <td>
-                <Pill value={editorialState(p)} />
-                <small>{nextAction(p)}</small>
+            </CatalogTable>
+            {!filtered.length && (
+              <div className="d-empty">
+                <Icon name="search" size={30} />
+                <h3>No encontramos productos</h3>
+                <p>Probá otro nombre o quitá los filtros.</p>
                 <button
-                  className="o-quick"
                   onClick={() =>
                     update({
-                      product: p.id,
-                      tab: actionTab(p),
+                      quality: "",
+                      view: "",
+                      work: "",
+                      mlState: "",
+                      tnState: "",
+                      q: "",
+                      status: "",
+                      brand: "",
+                      channel: "",
+                      conflict: "",
+                      action: "",
                     })
                   }
                 >
-                  {nextAction(p)}
+                  Ver todo el catálogo
                 </button>
-              </td>
-              <td>
-                <button
-                  className="d-open"
-                  aria-label={`Abrir ${p.id}`}
-                  onClick={() => update({ product: p.id, tab: "Ficha" })}
-                >
-                  <Icon name="arrow-right" size={16} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </CatalogTable>
-        {!filtered.length && (
-          <div className="d-empty">
-            <Icon name="search" size={30} />
-            <h3>No encontramos productos</h3>
-            <p>Probá otro nombre o quitá los filtros.</p>
-            <button
-              onClick={() =>
-                update({
-                  work: "",
-                  mlState: "",
-                  tnState: "",
-                  q: "",
-                  status: "",
-                  brand: "",
-                  channel: "",
-                  conflict: "",
-                  action: "",
-                })
-              }
-            >
-              Ver todo el catálogo
-            </button>
-          </div>
+              </div>
+            )}
+            <footer className="d-table-footer">
+              <span>
+                Mostrando {filtered.length} de {rows.length} variantes
+              </span>
+              <span>Identidad por Ecomm ID · nunca por SKU</span>
+            </footer>
+          </>
         )}
-        <footer className="d-table-footer">
-          <span>
-            Mostrando {filtered.length} de {rows.length} variantes
-          </span>
-          <span>Identidad por Ecomm ID · nunca por SKU</span>
-        </footer>
       </section>
       {(params.get("tools") === "1" || params.get("tool")) && (
         <div id="catalog-operations">

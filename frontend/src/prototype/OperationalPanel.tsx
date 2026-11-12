@@ -1,3 +1,7 @@
+import {
+  CommercialBackofficeFields,
+  assessCommercialReadiness,
+} from "../components/CommercialBackofficeFields";
 import { useEffect, useState } from "react";
 import {
   change,
@@ -62,7 +66,23 @@ export function OperationalPanel({
     setConfirmedIdentity(false);
   }
   function field<K extends keyof Editorial>(key: K, value: Editorial[K]) {
-    setDraft((old) => ({ ...old, [key]: value }));
+    setDraft((old) => {
+      const alias = (
+        {
+          name: "title",
+          description: "description",
+          features: "details",
+          seo: "seo_title",
+        } as Record<string, string>
+      )[key];
+      return {
+        ...old,
+        [key]: value,
+        commercial: alias
+          ? { ...old.commercial, [alias]: value }
+          : old.commercial,
+      };
+    });
   }
   const missing = requirements(p);
   const explain = (
@@ -75,7 +95,45 @@ export function OperationalPanel({
     <div className="o-panel">
       {explain}
       {tab === "Ficha" && (
+        <p className="r-notice">
+          EAN de prueba: {p.ean || "No informado"} · Barcode:{" "}
+          {p.barcode || "No informado"}. El editor compartido trabaja aquí en
+          memoria con datos sintéticos; guardar en PostgreSQL requiere el
+          backend aislado.
+        </p>
+      )}
+      {tab === "Ficha" && (
         <>
+          <details className="r-document">
+            <summary>Editor comercial completo · 18 campos compartidos</summary>
+            <p>
+              El mismo formulario del editor original. Simulación en memoria,
+              sin PostgreSQL ni publicación externa.
+            </p>
+            <CommercialBackofficeFields
+              memoryOnly
+              fields={draft.commercial}
+              readiness={assessCommercialReadiness(draft.commercial)}
+              categories={[]}
+              allowExternalResources={false}
+              onChange={(key, value) =>
+                setDraft((old) => {
+                  const commercial = { ...old.commercial, [key]: value };
+                  const aliases = {
+                    title: "name",
+                    description: "description",
+                    details: "features",
+                    seo_title: "seo",
+                  } as Record<string, string>;
+                  return {
+                    ...old,
+                    commercial,
+                    ...(aliases[key] ? { [aliases[key]]: value } : {}),
+                  };
+                })
+              }
+            />
+          </details>
           <h3>Editar ficha de producto</h3>
           <p>Completá los datos y compará antes de guardar un borrador.</p>
           <div className="o-form">
@@ -168,7 +226,7 @@ export function OperationalPanel({
               </thead>
               <tbody>
                 {(Object.keys(draft) as (keyof Editorial)[])
-                  .filter((k) => draft[k] !== p[k])
+                  .filter((k) => JSON.stringify(draft[k]) !== JSON.stringify(p[k]))
                   .map((k) => (
                     <tr key={k}>
                       <th>
@@ -182,11 +240,20 @@ export function OperationalPanel({
                             seo: "Título SEO",
                             price: "Precio",
                             stock: "Stock",
+                            commercial: "Ficha comercial de 18 campos",
                           }[k]
                         }
                       </th>
-                      <td>{p[k] || "Vacío"}</td>
-                      <td>{draft[k] || "Vacío"}</td>
+                      <td>
+                        {typeof p[k] === "object"
+                          ? JSON.stringify(p[k], null, 2)
+                          : p[k] || "Vacío"}
+                      </td>
+                      <td>
+                        {typeof draft[k] === "object"
+                          ? JSON.stringify(draft[k], null, 2)
+                          : draft[k] || "Vacío"}
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -580,11 +647,16 @@ export function OperationalPanel({
                             seo: "Título para buscadores",
                             price: "Precio",
                             stock: "Stock",
+                            commercial: "Ficha comercial de 18 campos",
                           } as Record<string, string>
                         )[k]
                       }
                     </dt>
-                    <dd>{v || "Vacío"}</dd>
+                    <dd>
+                      {typeof v === "object"
+                        ? JSON.stringify(v, null, 2)
+                        : v || "Vacío"}
+                    </dd>
                   </div>
                 ))}
               </dl>

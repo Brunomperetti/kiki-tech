@@ -1,0 +1,180 @@
+.k-commercial-views {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.k-commercial-views button {
+  background: white;
+  border: 1px solid #d3dfd7;
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: #285b4c;
+  font-size: 12px;
+  flex: 1;
+}
+.k-commercial-views button[aria-pressed="true"] {
+  background: #eaf2e7;
+  border-color: #75936a;
+}
+.k-commercial-views strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+.k-listings {
+  padding: 16px;
+}
+.k-listings p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.k-listings select {
+  padding: 8px;
+  border: 1px solid #cbd8cc;
+  border-radius: 8px;
+  max-width: 100%;
+}
+.k-listings-scroll {
+  overflow: auto;
+}
+.k-listings table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.k-listings th,
+.k-listings td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #dce5df;
+  vertical-align: top;
+}
+.k-listings small {
+  display: block;
+  margin-top: 6px;
+  color: #65775c;
+}
+.k-listings footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.k-quality-metrics {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.k-quality-metrics button {
+  padding: 8px 10px;
+  border: 1px solid #d3dfd7;
+  border-radius: 8px;
+  background: white;
+  color: #285b4c;
+  text-align: left;
+}
+.k-quality-metrics button[aria-pressed="true"] {
+  background: #eaf2e7;
+}
+.k-quality-metrics strong {
+  margin-left: 7px;
+}
+@media (max-width: 650px) {
+  .k-commercial-views button {
+    flex: 1 1 42%;
+    font-size: 11px;
+  }
+  .k-listings {
+    padding: 12px;
+  }
+  .k-listings th,
+  .k-listings td {
+    min-width: 130px;
+    padding: 9px;
+  }
+  .k-quality-metrics button {
+    font-size: 12px;
+  }
+}
+
+/* A working catalogue, with a compact header shared by both controllers. */
+.d-app .d-main {
+  padding-top: 18px !important;
+}
+.d-app .d-heading {
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.d-app .d-heading h1 {
+  font-size: 25px;
+  line-height: 1.2;
+  margin: 4px 0 7px;
+}
+.d-app .d-heading p {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.d-app .d-eyebrow {
+  display: none;
+}
+.d-app .d-topbar {
+  height: 46px;
+}
+.d-app .d-demo {
+  margin-bottom: 10px;
+  padding: 9px 12px;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric {
+  min-height: 82px;
+  padding: 9px 12px;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric strong {
+  font-size: 22px;
+  margin: 6px 0;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric > span {
+  font-size: 12px;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric small {
+  font-size: 10px;
+}
+@media (max-width: 760px) {
+  .d-app .d-sidebar {
+    padding: 10px 16px;
+  }
+  .d-app .d-sidebar nav {
+    margin-top: 8px;
+    gap: 4px;
+  }
+  .d-app .d-sidebar nav button {
+    min-height: 38px;
+    padding: 6px 9px;
+  }
+  .d-app .d-topbar {
+    min-height: 34px;
+    height: auto;
+    padding: 8px 16px;
+  }
+  .d-app .d-main {
+    padding: 14px 16px !important;
+  }
+  .d-app .d-heading h1 {
+    font-size: 21px;
+    max-width: none;
+  }
+  .d-app .d-heading > .d-primary {
+    margin-top: 9px;
+    padding: 8px 12px;
+  }
+  .d-app .d-demo {
+    font-size: 10px;
+    line-height: 1.45;
+  }
+  .d-app .s-count-note {
+    margin: 8px 0;
+    line-height: 1.4;
+  }
+}

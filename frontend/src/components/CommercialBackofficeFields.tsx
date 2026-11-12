@@ -25,6 +25,7 @@ type Props={
   readiness:KikiReadiness;
   categories:{name:string;count:number;subcategories:{name:string;count:number}[]}[];
   allowExternalResources?:boolean;
+  memoryOnly?:boolean;
 };
 
 const fieldNames:Record<string,string>={
@@ -36,7 +37,7 @@ const fieldNames:Record<string,string>={
   seo_title:'Título SEO',seo_description:'Metadescripción SEO',
   seo_keywords:'Palabras clave',
 };
-export function CommercialBackofficeFields({fields,onChange,readiness,categories,allowExternalResources=true}:Props){
+export function CommercialBackofficeFields({fields,onChange,readiness,categories,allowExternalResources=true,memoryOnly=false}:Props){
   const editAttribute=(idx:number,key:keyof KikiAttribute,value:string)=>{
     onChange('attributes',fields.attributes.map((a,i)=>i===idx?{...a,[key]:value}:a));
   };
@@ -52,7 +53,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
   return <div className="kiki-commercial">
     <div className="kiki-commercial-overview" role="status">
       <div><strong>Ficha comercial central de KIKI</strong>
-        <p>Todos los campos se guardan en KIKI y quedan asociados al ID de variante de Ecomm-App.
+        <p>{memoryOnly ? "En esta demostración los campos se conservan sólo en memoria y se identifican con la variante sintética." : "Todos los campos se guardan en KIKI y quedan asociados al ID de variante de Ecomm-App."}
           No se envían a ningún canal hasta que exista un proceso de publicación autorizado.</p></div>
       <div className="kiki-commercial-score"><strong>{readiness.percent}%</strong><span>Completitud documental</span></div>
       <div className="kiki-commercial-meter" aria-label={readiness.percent+'% de la ficha completa'}>

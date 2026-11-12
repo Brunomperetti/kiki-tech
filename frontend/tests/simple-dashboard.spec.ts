@@ -14,6 +14,10 @@ test.beforeEach(async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Tu catálogo, en un solo lugar." }),
   ).toBeVisible();
+  // Legacy secondary indicators remain available inside their collapsed group.
+  await page
+    .getByText("Más indicadores comerciales y de preparación", { exact: true })
+    .click();
 });
 test.afterEach(async ({ page }) => expect(attempts.get(page)).toEqual([]));
 const row = (page: Page, id: string) =>

@@ -239,6 +239,7 @@ def main():
                     for checks in (
                         "dashboard_checks",
                         "channel_checks",
+                        "catalog_operations_checks",
                         "editorial_checks",
                         "autonomous_checks",
                         "documental_workspace_checks",

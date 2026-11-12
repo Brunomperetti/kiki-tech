@@ -48,7 +48,7 @@ def main():
             if result.returncode == 0 or "Configuración ambigua" not in result.stderr:
                 raise RuntimeError("El build no rechazó configuración ambigua.")
         subprocess.run(
-            ["npm", "run", "test:integration", *(["--", "presentation-connected.spec.ts"] if "--presentation" in sys.argv[1:] else ["--", "channels-connected.spec.ts"] if "--channels" in sys.argv[1:] else ["--", "batches-connected.spec.ts"] if "--batches" in sys.argv[1:] else ["--", "autonomous-connected.spec.ts"] if "--autonomous" in sys.argv[1:] else [])],
+            ["npm", "run", "test:integration", *(["--", "presentation-connected.spec.ts", "functional-catalog.spec.ts"] if "--presentation" in sys.argv[1:] else ["--", "channels-connected.spec.ts"] if "--channels" in sys.argv[1:] else ["--", "batches-connected.spec.ts"] if "--batches" in sys.argv[1:] else ["--", "autonomous-connected.spec.ts"] if "--autonomous" in sys.argv[1:] else [])],
             cwd=ROOT / "frontend",
             env={
                 **clean_environment(),

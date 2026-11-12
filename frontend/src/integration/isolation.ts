@@ -6,6 +6,9 @@ const allowed = new Set([
   "POST /api/auth/logout",
   "GET /api/ecomm-app/stage/catalog",
   "GET /api/ecomm-app/workspace/queue",
+  "GET /api/ecomm-app/workspace/channels/listings",
+  "GET /api/ecomm-app/workspace/saved",
+  "GET /api/ecomm-app/workspace/master-export",
   "GET /api/test-discovery/pilot-status",
   "GET /api/test-commercial-pilot/mama-350",
   "POST /api/test-commercial-pilot/mama-350/prepare",
@@ -32,6 +35,10 @@ export function installIntegrationIsolation() {
       url.password ||
       !(
         allowed.has(`${method} ${url.pathname}`) ||
+        (method === "POST" &&
+          /^\/api\/ecomm-app\/workspace\/90000[1-6]\/confirm-review$/.test(
+            url.pathname,
+          )) ||
         (method === "GET" &&
           /^\/api\/ecomm-app\/workspace\/ai\/90000[1-6]\/latest$/.test(
             url.pathname,
@@ -128,6 +135,14 @@ export function installIntegrationIsolation() {
           : null;
       if (!(anchor instanceof HTMLAnchorElement)) return;
       const url = new URL(anchor.href, location.origin);
+      if (
+        url.origin === gatewayOrigin &&
+        url.pathname === "/api/ecomm-app/workspace/master-export" &&
+        !url.search &&
+        anchor.hasAttribute("download") &&
+        anchor.dataset.kikiDownload === "master-export"
+      )
+        return;
       if (url.origin !== gatewayOrigin || url.pathname !== "/") {
         event.preventDefault();
         event.stopImmediatePropagation();

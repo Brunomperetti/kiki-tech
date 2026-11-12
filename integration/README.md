@@ -1,5 +1,7 @@
 # Integración local aislada: etapas 2B–2J
 
+Entrega actual: [cierre funcional](FUNCTIONAL-CLOSE.md), [paridad](FUNCTIONAL-PARITY.md) y [opción online pendiente de autorización](ONLINE-PRESENTATION-PLAN.md). Esta última permite planificar acceso desde Chrome sin instalar WSL/Docker en Windows; todavía no fue desplegada. Las instrucciones locales siguientes son opcionales y corresponden al host de pruebas.
+
 Para la presentación del **13/11/2026**, usar el [cierre para Guillermo](PRESENTACION-GUILLERMO.md)
 y la [guía de Windows/WSL2](WINDOWS-DEMO.md): `python3 integration/run.py up --presentation`.
 Reutiliza este arnés con canales y documentación en un solo escenario, sin aprobar

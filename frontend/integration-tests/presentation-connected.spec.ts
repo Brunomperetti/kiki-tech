@@ -87,9 +87,15 @@ test("presentación integral: evidencia → comparación → revisión → persi
     })
     .click();
   await expect(source).toContainText("Revisada por una persona");
+  const extraction = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === root + "/evidence/extract" &&
+      r.request().method() === "POST",
+  );
   await page
     .getByRole("button", { name: "Extraer hechos del documento", exact: true })
     .click();
+  expect((await extraction).status()).toBe(200);
   const evidence: Dossier = await (
     await page.request.get(root + "/evidence")
   ).json();

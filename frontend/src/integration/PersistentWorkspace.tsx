@@ -18,6 +18,7 @@ import {
 } from "./catalog-adapter";
 import {
   cloneFields,
+  confirmMonthlyReview,
   compatibleWithRow,
   fieldKeys,
   getWorkspace,
@@ -130,6 +131,39 @@ export function PersistentWorkspace({
     setRemote(undefined);
     setIdentityBlocked(!compatibleWithRow(value, variant));
     onRecord(value);
+  }
+  async function monthlyReview() {
+    if (
+      !record ||
+      dirty ||
+      saving ||
+      identityBlocked ||
+      !window.confirm(
+        "¿Confirmar que revisaste fuentes, identidad y presentación de esta versión? Registra la revisión mensual interna; no cambia contenido ni publica.",
+      )
+    )
+      return;
+    setSaving(true);
+    setError("");
+    try {
+      const current = await getWorkspace(variant.id);
+      if (
+        !compatibleWithRow(current, variant) ||
+        !sameIdentity(record.source, current.source)
+      )
+        throw new CatalogError(
+          409,
+          "La identidad cambió; no se confirmó la revisión.",
+        );
+      adopt(await confirmMonthlyReview(variant.id, record.version, csrf));
+      setMessage(
+        "Revisión mensual registrada; contenido comercial conservado.",
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
   }
   async function persist(nextStatus: EcommEditStatus) {
     if (!record || !fields || saving || remote || identityBlocked) return;
@@ -379,6 +413,7 @@ export function PersistentWorkspace({
               <>
                 <button
                   className="d-primary"
+                  aria-label="Investigar producto"
                   disabled={
                     dirty ||
                     saving ||
@@ -393,8 +428,14 @@ export function PersistentWorkspace({
                     onTab("Evidencias");
                   }}
                 >
-                  Investigar producto
+                  Investigar y completar ficha con IA
                 </button>
+                <p className="r-notice">
+                  Recorrido guiado: identidad → fuentes → hechos respaldados →
+                  propuesta → revisión por campo. En este entorno la búsqueda es
+                  simulada y la redacción es determinista; OpenAI real permanece
+                  desactivado.
+                </p>
                 {variant.id === mamaPilotId && (
                   <MamaPilotSummary revision={record.version} />
                 )}
@@ -554,6 +595,24 @@ export function PersistentWorkspace({
             {tab === "Historial" && (
               <>
                 <h3>Historial persistido en KIKI</h3>
+                <p>
+                  Revisión de ficha lista para canales: cada 30 días. Próxima
+                  revisión:{" "}
+                  {captureDate(record.review_schedule?.next_review_at ?? null)}.
+                </p>
+                {!isAuxiliaryPilot(variant.id) && (
+                  <button
+                    disabled={
+                      dirty ||
+                      saving ||
+                      identityBlocked ||
+                      record.status !== "READY_FOR_CHANNELS"
+                    }
+                    onClick={() => void monthlyReview()}
+                  >
+                    Confirmar revisión mensual
+                  </button>
+                )}
                 <p>
                   Versión actual guardada: {record.version}.{" "}
                   {dirty &&

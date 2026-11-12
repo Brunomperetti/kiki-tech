@@ -15,6 +15,10 @@ test.beforeEach(async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Tu catálogo, en un solo lugar." }),
   ).toBeVisible();
+  // Legacy secondary indicators remain available inside their collapsed group.
+  await page
+    .getByText("Más indicadores comerciales y de preparación", { exact: true })
+    .click();
 });
 test.afterEach(async ({ page }) => expect(outbound.get(page)).toEqual([]));
 const record = (page: Page, id: string) =>
@@ -135,6 +139,9 @@ test("filtros combinados de ambos canales restauran URL y preservan Ecomm ID", a
     .click();
   await page.keyboard.press("Escape");
   await expect(record(page, "DEMO-1001")).toBeVisible();
+  await page
+    .getByText("Más indicadores comerciales y de preparación", { exact: true })
+    .click();
   await page
     .getByRole("region", { name: "Cobertura comercial por canal" })
     .locator('[data-metric="all"]')

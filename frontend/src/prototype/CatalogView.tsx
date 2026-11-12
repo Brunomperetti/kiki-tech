@@ -90,7 +90,7 @@ export function CatalogFrame({
           <span>
             {connected
               ? "Trabajo local · Sin conexión productiva"
-              : "Etapa 1.3 · Demostración"}
+              : "Demostración visual · Sin backend"}
           </span>
         </div>
       </aside>

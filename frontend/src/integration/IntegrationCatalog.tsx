@@ -1,3 +1,12 @@
+import { SettingsDialog } from "../prototype/SettingsDialog";
+import { SavedHistory } from "./SavedHistory";
+import {
+  CommercialViews,
+  ChannelListings,
+  commercialViews,
+  loadListings,
+  type CommercialView,
+} from "./CommercialViews";
 import { BatchPanel } from "./BatchPanel";
 import { channelLabels } from "./channel-labels";
 import {
@@ -18,6 +27,8 @@ import {
   adaptVariant,
   validVariantId,
   queueFilters,
+  validQueueFilter,
+  qualityFilterKeys,
   type QueueFilter,
   type Variant,
   request,
@@ -49,6 +60,9 @@ function sessionData(value: unknown): Session {
 export function IntegrationCatalog() {
   const [urlParams, setParams] = useSearchParams();
   const [params, setAcceptedParams] = useState(urlParams);
+  const [preferences, setPreferences] = useState(false),
+    [historyOpen, setHistoryOpen] = useState(false),
+    [advanced, setAdvanced] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [dirty, setDirty] = useState(false);
   const [editorBusy, setEditorBusy] = useState(false);
@@ -67,20 +81,37 @@ export function IntegrationCatalog() {
   const [revision, retry] = useState(0);
   const q = params.get("q") || "";
   const filter = (params.get("filter") || "all") as QueueFilter;
+  const view = (params.get("view") || "ecomm") as CommercialView;
+  const external = view === "ml" || view === "tn";
+  const linkage = params.get("linkage") || "all";
+  const [listingCounts, setListingCounts] = useState<{
+    ml?: number;
+    tn?: number;
+  }>();
   const rawPage = params.get("page") || "1",
     rawSize = params.get("limit") || "6";
   const page = Number(rawPage),
     pageSize = Number(rawSize);
   const invalid =
     q.length > 80 ||
-    !(filter in queueFilters) ||
+    !validQueueFilter(filter) ||
+    !Object.prototype.hasOwnProperty.call(commercialViews, view) ||
+    !["all", "unlinked", "verified"].includes(linkage) ||
     !/^[1-9]\d*$/.test(rawPage) ||
     page > 100000 ||
     ![3, 6, 25, 50].includes(pageSize) ||
     String(pageSize) !== rawSize ||
-    ["q", "page", "limit", "product", "tab", "filter", "proposal"].some(
-      (key) => params.getAll(key).length > 1,
-    ) ||
+    [
+      "q",
+      "page",
+      "limit",
+      "product",
+      "tab",
+      "filter",
+      "proposal",
+      "view",
+      "linkage",
+    ].some((key) => params.getAll(key).length > 1) ||
     Array.from(params.keys()).some(
       (key) =>
         ![
@@ -91,6 +122,8 @@ export function IntegrationCatalog() {
           "tab",
           "filter",
           "proposal",
+          "view",
+          "linkage",
         ].includes(key),
     ) ||
     (params.has("tab") && !tabs.includes(params.get("tab")!)) ||
@@ -117,6 +150,18 @@ export function IntegrationCatalog() {
   const navigationPermit = useRef<string | null>(null);
   const navigationAttempt = useRef<string | null>(null);
   function update(values: Record<string, string>) {
+    if (values.filter !== undefined && !("view" in values)) {
+      const parts = values.filter.split("+");
+      values = {
+        ...values,
+        view: parts.includes("ml_unconfirmed")
+          ? "ml_unconfirmed"
+          : parts.includes("tn_unconfirmed")
+            ? "tn_unconfirmed"
+            : "",
+        linkage: "",
+      };
+    }
     const next = new URLSearchParams(params);
     Object.entries(values).forEach(([key, value]) =>
       value ? next.set(key, value) : next.delete(key),
@@ -135,6 +180,8 @@ export function IntegrationCatalog() {
       "limit",
       "filter",
       "proposal",
+      "view",
+      "linkage",
     ].some((key) => next.get(key) !== params.get(key));
     // Confirm before pushing history; cancel must not leave a duplicate URL entry.
     if (
@@ -168,6 +215,8 @@ export function IntegrationCatalog() {
       "limit",
       "filter",
       "proposal",
+      "view",
+      "linkage",
     ].some((key) => urlParams.get(key) !== params.get(key));
     if (
       leaving &&
@@ -213,6 +262,24 @@ export function IntegrationCatalog() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    setListingCounts(undefined);
+    if (!session || invalid) return;
+    const c = new AbortController();
+    Promise.all([
+      loadListings("ml", "", 1, 3, "all", c.signal),
+      loadListings("tn", "", 1, 3, "all", c.signal),
+    ])
+      .then(([ml, tn]) => {
+        if (!c.signal.aborted)
+          setListingCounts({
+            ml: ml.available ? ml.distinct_publications : undefined,
+            tn: tn.available ? tn.distinct_publications : undefined,
+          });
+      })
+      .catch(() => {});
+    return () => c.abort();
+  }, [session, revision, invalid]);
   useEffect(() => {
     setData(undefined);
     setError(undefined);
@@ -408,10 +475,32 @@ export function IntegrationCatalog() {
     <CatalogFrame
       mode="integration"
       onCatalog={() => document.getElementById("integration-search")?.focus()}
-      onHistory={selected ? () => update({ tab: "Historial" }) : undefined}
+      onHistory={() =>
+        selected ? update({ tab: "Historial" }) : setHistoryOpen(true)
+      }
+      onSettings={() => setPreferences(true)}
       onLogout={logout}
       busy={busy}
     >
+      {preferences && (
+        <SettingsDialog
+          connected
+          advanced={advanced}
+          showPrices={false}
+          onAdvanced={setAdvanced}
+          onPrices={() => {}}
+          onClose={() => setPreferences(false)}
+        />
+      )}
+      {historyOpen && (
+        <SavedHistory
+          onClose={() => setHistoryOpen(false)}
+          onOpen={(id) => {
+            setHistoryOpen(false);
+            update({ product: id, tab: "Historial" });
+          }}
+        />
+      )}
       <div className="i-capture-strip" aria-label="Información de captura">
         <span data-testid="shown">
           En esta página: <strong>{data ? data.items.length : "—"}</strong> ·{" "}
@@ -433,6 +522,27 @@ export function IntegrationCatalog() {
         aria-label="Cobertura por canal"
         className="i-commercial-overview"
       >
+        <CommercialViews
+          value={view}
+          counts={{
+            ecomm: data?.total,
+            ml: listingCounts?.ml,
+            tn: listingCounts?.tn,
+            ml_unconfirmed: data?.summary?.ml_unconfirmed,
+            tn_unconfirmed: data?.summary?.tn_unconfirmed,
+          }}
+          onChange={(next) =>
+            update({
+              view: next === "ecomm" ? "" : next,
+              filter: next.endsWith("unconfirmed") ? next : "",
+              linkage: "",
+              page: "",
+              product: "",
+              tab: "",
+              proposal: "",
+            })
+          }
+        />
         <CatalogMetrics
           label="Resumen del catálogo"
           cards={[
@@ -488,8 +598,44 @@ export function IntegrationCatalog() {
             })),
           ]}
         />
-        <details className="i-more-metrics">
+        <details
+          className="i-more-metrics"
+          open={advanced}
+          onToggle={(e) => setAdvanced(e.currentTarget.open)}
+        >
           <summary>Más indicadores y alcance de capturas</summary>
+          <h3>Calidad del catálogo · candidatos para revisión</h3>
+          <div
+            className="k-quality-metrics"
+            role="group"
+            aria-label="Indicadores de calidad"
+          >
+            {qualityFilterKeys.map((key) => (
+              <button
+                type="button"
+                key={key}
+                aria-pressed={filter.split("+").includes(key)}
+                onClick={() => {
+                  const base =
+                    view === "ml_unconfirmed" || view === "tn_unconfirmed"
+                      ? view
+                      : "";
+                  update({
+                    view: base || "",
+                    filter: filter.split("+").includes(key)
+                      ? base
+                      : [base, key].filter(Boolean).join("+"),
+                    page: "",
+                    product: "",
+                    tab: "",
+                  });
+                }}
+              >
+                {queueFilters[key]}{" "}
+                <strong>{data?.summary?.[key] ?? "—"}</strong>
+              </button>
+            ))}
+          </div>
           <CatalogMetrics
             label="Indicadores editoriales adicionales"
             cards={[
@@ -634,7 +780,7 @@ export function IntegrationCatalog() {
             id="integration-search"
             value={search}
             onChange={setSearch}
-            placeholder="Nombre, marca editada, SKU, presentación o Ecomm ID"
+            placeholder="Nombre, marca, SKU, EAN o Ecomm ID"
             maxLength={80}
           />
           <button className="d-primary">Buscar</button>
@@ -642,7 +788,8 @@ export function IntegrationCatalog() {
             Estado y siguiente paso
             <select
               aria-label="Filtrar catálogo"
-              value={filter}
+              value={filter.split("+")[0]}
+              disabled={external}
               onChange={(event) =>
                 update({
                   filter:
@@ -660,6 +807,33 @@ export function IntegrationCatalog() {
               ))}
             </select>
           </label>
+          {!external && (
+            <label>
+              Combinar con
+              <select
+                aria-label="Combinar filtro de catálogo"
+                value={filter.split("+")[1] || "all"}
+                onChange={(e) =>
+                  update({
+                    filter:
+                      [filter.split("+")[0], e.target.value]
+                        .filter((f) => f !== "all")
+                        .filter((f, i, a) => a.indexOf(f) === i)
+                        .join("+") || "all",
+                    page: "",
+                    product: "",
+                    tab: "",
+                  })
+                }
+              >
+                {Object.entries(queueFilters).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {key === "all" ? "Sin filtro adicional" : label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {filter !== "all" && (
             <button
               type="button"
@@ -725,7 +899,18 @@ export function IntegrationCatalog() {
             </button>
           </div>
         )}
-        {data && (
+        {external && !invalid && (
+          <ChannelListings
+            channel={view as "ml" | "tn"}
+            q={q}
+            page={page}
+            limit={pageSize}
+            linkage={linkage}
+            onChange={update}
+            onOpen={(id) => update({ product: id, tab: "Canales" })}
+          />
+        )}
+        {data && !external && (
           <>
             <CatalogTable
               className="i-table"

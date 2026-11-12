@@ -22,6 +22,9 @@ ALLOWED_ROUTES = frozenset(
         ("POST", "/api/auth/logout"),
         ("GET", "/api/ecomm-app/stage/catalog"),
         ("GET", "/api/ecomm-app/workspace/queue"),
+        ("GET", "/api/ecomm-app/workspace/channels/listings"),
+        ("GET", "/api/ecomm-app/workspace/saved"),
+        ("GET", "/api/ecomm-app/workspace/master-export"),
     }
 )
 
@@ -37,6 +40,7 @@ def route_allowed(method: str, path: str) -> bool:
     return (
         (method, path) in ALLOWED_ROUTES
         or is_workspace_route(method, path)
+        or (method == "POST" and bool(re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/confirm-review",path)))
         or (
             method == "GET"
             and bool(re.fullmatch(r"/api/ecomm-app/workspace/ai/90000[1-6]/latest", path))
