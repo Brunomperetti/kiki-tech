@@ -613,10 +613,19 @@ class Editorial(unittest.TestCase):
             self.assertEqual(self.client.get(ROOT).status_code, 403)
 
     def test_additive_migration_round_trip_preserves_editor(self):
+        from app.services.editorial_batches.migration_2r import (
+            UP as UP_2R,
+            DOWN as DOWN_2R,
+        )
+
         with SessionLocal() as db:
+            for statement in DOWN_2R:
+                db.execute(text(statement))
             for statement in DOWN:
                 db.execute(text(statement))
             for statement in UP:
+                db.execute(text(statement))
+            for statement in UP_2R:
                 db.execute(text(statement))
             db.commit()
             self.assertIsNotNone(

@@ -67,47 +67,65 @@ class Context:
     Rules/citations run on the unchanged current document sections and facts.
     """
 
-    def __init__(self, db, ids, source_map, byte_limit, *, lock=False):
+    def __init__(self, db, ids, source_map, byte_limit, *, lock=False, preview=False):
         if len(ids) > 100:
             raise ValueError("Contexto demasiado grande.")
-        # Budget before ORM materialization, including potentially long histories.
-        for model, columns in (
-            (
-                EcommApiProductEdit,
-                [EcommApiProductEdit.fields, EcommApiProductEdit.history],
-            ),
-            (Dossier, [Dossier.facts]),
-        ):
-            size = db.scalar(
-                select(
-                    func.coalesce(
-                        func.sum(
-                            sum(func.octet_length(cast(c, Text)) for c in columns)
-                        ),
-                        0,
-                    )
-                ).where(model.ecomm_id.in_(ids))
-            )
-            if size > byte_limit:
-                raise ValueError(
-                    "La ficha o su historial supera el presupuesto del paso; revisar individualmente."
+        if preview:
+            if (
+                db.scalar(select(Control).where(Control.id == 1).with_for_update())
+                is None
+            ):
+                raise ValueError("Falta el control documental; operación bloqueada.")
+            from .preview_projection import project
+
+            self.edits, self.dossiers = project(db, ids, byte_limit)
+            self.source_map = source_map
+        else:
+            # Budget before ORM materialization, including potentially long histories.
+            for model, columns in (
+                (
+                    EcommApiProductEdit,
+                    [EcommApiProductEdit.fields, EcommApiProductEdit.history],
+                ),
+                (Dossier, [Dossier.facts]),
+            ):
+                size = db.scalar(
+                    select(
+                        func.coalesce(
+                            func.sum(
+                                sum(func.octet_length(cast(c, Text)) for c in columns)
+                            ),
+                            0,
+                        )
+                    ).where(model.ecomm_id.in_(ids))
                 )
-        self.source_map = source_map
-        stmt = select(EcommApiProductEdit).where(EcommApiProductEdit.ecomm_id.in_(ids))
-        if lock:
-            stmt = stmt.order_by(EcommApiProductEdit.ecomm_id).with_for_update()
-        self.edits = {
-            x.ecomm_id: x
-            for x in db.scalars(stmt.execution_options(populate_existing=True))
-        }
-        self.dossiers = {
-            x.ecomm_id: x
-            for x in db.scalars(
-                select(Dossier)
-                .options(defer(Dossier.history))
-                .where(Dossier.ecomm_id.in_(ids))
+                if size > byte_limit:
+                    raise ValueError(
+                        "La ficha o su historial supera el presupuesto del paso; revisar individualmente."
+                    )
+            self.source_map = source_map
+            stmt = select(EcommApiProductEdit).where(
+                EcommApiProductEdit.ecomm_id.in_(ids)
             )
-        }
+            if lock:
+                stmt = stmt.order_by(EcommApiProductEdit.ecomm_id).with_for_update()
+            self.edits = {
+                x.ecomm_id: x
+                for x in db.scalars(stmt.execution_options(populate_existing=True))
+            }
+            if (
+                db.scalar(select(Control).where(Control.id == 1).with_for_update())
+                is None
+            ):
+                raise ValueError("Falta el control documental; operación bloqueada.")
+            self.dossiers = {
+                x.ecomm_id: x
+                for x in db.scalars(
+                    select(Dossier)
+                    .options(defer(Dossier.history))
+                    .where(Dossier.ecomm_id.in_(ids))
+                )
+            }
         # JSONB subtraction is performed in PostgreSQL, before reading large PDFs.
         body = cast(Document.body, JSONB).op("-")("original_base64")
         docs = select(
@@ -141,8 +159,6 @@ class Context:
                 "Contexto editorial excede el límite; reducir selección o revisar individualmente."
             )
         # Existing versioned writer remains the only commercial persistence.
-        if db.scalar(select(Control).where(Control.id == 1).with_for_update()) is None:
-            raise ValueError("Falta el control documental; operación bloqueada.")
         context = self
 
         class Workspace(EcommApiProductWorkspace):
@@ -192,6 +208,13 @@ class Context:
             BulkResearch,
             BulkProposals,
         )
+
+    def release(self):
+        # Break the dynamic accessors' references to heavy payloads between chunks.
+        self.edits.clear()
+        self.dossiers.clear()
+        self.documents.clear()
+        self.source_map = {}
 
     def inspect(self, db, session, ident):
         research = self.Research(AtomicSession(db), session)

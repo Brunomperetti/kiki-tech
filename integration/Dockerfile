@@ -10,4 +10,4 @@ COPY --chown=1000:1000 backend/ ./
 COPY --chown=1000:1000 integration/fixtures/hileret-original.pdf /pilot-inputs/hileret-original.pdf
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 USER 1000:1000
-CMD ["python", "-m", "integration_sandbox.server"]
+CMD ["python", "-m", "integration_sandbox.runtime_supervisor"]

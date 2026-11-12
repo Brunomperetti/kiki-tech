@@ -28,8 +28,6 @@ test.afterEach(async ({ page }) => {
       .filter((p) => /oauth|sync|refresh|publish|publicar|openai/.test(p)),
   ).toEqual([]);
 });
-const panel = (page: Page) =>
-  page.getByRole("region", { name: "Trabajo por lotes", exact: true });
 async function preview(page: Page) {
   await page
     .getByRole("button", { name: "Seleccionar esta página", exact: true })
@@ -37,6 +35,7 @@ async function preview(page: Page) {
   await expect(page.getByTestId("selected-count")).toHaveText(
     "6 variantes seleccionadas",
   );
+  await page.getByRole("button", { name: "Operaciones", exact: true }).click();
   await page
     .getByRole("button", { name: "Previsualizar selección", exact: true })
     .click();
@@ -126,6 +125,7 @@ test("filtrar en la misma tabla y seleccionar todos los resultados sin perder Ec
     .selectOption("needs_research");
   await expect(page).toHaveURL(/filter=needs_research/);
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(5);
+  await page.getByRole("button", { name: "Operaciones", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Operación del lote", exact: true })
     .selectOption("REVIEW_TASKS");
@@ -152,7 +152,7 @@ test("filtrar en la misma tabla y seleccionar todos los resultados sin perder Ec
   );
 });
 
-test("selección por páginas, reanudación explícita y resultados sin repetición tras recarga", async ({
+test("selección por páginas y reapertura recuperan el lote sin ejecutar pasos desde el navegador", async ({
   page,
 }) => {
   await page
@@ -161,9 +161,6 @@ test("selección por páginas, reanudación explícita y resultados sin repetici
   await page
     .getByRole("button", { name: "Seleccionar esta página", exact: true })
     .click();
-  await expect(page.getByTestId("selected-count")).toHaveText(
-    "3 variantes seleccionadas",
-  );
   await page.getByRole("button", { name: "Siguiente", exact: true }).click();
   await page
     .getByRole("button", { name: "Seleccionar esta página", exact: true })
@@ -171,66 +168,33 @@ test("selección por páginas, reanudación explícita y resultados sin repetici
   await expect(page.getByTestId("selected-count")).toHaveText(
     "6 variantes seleccionadas",
   );
+  await page.getByRole("button", { name: "Operaciones", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Operación del lote", exact: true })
     .selectOption("REVIEW_TASKS");
   await page
     .getByRole("button", { name: "Previsualizar selección", exact: true })
     .click();
-  const text = await page
-    .getByRole("region", { name: "Detalle del lote", exact: true })
-    .innerText();
-  const id = text.match(/Lote ([a-f0-9-]{36})/)![1];
-  const csrf = (await (await page.request.get("/api/auth/me")).json())
-    .csrf_token;
-  let data = await (
-    await page.request.get("/api/ecomm-app/editorial-batches/" + id)
-  ).json();
-  await page.request.post(`/api/ecomm-app/editorial-batches/${id}/start`, {
-    headers: { "X-CSRF-Token": csrf },
-    data: {
-      confirm: true,
-      expected_revision: data.revision,
-      preview_hash: data.preview_hash,
-      idempotency_key: crypto.randomUUID(),
-    },
-  });
-  await page.request.post(`/api/ecomm-app/editorial-batches/${id}/step`, {
-    headers: { "X-CSRF-Token": csrf },
-    data: {},
-  });
-  await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Mi catálogo", exact: true }),
-  ).toBeVisible();
-  const stepsBefore = calls
-    .get(page)!
-    .filter((p) => p.endsWith("/step")).length;
-  await panel(page)
-    .getByText(/Lotes guardados/)
-    .click();
-  await panel(page)
-    .getByRole("button", { name: /6 variantes · Pendiente/ })
-    .first()
-    .click();
-  await expect(page.getByTestId("batch-progress")).toContainText(
-    "Completado: 5",
-  );
-  expect(calls.get(page)!.filter((p) => p.endsWith("/step")).length).toBe(
-    stepsBefore,
-  );
+    page.getByRole("button", { name: "Confirmar e iniciar lote", exact: true }),
+  ).toBeEnabled();
   await page
-    .getByRole("button", { name: "Reanudar lote", exact: true })
+    .getByRole("button", { name: "Confirmar e iniciar lote", exact: true })
     .click();
   await expect(page.getByTestId("batch-progress")).toContainText(
     "Completado: 6",
   );
-  data = await (
-    await page.request.get("/api/ecomm-app/editorial-batches/" + id)
-  ).json();
-  expect(data.items.every((i: { attempts: number }) => i.attempts === 1)).toBe(
-    true,
+  await page.reload();
+  await page.getByRole("button", { name: /Ver lotes/ }).click();
+  await page.getByText(/Lotes guardados/).click();
+  await page
+    .getByRole("button", { name: /6 variantes · Completado/ })
+    .first()
+    .click();
+  await expect(page.getByTestId("batch-progress")).toContainText(
+    "Completado: 6",
   );
+  expect(calls.get(page)!.filter((p) => p.endsWith("/step"))).toEqual([]);
 });
 
 test("check individual, cinco pestañas y URL de propuesta ajena bloqueada", async ({

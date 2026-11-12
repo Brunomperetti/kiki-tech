@@ -127,6 +127,10 @@ def step(
     db: Session = Depends(get_db),
     session=Depends(require_csrf),
 ):
+    if get_settings().kiki_editorial_executor_enabled:
+        raise HTTPException(
+            409, "La ejecución pertenece al backend. Consultá el progreso del lote."
+        )
     return execute(
         db, lambda: Batches(db, session).step(str(batch_id), body.resume_interrupted)
     )

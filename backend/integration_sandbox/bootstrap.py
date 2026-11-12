@@ -1,7 +1,7 @@
 from .policy import route_allowed, CSP, preflight
 
 
-def create_sandbox_app():
+def create_sandbox_app(*, autonomous=False):
     preflight()
     # Import ONLY after configuration, socket guard and database identity checks.
     from argon2 import PasswordHasher
@@ -32,6 +32,8 @@ def create_sandbox_app():
         kiki_document_workspace_enabled=True,
         kiki_channel_workspace_enabled=True,
         kiki_editorial_batches_enabled=True,
+        kiki_editorial_executor_enabled=autonomous,
+        kiki_editorial_lease_seconds=6,
     )
     # Harness-only binding, before any service imports. Production get_settings is unchanged.
     config.get_settings = lambda: settings
@@ -62,19 +64,27 @@ def create_sandbox_app():
     @asynccontextmanager
     async def synthetic_lifespan(app):
         async with original_lifespan(app):
-            seed(SessionLocal)
+            seed(SessionLocal, allow_scaled=autonomous)
             initialize_research(engine, SessionLocal)
             # Explicit additive migration ONLY after preflight + verified disposable database.
             from sqlalchemy import inspect, text
             from app.services.documental.migration import UP
+
             with engine.begin() as connection:
                 if not inspect(connection).has_table("kiki_evidence_control"):
                     for statement in UP:
                         connection.execute(text(statement))
             from app.services.editorial_batches.migration import UP as EDITORIAL_UP
+
             with engine.begin() as connection:
                 if not inspect(connection).has_table("kiki_editorial_batches"):
                     for statement in EDITORIAL_UP:
+                        connection.execute(text(statement))
+            from app.services.editorial_batches.migration_2r import UP as EXECUTOR_UP
+
+            with engine.begin() as connection:
+                if not inspect(connection).has_table("kiki_editorial_batch_signals"):
+                    for statement in EXECUTOR_UP:
                         connection.execute(text(statement))
             try:
                 yield

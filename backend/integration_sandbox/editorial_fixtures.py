@@ -1,6 +1,5 @@
 """Opt-in authored documentary approvals; never client approvals or real identity."""
 
-from copy import deepcopy
 from types import SimpleNamespace
 from sqlalchemy import select
 from .document_test_fixtures import TEXT
@@ -62,29 +61,13 @@ def catalogue(db, size):
     record = db.scalar(
         select(CatalogSnapshot).where(CatalogSnapshot.source == "ECOMM_APP_API_STAGE")
     )
-    parent = deepcopy(record.payload[0]["items"][0])
-    items = []
-    for index in range(size):
-        item = deepcopy(parent)
-        item["code"] = f"BATCH-SYNTHETIC-{index}"
-        item["variants"][0].update(id=900001 + index, sku=f"BATCH-SYNTHETIC-{index}")
-        items.append(item)
-    # Preserve captured pagination; the DB source contract consumes captured pages.
-    record.payload = [
-        {
-            "page": i // 50 + 1,
-            "total": size,
-            "total_pages": (size + 49) // 50,
-            "per_page": 50,
-            "captured_at": "2026-11-01T12:00:00+00:00",
-            "items": items[i : i + 50],
-        }
-        for i in range(0, size, 50)
-    ]
+    from .fixtures import scaled_capture
+
+    record.payload = scaled_capture(size)
     db.commit()
 
 
-def install(factory):
+def install(factory, *, scale=False):
     from app.database.models import CatalogSnapshot
 
     with factory() as db:
@@ -101,6 +84,8 @@ def install(factory):
             raise RuntimeError(
                 "El escenario de lotes requiere el catálogo sintético inicial intacto."
             )
+        if scale:
+            catalogue(db, 5000)
         approved(db)
 
 
@@ -113,4 +98,8 @@ if __name__ == "__main__":
     create_sandbox_app()
     from app.database.session import SessionLocal
 
-    install(SessionLocal)
+    import sys
+
+    if sys.argv[1:] not in ([], ["--scale-5000"]):
+        raise RuntimeError("Escenario de pruebas desconocido.")
+    install(SessionLocal, scale=bool(sys.argv[1:]))

@@ -429,131 +429,183 @@ export function IntegrationCatalog() {
           · {captureDate(data?.lastAt ?? null)}
         </span>
       </div>
-      <CatalogMetrics
-        label="Resumen del catálogo"
-        cards={[
-          {
-            id: "all",
-            testId: "total",
-            title: "Variantes Ecomm-App",
-            value: data?.total ?? "—",
-            note: "Total informado por el backend",
-            active: filter === "all" && !q,
-            onClick: () =>
-              update({ filter: "", q: "", page: "", product: "", tab: "" }),
-          },
-          ...(
-            [
-              "identity",
-              "untouched",
-              "draft",
-              "ready",
-              "ready_for_channels",
-              "pack",
-            ] as const
-          ).map((key) => ({
-            id: key,
-            title: queueFilters[key],
-            value: data?.summary?.[key] ?? "—",
-            note:
-              key === "ready_for_channels"
-                ? "No confirma publicación en canales"
-                : "Calculado sobre el catálogo completo",
-            active: filter === key,
-            onClick: () =>
-              update({
-                filter: filter === key ? "" : key,
-                page: "",
-                product: "",
-                tab: "",
-              }),
-          })),
-        ]}
-      />
-      <p className="s-count-note">
-        Totales del catálogo completo, no sólo de esta página. Una variante
-        puede necesitar varias tareas. La ficha editorial y la publicación de
-        cada canal son estados distintos.
-      </p>
-      <CatalogMetrics
-        label="Cobertura por canal"
-        cards={[
-          ["ml_confirmed", "Variantes con ML confirmado"],
-          ["tn_verified", "Vínculos TN verificados"],
-          ["channel_candidates", "Candidatos pendientes"],
-          ["channel_conflicts", "Conflictos de canal"],
-          ["channel_no_evidence", "Sin evidencia suficiente"],
-          ["channel_stale", "Capturas desactualizadas"],
-        ].map(([key, title]) => ({
-          id: key,
-          title,
-          value:
-            data?.channelOverview?.validated &&
-            !(
-              key === "ml_confirmed" &&
-              !data.channelOverview.sources.ml.available
-            ) &&
-            !(
-              key === "tn_verified" &&
-              !data.channelOverview.sources.tn.available
-            )
-              ? (data.summary?.[key] ?? "—")
-              : unavailable,
-          note:
-            key === "ml_confirmed"
-              ? "Publicación en captura ML revisada; no es estado en vivo"
-              : key === "tn_verified"
-                ? "Vínculos revisados; el CSV no confirma publicación actual"
-                : "Variantes únicas; las tareas pueden superponerse",
-          active: filter === key,
-          onClick: () =>
-            update({
-              filter: filter === key ? "" : key,
-              page: "",
-              product: "",
-              tab: "",
-            }),
-        }))}
-      />
       <section
-        className="i-coverage"
-        aria-label="Alcance de la evidencia de canales"
+        aria-label="Cobertura por canal"
+        className="i-commercial-overview"
       >
-        <div>
-          <span>Publicación Tiendanube</span>
-          <strong>Sin dato verificable de publicación</strong>
-          <small>
-            El contrato CSV no demuestra publicación actual. No se inventa un
-            total.
-          </small>
-        </div>
-        <div>
-          <span>Publicaciones ML confirmadas en captura</span>
-          <strong>
-            {data?.channelOverview?.validated &&
-            data.channelOverview.sources.ml.available
-              ? data.channelOverview.confirmedMlListings
-              : unavailable}
-          </strong>
-          <small>Publicaciones y variantes son entidades diferentes.</small>
-        </div>
-        {(["ml", "tn"] as const).map((c) => (
-          <div key={c}>
-            <span>
-              {c === "ml"
-                ? "Captura Mercado Libre"
-                : "Importación CSV Tiendanube"}
-            </span>
-            <strong>
-              {captureDate(data?.channelOverview?.sources[c].updatedAt ?? null)}
-            </strong>
-            <small>
-              {data?.channelOverview?.sources[c].available
-                ? "Copia disponible; consultar vigencia por producto"
-                : "Sin captura disponible; no demuestra ausencia de publicación"}
-            </small>
-          </div>
-        ))}
+        <CatalogMetrics
+          label="Resumen del catálogo"
+          cards={[
+            {
+              id: "all",
+              testId: "total",
+              title: "Variantes Ecomm-App",
+              value: data?.total ?? "—",
+              note: "Total informado por el backend",
+              active: filter === "all" && !q,
+              onClick: () =>
+                update({ filter: "", q: "", page: "", product: "", tab: "" }),
+            },
+            {
+              id: "identity",
+              title: queueFilters.identity,
+              value: data?.summary?.identity ?? "—",
+              note: "Variantes que necesitan revisar su identidad",
+              active: filter === "identity",
+              onClick: () =>
+                update({
+                  filter: filter === "identity" ? "" : "identity",
+                  page: "",
+                  product: "",
+                  tab: "",
+                }),
+            },
+            ...[
+              ["ml_confirmed", "Variantes con ML confirmado"],
+              ["tn_verified", "Vínculos TN verificados"],
+            ].map(([key, title]) => ({
+              id: key,
+              title,
+              value:
+                data?.channelOverview?.validated &&
+                data.channelOverview.sources[
+                  key === "ml_confirmed" ? "ml" : "tn"
+                ].available
+                  ? (data.summary?.[key] ?? "—")
+                  : unavailable,
+              note:
+                key === "ml_confirmed"
+                  ? "Publicación en captura revisada, no en vivo"
+                  : "Vínculos de CSV; no confirma publicación actual",
+              active: filter === key,
+              onClick: () =>
+                update({
+                  filter: filter === key ? "" : key,
+                  page: "",
+                  product: "",
+                  tab: "",
+                }),
+            })),
+          ]}
+        />
+        <details className="i-more-metrics">
+          <summary>Más indicadores y alcance de capturas</summary>
+          <CatalogMetrics
+            label="Indicadores editoriales adicionales"
+            cards={[
+              ...(
+                [
+                  "untouched",
+                  "draft",
+                  "ready",
+                  "ready_for_channels",
+                  "pack",
+                ] as const
+              ).map((key) => ({
+                id: key,
+                title: queueFilters[key],
+                value: data?.summary?.[key] ?? "—",
+                note:
+                  key === "ready_for_channels"
+                    ? "No confirma publicación en canales"
+                    : "Calculado sobre el catálogo completo",
+                active: filter === key,
+                onClick: () =>
+                  update({
+                    filter: filter === key ? "" : key,
+                    page: "",
+                    product: "",
+                    tab: "",
+                  }),
+              })),
+            ]}
+          />
+          <p className="s-count-note">
+            Totales del catálogo completo, no sólo de esta página. Una variante
+            puede necesitar varias tareas. La ficha editorial y la publicación
+            de cada canal son estados distintos.
+          </p>
+          <CatalogMetrics
+            label="Indicadores adicionales de canales"
+            cards={[
+              ["channel_candidates", "Candidatos pendientes"],
+              ["channel_conflicts", "Conflictos de canal"],
+              ["channel_no_evidence", "Sin evidencia suficiente"],
+              ["channel_stale", "Capturas desactualizadas"],
+            ].map(([key, title]) => ({
+              id: key,
+              title,
+              value:
+                data?.channelOverview?.validated &&
+                !(
+                  key === "ml_confirmed" &&
+                  !data.channelOverview.sources.ml.available
+                ) &&
+                !(
+                  key === "tn_verified" &&
+                  !data.channelOverview.sources.tn.available
+                )
+                  ? (data.summary?.[key] ?? "—")
+                  : unavailable,
+              note:
+                key === "ml_confirmed"
+                  ? "Publicación en captura ML revisada; no es estado en vivo"
+                  : key === "tn_verified"
+                    ? "Vínculos revisados; el CSV no confirma publicación actual"
+                    : "Variantes únicas; las tareas pueden superponerse",
+              active: filter === key,
+              onClick: () =>
+                update({
+                  filter: filter === key ? "" : key,
+                  page: "",
+                  product: "",
+                  tab: "",
+                }),
+            }))}
+          />
+          <section
+            className="i-coverage"
+            aria-label="Alcance de la evidencia de canales"
+          >
+            <div>
+              <span>Publicación Tiendanube</span>
+              <strong>Sin dato verificable de publicación</strong>
+              <small>
+                El contrato CSV no demuestra publicación actual. No se inventa
+                un total.
+              </small>
+            </div>
+            <div>
+              <span>Publicaciones ML confirmadas en captura</span>
+              <strong>
+                {data?.channelOverview?.validated &&
+                data.channelOverview.sources.ml.available
+                  ? data.channelOverview.confirmedMlListings
+                  : unavailable}
+              </strong>
+              <small>Publicaciones y variantes son entidades diferentes.</small>
+            </div>
+            {(["ml", "tn"] as const).map((c) => (
+              <div key={c}>
+                <span>
+                  {c === "ml"
+                    ? "Captura Mercado Libre"
+                    : "Importación CSV Tiendanube"}
+                </span>
+                <strong>
+                  {captureDate(
+                    data?.channelOverview?.sources[c].updatedAt ?? null,
+                  )}
+                </strong>
+                <small>
+                  {data?.channelOverview?.sources[c].available
+                    ? "Copia disponible; consultar vigencia por producto"
+                    : "Sin captura disponible; no demuestra ausencia de publicación"}
+                </small>
+              </div>
+            ))}
+          </section>
+        </details>
       </section>
       <section className="d-catalog" aria-label="Catálogo Ecomm-App">
         <div className="i-catalog-heading">
@@ -675,28 +727,6 @@ export function IntegrationCatalog() {
         )}
         {data && (
           <>
-            <BatchPanel
-              ids={checked}
-              query={q}
-              filter={filter}
-              matches={data.matches}
-              csrf={session.csrf_token}
-              disabled={dirty || editorBusy || loading}
-              onClear={() => setChecked(new Set())}
-              onPage={() =>
-                setChecked(
-                  (current) =>
-                    new Set([...current, ...data.items.map((i) => i.id)]),
-                )
-              }
-              onOpen={(id, proposal) =>
-                update({
-                  product: id,
-                  tab: proposal ? "IA" : "Ficha",
-                  proposal: proposal ? String(proposal) : "",
-                })
-              }
-            />
             <CatalogTable
               className="i-table"
               headings={[
@@ -851,6 +881,28 @@ export function IntegrationCatalog() {
                 </button>
               </div>
             </footer>
+            <BatchPanel
+              ids={checked}
+              query={q}
+              filter={filter}
+              matches={data.matches}
+              csrf={session.csrf_token}
+              disabled={dirty || editorBusy || loading || !!selected}
+              onClear={() => setChecked(new Set())}
+              onPage={() =>
+                setChecked(
+                  (current) =>
+                    new Set([...current, ...data.items.map((i) => i.id)]),
+                )
+              }
+              onOpen={(id, proposal) =>
+                update({
+                  product: id,
+                  tab: proposal ? "IA" : "Ficha",
+                  proposal: proposal ? String(proposal) : "",
+                })
+              }
+            />
           </>
         )}
         {data && params.get("product") && !selected && (

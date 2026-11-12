@@ -8,7 +8,8 @@ from pathlib import Path
 def main():
     from .bootstrap import create_sandbox_app
 
-    application = create_sandbox_app()
+    from .runtime_supervisor import mode
+    application = create_sandbox_app(autonomous=mode()=="backend")
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa

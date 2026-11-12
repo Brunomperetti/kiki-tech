@@ -4,12 +4,15 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from time import monotonic
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, exists, text, bindparam, String
+from sqlalchemy.orm import aliased
+from sqlalchemy.dialects.postgresql import insert, ARRAY
 from app.core.config import get_settings
 from app.services.documental.storage import digest
 from app.services.ecomm_api_work_queue_service import build_queue
 from app.integrations.ecomm_app.api_catalog_browser import valid_variant_id
-from .storage import Batch, Item
+from .storage import Batch, Item, Signal
+from .status import public_state, progress
 from .context import Context, AtomicSession, sources
 
 TERMINAL = {"COMPLETED", "BLOCKED", "CONFLICT", "ERROR", "CANCELLED"}
@@ -20,12 +23,13 @@ def now():
 
 
 class Batches:
-    def __init__(self, db, session):
+    def __init__(self, db, session, *, source_loader=None):
         if db.bind.dialect.name != "postgresql":
             raise ValueError(
                 "La cola persistente requiere PostgreSQL y su migración revisada; no hay fallback de base."
             )
         self.db, self.session = db, session
+        self.source_loader = source_loader or sources
         self.config = get_settings()
         self.actor = f"{self.config.kiki_admin_username} · sesión {session.id}"
 
@@ -36,7 +40,7 @@ class Batches:
             .execution_options(populate_existing=True)
         )
         if lock:
-            stmt = stmt.with_for_update(nowait=True)
+            stmt = stmt.with_for_update(nowait=True, key_share=True)
         batch = self.db.scalar(stmt)
         if not batch:
             raise ValueError("Lote no encontrado.")
@@ -65,6 +69,23 @@ class Batches:
         )
 
     def dto(self, batch):
+        counts = self.counts(batch.id)
+        stats = progress(counts, batch.total)
+        if not batch.authorized_at:
+            stats["processed"] = 0
+            if counts.get("CANCELLED") or counts.get("ERROR"):
+                stats["prepared"] = self.db.scalar(
+                    select(func.count())
+                    .select_from(Item)
+                    .where(
+                        Item.batch_id == batch.id, Item.result["preview"].is_not(None)
+                    )
+                )
+        cancelling = bool(
+            self.config.kiki_editorial_executor_enabled
+            and self.db.get(Signal, batch.id)
+            and batch.state != "CANCELLED"
+        )
         return {
             key: getattr(batch, key)
             for key in (
@@ -84,7 +105,13 @@ class Batches:
                 "history",
             )
         } | {
-            "counts": self.counts(batch.id),
+            "counts": counts,
+            "public_state": "FAILED"
+            if batch.state == "ERROR" and not batch.authorized_at
+            else public_state(batch.state, counts, cancelling),
+            "progress": stats,
+            "autonomous": self.config.kiki_editorial_executor_enabled,
+            "cancel_requested": cancelling,
             "internal_only": True,
             "external_writes_enabled": False,
         }
@@ -162,7 +189,7 @@ class Batches:
             raise ValueError(
                 "Selección vacía, repetida, inválida o supera el límite del lote."
             )
-        source_map = sources(self.db, lock=True)
+        source_map = self.source_loader(self.db, lock=True)
         if any(i not in source_map for i in ids):
             raise ValueError(
                 "La selección contiene variantes que no pertenecen a la captura API."
@@ -183,6 +210,32 @@ class Batches:
             history=[],
         )
         self.db.add(batch)
+        if self.config.kiki_editorial_executor_enabled:
+            batch.state = "PREPARING"
+            batch.preview_hash = digest({"operation": batch.operation})
+            self.db.flush()
+            # Constant metadata stays in SQL; do not allocate 5000 ORM/dict rows.
+            statement = text("""INSERT INTO kiki_editorial_batch_items
+              (id,batch_id,ecomm_id,position,state,attempts,expected,result,error,history)
+              SELECT k,:batch_id,e,ordinal-1+:offset,'PREPARING',0,'{}'::json,'{}'::json,'{}'::json,'[]'::json
+              FROM unnest(:keys,:ids) WITH ORDINALITY AS selected(k,e,ordinal)""").bindparams(
+                bindparam("keys", type_=ARRAY(String)),
+                bindparam("ids", type_=ARRAY(String)),
+            )
+            for offset in range(0, len(ids), 100):
+                chunk = ids[offset : offset + 100]
+                self.db.execute(
+                    statement,
+                    {
+                        "keys": [str(uuid4()) for _ in chunk],
+                        "ids": chunk,
+                        "batch_id": batch.id,
+                        "offset": offset,
+                    },
+                )
+            self.event(batch, "PREVIEW_REQUESTED", {"selected": len(ids)})
+            self.db.commit()
+            return self.detail(batch.id)
         counts, fingerprints = Counter(), []
         for offset in range(0, len(ids), 25):
             chunk = ids[offset : offset + 25]
@@ -261,7 +314,68 @@ class Batches:
         self.db.commit()
         return self.dto(batch)
 
+    def cancellation_requested(self, ident):
+        return self.db.get(Signal, ident) is not None
+
+    def request_cancel(self, ident, revision):
+        batch = self.get(ident)
+        if revision > batch.revision:
+            raise ValueError("La revisión del lote es inválida.")
+        if batch.state in {"COMPLETED", "CANCELLED"}:
+            return self.dto(batch)
+        self.db.execute(
+            insert(Signal)
+            .values(batch_id=ident, requested_at=now(), requested_by=self.actor)
+            .on_conflict_do_nothing(index_elements=[Signal.batch_id])
+        )
+        self.db.commit()
+        return self.dto(self.get(ident))
+
+    def finish_cancel(self, batch):
+        signal = self.db.get(Signal, batch.id)
+        if not signal:
+            return False
+        rows = list(
+            self.db.scalars(
+                select(Item).where(
+                    Item.batch_id == batch.id,
+                    Item.state.in_(["PREPARING", "PENDING", "RUNNING"]),
+                )
+            )
+        )
+        if not rows and batch.state in TERMINAL:
+            self.db.delete(signal)
+            self.event(
+                batch, "CANCEL_AFTER_FINISH", {"requested_by": signal.requested_by}
+            )
+            self.db.flush()
+            return True
+        for item in rows:
+            item.state = "CANCELLED"
+            item.history = item.history + [
+                {
+                    "action": "CANCELLED",
+                    "at": now().isoformat(),
+                    "actor": signal.requested_by,
+                }
+            ]
+        batch.state = "CANCELLED"
+        batch.owner = None
+        batch.lease_until = None
+        self.event(
+            batch,
+            "CANCELLED",
+            {
+                "requested_by": signal.requested_by,
+                "requested_at": signal.requested_at.isoformat(),
+            },
+        )
+        self.db.flush()
+        return True
+
     def cancel(self, ident, revision):
+        if self.config.kiki_editorial_executor_enabled:
+            return self.request_cancel(ident, revision)
         batch = self.get(ident, lock=True)
         if batch.revision != revision:
             raise ValueError("El lote cambió; recargá antes de cancelar.")
@@ -285,13 +399,22 @@ class Batches:
         return self.dto(batch)
 
     def claim(self, ident, resume=False):
+        # Serialize reservations across jobs, not their actual bounded processing.
+        if not self.db.scalar(select(func.pg_try_advisory_xact_lock(21471022))):
+            raise ValueError(
+                "Otro ejecutor está reclamando tareas; volver a consultar."
+            )
         batch = self.get(ident, lock=True)
         if not batch.authorized_at or batch.state in {
             "PREVIEW",
+            "PREPARING",
             "CANCELLED",
             "COMPLETED",
         }:
             raise ValueError("Lote no autorizado o ya terminado.")
+        if self.config.kiki_editorial_executor_enabled and self.finish_cancel(batch):
+            self.db.commit()
+            return None
         if batch.owner:
             if not resume and batch.lease_until and batch.lease_until > now():
                 raise ValueError(
@@ -316,13 +439,30 @@ class Batches:
                         "actor": self.actor,
                     }
                 ]
+        other = aliased(Item)
+        other_batch = aliased(Batch)
+        incompatible = exists(
+            select(other.id)
+            .join(other_batch, other.batch_id == other_batch.id)
+            .where(
+                other.ecomm_id == Item.ecomm_id,
+                other.batch_id != ident,
+                other.state == "RUNNING",
+                other_batch.owner.is_not(None),
+                other_batch.lease_until > now(),
+            )
+        )
         rows = self.db.scalars(
             select(Item)
-            .where(Item.batch_id == ident, Item.state == "PENDING")
+            .where(Item.batch_id == ident, Item.state == "PENDING", ~incompatible)
             .order_by(Item.position)
             .limit(self.config.kiki_editorial_step_size)
         ).all()
         if not rows:
+            if self.counts(ident).get("PENDING"):
+                batch.updated_at = now()
+                self.db.commit()
+                return None
             batch.owner = None
             batch.lease_until = None
             counts = self.counts(ident)
@@ -340,7 +480,9 @@ class Batches:
             return None
         token = str(uuid4())
         batch.owner = token
-        batch.lease_until = now() + timedelta(seconds=60)
+        batch.lease_until = now() + timedelta(
+            seconds=self.config.kiki_editorial_lease_seconds
+        )
         batch.state = "RUNNING"
         for item in rows:
             item.state = "RUNNING"
@@ -361,9 +503,15 @@ class Batches:
         if batch.owner != token or batch.state != "RUNNING":
             raise ValueError("Concesión reemplazada: este proceso no puede escribir.")
         rows = self.db.scalars(
-            select(Item).where(Item.id.in_(item_ids)).order_by(Item.position)
+            select(Item)
+            .where(
+                Item.batch_id == ident, Item.state == "RUNNING", Item.id.in_(item_ids)
+            )
+            .order_by(Item.position)
         ).all()
-        source_map = sources(self.db, lock=True)
+        if len(rows) != len(set(item_ids)):
+            raise ValueError("Reclamación incompatible con los ítems de este lote.")
+        source_map = self.source_loader(self.db, lock=True)
         context = Context(
             self.db,
             [i.ecomm_id for i in rows],
@@ -373,6 +521,11 @@ class Batches:
         )
         started = monotonic()
         for index, item in enumerate(rows):
+            if (
+                self.config.kiki_editorial_executor_enabled
+                and self.cancellation_requested(ident)
+            ):
+                break
             if (
                 index
                 and monotonic() - started >= self.config.kiki_editorial_step_seconds
@@ -461,6 +614,9 @@ class Batches:
         batch.revision += 1
         if batch.state != "PENDING":
             self.event(batch, "FINISHED", counts)
+        if self.config.kiki_editorial_executor_enabled:
+            self.finish_cancel(batch)
+        context.release()
         # Commit proposals AND item results together. No service can commit early.
         self.db.commit()
         return self.dto(batch)
@@ -532,3 +688,189 @@ class Batches:
         self.event(batch, "RETRY_AUTHORIZED", {"items": len(rows)})
         self.db.commit()
         return self.dto(batch)
+
+    def claim_next(self):
+        """Reserve one persisted chunk, SKIP LOCKED across independent executors."""
+        if not self.config.kiki_editorial_executor_enabled:
+            raise ValueError("Ejecutor deshabilitado por configuración.")
+        if not self.db.scalar(select(func.pg_try_advisory_xact_lock(21471022))):
+            self.db.rollback()
+            return None
+        cancelled = exists(select(Signal.batch_id).where(Signal.batch_id == Batch.id))
+        candidate = self.db.scalar(
+            select(Batch)
+            .where(
+                or_(
+                    Batch.state == "PREPARING",
+                    Batch.authorized_at.is_not(None)
+                    & (
+                        Batch.state.in_(["PENDING", "RUNNING"])
+                        | (
+                            (Batch.state == "ERROR")
+                            & exists(
+                                select(Item.id).where(
+                                    Item.batch_id == Batch.id, Item.state == "PENDING"
+                                )
+                            )
+                        )
+                    ),
+                    cancelled & ~Batch.state.in_(["CANCELLED", "COMPLETED"]),
+                ),
+                or_(Batch.owner.is_(None), Batch.lease_until < now(), cancelled),
+            )
+            .order_by(Batch.updated_at, Batch.id)
+            .limit(1)
+            .with_for_update(skip_locked=True, key_share=True)
+        )
+        if candidate is None:
+            self.db.rollback()
+            return None
+        if self.finish_cancel(candidate):
+            self.db.commit()
+            return None
+        ident = candidate.id
+        if candidate.state == "PREPARING":
+            rows = self.db.scalars(
+                select(Item)
+                .where(Item.batch_id == ident, Item.state == "PREPARING")
+                .order_by(Item.position)
+                .limit(self.config.kiki_editorial_preview_size)
+            ).all()
+            token = str(uuid4())
+            candidate.owner = token
+            candidate.lease_until = now() + timedelta(
+                seconds=self.config.kiki_editorial_lease_seconds
+            )
+            self.db.commit()
+            return ident, token, [r.id for r in rows], "PREVIEW"
+        claim = self.claim(ident, resume=True)
+        if claim is None:
+            return None
+        return ident, *claim, "PROCESS"
+
+    def preview_step(self, ident, token, item_ids):
+        batch = self.get(ident, lock=True)
+        if batch.owner != token or batch.state != "PREPARING":
+            raise ValueError("Concesión de análisis reemplazada.")
+        rows = self.db.scalars(
+            select(Item)
+            .where(
+                Item.batch_id == ident, Item.state == "PREPARING", Item.id.in_(item_ids)
+            )
+            .order_by(Item.position)
+        ).all()
+        if len(rows) != len(set(item_ids)):
+            raise ValueError("Ítems de análisis incompatibles.")
+        source_map = self.source_loader(self.db, lock=True)
+        dimensions = (
+            "sufficient_evidence",
+            "no_documentation",
+            "conflicts",
+            "stale",
+            "eligible",
+            "human_required",
+            "revoked",
+            "documents_changed",
+        )
+        totals = Counter(batch.summary)
+
+        def inspect_chunk(items):
+            try:
+                context = Context(
+                    self.db,
+                    [i.ecomm_id for i in items],
+                    source_map,
+                    self.config.kiki_editorial_context_bytes,
+                    preview=True,
+                )
+            except ValueError as exc:
+                if len(items) > 1:
+                    middle = len(items) // 2
+                    inspect_chunk(items[:middle])
+                    inspect_chunk(items[middle:])
+                    return
+                result = {
+                    "expected": {"blocked": str(exc)},
+                    "fingerprint": digest({"blocked": str(exc)}),
+                    "conflicts": True,
+                    "eligible": False,
+                    "human_required": True,
+                    "reasons": [str(exc)],
+                }
+                results = [result]
+            else:
+                try:
+                    results = [self.inspect(context, i.ecomm_id) for i in items]
+                finally:
+                    context.release()
+            for item, result in zip(items, results):
+                item.expected = result["expected"]
+                item.result = {"preview": result}
+                item.state = "PENDING"
+                item.history = item.history + [
+                    {
+                        "action": "PREVIEWED",
+                        "at": now().isoformat(),
+                        "actor": self.actor,
+                    }
+                ]
+                for key in dimensions:
+                    totals[key] += int(result.get(key, False))
+
+        if not self.cancellation_requested(ident):
+            inspect_chunk(rows)
+        self.db.flush()
+        batch.summary = {key: totals[key] for key in dimensions}
+        batch.owner = None
+        batch.lease_until = None
+        batch.updated_at = now()
+        batch.revision += 1
+        if not self.counts(ident).get("PREPARING"):
+            fingerprints = list(
+                self.db.execute(
+                    select(
+                        Item.ecomm_id, Item.result["preview"]["fingerprint"].as_string()
+                    )
+                    .where(Item.batch_id == ident)
+                    .order_by(Item.position)
+                ).tuples()
+            )
+            batch.preview_hash = digest(
+                {
+                    "items": [tuple(r) for r in fingerprints],
+                    "operation": batch.operation,
+                }
+            )
+            batch.state = "PREVIEW"
+            self.event(batch, "PREVIEW_CREATED")
+        self.finish_cancel(batch)
+        self.db.commit()
+        return self.dto(batch)
+
+    def fail_claim(self, ident, token, item_ids, kind):
+        self.db.rollback()
+        batch = self.get(ident, lock=True)
+        if batch.owner != token:
+            return
+        action = "PREVIEW_STEP_ERROR" if kind == "PREVIEW" else "STEP_ROLLED_BACK"
+        failures = sum(h["action"] == "PREVIEW_STEP_ERROR" for h in batch.history)
+        if kind == "PROCESS" or failures >= self.config.kiki_editorial_max_attempts - 1:
+            stmt = select(Item).where(
+                Item.batch_id == ident, Item.state.in_(["PREPARING", "RUNNING"])
+            )
+            if kind == "PROCESS":
+                stmt = stmt.where(Item.id.in_(item_ids))
+            for item in self.db.scalars(stmt):
+                item.state = "ERROR"
+                item.error = {
+                    "message": "El paso se revirtió; requiere revisión. No se modificó ninguna ficha."
+                }
+                item.history = item.history + [
+                    {"action": action, "at": now().isoformat(), "actor": self.actor}
+                ]
+            batch.state = "ERROR"
+        batch.owner = None
+        batch.lease_until = None
+        self.event(batch, action)
+        self.finish_cancel(batch)
+        self.db.commit()

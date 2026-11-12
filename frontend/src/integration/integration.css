@@ -409,3 +409,87 @@
   border-radius: 7px;
   font: inherit;
 }
+/* 2R: the catalogue is the daily workspace; all secondary metrics remain reachable. */
+.i-app .d-main {
+  padding-top: 20px;
+}
+.i-app .d-heading {
+  margin-bottom: 14px;
+}
+.i-app .d-heading h1 {
+  font-size: 28px;
+}
+.i-app .d-eyebrow {
+  display: none;
+}
+.i-app .d-demo {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+}
+.i-app .i-capture-strip {
+  margin: 8px 0;
+}
+.i-commercial-overview > .c-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.i-commercial-overview > .c-metrics .c-central {
+  grid-column: auto;
+}
+.i-commercial-overview > .c-metrics .d-metric {
+  padding: 13px;
+  min-height: 118px;
+}
+.i-commercial-overview > .c-metrics .d-metric strong {
+  font-size: 26px;
+}
+.i-more-metrics {
+  margin: 10px 0 14px;
+  padding: 10px 14px;
+  border: 1px solid #dce5df;
+  border-radius: 10px;
+  background: #fff;
+}
+.i-more-metrics > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #285b4c;
+}
+.i-more-metrics[open] > summary {
+  margin-bottom: 15px;
+}
+.i-app .i-filters {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #fff;
+  padding: 12px 16px;
+  border-bottom: 1px solid #dce5df;
+}
+.i-app .i-catalog-heading {
+  padding-top: 16px;
+  padding-bottom: 8px;
+}
+.i-app .i-table tr {
+  scroll-margin-bottom: 160px;
+}
+@media (max-width: 850px) {
+  .i-commercial-overview > .c-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .i-commercial-overview > .c-metrics .d-metric {
+    min-height: 105px;
+  }
+  .i-app .d-main {
+    padding-top: 12px;
+  }
+  .i-app .d-heading h1 {
+    font-size: 23px;
+  }
+  .i-app .i-filters {
+    position: static;
+  }
+}
+.i-app .i-commercial-overview > .c-metrics .d-metric.c-central {
+  grid-column: auto;
+}

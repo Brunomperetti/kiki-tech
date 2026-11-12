@@ -53,3 +53,14 @@ class Item(EditorialBase):
     result: Mapped[dict] = mapped_column(JSON, default=dict)
     error: Mapped[dict] = mapped_column(JSON, default=dict)
     history: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class Signal(EditorialBase):
+    """An independent row lets cancellation commit while a work chunk is locked."""
+
+    __tablename__ = "kiki_editorial_batch_signals"
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("kiki_editorial_batches.id", ondelete="CASCADE"), primary_key=True
+    )
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    requested_by: Mapped[str] = mapped_column(String(240))

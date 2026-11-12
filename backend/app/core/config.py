@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     kiki_ai_api_key: str = ""
     kiki_ai_model: str = "gpt-4.1-mini"
     kiki_editorial_batches_enabled: bool = False
+    kiki_editorial_executor_enabled: bool = False
+    kiki_editorial_preview_size: int = Field(default=100, ge=1, le=100)
+    kiki_editorial_lease_seconds: int = Field(default=60, ge=3, le=120)
     kiki_editorial_batch_max_items: int = Field(default=5000, ge=100, le=10000)
     kiki_editorial_step_seconds: int = Field(default=10, ge=1, le=30)
     kiki_editorial_step_size: int = Field(default=5, ge=1, le=20)

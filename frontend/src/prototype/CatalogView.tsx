@@ -247,6 +247,8 @@ export function ProductDrawer({
   panelRef,
   busy,
   caption = "DETALLE DEL PRODUCTO",
+  dialogLabel,
+  closeLabel = "Cerrar ficha",
 }: {
   id: string;
   title: ReactNode;
@@ -258,6 +260,8 @@ export function ProductDrawer({
   panelRef: Ref<HTMLElement>;
   busy?: boolean;
   caption?: string;
+  dialogLabel?: string;
+  closeLabel?: string;
 }) {
   return (
     <>
@@ -267,7 +271,7 @@ export function ProductDrawer({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={`Ficha ${id}`}
+        aria-label={dialogLabel ?? `Ficha ${id}`}
       >
         <div className="d-drawer-top">
           <span>{caption}</span>
@@ -275,7 +279,7 @@ export function ProductDrawer({
             ref={closeRef}
             onClick={onClose}
             disabled={busy}
-            aria-label="Cerrar ficha"
+            aria-label={closeLabel}
           >
             ×
           </button>

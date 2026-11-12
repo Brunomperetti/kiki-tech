@@ -177,6 +177,9 @@ test("pack x2 y x6 siguen separados; mismo EAN no transfiere publicación y barc
 test("sin evidencia no significa no publicado; conserva búsqueda, selección, cinco pestañas y URL", async ({
   page,
 }) => {
+  await page
+    .getByText("Más indicadores y alcance de capturas", { exact: true })
+    .click();
   await metrics(page)
     .getByRole("button", { name: /Candidatos pendientes/ })
     .click();

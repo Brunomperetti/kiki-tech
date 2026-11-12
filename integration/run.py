@@ -140,10 +140,13 @@ def main():
             "status",
         ],
     )
+    parser.add_argument("--autonomous", action="store_true", help="Escenario 2R: 5000 variantes sintéticas y ejecución backend.")
     parser.add_argument("--batches", action="store_true", help="Escenario documental sintético para lotes (up/browser-test).")
     parser.add_argument("--channels", action="store_true", help="Cargar escenario de canales sintético (sólo up/browser-test).")
     arguments = parser.parse_args()
     command = arguments.command
+    if arguments.autonomous and (command not in {"up", "browser-test"} or arguments.batches or arguments.channels):
+        parser.error("--autonomous requiere up/browser-test y un escenario independiente.")
     if arguments.batches and (command not in {"up", "browser-test"} or arguments.channels):
         parser.error("--batches requiere up/browser-test y no se combina con --channels.")
     if arguments.channels and command not in {"up", "browser-test"}:
@@ -164,9 +167,13 @@ def main():
                 "Falta el frontend de integración. Ejecutá primero integration/run.py build."
             )
         directory = runtime_directory()
+        (directory / "editorial-mode").write_text("backend" if command in {"up", "browser-test"} else "manual")
+        (directory / "editorial-workers").write_text("1")
         try:
             compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "90")
             verify_containers()
+            if arguments.autonomous:
+                compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.editorial_fixtures", "--scale-5000")
             if arguments.batches:
                 compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.editorial_fixtures")
             if arguments.channels:
@@ -228,6 +235,7 @@ def main():
                         "dashboard_checks",
                         "channel_checks",
                         "editorial_checks",
+                        "autonomous_checks",
                         "documental_workspace_checks",
                         "connector_checks",
                         "pilot_checks",
@@ -244,6 +252,7 @@ def main():
                             "integration_sandbox." + checks,
                         )
                     subprocess.run([sys.executable, str(ROOT / "integration/test_batch_restart.py")], check=True, env=clean_environment())
+                    subprocess.run([sys.executable, str(ROOT / "integration/test_autonomous_restart.py")], check=True, env=clean_environment())
                     subprocess.run(
                         [sys.executable, str(ROOT / "integration/test_gateway.py")],
                         check=True,
@@ -252,7 +261,7 @@ def main():
             elif command == "browser-test":
                 # Runs its own gateway and Playwright against the actual isolated backend.
                 subprocess.run(
-                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--channels"] if arguments.channels else ["--batches"] if arguments.batches else [])],
+                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
                     check=True,
                     env=clean_environment(),
                 )
