@@ -1,6 +1,8 @@
 import { proposalPath } from "./proposal-adapter";
 import { useState } from "react";
 import { request } from "./catalog-adapter";
+import type { EcommAiLatest } from "../types/ecomm-app";
+import { isAuxiliaryPilot } from "./hileret-pilot";
 
 type Contract = {
   schema_version: string;
@@ -25,6 +27,35 @@ export function GenerationReadiness({ id }: { id: string }) {
   const [context, setContext] = useState<Contract>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [legacy, setLegacy] = useState<EcommAiLatest>();
+  async function loadExisting() {
+    setBusy(true);
+    setError("");
+    try {
+      const value = (await (
+        await request(
+          `/api/ecomm-app/workspace/ai/${encodeURIComponent(id)}/latest`,
+        )
+      ).json()) as EcommAiLatest;
+      if (
+        typeof value.enabled !== "boolean" ||
+        typeof value.available !== "boolean" ||
+        !Number.isInteger(value.remaining_today) ||
+        value.remaining_today < 0 ||
+        value.remaining_today > 10 ||
+        (value.available && (!value.draft || value.draft.ecomm_id !== id))
+      )
+        throw new Error(
+          "Respuesta OpenAI de otra identidad o contrato inválido.",
+        );
+      setLegacy(value);
+    } catch (e) {
+      setLegacy(undefined);
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function load() {
     setBusy(true);
     setError("");
@@ -55,12 +86,57 @@ export function GenerationReadiness({ id }: { id: string }) {
       <summary>Preparación avanzada para IA real · Desactivada</summary>
       <p>
         El contrato sólo reúne hechos aprobados vigentes con citas y versiones.
-        OpenAI no está conectado; presupuesto autorizado: USD 0,00. Consultarlo
-        no genera ni guarda contenido.
+        La generación con OpenAI sigue desactivada; presupuesto autorizado: USD
+        0,00. Consultarlo no genera ni guarda contenido.
       </p>
       <button disabled={busy} onClick={() => void load()}>
         Ver contrato de hechos aprobados
       </button>
+      {!isAuxiliaryPilot(id) && (
+        <>
+          <p>
+            Servicio OpenAI original: título y descripción con cuota diaria. Sus
+            sugerencias históricas no equivalen a hechos documentales aprobados
+            ni completan los 18 campos con citas.
+          </p>
+          <button disabled={busy} onClick={() => void loadExisting()}>
+            Consultar servicio OpenAI existente (sin generar)
+          </button>
+          {legacy && (
+            <section aria-label="Servicio OpenAI existente">
+              <p>
+                {legacy.enabled
+                  ? "Configurado en este backend"
+                  : "Desactivado en este backend"}{" "}
+                · Intentos disponibles hoy: {legacy.remaining_today} de 10.
+              </p>
+              <p>
+                Consulta de sólo lectura. No se invocó OpenAI ni se reservó
+                consumo. La generación real sigue bloqueada en este entorno.
+              </p>
+              {legacy.available && legacy.draft ? (
+                <>
+                  <p>
+                    Sugerencia histórica sin aprobación documental · Modelo
+                    registrado: {legacy.draft.model} ·{" "}
+                    {legacy.draft.source_current
+                      ? "Fuente vigente"
+                      : "Fuente modificada; no utilizar"}
+                  </p>
+                  <p>Título: {legacy.draft.title}</p>
+                  <p>Descripción: {legacy.draft.description}</p>
+                  <p>
+                    No se aplica ni se convierte automáticamente en una
+                    propuesta respaldada.
+                  </p>
+                </>
+              ) : (
+                <p>No hay sugerencias históricas para esta variante.</p>
+              )}
+            </section>
+          )}
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
       {context && (
         <section aria-label="Contrato de generación respaldada">

@@ -39,6 +39,10 @@ def route_allowed(method: str, path: str) -> bool:
         or is_workspace_route(method, path)
         or (
             method == "GET"
+            and bool(re.fullmatch(r"/api/ecomm-app/workspace/ai/90000[1-6]/latest", path))
+        )
+        or (
+            method == "GET"
             and bool(
                 re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/channels", path)
             )

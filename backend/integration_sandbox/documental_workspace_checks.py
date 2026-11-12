@@ -23,6 +23,34 @@ ID = "900001"
 
 
 class DocumentalWorkspace(unittest.TestCase):
+    def test_original_openai_readonly_without_quota_or_provider_access(self):
+        from app.database.models import KikiEcommAiDailySlot
+        from sqlalchemy import func, select
+
+        with SessionLocal() as db:
+            before = db.scalar(select(func.count()).select_from(KikiEcommAiDailySlot))
+        result = self.ok(self.client.get(ROOT + "ai/900001/latest"))
+        self.assertFalse(result["enabled"])
+        self.assertFalse(result["available"])
+        self.assertEqual(result["remaining_today"], 10)
+        self.assertEqual(
+            self.client.post(
+                ROOT + "ai/900001/suggest", json={"expected_version": 0}
+            ).status_code,
+            403,
+        )
+        for ident in ["None", "900007", "PILOT-HILERET-200-UNIT-SYNTHETIC"]:
+            self.assertEqual(
+                self.client.get(ROOT + f"ai/{ident}/latest").status_code, 403
+            )
+        with SessionLocal() as db:
+            after = db.scalar(select(func.count()).select_from(KikiEcommAiDailySlot))
+        self.assertEqual(before, after)
+
+    def test_original_openai_read_requires_authentication(self):
+        with TestClient(application, base_url="https://127.0.0.1:8443") as anonymous:
+            self.assertEqual(anonymous.get(ROOT + "ai/900001/latest").status_code, 401)
+
     @classmethod
     def setUpClass(cls):
         cls.lifecycle = TestClient(application, base_url="https://127.0.0.1:8443")

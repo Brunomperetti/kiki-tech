@@ -33,6 +33,10 @@ export function installIntegrationIsolation() {
       !(
         allowed.has(`${method} ${url.pathname}`) ||
         (method === "GET" &&
+          /^\/api\/ecomm-app\/workspace\/ai\/90000[1-6]\/latest$/.test(
+            url.pathname,
+          )) ||
+        (method === "GET" &&
           /^\/api\/ecomm-app\/editorial-batches(?:\/[a-f0-9-]{36})?$/.test(
             url.pathname,
           )) ||

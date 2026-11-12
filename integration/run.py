@@ -140,11 +140,14 @@ def main():
             "status",
         ],
     )
+    parser.add_argument("--presentation", action="store_true", help="Presentación: canales sintéticos y documentos pendientes de revisión.")
     parser.add_argument("--autonomous", action="store_true", help="Escenario 2R: 5000 variantes sintéticas y ejecución backend.")
     parser.add_argument("--batches", action="store_true", help="Escenario documental sintético para lotes (up/browser-test).")
     parser.add_argument("--channels", action="store_true", help="Cargar escenario de canales sintético (sólo up/browser-test).")
     arguments = parser.parse_args()
     command = arguments.command
+    if arguments.presentation and (command not in {"up", "browser-test"} or arguments.autonomous or arguments.batches or arguments.channels):
+        parser.error("--presentation requiere up/browser-test y no se combina con otros escenarios.")
     if arguments.autonomous and (command not in {"up", "browser-test"} or arguments.batches or arguments.channels):
         parser.error("--autonomous requiere up/browser-test y un escenario independiente.")
     if arguments.batches and (command not in {"up", "browser-test"} or arguments.channels):
@@ -172,6 +175,8 @@ def main():
         try:
             compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "90")
             verify_containers()
+            if arguments.presentation:
+                compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.presentation_fixtures")
             if arguments.autonomous:
                 compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.editorial_fixtures", "--scale-5000")
             if arguments.batches:
@@ -261,7 +266,7 @@ def main():
             elif command == "browser-test":
                 # Runs its own gateway and Playwright against the actual isolated backend.
                 subprocess.run(
-                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
+                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--presentation"] if arguments.presentation else ["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
                     check=True,
                     env=clean_environment(),
                 )

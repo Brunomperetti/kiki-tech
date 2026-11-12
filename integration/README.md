@@ -1,5 +1,10 @@
 # Integración local aislada: etapas 2B–2J
 
+Para la presentación del **13/11/2026**, usar el [cierre para Guillermo](PRESENTACION-GUILLERMO.md)
+y la [guía de Windows/WSL2](WINDOWS-DEMO.md): `python3 integration/run.py up --presentation`.
+Reutiliza este arnés con canales y documentación en un solo escenario, sin aprobar
+hechos ni conectar proveedores. Los apartados siguientes son el registro histórico.
+
 La etapa 2J incorpora el [expediente comercial MAMA 350 g / 10 mm](MAMA-PILOT.md),
 con ID de pruebas explícito, referencias auxiliares separadas y propuesta bloqueada
 hasta disponer de documentación auténtica suficiente. No altera el catálogo maestro.
