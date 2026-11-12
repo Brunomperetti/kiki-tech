@@ -15,14 +15,12 @@ test.beforeEach(async ({ page }) => {
     page.getByRole("heading", { name: "Tu catálogo, en un solo lugar." }),
   ).toBeVisible();
   // Legacy secondary indicators remain available inside their collapsed group.
-  await page
-    .getByText("Más indicadores comerciales y de preparación", { exact: true })
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
 });
 test.afterEach(async ({ page }) => expect(attempts.get(page)).toEqual([]));
 const row = (page: Page, id: string) =>
   page.locator(".d-table tbody tr").filter({ hasText: id });
-test("navegación simple y ocho indicadores comerciales en la misma pantalla", async ({
+test("navegación simple, cinco vistas y preparación separada de indicadores secundarios", async ({
   page,
 }, info) => {
   const nav = page.getByRole("navigation", {
@@ -36,7 +34,7 @@ test("navegación simple y ocho indicadores comerciales en la misma pantalla", a
   const metrics = page.getByRole("region", {
     name: "Cobertura comercial por canal",
   });
-  await expect(metrics.getByRole("button")).toHaveCount(8);
+  await expect(metrics.getByRole("button")).toHaveCount(3);
   await page
     .getByRole("button", { name: "Ver todo el catálogo", exact: true })
     .click();
@@ -72,7 +70,7 @@ test("editorial y canales separados; preparar no publica ni confirma candidatos"
   await expect(lamp).toContainText("Listo para publicar");
   await expect(lamp).toContainText("Publicado");
   await page
-    .getByRole("region", { name: "Cobertura comercial por canal" })
+    .getByRole("region", { name: "Preparación por canal" })
     .getByRole("button", { name: /^Listos para Tiendanube 2 / })
     .click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
@@ -137,7 +135,9 @@ test("editar invalida preparación y muestra bloqueo sin borrar publicación con
     metrics.getByRole("button", { name: /^Necesitan revisión 4 / }),
   ).toBeVisible();
   await expect(
-    metrics.getByRole("button", { name: /^Listos para Tiendanube 0 / }),
+    page
+      .getByRole("region", { name: "Preparación por canal" })
+      .getByRole("button", { name: /^Listos para Tiendanube 0 / }),
   ).toBeVisible();
   await expect(
     metrics.getByRole("button", { name: /^Mercado Libre · confirmadas 4 / }),

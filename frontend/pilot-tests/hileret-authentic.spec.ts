@@ -100,8 +100,12 @@ test("original auténtico: bytes, citas, revisiones explícitas del operador de 
   await page.screenshot({
     path: `artifacts/hileret-autentico-antes-${info.project.name}.png`,
   });
+  await page.getByRole("tab", { name: "IA", exact: true }).click();
   await page
-    .getByRole("button", { name: "Investigar producto", exact: true })
+    .getByRole("button", {
+      name: "Investigar y completar ficha con IA",
+      exact: true,
+    })
     .click();
   await page
     .getByText("Incorporar archivo local o referencia oficial", { exact: true })
@@ -326,8 +330,12 @@ test("original auténtico: bytes, citas, revisiones explícitas del operador de 
       exact: true,
     })
     .click();
+  await page.getByRole("tab", { name: "IA", exact: true }).click();
   await page
-    .getByRole("button", { name: "Investigar producto", exact: true })
+    .getByRole("button", {
+      name: "Investigar y completar ficha con IA",
+      exact: true,
+    })
     .click();
   await page
     .getByLabel("Documento disponible", { exact: true })

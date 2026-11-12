@@ -178,3 +178,130 @@
     line-height: 1.4;
   }
 }
+
+.d-app .k-preparation > .c-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+.k-preparation .d-metric {
+  min-height: 86px;
+  padding: 12px 15px;
+  border-left: 3px solid #80a769;
+}
+.k-preparation .d-metric > span {
+  font-size: 13px;
+}
+.k-preparation .d-metric strong {
+  font-size: 24px;
+  margin: 5px 0;
+}
+.k-preparation .d-metric small {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.d-tabs .k-ai-tab {
+  font-weight: 750;
+  color: #285544;
+  background: #edf5e7;
+  border-color: #8ba77a;
+}
+.d-tabs .k-ai-tab[aria-selected="true"] {
+  background: #285544;
+  color: #fff;
+}
+.k-ai-workflow {
+  border: 1px solid #bfd1b4;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 0 0 14px;
+  background: #f5f8f1;
+}
+.k-ai-workflow h3 {
+  margin: 0 0 10px;
+}
+.k-ai-workflow p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.k-ai-workflow .d-primary {
+  max-width: 100%;
+  white-space: normal;
+}
+.k-ai-entry {
+  margin-bottom: 12px;
+}
+.k-operations-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border: 1px solid #dce5df;
+  border-radius: 9px;
+  background: white;
+}
+.k-operations-summary small {
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+  color: #65775c;
+}
+.k-operations-caption {
+  font-size: 11px;
+  color: #53674e;
+}
+.k-open-editor {
+  font-size: 11px;
+  margin-top: 6px;
+}
+.i-secondary .c-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.i-secondary .d-metric {
+  min-height: 100px;
+  padding: 12px;
+}
+.i-secondary .d-metric strong {
+  font-size: 24px;
+  margin: 6px 0;
+}
+@media (max-width: 760px) {
+  .k-preparation .d-metric {
+    min-height: 96px;
+    padding: 10px;
+  }
+  .k-preparation .d-metric small {
+    font-size: 10px;
+  }
+  .k-operations-summary {
+    flex-wrap: wrap;
+  }
+  .i-secondary .c-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .k-operations-caption {
+    flex-basis: 100%;
+  }
+}
+/* Override the historical eight-card grid spans in the compact two-card row. */
+.d-app .k-preparation > .c-metrics > .d-metric:nth-child(n) {
+  grid-column: auto;
+  min-height: 90px;
+}
+.d-app .k-preparation .d-metric > span {
+  min-height: 0;
+}
+.d-app .i-more-metrics > .c-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.d-app .i-more-metrics > .c-metrics > .d-metric:nth-child(n) {
+  grid-column: auto;
+  min-height: 100px;
+}
+@media (max-width: 760px) {
+  .d-app .i-more-metrics > .c-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

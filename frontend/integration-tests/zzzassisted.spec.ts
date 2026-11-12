@@ -86,8 +86,12 @@ async function open(
   const pending = page.waitForResponse(
     (r) => r.url().endsWith(`${api}/start`) && r.request().method() === "POST",
   );
+  await page.getByRole("tab", { name: "IA", exact: true }).click();
   await page
-    .getByRole("button", { name: "Investigar producto", exact: true })
+    .getByRole("button", {
+      name: "Investigar y completar ficha con IA",
+      exact: true,
+    })
     .click();
   expect((await pending).status()).toBe(200);
   await expect(

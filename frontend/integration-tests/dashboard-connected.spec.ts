@@ -21,6 +21,7 @@ test("indicadores globales del backend filtran sin sumar tareas superpuestas", a
   page,
 }) => {
   await login(page);
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   const response = await page.request.get(`${queuePath}?sort=capture`);
   const body = await response.json();
   for (const key of [

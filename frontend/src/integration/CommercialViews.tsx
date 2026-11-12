@@ -116,6 +116,8 @@ export function CommercialViews({
         <button
           type="button"
           key={key}
+          data-testid={key === "ecomm" ? "total" : undefined}
+          data-metric={key === "ecomm" ? "all" : undefined}
           aria-pressed={value === key}
           onClick={() => onChange(key as CommercialView)}
         >

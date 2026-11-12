@@ -63,11 +63,11 @@ async function cancel(page: Page) {
 test("tabla accesible, indicadores completos sin duplicación y cinco pestañas conservadas", async ({
   page,
 }, info) => {
-  const secondary = page.locator(".i-more-metrics");
+  const secondary = page.locator(".i-secondary");
   await expect(secondary).not.toHaveAttribute("open", "");
   await expect(
-    page.locator(".i-commercial-overview > .c-metrics [data-metric]"),
-  ).toHaveCount(4);
+    page.locator(".k-preparation .c-metrics [data-metric]"),
+  ).toHaveCount(2);
   for (const id of [
     "all",
     "identity",
@@ -85,14 +85,13 @@ test("tabla accesible, indicadores completos sin duplicación y cinco pestañas 
   ])
     await expect(page.locator(`[data-metric="${id}"]`)).toHaveCount(1);
   const tops = await page
-    .locator(".i-commercial-overview > .c-metrics [data-metric]")
+    .locator(".k-preparation .c-metrics [data-metric]")
     .evaluateAll((cards) =>
       cards.map((card) => card.getBoundingClientRect().top),
     );
   if (info.project.name === "desktop") expect(new Set(tops).size).toBe(1);
   else {
     expect(tops[0]).toBe(tops[1]);
-    expect(tops[2]).toBe(tops[3]);
   }
   const y = await page
     .locator(".i-table")
@@ -108,13 +107,9 @@ test("tabla accesible, indicadores completos sin duplicación y cinco pestañas 
     path: `artifacts/operations-2r-dashboard-${info.project.name}.png`,
     fullPage: false,
   });
-  await page
-    .getByText("Más indicadores y alcance de capturas", { exact: true })
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await expect(page.locator('[data-metric="pack"]')).toBeVisible();
-  await page
-    .getByText("Más indicadores y alcance de capturas", { exact: true })
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await page
     .locator('[data-ecomm-id="900001"]')
     .getByRole("button", { name: "Ver ficha", exact: true })

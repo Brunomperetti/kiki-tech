@@ -298,6 +298,11 @@ export function nextAction(p: Item) {
     return "Revisar evidencia";
   if (requirements(p).length) return "Completar ficha";
   if (p.ai?.state === "Pendiente") return "Revisar IA";
+  if (
+    p.status !== "Preparada" &&
+    !assessCommercialReadiness(p.commercial).ready
+  )
+    return "Investigar con IA";
   if (p.status !== "Preparada") return "Revisar ficha";
   if (
     (["ml", "tn"] as const).some(
@@ -312,7 +317,7 @@ export function actionTab(p: Item) {
   const action = nextAction(p);
   return p.conflict || action === "Revisar evidencia"
     ? "Evidencias"
-    : action === "Revisar IA"
+    : ["Revisar IA", "Investigar con IA"].includes(action)
       ? "IA"
       : ["Completar ficha", "Revisar ficha"].includes(action)
         ? "Ficha"

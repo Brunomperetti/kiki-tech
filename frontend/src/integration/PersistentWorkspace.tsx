@@ -269,6 +269,7 @@ export function PersistentWorkspace({
         {tabs.map((label) => (
           <button
             role="tab"
+            className={label === "IA" ? "k-ai-tab" : undefined}
             disabled={saving || researchBusy || proposalBusy}
             key={label}
             aria-selected={tab === label}
@@ -412,30 +413,12 @@ export function PersistentWorkspace({
             {tab === "Ficha" && (
               <>
                 <button
-                  className="d-primary"
-                  aria-label="Investigar producto"
-                  disabled={
-                    dirty ||
-                    saving ||
-                    researchBusy ||
-                    proposalBusy ||
-                    identityBlocked ||
-                    reauth ||
-                    !!remote
-                  }
-                  onClick={() => {
-                    setResearchStart(isAuxiliaryPilot(variant.id) ? 0 : 1);
-                    onTab("Evidencias");
-                  }}
+                  className="k-ai-entry"
+                  disabled={saving || researchBusy || proposalBusy}
+                  onClick={() => onTab("IA")}
                 >
-                  Investigar y completar ficha con IA
+                  Ir a IA · investigación y propuestas
                 </button>
-                <p className="r-notice">
-                  Recorrido guiado: identidad → fuentes → hechos respaldados →
-                  propuesta → revisión por campo. En este entorno la búsqueda es
-                  simulada y la redacción es determinista; OpenAI real permanece
-                  desactivado.
-                </p>
                 {variant.id === mamaPilotId && (
                   <MamaPilotSummary revision={record.version} />
                 )}
@@ -646,6 +629,39 @@ export function PersistentWorkspace({
               </>
             )}
             <div hidden={tab !== "IA"}>
+              <section
+                className="k-ai-workflow"
+                aria-label="Disponibilidad de investigación e IA"
+              >
+                <h3>Investigar, revisar y completar</h3>
+                <button
+                  className="d-primary"
+                  disabled={
+                    dirty ||
+                    proposalDirty ||
+                    saving ||
+                    researchBusy ||
+                    proposalBusy ||
+                    identityBlocked ||
+                    reauth ||
+                    !!remote
+                  }
+                  onClick={() => {
+                    setResearchStart(isAuxiliaryPilot(variant.id) ? 0 : 1);
+                    onTab("Evidencias");
+                  }}
+                >
+                  Investigar y completar ficha con IA
+                </button>
+                <p className="r-notice">
+                  Investigación web real y OpenAI: bloqueados en este entorno.
+                  Se reutilizan fuentes de prueba o documentos locales
+                  autorizados y el generador determinista existente. Ninguna
+                  llamada externa ni consumo. Recorrido: identidad → Evidencias
+                  → hechos aprobados → propuesta → revisión por campo → guardado
+                  versionado.
+                </p>
+              </section>
               <ProposalPanel
                 draftId={proposalId}
                 record={record}

@@ -104,8 +104,12 @@ test("referencia sin descarga no permite extracción ni propuesta y solicita evi
   page,
 }, info) => {
   await open(page);
+  await page.getByRole("tab", { name: "IA", exact: true }).click();
   await page
-    .getByRole("button", { name: "Investigar producto", exact: true })
+    .getByRole("button", {
+      name: "Investigar y completar ficha con IA",
+      exact: true,
+    })
     .click();
   await expect(
     page.getByLabel("Expediente comercial MAMA 350 g"),

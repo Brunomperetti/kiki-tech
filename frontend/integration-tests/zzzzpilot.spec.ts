@@ -59,8 +59,12 @@ async function open(page: Page) {
     .locator(`[data-ecomm-id="${id}"]`)
     .getByRole("button", { name: "Ver ficha", exact: true })
     .click();
+  await page.getByRole("tab", { name: "IA", exact: true }).click();
   await page
-    .getByRole("button", { name: "Investigar producto", exact: true })
+    .getByRole("button", {
+      name: "Investigar y completar ficha con IA",
+      exact: true,
+    })
     .click();
   await expect(
     page.getByLabel("Preparación del piloto documental"),

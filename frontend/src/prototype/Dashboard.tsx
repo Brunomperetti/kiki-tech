@@ -192,6 +192,7 @@ function DemoDashboard() {
         Number(b.status === "Pendiente") - Number(a.status === "Pendiente") ||
         a.id.localeCompare(b.id),
     );
+  const readyIds = ["ml-ready", "tn-ready"];
   const ml = coverage(rows, "ml"),
     tn = coverage(rows, "tn");
   const indicators = [
@@ -252,6 +253,42 @@ function DemoDashboard() {
       filter: { tnState: "ready" },
     },
   ];
+  const displayIndicators = indicators.map((card) => ({
+    ...card,
+    active:
+      card.id === "all"
+        ? !mlFilter &&
+          !tnFilter &&
+          !work &&
+          !q &&
+          !status &&
+          !brand &&
+          !channel &&
+          !conflict &&
+          !action
+        : Object.entries(card.filter).every(([k, v]) => params.get(k) === v),
+    onClick: () => {
+      if (card.id === "all")
+        update({
+          mlState: "",
+          tnState: "",
+          work: "",
+          status: "",
+          channel: "",
+          conflict: "",
+          action: "",
+          brand: "",
+          q: "",
+        });
+      else {
+        const entries = Object.entries(card.filter);
+        const active = entries.every(([k, v]) => params.get(k) === v);
+        update(
+          Object.fromEntries(entries.map(([k, v]) => [k, active ? "" : v])),
+        );
+      }
+    },
+  }));
   function replaceProduct(p: Item) {
     setRows((old) => old.map((row) => (row.id === p.id ? p : row)));
     setDirty(false);
@@ -350,6 +387,12 @@ function DemoDashboard() {
             mlState: next === "ml_unconfirmed" ? "unconfirmed" : "",
             tnState: next === "tn_unconfirmed" ? "unconfirmed" : "",
             quality: "",
+            work: "",
+            status: "",
+            brand: "",
+            channel: "",
+            conflict: "",
+            action: "",
             q: "",
             listingPage: "",
             linkage: "",
@@ -358,50 +401,19 @@ function DemoDashboard() {
           })
         }
       />
+      <div className="k-preparation">
+        <CatalogMetrics
+          label="Preparación por canal"
+          cards={displayIndicators.filter((card) => readyIds.includes(card.id))}
+        />
+      </div>
       <details className="i-more-metrics">
-        <summary>Más indicadores comerciales y de preparación</summary>
+        <summary>Más indicadores comerciales</summary>
         <CatalogMetrics
           label="Cobertura comercial por canal"
-          cards={indicators.map((card) => ({
-            ...card,
-            active:
-              card.id === "all"
-                ? !mlFilter &&
-                  !tnFilter &&
-                  !work &&
-                  !q &&
-                  !status &&
-                  !brand &&
-                  !channel &&
-                  !conflict &&
-                  !action
-                : Object.entries(card.filter).every(
-                    ([k, v]) => params.get(k) === v,
-                  ),
-            onClick: () => {
-              if (card.id === "all")
-                update({
-                  mlState: "",
-                  tnState: "",
-                  work: "",
-                  status: "",
-                  channel: "",
-                  conflict: "",
-                  action: "",
-                  brand: "",
-                  q: "",
-                });
-              else {
-                const entries = Object.entries(card.filter);
-                const active = entries.every(([k, v]) => params.get(k) === v);
-                update(
-                  Object.fromEntries(
-                    entries.map(([k, v]) => [k, active ? "" : v]),
-                  ),
-                );
-              }
-            },
-          }))}
+          cards={displayIndicators.filter((card) =>
+            ["ml-confirmed", "tn-confirmed", "attention"].includes(card.id),
+          )}
         />
       </details>
       <details className="i-more-metrics">
@@ -464,16 +476,7 @@ function DemoDashboard() {
           {new Set(rows.map((p) => p.family)).size} productos · {rows.length}{" "}
           variantes en Ecomm-App
         </span>
-        <button
-          onClick={() =>
-            update({
-              tools: params.get("tools") === "1" ? "" : "1",
-              tool: "",
-            })
-          }
-        >
-          Más acciones del catálogo
-        </button>
+
         <button
           onClick={() =>
             update({
@@ -594,6 +597,7 @@ function DemoDashboard() {
                   "Revisar evidencia",
                   "Revisar IA",
                   "Completar ficha",
+                  "Investigar con IA",
                   "Revisar ficha",
                   "Verificar antes de publicar",
                   "Revisar publicaciones",
@@ -767,6 +771,30 @@ function DemoDashboard() {
           </>
         )}
       </section>
+      <section
+        className="k-operations-summary"
+        aria-label="Acceso al centro de operaciones"
+      >
+        <div>
+          <strong>Centro de operaciones</strong>
+          <small>
+            Propuestas IA para varias variantes, preparación y resultados ·
+            simulación en memoria.
+          </small>
+        </div>
+        <button
+          aria-expanded={params.get("tools") === "1" || !!params.get("tool")}
+          aria-controls="catalog-operations"
+          onClick={() =>
+            update({
+              tools: params.get("tools") === "1" ? "" : "1",
+              tool: "",
+            })
+          }
+        >
+          Más acciones del catálogo
+        </button>
+      </section>
       {(params.get("tools") === "1" || params.get("tool")) && (
         <div id="catalog-operations">
           <button
@@ -866,6 +894,7 @@ function DemoDashboard() {
               <button
                 key={t}
                 role="tab"
+                className={t === "IA" ? "k-ai-tab" : undefined}
                 tabIndex={tab === t ? 0 : -1}
                 id={`tab-${t}`}
                 aria-controls="product-tabpanel"
@@ -887,6 +916,7 @@ function DemoDashboard() {
               product={selected}
               tab={tab}
               onChange={replaceProduct}
+              onTab={(next) => update({ tab: next })}
               onDirty={setDirty}
             />
           </div>

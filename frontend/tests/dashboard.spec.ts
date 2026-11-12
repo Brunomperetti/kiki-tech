@@ -25,9 +25,7 @@ test.beforeEach(async ({ page }) => {
     page.getByRole("heading", { name: "Tu catálogo, en un solo lugar." }),
   ).toBeVisible();
   // Legacy secondary indicators remain available inside their collapsed group.
-  await page
-    .getByText("Más indicadores comerciales y de preparación", { exact: true })
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
 });
 
 test("busca por nombre, SKU, marca e identidad; variantes con SKU repetido son distintas", async ({
@@ -68,9 +66,7 @@ test("combina filtros, restaura URL y muestra vacío recuperable", async ({
     .getByRole("button", { name: "Ver todo el catálogo" })
     .click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(8);
-  await page
-    .getByText("Más indicadores comerciales y de preparación", { exact: true })
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await page.getByRole("button", { name: /^Necesitan revisión 3/ }).click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(3);
   await page.goBack();

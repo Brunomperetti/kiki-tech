@@ -16,9 +16,7 @@ test.beforeEach(async ({ page }) => {
     page.getByRole("heading", { name: "Tu catálogo, en un solo lugar." }),
   ).toBeVisible();
   // Legacy secondary indicators remain available inside their collapsed group.
-  await page
-    .getByText("Más indicadores comerciales y de preparación", { exact: true })
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
 });
 test.afterEach(async ({ page }) => expect(outbound.get(page)).toEqual([]));
 const record = (page: Page, id: string) =>
@@ -41,8 +39,8 @@ test("totales calculados separan publicaciones únicas, variantes y registros re
   const metrics = page.getByRole("region", {
     name: "Cobertura comercial por canal",
   });
-  await expect(metrics.getByRole("button")).toHaveCount(8);
-  await expect(metrics.locator('[data-metric="all"] strong')).toHaveText(
+  await expect(metrics.getByRole("button")).toHaveCount(3);
+  await expect(page.locator('[data-metric="all"] strong')).toHaveText(
     String(new Set(products.map((p) => p.id)).size),
   );
   for (const c of ["ml", "tn"] as const) {
@@ -54,19 +52,31 @@ test("totales calculados separan publicaciones únicas, variantes y registros re
       metrics.locator(`[data-metric="${c}-confirmed"] small`),
     ).toContainText(`${confirmed.length} variantes`);
     await expect(
-      metrics.locator(`[data-metric="${c}-unconfirmed"] strong`),
-    ).toHaveText(String(products.length - confirmed.length));
+      page
+        .getByRole("navigation", { name: "Vistas comerciales" })
+        .getByRole("button", {
+          name:
+            c === "ml" ? /^Sin confirmación en ML/ : /^Sin confirmación en TN/,
+        })
+        .locator("strong"),
+    ).toHaveText(
+      String(c === "ml" ? products.length - confirmed.length : products.length),
+    );
     await metrics.locator(`[data-metric="${c}-confirmed"]`).click();
     await expect(page.locator(".d-table tbody tr")).toHaveCount(
       confirmed.length,
     );
     for (const p of confirmed) await expect(record(page, p.id)).toBeVisible();
-    await metrics.locator('[data-metric="all"]').click();
-    await metrics.locator(`[data-metric="${c}-unconfirmed"]`).click();
+    await page.locator('[data-metric="all"]').click();
+    await page
+      .getByLabel(c === "ml" ? "Estado Mercado Libre" : "Estado Tiendanube", {
+        exact: true,
+      })
+      .selectOption("unconfirmed");
     await expect(page.locator(".d-table tbody tr")).toHaveCount(
       products.length - confirmed.length,
     );
-    await metrics.locator('[data-metric="all"]').click();
+    await page.locator('[data-metric="all"]').click();
   }
   expect(fixturePubs("ml")).toBeGreaterThan(fixtureConfirmed("ml").length);
   await page.screenshot({
@@ -139,13 +149,8 @@ test("filtros combinados de ambos canales restauran URL y preservan Ecomm ID", a
     .click();
   await page.keyboard.press("Escape");
   await expect(record(page, "DEMO-1001")).toBeVisible();
-  await page
-    .getByText("Más indicadores comerciales y de preparación", { exact: true })
-    .click();
-  await page
-    .getByRole("region", { name: "Cobertura comercial por canal" })
-    .locator('[data-metric="all"]')
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
+  await page.locator('[data-metric="all"]').click();
   await page.getByRole("textbox", { name: "Buscar productos" }).fill("ALM-NAT");
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await expect(record(page, "DEMO-1006")).toContainText("1 kg");
@@ -155,10 +160,7 @@ test("filtros combinados de ambos canales restauran URL y preservan Ecomm ID", a
     .selectOption("unknown");
   await expect(page.locator(".d-table tbody tr")).toHaveCount(1);
   await expect(record(page, "DEMO-1006")).toBeVisible();
-  await page
-    .getByRole("region", { name: "Cobertura comercial por canal" })
-    .locator('[data-metric="all"]')
-    .click();
+  await page.locator('[data-metric="all"]').click();
   await page
     .getByLabel("Estado Tiendanube", { exact: true })
     .selectOption("stale");
@@ -178,12 +180,12 @@ test("preparar un canal modifica listas internas y confirma cero publicaciones n
     ["tn-ready", 1],
     ["attention", 3],
   ] as const) {
-    await expect(metrics.locator(`[data-metric="${key}"] strong`)).toHaveText(
+    await expect(page.locator(`[data-metric="${key}"] strong`)).toHaveText(
       String(n),
     );
-    await metrics.locator(`[data-metric="${key}"]`).click();
+    await page.locator(`[data-metric="${key}"]`).click();
     await expect(page.locator(".d-table tbody tr")).toHaveCount(n);
-    await metrics.locator('[data-metric="all"]').click();
+    await page.locator('[data-metric="all"]').click();
   }
   const before = { ml: fixturePubs("ml"), tn: fixturePubs("tn") };
   await page.getByRole("button", { name: "Abrir DEMO-1005" }).click();
@@ -192,9 +194,7 @@ test("preparar un canal modifica listas internas y confirma cero publicaciones n
   await panel.getByRole("button", { name: "Preparar para TN" }).click();
   await panel.getByRole("button", { name: "Confirmar decisión" }).click();
   await page.keyboard.press("Escape");
-  await expect(metrics.locator('[data-metric="tn-ready"] strong')).toHaveText(
-    "2",
-  );
+  await expect(page.locator('[data-metric="tn-ready"] strong')).toHaveText("2");
   for (const c of ["ml", "tn"] as const)
     await expect(
       metrics.locator(`[data-metric="${c}-confirmed"] strong`),

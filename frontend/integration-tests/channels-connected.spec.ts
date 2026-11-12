@@ -72,6 +72,7 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
 }, info) => {
   const initial = await read(page);
   expect(initial.ml.confirmed_listing).toBe(false);
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await open(page);
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
     /Coincidencia candidata|Vinculación pendiente/,
@@ -121,6 +122,7 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
     .click();
   await expect(row(page)).toContainText("Cantidad declarada por operador: 1");
   await page.getByRole("button", { name: "Cerrar ficha", exact: true }).click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await metrics(page)
     .getByRole("button", { name: /Variantes con ML confirmado/ })
     .click();
@@ -128,7 +130,7 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
   await expect(page).toHaveURL(/filter=ml_confirmed/);
   await page.reload();
   await expect(page.locator('[data-ecomm-id="900003"]')).toBeVisible();
-  await page.getByRole("button", { name: /Variantes Ecomm-App/ }).click();
+  await page.getByTestId("total").click();
   await expect(page.locator("tbody tr[data-ecomm-id]")).toHaveCount(6);
   await page.screenshot({
     path: `artifacts/dashboard-canales-2p-${info.project.name}.png`,
@@ -177,9 +179,7 @@ test("pack x2 y x6 siguen separados; mismo EAN no transfiere publicación y barc
 test("sin evidencia no significa no publicado; conserva búsqueda, selección, cinco pestañas y URL", async ({
   page,
 }) => {
-  await page
-    .getByText("Más indicadores y alcance de capturas", { exact: true })
-    .click();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await metrics(page)
     .getByRole("button", { name: /Candidatos pendientes/ })
     .click();
@@ -200,7 +200,7 @@ test("sin evidencia no significa no publicado; conserva búsqueda, selección, c
     "Coincidencia candidata",
   );
   await page.getByRole("button", { name: "Cerrar ficha", exact: true }).click();
-  await page.getByRole("button", { name: /Variantes Ecomm-App/ }).click();
+  await page.getByTestId("total").click();
   await open(page, "900005");
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
     "Sin evidencia suficiente",
@@ -220,6 +220,7 @@ test("revocación conserva historial y retira confirmación sin cambiar la ficha
   const before = await (
     await page.request.get("/api/ecomm-app/workspace/900003")
   ).json();
+  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await open(page);
   const card = row(page);
   await fill(page);

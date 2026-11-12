@@ -1,4 +1,5 @@
 import { SettingsDialog } from "../prototype/SettingsDialog";
+import { recommendedAction } from "./product-actions";
 import { SavedHistory } from "./SavedHistory";
 import {
   CommercialViews,
@@ -24,6 +25,7 @@ import {
   type CatalogPage,
   captureDate,
   loadDashboard,
+  adaptQueue,
   adaptVariant,
   validVariantId,
   queueFilters,
@@ -87,6 +89,11 @@ export function IntegrationCatalog() {
   const [listingCounts, setListingCounts] = useState<{
     ml?: number;
     tn?: number;
+  }>();
+  const [preparation, setPreparation] = useState<{
+    ml: number;
+    tn: number;
+    capturedAt: string | null;
   }>();
   const rawPage = params.get("page") || "1",
     rawSize = params.get("limit") || "6";
@@ -262,6 +269,42 @@ export function IntegrationCatalog() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    setPreparation(undefined);
+    if (!session || invalid || !data) return;
+    const c = new AbortController();
+    Promise.all(
+      (["ml", "tn"] as const).map((channel) =>
+        request(
+          `/api/ecomm-app/workspace/queue?q=&page=1&limit=3&sort=capture&filter=ready_for_channels%2B${channel}_unconfirmed`,
+          { signal: c.signal },
+        )
+          .then((response) => response.json())
+          .then((payload) =>
+            adaptQueue(
+              payload,
+              data,
+              "",
+              1,
+              3,
+              `ready_for_channels+${channel}_unconfirmed`,
+            ),
+          ),
+      ),
+    )
+      .then(([ml, tn]) => {
+        if (!c.signal.aborted && ml.lastAt === tn.lastAt)
+          setPreparation({
+            ml: ml.matches,
+            tn: tn.matches,
+            capturedAt: ml.lastAt,
+          });
+      })
+      .catch(() => {
+        /* Unknown is displayed as —, never a fabricated zero. */
+      });
+    return () => c.abort();
+  }, [revision, session, invalid, data?.lastAt]);
   useEffect(() => {
     setListingCounts(undefined);
     if (!session || invalid) return;
@@ -534,6 +577,7 @@ export function IntegrationCatalog() {
           onChange={(next) =>
             update({
               view: next === "ecomm" ? "" : next,
+              q: next === "ecomm" ? "" : q,
               filter: next.endsWith("unconfirmed") ? next : "",
               linkage: "",
               page: "",
@@ -543,104 +587,83 @@ export function IntegrationCatalog() {
             })
           }
         />
-        <CatalogMetrics
-          label="Resumen del catálogo"
-          cards={[
-            {
-              id: "all",
-              testId: "total",
-              title: "Variantes Ecomm-App",
-              value: data?.total ?? "—",
-              note: "Total informado por el backend",
-              active: filter === "all" && !q,
-              onClick: () =>
-                update({ filter: "", q: "", page: "", product: "", tab: "" }),
-            },
-            {
-              id: "identity",
-              title: queueFilters.identity,
-              value: data?.summary?.identity ?? "—",
-              note: "Variantes que necesitan revisar su identidad",
-              active: filter === "identity",
-              onClick: () =>
-                update({
-                  filter: filter === "identity" ? "" : "identity",
-                  page: "",
-                  product: "",
-                  tab: "",
-                }),
-            },
-            ...[
-              ["ml_confirmed", "Variantes con ML confirmado"],
-              ["tn_verified", "Vínculos TN verificados"],
-            ].map(([key, title]) => ({
-              id: key,
-              title,
+        <div className="k-preparation">
+          <CatalogMetrics
+            label="Preparación por canal"
+            cards={(["ml", "tn"] as const).map((channel) => ({
+              id: `${channel}-ready`,
+              title: `Listos para ${channel === "ml" ? "Mercado Libre" : "Tiendanube"}`,
               value:
-                data?.channelOverview?.validated &&
-                data.channelOverview.sources[
-                  key === "ml_confirmed" ? "ml" : "tn"
-                ].available
-                  ? (data.summary?.[key] ?? "—")
-                  : unavailable,
-              note:
-                key === "ml_confirmed"
-                  ? "Publicación en captura revisada, no en vivo"
-                  : "Vínculos de CSV; no confirma publicación actual",
-              active: filter === key,
+                data && preparation?.capturedAt === data.lastAt
+                  ? preparation[channel]
+                  : "—",
+              note: "Ficha completa interna, sin confirmación en este canal. Falta verificar identidad y vigencia; no publica.",
+              active: filter === `ready_for_channels+${channel}_unconfirmed`,
               onClick: () =>
                 update({
-                  filter: filter === key ? "" : key,
+                  filter:
+                    filter === `ready_for_channels+${channel}_unconfirmed`
+                      ? ""
+                      : `ready_for_channels+${channel}_unconfirmed`,
+                  view: "",
                   page: "",
                   product: "",
                   tab: "",
                 }),
-            })),
-          ]}
-        />
+            }))}
+          />
+        </div>
         <details
-          className="i-more-metrics"
+          className="i-more-metrics i-quality"
           open={advanced}
           onToggle={(e) => setAdvanced(e.currentTarget.open)}
         >
-          <summary>Más indicadores y alcance de capturas</summary>
+          <summary>Calidad del catálogo</summary>
           <h3>Calidad del catálogo · candidatos para revisión</h3>
           <div
             className="k-quality-metrics"
             role="group"
             aria-label="Indicadores de calidad"
           >
-            {qualityFilterKeys.map((key) => (
-              <button
-                type="button"
-                key={key}
-                aria-pressed={filter.split("+").includes(key)}
-                onClick={() => {
-                  const base =
-                    view === "ml_unconfirmed" || view === "tn_unconfirmed"
-                      ? view
-                      : "";
-                  update({
-                    view: base || "",
-                    filter: filter.split("+").includes(key)
-                      ? base
-                      : [base, key].filter(Boolean).join("+"),
-                    page: "",
-                    product: "",
-                    tab: "",
-                  });
-                }}
-              >
-                {queueFilters[key]}{" "}
-                <strong>{data?.summary?.[key] ?? "—"}</strong>
-              </button>
-            ))}
+            {qualityFilterKeys
+              .filter(
+                (key) => !["ml_unconfirmed", "tn_unconfirmed"].includes(key),
+              )
+              .map((key) => (
+                <button
+                  type="button"
+                  key={key}
+                  aria-pressed={filter.split("+").includes(key)}
+                  onClick={() => {
+                    const base =
+                      view === "ml_unconfirmed" || view === "tn_unconfirmed"
+                        ? view
+                        : "";
+                    update({
+                      view: base || "",
+                      filter: filter.split("+").includes(key)
+                        ? base
+                        : [base, key].filter(Boolean).join("+"),
+                      page: "",
+                      product: "",
+                      tab: "",
+                    });
+                  }}
+                >
+                  {queueFilters[key]}{" "}
+                  <strong>{data?.summary?.[key] ?? "—"}</strong>
+                </button>
+              ))}
           </div>
+        </details>
+        <details className="i-more-metrics i-secondary">
+          <summary>Más indicadores comerciales</summary>
           <CatalogMetrics
             label="Indicadores editoriales adicionales"
             cards={[
               ...(
                 [
+                  "identity",
                   "untouched",
                   "draft",
                   "ready",
@@ -674,6 +697,8 @@ export function IntegrationCatalog() {
           <CatalogMetrics
             label="Indicadores adicionales de canales"
             cards={[
+              ["ml_confirmed", "Variantes con ML confirmado"],
+              ["tn_verified", "Vínculos TN verificados"],
               ["channel_candidates", "Candidatos pendientes"],
               ["channel_conflicts", "Conflictos de canal"],
               ["channel_no_evidence", "Sin evidencia suficiente"],
@@ -1011,10 +1036,25 @@ export function IntegrationCatalog() {
                     <strong>
                       {stateLabels[item.editorialStatus || ""] ?? unavailable}
                     </strong>
-                    <small>{item.reason}</small>
+                    <small>{recommendedAction(item).hint}</small>
                   </td>
                   <td data-label="Acción">
+                    {recommendedAction(item).label !== "Ver ficha" && (
+                      <button
+                        className="o-quick"
+                        onClick={(event) => {
+                          originRef.current = event.currentTarget;
+                          update({
+                            product: item.id,
+                            tab: recommendedAction(item).tab,
+                          });
+                        }}
+                      >
+                        {recommendedAction(item).label}
+                      </button>
+                    )}
                     <button
+                      className="k-open-editor"
                       onClick={(event) => {
                         originRef.current = event.currentTarget;
                         update({ product: item.id, tab: "Ficha" });

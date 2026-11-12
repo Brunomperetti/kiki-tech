@@ -18,11 +18,13 @@ export function OperationalPanel({
   product: p,
   tab,
   onChange,
+  onTab,
   onDirty,
 }: {
   product: Item;
   tab: string;
   onChange: (p: Item) => void;
+  onTab: (tab: string) => void;
   onDirty: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState<Editorial>(snapshot(p));
@@ -226,7 +228,9 @@ export function OperationalPanel({
               </thead>
               <tbody>
                 {(Object.keys(draft) as (keyof Editorial)[])
-                  .filter((k) => JSON.stringify(draft[k]) !== JSON.stringify(p[k]))
+                  .filter(
+                    (k) => JSON.stringify(draft[k]) !== JSON.stringify(p[k]),
+                  )
                   .map((k) => (
                     <tr key={k}>
                       <th>
@@ -415,6 +419,29 @@ export function OperationalPanel({
       )}
       {tab === "IA" && (
         <>
+          <section
+            className="k-ai-workflow"
+            aria-label="Disponibilidad de investigación e IA"
+          >
+            <h3>Investigar, revisar y completar</h3>
+            <p>
+              <strong>Investigación web y OpenAI real: desactivados.</strong>{" "}
+              Esta demo usa evidencias sintéticas y una plantilla local; no hay
+              servicios ni consumo económico.
+            </p>
+            <button
+              className="d-primary"
+              disabled={dirty}
+              onClick={() => onTab("Evidencias")}
+            >
+              Investigar y completar ficha con IA
+            </button>
+            <p>
+              Primero revisá identidad y evidencias. Después volvé a IA para
+              preparar y revisar una propuesta simulada; la ficha se conserva
+              sólo en esta sesión.
+            </p>
+          </section>
           <h3>Propuesta editorial asistida</h3>
           <p>
             Procedencia: plantilla local KIKI demo. No se ejecuta ningún modelo.

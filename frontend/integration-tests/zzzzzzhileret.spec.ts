@@ -117,8 +117,12 @@ test("URL sin bytes bloquea extracción y propuesta, mantiene incorporación man
 }, info) => {
   await login(page);
   await open(page);
+  await page.getByRole("tab", { name: "IA", exact: true }).click();
   await page
-    .getByRole("button", { name: "Investigar producto", exact: true })
+    .getByRole("button", {
+      name: "Investigar y completar ficha con IA",
+      exact: true,
+    })
     .click();
   const source = page.getByLabel("Procedencia del documento local");
   await expect(source).toContainText(

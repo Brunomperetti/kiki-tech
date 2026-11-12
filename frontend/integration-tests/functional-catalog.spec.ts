@@ -65,9 +65,7 @@ test("cinco vistas: registros huérfanos, CSV sin vigencia y maestro sin identid
 test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar variantes", async ({
   page,
 }, info) => {
-  await page
-    .getByText("Más indicadores y alcance de capturas", { exact: true })
-    .click();
+  await page.getByText("Calidad del catálogo", { exact: true }).click();
   const quality = page.getByRole("group", { name: "Indicadores de calidad" });
   const metric = quality.getByRole("button", { name: /^EAN repetido/ });
   await expect(metric.locator("strong")).toHaveText("2");
@@ -125,15 +123,17 @@ test("configuración, exportación e historial reutilizan contratos existentes",
     .locator('[data-ecomm-id="900003"]')
     .getByRole("button", { name: "Ver ficha", exact: true })
     .click();
+  await page.getByRole("tab", { name: "IA", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Investigar producto", exact: true }),
+    page.getByRole("button", {
+      name: "Investigar y completar ficha con IA",
+      exact: true,
+    }),
   ).toHaveText("Investigar y completar ficha con IA");
   await expect(page.getByRole("tab")).toHaveCount(5);
-  await page
-    .getByRole("dialog")
-    .screenshot({
-      path: `artifacts/functional-catalog-editor-${info.project.name}.png`,
-    });
+  await page.getByRole("dialog").screenshot({
+    path: `artifacts/functional-catalog-editor-${info.project.name}.png`,
+  });
 });
 test("rechaza una respuesta de canal que pretende confirmar un CSV", async ({
   page,
@@ -155,4 +155,202 @@ test("rechaza una respuesta de canal que pretende confirmar un CSV", async ({
     "Registros de canal incompatibles",
   );
   await expect(page.locator("[data-channel-record]")).toHaveCount(0);
+});
+
+test("preparación calculada por canal, CTA IA y publicación confirmada se mantienen separados", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  const root = "/api/ecomm-app/workspace/900003";
+  const csrf = (await (await page.request.get("/api/auth/me")).json())
+    .csrf_token;
+  const headers = { "X-CSRF-Token": csrf };
+  const before = await (await page.request.get(root)).json();
+  let linked = false;
+  try {
+    const fields = {
+      ...before.fields,
+      brand: "Marca sintética KIKI",
+      title: "Semillas de chía sintéticas 250 g",
+      short_title: "Chía sintética",
+      short_description: "Ficha de prueba, no comercial.",
+      description:
+        "Semillas de chía sintéticas 250 g. Información exclusivamente de prueba.",
+      presentation: "250 g",
+      category: "Dietética",
+      subcategory: "Semillas",
+      seo_title: "Chía de prueba 250 g",
+      seo_description: "Texto sintético de presentación.",
+      seo_keywords: "demostración, chía",
+      attributes: [{ name: "Presentación de prueba", value: "250 g" }],
+      media: [
+        {
+          kind: "IMAGE",
+          url: "https://synthetic.invalid/imagen.jpg",
+          alt: "No se descarga",
+          source_url: "",
+        },
+      ],
+      sources: [
+        {
+          kind: "ETIQUETA",
+          name: "Fuente sintética",
+          url: "",
+          note: "Verificación automatizada del fixture, no aprobación del cliente.",
+          verified: true,
+        },
+      ],
+    };
+    const saved = await page.request.post(root, {
+      headers,
+      data: {
+        expected_version: before.version,
+        status: "READY_FOR_CHANNELS",
+        fields,
+      },
+    });
+    expect(saved.status()).toBe(200);
+    await page.reload();
+    for (const channel of ["ml", "tn"])
+      await expect(
+        page.locator(`[data-metric="${channel}-ready"] strong`),
+      ).toHaveText("1");
+    const r = await (await page.request.get(root + "/channels")).json();
+    const c = r.ml.candidates.find(
+      (c: { id: string }) => c.id === "MLA900000003",
+    );
+    expect(c.can_review).toBe(true);
+    const result = await page.request.post(root + "/channels/review", {
+      headers,
+      data: {
+        channel: "ml",
+        listing_id: c.id,
+        expected_fingerprint: c.token,
+        expected_revision: c.revision,
+        decision: "APPROVED",
+        checks: [
+          "name",
+          "brand",
+          "presentation",
+          "quantity",
+          "sale_type",
+          "codes",
+        ],
+        quantity_commercial: 1,
+        reason:
+          "Validación automatizada de identidad y cantidad sintéticas para comprobar sólo la interfaz.",
+      },
+    });
+    expect(result.status()).toBe(200);
+    linked = true;
+    await page.reload();
+    await expect(page.locator('[data-metric="ml-ready"] strong')).toHaveText(
+      "0",
+    );
+    await expect(page.locator('[data-metric="tn-ready"] strong')).toHaveText(
+      "1",
+    );
+    await page.locator('[data-metric="tn-ready"]').click();
+    await expect(page).toHaveURL(/filter=ready_for_channels%2Btn_unconfirmed/);
+    await expect(page.locator("[data-ecomm-id]")).toHaveCount(1);
+    await expect(page.locator('[data-ecomm-id="900003"]')).toBeVisible();
+    await expect(page.locator('[data-metric="tn-ready"]')).toContainText(
+      "no publica",
+    );
+    await page.getByTestId("total").click();
+    await expect(page.getByTestId("total").locator("strong")).toHaveText("6");
+    await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
+    await expect(page.locator('[data-metric="tn-ready"] strong')).toHaveText(
+      "1",
+    );
+    const coverage = await page
+      .getByRole("region", { name: "Preparación por canal" })
+      .evaluate((element) => {
+        const cards = Array.from(element.querySelectorAll("button"));
+        return (
+          cards.reduce(
+            (sum, card) => sum + card.getBoundingClientRect().width,
+            0,
+          ) / element.getBoundingClientRect().width
+        );
+      });
+    expect(coverage).toBeGreaterThan(0.9);
+    await page.screenshot({
+      path: `artifacts/ux-final-connected-dashboard-${info.project.name}.png`,
+      fullPage: info.project.name === "mobile",
+      scale: "css",
+    });
+    await page
+      .locator('[data-ecomm-id="900001"]')
+      .getByRole("button", { name: "Revisar identidad", exact: true })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Ficha 900001" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: "Evidencias", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await page
+      .getByRole("button", { name: "Cerrar ficha", exact: true })
+      .click();
+    await page
+      .locator('[data-ecomm-id="900003"]')
+      .getByRole("button", { name: "Ver ficha", exact: true })
+      .click();
+    await page.getByRole("tab", { name: "IA", exact: true }).click();
+    await expect(
+      page.getByRole("region", {
+        name: "Disponibilidad de investigación e IA",
+      }),
+    ).toContainText("bloqueados");
+    await expect(
+      page.getByRole("button", {
+        name: "Investigar y completar ficha con IA",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.getByRole("dialog").screenshot({
+      path: `artifacts/ux-final-connected-ai-${info.project.name}.png`,
+      scale: "css",
+    });
+  } finally {
+    if (linked) {
+      const r = await (await page.request.get(root + "/channels")).json();
+      const c = r.ml.candidates.find(
+        (c: { id: string }) => c.id === "MLA900000003",
+      );
+      const revoked = await page.request.post(root + "/channels/review", {
+        headers,
+        data: {
+          channel: "ml",
+          listing_id: c.id,
+          expected_fingerprint: c.token,
+          expected_revision: c.revision,
+          decision: "REVOKED",
+          checks: [
+            "name",
+            "brand",
+            "presentation",
+            "quantity",
+            "sale_type",
+            "codes",
+          ],
+          quantity_commercial: 1,
+          reason:
+            "Fin del recorrido automatizado: retiro explícitamente la vinculación sintética de prueba.",
+        },
+      });
+      expect(revoked.status()).toBe(200);
+    }
+    const current = await (await page.request.get(root)).json();
+    const restored = await page.request.post(root, {
+      headers,
+      data: {
+        expected_version: current.version,
+        status: before.status === "NOT_STARTED" ? "DRAFT" : before.status,
+        fields: before.fields,
+      },
+    });
+    expect(restored.status()).toBe(200);
+  }
 });

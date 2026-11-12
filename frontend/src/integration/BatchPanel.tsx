@@ -252,6 +252,9 @@ export function BatchPanel({
   return (
     <section className="b-work" aria-label="Trabajo por lotes">
       <div className="b-toolbar">
+        <span className="k-operations-caption">
+          Centro de operaciones · propuestas IA y revisión por lotes
+        </span>
         <strong data-testid="selected-count">
           {ids.size} variantes seleccionadas
         </strong>

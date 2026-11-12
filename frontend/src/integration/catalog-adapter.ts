@@ -24,6 +24,7 @@ export type Variant = {
     { status: string; note: string; evidenceState?: string }
   >;
   reason?: string;
+  flags?: string[];
 };
 export type CatalogPage = {
   items: Variant[];
@@ -395,6 +396,9 @@ export function adaptQueue(
         editVersion: count(row.edit_version),
         channels: { ml: channel("ml"), tn: channel("tn") },
         reason: text(row.reason) ?? undefined,
+        flags: (row.flags as unknown[]).filter(
+          (v): v is string => typeof v === "string",
+        ),
       };
     });
     const matches = count(data.total);
