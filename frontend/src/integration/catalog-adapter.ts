@@ -72,6 +72,22 @@ export async function request(path: string, options: RequestInit = {}) {
   }
   if (!response.ok) {
     if (
+      [
+        "/api/ecomm-app/stage/manual/start",
+        "/api/mercadolibre/sync",
+        "/api/mercadolibre/auth-url",
+        "/api/tiendanube/import-csv",
+      ].includes(path)
+    ) {
+      const body = await response.json().catch(() => null);
+      throw new CatalogError(
+        response.status,
+        typeof body?.detail === "string"
+          ? body.detail.slice(0, 600)
+          : "No se pudo completar la actualización de la copia interna.",
+      );
+    }
+    if (
       /^\/api\/(?:ecomm-app\/(?:workspace|editorial-batches)|test-research|test-proposals|test-documents|test-discovery|test-commercial-pilot)\//.test(
         path,
       ) &&

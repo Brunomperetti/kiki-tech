@@ -25,6 +25,7 @@ from integration_sandbox.policy import (
 from integration_sandbox.hileret_brochure import MAX_HTTP_BODY  # noqa: E402
 
 HILERET_ID = r"PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC"
+CONNECTIONS = False
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.integration-dist"
 WEB_CSP = (
@@ -71,7 +72,7 @@ class Handler(BaseHTTPRequestHandler):
         ):
             self.serve_static(path.path)
             return
-        if not route_allowed(self.command, path.path):
+        if not route_allowed(self.command, path.path, connections=CONNECTIONS):
             self.deny(403)
             return
         try:
@@ -91,6 +92,8 @@ class Handler(BaseHTTPRequestHandler):
                 r"/api/test-documents/" + HILERET_ID + "/import", path.path
             ):
                 max_body = MAX_HTTP_BODY
+            if CONNECTIONS and self.command == "POST" and path.path == "/api/tiendanube/import-csv":
+                max_body = 15 * 1024 * 1024 + 65536  # existing CSV cap + multipart envelope
             if not 0 <= length <= max_body:
                 self.deny(413)
                 return
@@ -204,6 +207,11 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1]).resolve(strict=True)
+    flag = directory / "connections-mode"
+    connection_mode = flag.read_text().strip() if flag.exists() else "off"
+    if connection_mode not in {"off", "offline-fixtures"}:
+        raise RuntimeError("Modo de conexiones aisladas inválido.")
+    CONNECTIONS = connection_mode == "offline-fixtures"
     SOCKET = directory / "api.sock"
     os.umask(0o077)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

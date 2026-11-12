@@ -25,6 +25,7 @@ ALLOWED_ROUTES = frozenset(
         ("GET", "/api/ecomm-app/workspace/channels/listings"),
         ("GET", "/api/ecomm-app/workspace/saved"),
         ("GET", "/api/ecomm-app/workspace/master-export"),
+        ("GET", "/api/connections/status"),
     }
 )
 
@@ -36,8 +37,18 @@ def is_workspace_route(method: str, path: str) -> bool:
     )
 
 
-def route_allowed(method: str, path: str) -> bool:
+CONNECTION_ACTIONS = frozenset({
+    ("POST", "/api/ecomm-app/stage/manual/start"),
+    ("POST", "/api/mercadolibre/auth-url"),
+    ("POST", "/api/mercadolibre/sync"),
+    ("POST", "/api/tiendanube/import-csv"),
+})
+
+
+def route_allowed(method: str, path: str, *, connections=False) -> bool:
     return (
+        (connections and (method, path) in CONNECTION_ACTIONS)
+        or
         (method, path) in ALLOWED_ROUTES
         or is_workspace_route(method, path)
         or (method == "POST" and bool(re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/confirm-review",path)))

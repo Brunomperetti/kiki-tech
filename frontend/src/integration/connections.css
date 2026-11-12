@@ -1,0 +1,122 @@
+.s-settings.s-connections {
+  width: min(1100px, calc(100% - 32px));
+  max-height: 90dvh;
+  overflow: auto;
+}
+.n-center {
+  margin: 18px 0 26px;
+}
+.n-close {
+  float: right;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: white;
+}
+.n-center h3 {
+  font-size: 21px;
+  margin: 0 0 10px;
+}
+.n-notice {
+  padding: 12px;
+  background: #eff5e9;
+  border: 1px solid #cfddc3;
+  border-radius: 8px;
+}
+.n-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.n-cards article {
+  padding: 17px;
+  border: 1px solid #d8e2d9;
+  border-radius: 10px;
+  background: #fff;
+  min-width: 0;
+}
+.n-cards h4 {
+  font-size: 19px;
+  margin: 0 0 12px;
+}
+.n-state {
+  display: block;
+  font-size: 13px;
+  color: #285544;
+}
+.n-cards dl {
+  font-size: 13px;
+}
+.n-cards dt {
+  color: #637265;
+  margin-top: 10px;
+}
+.n-cards dd {
+  margin: 3px 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.n-cards small {
+  display: block;
+  margin-top: 12px;
+  line-height: 1.6;
+  color: #60705e;
+}
+.n-cards details {
+  margin: 14px 0;
+  font-size: 13px;
+}
+.n-cards summary {
+  cursor: pointer;
+  font-weight: 650;
+  line-height: 1.6;
+}
+.n-center .n-upload {
+  display: block;
+  border: 1px solid #b3c6ab;
+  border-radius: 7px;
+  padding: 10px;
+}
+.n-center .n-upload input {
+  width: 100%;
+  height: auto;
+  font-size: 12px;
+  margin-top: 10px;
+}
+.n-center .n-error {
+  color: #913d2f;
+  background: #fff3eb;
+  padding: 12px;
+  border-radius: 7px;
+}
+.n-center > .n-error,
+.n-center > .n-notice[role="status"] {
+  position: sticky;
+  top: 42px;
+  z-index: 2;
+  max-height: 140px;
+  overflow: auto;
+  box-shadow: 0 3px 12px #23442b15;
+}
+.n-footer {
+  margin-top: 16px;
+}
+.d-topbar .n-shortcut {
+  margin-right: 12px;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+@media (max-width: 850px) {
+  .n-cards {
+    grid-template-columns: 1fr;
+  }
+  .s-settings.s-connections {
+    padding: 17px;
+  }
+  .n-cards article {
+    padding: 14px;
+  }
+  .d-topbar .n-shortcut {
+    margin-right: 5px;
+  }
+}

@@ -9,7 +9,11 @@ def main():
     from .bootstrap import create_sandbox_app
 
     from .runtime_supervisor import mode
-    application = create_sandbox_app(autonomous=mode()=="backend")
+    flag = Path("/runtime/connections-mode")
+    connection_mode = flag.read_text().strip() if flag.exists() else "off"
+    if connection_mode not in {"off", "offline-fixtures"}:
+        raise RuntimeError("Modo de conexiones aisladas inválido.")
+    application = create_sandbox_app(autonomous=mode()=="backend", connections=connection_mode=="offline-fixtures")
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa

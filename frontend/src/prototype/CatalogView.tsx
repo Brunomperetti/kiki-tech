@@ -13,6 +13,7 @@ export function CatalogFrame({
   onLogout,
   busy,
   action,
+  connectionStatus,
 }: {
   mode: "demo" | "integration";
   children: ReactNode;
@@ -22,6 +23,7 @@ export function CatalogFrame({
   onLogout?: () => void;
   busy?: boolean;
   action?: ReactNode;
+  connectionStatus?: ReactNode;
 }) {
   const connected = mode === "integration";
   return (
@@ -100,6 +102,15 @@ export function CatalogFrame({
             Espacio de trabajo / <strong>Mi catálogo</strong>
           </span>
           <div>
+            {onSettings && (
+              <button
+                className="n-shortcut"
+                onClick={onSettings}
+                aria-label="Centro de conexiones"
+              >
+                {connectionStatus || "Conexiones"}
+              </button>
+            )}
             <span className="d-demo-dot" />
             {connected
               ? "Conectado · Entorno aislado"

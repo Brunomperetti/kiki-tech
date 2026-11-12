@@ -1,4 +1,6 @@
 import { SettingsDialog } from "../prototype/SettingsDialog";
+import { ConnectionCenter } from "./ConnectionCenter";
+import { useConnections } from "./connections";
 import { recommendedAction } from "./product-actions";
 import { SavedHistory } from "./SavedHistory";
 import {
@@ -72,6 +74,12 @@ export function IntegrationCatalog() {
   const [selectionError, setSelectionError] = useState("");
   const dataRef = useRef<CatalogPage>();
   const [session, setSession] = useState<Session | null>();
+  const [connectionsOpened, setConnectionsOpened] = useState(false);
+  const connections = useConnections(
+    !!session && connectionsOpened,
+    session?.csrf_token,
+    preferences,
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -521,12 +529,36 @@ export function IntegrationCatalog() {
       onHistory={() =>
         selected ? update({ tab: "Historial" }) : setHistoryOpen(true)
       }
-      onSettings={() => setPreferences(true)}
+      onSettings={() => {
+        setConnectionsOpened(true);
+        setPreferences(true);
+      }}
+      connectionStatus={
+        connections.data?.ecomm.refresh_in_progress
+          ? "Ecomm-App actualizando…"
+          : connections.refreshSuggested
+            ? "Nueva copia disponible"
+            : undefined
+      }
       onLogout={logout}
       busy={busy}
     >
       {preferences && (
         <SettingsDialog
+          connections={
+            <ConnectionCenter
+              {...connections}
+              onOperate={(kind, file) => {
+                void connections.operate(kind, file);
+              }}
+              onReload={connections.reload}
+              refreshBlocked={dirty || editorBusy}
+              onRefresh={() => {
+                retry((r) => r + 1);
+                connections.acknowledge();
+              }}
+            />
+          }
           connected
           advanced={advanced}
           showPrices={false}

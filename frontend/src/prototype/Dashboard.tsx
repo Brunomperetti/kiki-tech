@@ -9,6 +9,7 @@ import {
   queueFilters,
 } from "../integration/catalog-adapter";
 import { demoListings, demoQuality } from "./commercial-demo";
+import { DemoConnections } from "./DemoConnections";
 import {
   CatalogFrame,
   CatalogTable,
@@ -924,6 +925,7 @@ function DemoDashboard() {
       )}
       {params.get("settings") === "1" && (
         <SettingsDialog
+          connections={<DemoConnections rows={rows} />}
           advanced={advanced}
           showPrices={showPrices}
           onAdvanced={setAdvanced}

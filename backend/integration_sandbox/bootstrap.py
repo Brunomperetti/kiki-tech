@@ -1,7 +1,7 @@
 from .policy import route_allowed, CSP, preflight
 
 
-def create_sandbox_app(*, autonomous=False):
+def create_sandbox_app(*, autonomous=False, connections=False):
     preflight()
     # Import ONLY after configuration, socket guard and database identity checks.
     from argon2 import PasswordHasher
@@ -21,11 +21,11 @@ def create_sandbox_app(*, autonomous=False):
         cors_origins="https://127.0.0.1:8443",
         frontend_url="https://127.0.0.1:8443",
         ml_api_url="https://blocked.invalid",
-        ml_authorization_url="https://blocked.invalid",
-        ml_redirect_uri="",
-        ml_client_id="",
-        ml_client_secret="",
-        ecomm_app_api_token="",
+        ml_authorization_url="https://auth.mercadolibre.com.ar/authorization" if connections else "https://blocked.invalid",
+        ml_redirect_uri="https://127.0.0.1:8443/api/mercadolibre/callback" if connections else "",
+        ml_client_id="SYNTHETIC-CLIENT" if connections else "",
+        ml_client_secret="SYNTHETIC-NOT-A-CREDENTIAL" if connections else "",
+        ecomm_app_api_token="SYNTHETIC-NOT-A-CREDENTIAL" if connections else "",
         kiki_refresh_token="",
         kiki_ai_api_key="",
         kiki_ai_enabled=False,
@@ -51,6 +51,11 @@ def create_sandbox_app(*, autonomous=False):
     from .hileret_routes import router as hileret_router
 
     application = create_app(settings)
+    application.state.local_synthetic = True
+    application.state.connection_test_mode = connections
+    if connections:
+        from .connection_fixtures import install
+        install()
     application.include_router(research_router)
     application.include_router(proposal_router)
     application.include_router(document_router)
@@ -66,6 +71,9 @@ def create_sandbox_app(*, autonomous=False):
         async with original_lifespan(app):
             seed(SessionLocal, allow_scaled=autonomous)
             initialize_research(engine, SessionLocal)
+            if connections:
+                from .connection_fixtures import seed_connection
+                seed_connection(SessionLocal)
             # Explicit additive migration ONLY after preflight + verified disposable database.
             from sqlalchemy import inspect, text
             from app.services.documental.migration import UP
@@ -95,7 +103,7 @@ def create_sandbox_app(*, autonomous=False):
 
     @application.middleware("http")
     async def isolation_boundary(request, call_next):
-        if not route_allowed(request.method, request.url.path):
+        if not route_allowed(request.method, request.url.path, connections=connections):
             response = JSONResponse(
                 status_code=403,
                 content={"detail": "Operación deshabilitada en etapa 2B sintética."},

@@ -2,6 +2,7 @@ declare const __KIKI_INTEGRATION__: boolean;
 export const gatewayOrigin = "https://127.0.0.1:8443";
 const allowed = new Set([
   "GET /api/auth/me",
+  "GET /api/connections/status",
   "POST /api/auth/login",
   "POST /api/auth/logout",
   "GET /api/ecomm-app/stage/catalog",
@@ -15,6 +16,16 @@ const allowed = new Set([
   "GET /api/test-commercial-pilot/hileret-200",
   "POST /api/test-commercial-pilot/hileret-200/prepare",
 ]);
+const connectionActions = new Set([
+  "POST /api/ecomm-app/stage/manual/start",
+  "POST /api/mercadolibre/auth-url",
+  "POST /api/mercadolibre/sync",
+  "POST /api/tiendanube/import-csv",
+]);
+let connectionActionsEnabled = false;
+export function setConnectionActionsEnabled(value: boolean) {
+  connectionActionsEnabled = value;
+}
 
 export function installIntegrationIsolation() {
   const nativeFetch = window.fetch.bind(window);
@@ -35,6 +46,8 @@ export function installIntegrationIsolation() {
       url.password ||
       !(
         allowed.has(`${method} ${url.pathname}`) ||
+        (connectionActionsEnabled &&
+          connectionActions.has(`${method} ${url.pathname}`)) ||
         (method === "POST" &&
           /^\/api\/ecomm-app\/workspace\/90000[1-6]\/confirm-review$/.test(
             url.pathname,

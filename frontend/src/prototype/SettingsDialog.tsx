@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 export function SettingsDialog({
   advanced,
   showPrices,
@@ -6,6 +6,7 @@ export function SettingsDialog({
   onPrices,
   onClose,
   connected = false,
+  connections,
 }: {
   advanced: boolean;
   showPrices: boolean;
@@ -13,6 +14,7 @@ export function SettingsDialog({
   onPrices: (v: boolean) => void;
   onClose: () => void;
   connected?: boolean;
+  connections?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -20,7 +22,7 @@ export function SettingsDialog({
   }, []);
   return (
     <dialog
-      className="s-settings"
+      className={`s-settings${connections ? " s-connections" : ""}`}
       ref={ref}
       aria-label="Configuración del catálogo"
       onCancel={(e) => {
@@ -28,7 +30,16 @@ export function SettingsDialog({
         onClose();
       }}
     >
+      <button
+        className="n-close"
+        onClick={onClose}
+        aria-label="Cerrar configuración"
+      >
+        Cerrar ×
+      </button>
       <h2>Configuración del catálogo</h2>
+      {connections}
+      {connections && <h3>Preferencias de visualización</h3>}
       <p>Preferencias de esta sesión. No cambian tus productos.</p>
       {!connected && (
         <label>
