@@ -22,10 +22,48 @@ export type Variant = {
   editVersion?: number;
   channels?: Record<
     "ml" | "tn",
-    { status: string; note: string; evidenceState?: string }
+    {
+      status: string;
+      note: string;
+      evidenceState?: string;
+      candidatesTotal?: number;
+      snapshotAt?: string | null;
+      comparisonState?: string;
+    }
   >;
   reason?: string;
   flags?: string[];
+};
+export const comparisonStates = [
+  "verified",
+  "candidates",
+  "conflicts",
+  "no_match",
+  "insufficient",
+  "stale",
+] as const;
+export type ComparisonState = (typeof comparisonStates)[number];
+export type ChannelComparison = {
+  variants: number;
+  variant_states: Record<ComparisonState, number>;
+  captured_records: number;
+  valid_records: number;
+  invalid_records: number;
+  distinct_publications: number;
+  records_without_sku: number;
+  records_without_valid_gtin: number;
+  candidate_pairs: number;
+  records_with_candidates: number;
+  records_without_candidate: number;
+  verified_records: number;
+  confirmed_publications: number;
+  variants_with_candidates: number;
+  snapshot_at: string | null;
+  freshness: {
+    fresh: boolean;
+    age_hours: number | null;
+    review_after_hours: number;
+  };
 };
 export type CatalogPage = {
   items: Variant[];
@@ -40,6 +78,7 @@ export type CatalogPage = {
   channelOverview?: {
     validated: boolean;
     confirmedMlListings: number;
+    comparison?: Record<"ml" | "tn", ChannelComparison>;
     sources: Record<
       "ml" | "tn",
       { available: boolean; updatedAt: string | null }
@@ -287,6 +326,18 @@ export function adaptCatalog(
 }
 
 export const queueFilters = {
+  ml_comparison_verified: "Vínculos verificados · ML",
+  ml_comparison_candidates: "Coincidencias pendientes · ML",
+  ml_comparison_conflicts: "Conflictos o ambigüedades · ML",
+  ml_comparison_no_match: "Sin coincidencia en captura · ML",
+  ml_comparison_insufficient: "Evidencia insuficiente · ML",
+  ml_comparison_stale: "Captura desactualizada · ML",
+  tn_comparison_verified: "Vínculos verificados · TN",
+  tn_comparison_candidates: "Coincidencias pendientes · TN",
+  tn_comparison_conflicts: "Conflictos o ambigüedades · TN",
+  tn_comparison_no_match: "Sin coincidencia en captura · TN",
+  tn_comparison_insufficient: "Evidencia insuficiente · TN",
+  tn_comparison_stale: "Captura desactualizada · TN",
   ean_missing: "EAN no informado en Ecomm-App",
   ean_repeated: "EAN repetido · revisar presentaciones",
   sku_repeated: "SKU repetido · no confirma duplicados",
@@ -446,6 +497,12 @@ export function adaptQueue(
           throw new Error("Canal no verificable");
         return {
           status: String(v.status),
+          candidatesTotal: count(v.candidates_total ?? 0),
+          snapshotAt: date(v.snapshot_at),
+          comparisonState:
+            typeof v.comparison_state === "string"
+              ? v.comparison_state
+              : undefined,
           evidenceState:
             typeof v.evidence_state === "string" ? v.evidence_state : undefined,
           note: text(v.note) ?? "Sin evidencia suficiente de publicación.",
@@ -486,6 +543,53 @@ export function adaptQueue(
         throw new Error("Fuente de canal inválida");
       return { available: v.available, updatedAt: date(v.updated_at) };
     };
+    const comparison =
+      overview.comparison === undefined
+        ? undefined
+        : (() => {
+            const raw = object(overview.comparison);
+            const read = (channel: "ml" | "tn") => {
+              const c = object(raw[channel]);
+              const states = object(c.variant_states);
+              const totals = Object.fromEntries(
+                comparisonStates.map((k) => [k, count(states[k])]),
+              );
+              if (
+                count(c.variants) !== capture.total ||
+                Object.values(totals).reduce((a, b) => a + b, 0) !==
+                  capture.total
+              )
+                throw new Error("Totales por variante incompatibles");
+              for (const k of [
+                "captured_records",
+                "valid_records",
+                "invalid_records",
+                "distinct_publications",
+                "records_without_sku",
+                "records_without_valid_gtin",
+                "candidate_pairs",
+                "records_with_candidates",
+                "records_without_candidate",
+                "verified_records",
+                "confirmed_publications",
+                "variants_with_candidates",
+              ])
+                count(c[k]);
+              if (
+                Number(c.valid_records) + Number(c.invalid_records) !==
+                  c.captured_records ||
+                Number(c.records_with_candidates) +
+                  Number(c.records_without_candidate) !==
+                  c.valid_records
+              )
+                throw new Error("Registros de canal incompatibles");
+              const freshness = object(c.freshness);
+              if (typeof freshness.fresh !== "boolean")
+                throw new Error("Vigencia no informada");
+              return { ...c, variant_states: totals } as ChannelComparison;
+            };
+            return { ml: read("ml"), tn: read("tn") };
+          })();
     return {
       ...capture,
       items,
@@ -493,6 +597,7 @@ export function adaptQueue(
       summary: counts,
       channelOverview: {
         validated: coverage.api_validation_enabled === true,
+        comparison,
         confirmedMlListings: count(overview.confirmed_ml_listings ?? 0),
         sources: { ml: source("ml"), tn: source("tn") },
       },

@@ -4,12 +4,20 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from app.database.models import CatalogSnapshot, EcommApiProductEdit
 from app.integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
-from .ecomm_channel_coverage_service import build_channel_coverage
+from .ecomm_channel_coverage_service import build_channel_coverage, channel_sku, channel_codes
 from .ecomm_api_channel_evidence import row_key, age_info
 
 
 def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
-    if channel not in {"ml", "tn"} or linkage not in {"all", "unlinked", "verified"}:
+    if channel not in {"ml", "tn"} or linkage not in {
+        "all",
+        "unlinked",
+        "verified",
+        "candidates",
+        "conflicts",
+        "no_match",
+        "stale",
+    }:
         raise ValueError("Canal o filtro de vinculación inválido.")
     if len(query) > 80 or not 1 <= page <= 100000 or not 1 <= limit <= 50:
         raise ValueError("Consulta o paginación fuera de límites.")
@@ -50,6 +58,7 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
         api_validation=True,
         edits=edits,
         snapshots=snapshots,
+        include_reverse=True,
     )
     verified = {}
     for ident, item in coverage["items_by_id"].items():
@@ -72,6 +81,11 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
         if actual_id:
             parents.add(actual_id.split("#")[0] if channel == "ml" else actual_id)
         ids = sorted(verified.get(key, []))
+        candidate_ids = coverage["candidate_ids_by_position"][channel].get(position, [])
+        conflict = any(
+            coverage["items_by_id"][ident][channel]["comparison_state"] == "conflicts"
+            for ident in candidate_ids
+        )
         title = str(raw.get("title" if channel == "ml" else "name") or "").strip()
         sku = str(
             raw.get("variant_sku")
@@ -89,6 +103,12 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
             else "VERIFIED_LINK"
             if ids
             else "PENDING_VALIDATION"
+            if conflict
+            else "CANDIDATE"
+            if candidate_ids
+            else "NO_MATCH_IN_CAPTURE"
+            if valid_master and (channel_sku(channel, raw) or channel_codes(raw))
+            else "INSUFFICIENT_EVIDENCE"
         )
         row = {
             "position": position,
@@ -96,6 +116,10 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
             "title": title or None,
             "sku": sku or None,
             "ecomm_ids": ids,
+            "candidate_ecomm_ids": candidate_ids[:50],
+            "candidate_variants_total": len(candidate_ids),
+            "candidate_variants_truncated": len(candidate_ids) > 50,
+            "identity_ambiguous": conflict,
             "listing_status": status,
             "evidence_state": state,
             "captured_at": at,
@@ -109,12 +133,22 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
             continue
         if linkage == "unlinked" and ids or linkage == "verified" and not ids:
             continue
+        if linkage == "candidates" and not candidate_ids:
+            continue
+        if linkage == "conflicts" and not conflict:
+            continue
+        if linkage == "no_match" and candidate_ids:
+            continue
+        if linkage == "stale" and age["fresh"]:
+            continue
         result.append(row)
     offset = (page - 1) * limit
     return {
+        "comparison": coverage["summary"]["comparison"][channel],
         "channel": channel,
         "source": "MERCADOLIBRE_API" if channel == "ml" else "TIENDANUBE_CSV",
         "available": snap is not None,
+        "master_available": valid_master,
         "captured_at": at,
         "freshness": age,
         "total_records": len(rows),
