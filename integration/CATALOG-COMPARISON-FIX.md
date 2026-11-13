@@ -23,6 +23,8 @@ Se reutilizan las capturas `ECOMM_APP_API_STAGE`, `MERCADOLIBRE_API` y `TIENDANU
 
 Cada candidato expone razones, datos Ecomm/canal, diferencias, cantidad, fecha y bloqueos. La coincidencia no confirma identidad ni habilita aprobación automática. Se contrastan marca, códigos, tamaño, unidad/pack/combo y cantidad. El conflicto barcode/GTIN bloquea aprobación. TN incorpora a la comparación los valores de presentación de sus atributos CSV.
 
+Si hay candidatos por código exacto, el título corrobora esas filas y no agrega otras de la misma familia. Sin código coincidente, las señales de nombre/marca siguen disponibles para recuperar candidatos.
+
 Se mantienen las tablas, fingerprints, checks explícitos, CSRF, revisión de versiones, decisiones y su historial existentes. Las filas anteriormente revisadas siguen visibles aunque cambien sus códigos; el fingerprint anterior queda obsoleto y no vuelve a aprobarse. No se transfieren decisiones históricas de Excel. Los ocho candidatos iniciales se muestran junto con cualquier fila previamente revisada; se informa el truncamiento. El listado del canal permite abrir variantes candidatas sin inventar un Ecomm ID.
 
 El dashboard usa el resumen de la misma cola para los KPI y la preparación interna: elimina cuatro consultas iniciales adicionales que recalculaban la matriz. Los filtros guardan su contexto en la URL y mantienen la misma tabla. El panel lateral y las cinco pestañas se conservan.
@@ -54,16 +56,16 @@ Fixture de 3.001 variantes, 2.844 filas ML y 550 filas TN, con SKU únicos y sin
 
 El agregado no se reduce artificialmente aprobando candidatos. El nuevo desglose explica su composición. Este fixture fue construido para pruebas y no reproduce ni afirma las coincidencias del catálogo auténtico.
 
-Rendimiento: 1,031 s y cuatro SELECT para esa matriz en el ensayo aislado; 3,236 s en la ejecución final concurrente de CI local. La regresión PostgreSQL existente midió 50 y 5.000 variantes: seis consultas en ambos casos, 0,024 y 2,148 s respectivamente. Sin solicitudes por fila, escrituras o llamadas a proveedores. Son tiempos de este entorno, no un SLA productivo.
+Rendimiento: 1,497 s y cuatro SELECT para esa matriz en la ejecución final de CI local. Otro ensayo con 3.201 variantes de nombre, marca y presentación idénticos preservó exactamente 3.201 pares candidatos por sus códigos únicos, en 1,089 s; evita expandir el catálogo por similitud de título cuando ya hay un código exacto. La regresión PostgreSQL existente midió 50 y 5.000 variantes: seis consultas en ambos casos, 0,024 y 2,560 s respectivamente. Sin solicitudes por fila, escrituras o llamadas a proveedores. Son tiempos de este entorno, no un SLA productivo.
 
 ## Validación
 
-- 499 pruebas pytest, incluyendo 15 nuevas de comparación y las regresiones anteriores; Ruff aprobado.
+- 500 pruebas pytest, incluyendo 16 nuevas de comparación y las regresiones anteriores; Ruff aprobado.
 - 239 pruebas de integración PostgreSQL de los módulos del arnés, además del preflight independiente: identidad, fichas, evidencias, canales, concurrencia, sesiones, lotes, conexiones simuladas y PDF auténtico. El paso posterior de reinicios encontró falta de espacio en Docker. Tras eliminar caché reconstruible, pasó la repetición separada: sin acción duplicada, recuperación de lease con dos ejecutores y 1.000 tareas únicas recuperadas sin escrituras comerciales; también aprobaron las ocho pruebas HTTPS/pasarela. No se borraron bases ni capturas para resolver el espacio.
 - TypeScript y builds demostrativo, integración y productivo aprobados. El build productivo conserva el control de exclusión de fixtures y API del mismo origen.
 - Playwright: diez pruebas de canales aprobadas (escritorio/celular) y 58 regresiones demo aprobadas. 16 pruebas de entrada productiva/clásica aprobadas. Capturas sintéticas: `frontend/artifacts/comparacion-catalogos-desktop.png` y `comparacion-catalogos-mobile.png`.
 
-No se ejecutaron sincronizaciones, importaciones, OAuth, OpenAI o publicaciones reales. Las únicas escrituras de pruebas fueron en bases descartables. Sin merge o despliegue. La PR utiliza el CI existente (`pull_request`: Ruff, pytest y build); su creación/ejecución remota requiere acceso a la API de GitHub.
+No se ejecutaron sincronizaciones, importaciones, OAuth, OpenAI o publicaciones reales. Las únicas escrituras de pruebas fueron en bases descartables. Sin merge o despliegue. Tras optimizar títulos se repitieron los 18 casos PostgreSQL de canales y nueve de compatibilidad /v2/, manteniendo sus controles. La instalación del fixture adicional rechazó reutilizar esa base ya editada, correctamente; el navegador usa una base nueva. Al crear la PR se activará el CI existente (`pull_request`: Ruff, pytest y build). Su creación desde Codex quedó bloqueada: `POST https://api.github.com/graphql` devuelve `Forbidden` por la política de red. La rama está publicada, pero no hay PR creada ni CI remoto verificado. Se guardó un borrador para permitir únicamente `api.github.com` conservando los dominios previos; falta aplicarlo en el entorno de Codex. Alternativa manual: https://github.com/Brunomperetti/kiki-tech/compare/main...fix/catalog-channel-comparison?expand=1 .
 
 ## Archivos modificados
 

@@ -311,10 +311,33 @@ def test_manual_approval_history_preserved_after_new_matching_and_source_change(
 
 def test_listing_without_master_does_not_claim_absence_of_candidates(db):
     from sqlalchemy import delete
+
     captures(db, [product()], [ml()])
-    db.execute(delete(CatalogSnapshot).where(CatalogSnapshot.source == "ECOMM_APP_API_STAGE"))
+    db.execute(
+        delete(CatalogSnapshot).where(CatalogSnapshot.source == "ECOMM_APP_API_STAGE")
+    )
     db.commit()
     result = listings(db, "ml")
     assert not result["master_available"]
     assert result["items"][0]["evidence_state"] == "INSUFFICIENT_EVIDENCE"
     assert result["items"][0]["candidate_ecomm_ids"] == []
+
+
+def test_3201_shared_titles_do_not_expand_exact_code_candidates_quadratically(db):
+    size = 3201
+    # Same commercial title/brand/size does not merge distinct variant codes.
+    products = [product(i + 1, f"SYNTH-{i}") for i in range(size)]
+    rows = [ml(f"MLA{200000+i}", f"SYNTH-{i}") for i in range(size)]
+    began = perf_counter()
+    result = captures(db, products, rows, [])
+    elapsed = perf_counter() - began
+    stats = result["summary"]["comparison"]["ml"]
+    assert stats["candidate_pairs"] == size
+    assert stats["records_with_candidates"] == size
+    assert stats["variant_states"]["candidates"] == size
+    assert all(r["ml"]["candidates_total"] == 1 for r in result["items_by_id"].values())
+    assert not any(r["ml"]["confirmed_listing"] for r in result["items_by_id"].values())
+    assert elapsed < 20
+    print(
+        f"Synthetic shared-title benchmark: {size} variants; {size} candidate pairs; {elapsed:.3f}s"
+    )

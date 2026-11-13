@@ -131,15 +131,18 @@ def _find_candidates(identity, valid, indices):
         reasons[position].add("SKU_EXACT")
     for position in indices["gtin"].get(code, ()):
         reasons[position].add("VALID_GTIN_EXACT")
+    strong = bool(reasons)
     for name in names:
-        for position in indices["title"].get(name, ()):
+        positions = indices["title"].get(name, set())
+        if strong:
+            positions = positions & reasons.keys()
+        for position in positions:
             reasons[position].add("TITLE_EXACT")
     brand = normalize(identity.get("brand"))
     words = {w for w in title.split() if len(w) >= 4 and not w.isdigit()} - set(
         brand.split()
     )
     # Intersect posting lists, avoiding a full channel scan for every variant.
-    strong = any("SKU_EXACT" in r or "VALID_GTIN_EXACT" in r for r in reasons.values())
     # With an exact code hit, title/brand remain comparison evidence rather than
     # adding every similar product in the same family (quadratic noise).
     distinguishing_numbers = numbers(identity.get("product_name")) - numbers(
