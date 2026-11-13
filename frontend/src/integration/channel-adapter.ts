@@ -5,6 +5,9 @@ export type ChannelCandidate = {
   id: string;
   slug?: string | null;
   token: string;
+  match_reasons?: string[];
+  discrepancies?: string[];
+  comparison?: Record<string, string | number | null>;
   title: string | null;
   sku: string | null;
   barcode: string | null;
@@ -32,12 +35,15 @@ export type ChannelEvidence = {
   snapshot_available: boolean;
   snapshot_at: string | null;
   status: string;
+  comparison_state?: string;
   evidence_state: string;
   note: string;
   confirmed_listing: boolean;
   identity_verified: boolean;
   candidates: ChannelCandidate[];
   candidates_total: number;
+  no_candidates_reason?: string | null;
+  candidates_truncated?: boolean;
   freshness: {
     fresh: boolean;
     age_hours: number | null;
@@ -96,7 +102,8 @@ export async function loadChannels(
         !Array.isArray(c.candidates) ||
         c.candidates.some(
           (r) =>
-            !r.id ||
+            typeof r.id !== "string" ||
+            (!r.id && r.can_review) ||
             !/^[a-f0-9]{64}$/.test(r.token) ||
             !Number.isSafeInteger(r.revision) ||
             !Array.isArray(r.blockers) ||

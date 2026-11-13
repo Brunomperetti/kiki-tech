@@ -392,7 +392,17 @@ class Channels(unittest.TestCase):
         self.assertFalse(
             any(c["can_review"] for c in self.report()["ml"]["candidates"])
         )
-        self.assertEqual(self.report("900004")["ml"]["candidates"], [])
+        # New title/brand retrieval can expose a malformed variation as a
+        # candidate, but it must stay visible as unreviewable, never linked.
+        other = self.report("900004")["ml"]
+        self.assertFalse(other["confirmed_listing"])
+        self.assertTrue(all(not c["can_review"] for c in other["candidates"]))
+        self.assertTrue(
+            all(
+                "Identificador ML no verificable" in " ".join(c["blockers"])
+                for c in other["candidates"]
+            )
+        )
 
     def test_multiple_listings_count_separately_from_one_variant_and_keep_pending_candidates(
         self,

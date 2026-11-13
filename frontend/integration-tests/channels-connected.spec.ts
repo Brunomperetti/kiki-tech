@@ -203,7 +203,7 @@ test("sin evidencia no significa no publicado; conserva búsqueda, selección, c
   await page.getByTestId("total").click();
   await open(page, "900005");
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
-    "Sin evidencia suficiente",
+    "Sin coincidencia en esta captura",
   );
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
     "no significa que el producto no esté publicado",
@@ -244,4 +244,81 @@ test("revocación conserva historial y retira confirmación sin cambiar la ficha
   const data = await read(page);
   expect(data.ml.confirmed_listing).toBe(false);
   expect(data.ml.candidates[0].history.at(-1)?.decision).toBe("REVOKED");
+});
+
+test("matriz reconcilia variantes y registros, filtra en la misma tabla y abre evidencia por Ecomm ID", async ({
+  page,
+}, info) => {
+  const response = await page.request.get(
+    "/api/ecomm-app/workspace/queue?limit=50&sort=capture",
+  );
+  expect(response.status()).toBe(200);
+  const queue = await response.json();
+  const matrix = page.getByLabel("Matriz de comparación de catálogos", {
+    exact: true,
+  });
+  await expect(matrix).toBeVisible();
+  await expect(matrix).toContainText(
+    "Sin confirmación no significa «no publicado»",
+  );
+  const labels = {
+    verified: "Vínculos verificados",
+    candidates: "Coincidencias pendientes",
+    conflicts: "Conflictos o ambigüedades",
+    no_match: "Sin coincidencia en captura",
+    insufficient: "Evidencia insuficiente",
+    stale: "Captura desactualizada",
+  };
+  for (const channel of ["ml", "tn"] as const) {
+    const stats = queue.channel_coverage.summary.comparison[channel];
+    expect(
+      Object.values(stats.variant_states).reduce(
+        (a: number, b) => a + Number(b),
+        0,
+      ),
+    ).toBe(6);
+    expect(
+      stats.records_with_candidates + stats.records_without_candidate,
+    ).toBe(stats.valid_records);
+    const card = matrix.locator(`[data-comparison-channel="${channel}"]`);
+    for (const [state, label] of Object.entries(labels)) {
+      const button = card.getByRole("button", {
+        name: new RegExp("^" + label),
+      });
+      await expect(button.locator("strong")).toHaveText(
+        String(stats.variant_states[state]),
+      );
+      await button.click();
+      await expect(page).toHaveURL(
+        new RegExp(`filter=${channel}_comparison_${state}`),
+      );
+      await expect(page.locator("tbody tr[data-ecomm-id]")).toHaveCount(
+        stats.variant_states[state],
+      );
+    }
+  }
+  await page.getByTestId("total").click();
+  const channelCell = page.locator(
+    '[data-ecomm-id="900003"] [data-channel="ml"]',
+  );
+  await channelCell.getByRole("button", { name: "Revisar candidatos" }).click();
+  await expect(page).toHaveURL(/product=900003.*tab=Canales/);
+  await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
+    "Motivo de coincidencia: SKU exacto",
+  );
+  await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
+    "Presentación Ecomm-App",
+  );
+  await page.getByRole("button", { name: "Cerrar ficha", exact: true }).click();
+  await page.reload();
+  await expect(matrix).toBeVisible();
+  await page.screenshot({
+    path: `artifacts/comparacion-catalogos-${info.project.name}.png`,
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

@@ -56,7 +56,9 @@ test("totales calculados separan publicaciones únicas, variantes y registros re
         .getByRole("navigation", { name: "Vistas comerciales" })
         .getByRole("button", {
           name:
-            c === "ml" ? /^Sin confirmación en ML/ : /^Sin confirmación en TN/,
+            c === "ml"
+              ? /^Variantes sin publicación confirmada · ML/
+              : /^Variantes sin publicación confirmada · TN/,
         })
         .locator("strong"),
     ).toHaveText(

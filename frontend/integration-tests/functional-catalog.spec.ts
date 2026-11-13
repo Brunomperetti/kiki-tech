@@ -54,7 +54,10 @@ test("cinco vistas: registros huérfanos, CSV sin vigencia y maestro sin identid
   await expect(tn).toContainText("registro-tn-sin-vinculo");
   await expect(tn).toContainText("Información desactualizada");
   await expect(tn).not.toContainText("Publicación confirmada en captura");
-  for (const label of [/^Sin confirmación en ML/, /^Sin confirmación en TN/]) {
+  for (const label of [
+    /^Variantes sin publicación confirmada · ML/,
+    /^Variantes sin publicación confirmada · TN/,
+  ]) {
     await nav(page).getByRole("button", { name: label }).click();
     await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
     await expect(page.locator(".i-pagination")).toContainText(

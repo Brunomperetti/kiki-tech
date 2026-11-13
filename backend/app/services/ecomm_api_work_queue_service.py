@@ -61,6 +61,19 @@ FILTERS = {
     "documents_changed",
     "review_soon",
 }
+COMPARISON_STATES = (
+    "verified",
+    "candidates",
+    "conflicts",
+    "no_match",
+    "insufficient",
+    "stale",
+)
+FILTERS |= {
+    f"{channel}_comparison_{state}"
+    for channel in ("ml", "tn")
+    for state in COMPARISON_STATES
+}
 FILTERS |= set(QUALITY_FILTERS)
 
 
@@ -150,6 +163,8 @@ def _queue_item(
     ml = (coverage or {}).get("ml") or {"status": "UNAVAILABLE"}
     tn = (coverage or {}).get("tn") or {"status": "UNAVAILABLE"}
     for channel, evidence in (("ml", ml), ("tn", tn)):
+        if evidence.get("comparison_state") in COMPARISON_STATES:
+            flags.append(f"{channel}_comparison_{evidence['comparison_state']}")
         if evidence.get("confirmed_listing"):
             flags.append(channel + "_confirmed")
     if tn.get("identity_verified"):
@@ -374,6 +389,13 @@ def build_queue(
                 if editorial_available and "evidence_approved" not in extra_flags:
                     item["flags"].append("needs_research")
                 item["source"] = source
+                for channel in ("ml", "tn"):
+                    counts[f"{channel}_ready_without_confirmation"] += int(
+                        "ready_for_channels" in item["flags"]
+                        and not item["channel_coverage"][channel].get(
+                            "confirmed_listing"
+                        )
+                    )
                 counts["total"] += 1
                 counts["source_name_present"] += int(item["source_name_present"])
                 counts["source_name_missing"] += int(not item["source_name_present"])
@@ -447,6 +469,8 @@ def build_queue(
         "summary": {key: counts[key] for key in sorted(FILTERS - {"all"})}
         | {
             "total": counts["total"],
+            "ml_ready_without_confirmation": counts["ml_ready_without_confirmation"],
+            "tn_ready_without_confirmation": counts["tn_ready_without_confirmation"],
             "source_name_present": counts["source_name_present"],
             "source_name_missing": counts["source_name_missing"],
             "editorial_started": counts["editorial_started"],

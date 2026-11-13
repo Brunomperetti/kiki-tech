@@ -94,12 +94,26 @@ def source_identity(parent, variant, captured_at, edit):
     }
 
 
-def enrich(base, channel, rows, identity, reviews, now):
+def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
     age = age_info(base["snapshot_at"], channel, now)
-    title_key = "title" if channel == "ml" else "name"
     candidates = []
     key_counts = reviews["row_counts"][channel]
-    for row in rows[:8]:
+
+    # Include previously reviewed rows even beyond the display cap, so an
+    # unrelated candidate cannot hide an existing linkage or its revocation.
+    def reviewed(row):
+        record = reviews[channel].get(decision_key(channel, row))
+        return bool(
+            record
+            and str(record.ecomm_id if channel == "ml" else record.target_ecomm_id)
+            == identity["ecomm_id"]
+        )
+
+    visible = list(rows[:8])
+    visible.extend(row for row in rows[8:] if reviewed(row))
+    for row in visible:
+        from .ecomm_channel_coverage_service import channel_title, channel_codes
+
         key = row_key(channel, row)
         record = reviews[channel].get(decision_key(channel, row))
         target = (
@@ -159,12 +173,17 @@ def enrich(base, channel, rows, identity, reviews, now):
             blockers.append(
                 "Presentación o condición de combo desconocida en la variante API."
             )
-        actual_name = str(row.get(title_key) or "")
+        actual_name = channel_title(channel, row)
+        discrepancies = []
         expected_name = f"{identity.get('product_name') or ''} {identity.get('variant_description') or ''}"
         if not actual_name or variant_conflict(
             expected_name, identity.get("sku"), actual_name, row.get("sku")
         ):
             blockers.append("Nombre/presentación de canal ausente o incompatible.")
+            if actual_name and variant_conflict(
+                expected_name, identity.get("sku"), actual_name, row.get("sku")
+            ):
+                discrepancies.append("PRESENTATION_CONFLICT")
         expected_units, actual_units = (
             pack_units(identity.get("variant_description")),
             pack_units(actual_name),
@@ -182,9 +201,23 @@ def enrich(base, channel, rows, identity, reviews, now):
             blockers.append(
                 "Marca ausente o diferente; completar el contraste antes de validar."
             )
-        gtin = row.get("ean_raw") or row.get("ean")
+        if brand and row.get("brand") and normalize(brand) != normalize(row["brand"]):
+            discrepancies.append("BRAND_CONFLICT")
+        gtin = (
+            row.get("ean_raw")
+            or row.get("ean")
+            or row.get("gtin")
+            or row.get("barcode")
+        )
+        codes = channel_codes(row)
+        if len(codes) > 1:
+            blockers.append(
+                "Barcode/GTIN del canal contradictorios; no se puede validar la identidad."
+            )
+            discrepancies.append("CHANNEL_GTIN_CONFLICT")
         if identity.get("gtin") and gtin and str(identity["gtin"]) != str(gtin):
             blockers.append("GTIN de canal diferente del código de la variante API.")
+            discrepancies.append("GTIN_CONFLICT")
         if gtin and not _gtin_check_digit_valid(str(gtin)):
             blockers.append(
                 "Código de canal inválido; requiere revisión de su documentación."
@@ -195,8 +228,20 @@ def enrich(base, channel, rows, identity, reviews, now):
             not source_qty or source_qty != actual_qty
         ):
             blockers.append("Pack sin composición/cantidad coincidente y explícita.")
+        if (
+            source_qty is not None
+            and actual_qty is not None
+            and source_qty != actual_qty
+        ):
+            discrepancies.append("QUANTITY_CONFLICT")
+            blockers.append("Cantidad comercial diferente entre variante API y canal.")
         if identity.get("is_combo") is False and actual_qty not in (None, 1):
             blockers.append("El canal describe un pack y la variante API no es combo.")
+            discrepancies.append("SALE_TYPE_CONFLICT")
+        if channel == "ml" and "#" in key and not row.get("variant_sku"):
+            blockers.append(
+                "Variación ML sin SKU propio; el código de barras puede provenir del producto padre."
+            )
         if record and variant_id != identity["ecomm_id"] and state == "APPROVED":
             blockers.append(
                 "La fila está validada para otro Ecomm ID; primero requiere revisión/revocación de su vinculación."
@@ -213,6 +258,18 @@ def enrich(base, channel, rows, identity, reviews, now):
                 "slug": row.get("slug") if channel == "tn" else None,
                 "token": token,
                 "title": actual_name or None,
+                "match_reasons": (match_signals or {}).get(id(row), ["SKU_EXACT"]),
+                "discrepancies": sorted(set(discrepancies)),
+                "comparison": {
+                    "ecomm_title": expected_name.strip(),
+                    "channel_title": actual_name,
+                    "ecomm_sku": identity.get("sku"),
+                    "ecomm_brand": identity.get("brand"),
+                    "ecomm_gtin": identity.get("gtin"),
+                    "ecomm_presentation": identity.get("variant_description"),
+                    "ecomm_quantity": source_qty,
+                    "channel_quantity": actual_qty,
+                },
                 "sku": row.get("variant_sku")
                 or row.get("sku_effective")
                 or row.get("sku"),
@@ -237,10 +294,9 @@ def enrich(base, channel, rows, identity, reviews, now):
         for c in linked
         if channel == "ml" and c["listing_status"] == "active" and age["fresh"]
     ]
-    hard_conflict = bool(identity.get("identity_blockers")) or base["status"] in {
-        "GTIN_CONFLICT",
-        "PRESENTATION_CONFLICT",
-    }
+    hard_conflict = bool(identity.get("identity_blockers")) or bool(
+        candidates and all(c["discrepancies"] for c in candidates)
+    )
     state = (
         "IDENTITY_CONFLICT"
         if hard_conflict
@@ -278,6 +334,18 @@ def enrich(base, channel, rows, identity, reviews, now):
         "freshness": age,
         "candidates": candidates,
         "candidates_total": len(rows),
+        "candidates_truncated": len(rows) > len(candidates),
+        "no_candidates_reason": None
+        if rows
+        else (
+            "No existe captura del canal."
+            if not base["snapshot_available"]
+            else "La captura no contiene códigos o nombres/marcas suficientes para contrastar."
+            if not base.get("capture_searchable", True)
+            else "La variante no tiene SKU, GTIN válido ni marca/nombre suficientes para buscar."
+            if not base.get("searchable_identity")
+            else "No hay coincidencias por SKU exacto, GTIN válido o nombre/marca en esta captura. No demuestra ausencia de publicación."
+        ),
         "note": note,
         "legacy_decisions_ignored": reviews["legacy_ignored"],
         "scope": "CAPTURE_ONLY"

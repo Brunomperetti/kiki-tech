@@ -201,7 +201,11 @@ export function ChannelsPanel({
               data-channel-panel={channel}
             >
               <h4>{channel === "ml" ? "Mercado Libre" : "Tiendanube · CSV"}</h4>
-              <strong>{channelLabels[c.evidence_state]}</strong>
+              <strong>
+                {c.comparison_state === "no_match"
+                  ? "Sin coincidencia en esta captura"
+                  : channelLabels[c.evidence_state]}
+              </strong>
               <p>{c.note}</p>
               <p>
                 Origen: {c.source} ·{" "}
@@ -224,12 +228,25 @@ export function ChannelsPanel({
                 {c.legacy_decisions_ignored > 0 &&
                   `${c.legacy_decisions_ignored} decisiones históricas no se aplicaron automáticamente al catálogo API.`}
               </p>
-              {c.candidates.map((row) => {
+              {!c.candidates_total && (
+                <p>
+                  {c.no_candidates_reason ||
+                    "No hay candidatos en esta captura. No implica que no esté publicado."}
+                </p>
+              )}
+              {c.candidates_truncated && (
+                <p>
+                  Se muestran hasta ocho candidatos iniciales y las filas con
+                  decisiones previas. Hay más coincidencias: no se selecciona
+                  ninguna automáticamente.
+                </p>
+              )}
+              {c.candidates.map((row, index) => {
                 const key = channel + row.id;
                 return (
                   <article
                     className="r-fact"
-                    key={row.id}
+                    key={row.id + row.token + index}
                     data-channel-row={row.id}
                   >
                     <h4>{row.title || "Nombre no informado"}</h4>
@@ -247,6 +264,47 @@ export function ChannelsPanel({
                       · SKU: {row.sku || "Sin dato"} · Marca:{" "}
                       {row.brand || "Sin dato"}
                     </p>
+                    <p>
+                      Motivo de coincidencia:{" "}
+                      {(row.match_reasons || [])
+                        .map(
+                          (reason) =>
+                            ({
+                              SKU_EXACT: "SKU exacto",
+                              VALID_GTIN_EXACT: "EAN/GTIN válido coincidente",
+                              TITLE_EXACT: "Nombre exacto",
+                              BRAND_AND_TITLE_WORDS:
+                                "Marca y palabras del nombre",
+                              PREVIOUS_MANUAL_REVIEW: "Decisión manual previa",
+                            })[reason] || reason,
+                        )
+                        .join(" · ") || "Consultar evidencia"}
+                      . No confirma identidad.
+                    </p>
+                    {row.comparison && (
+                      <dl>
+                        {Object.entries(row.comparison).map(([key, value]) => (
+                          <div key={key}>
+                            <dt>
+                              {{
+                                ecomm_title: "Nombre Ecomm-App",
+                                channel_title: "Nombre de canal",
+                                ecomm_sku: "SKU Ecomm-App",
+                                ecomm_brand: "Marca Ecomm-App",
+                                ecomm_gtin: "GTIN Ecomm-App",
+                                ecomm_presentation: "Presentación Ecomm-App",
+                                ecomm_quantity: "Cantidad Ecomm-App",
+                                channel_quantity: "Cantidad de canal",
+                              }[key] || key}
+                            </dt>
+                            <dd>{value ?? "No informado"}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    {!!row.discrepancies?.length && (
+                      <p>Discrepancias: {row.discrepancies.join(" · ")}</p>
+                    )}
                     <p>
                       Barcode: {row.barcode || "Sin dato"} · GTIN:{" "}
                       {row.gtin || "Sin dato"} · Estado en captura:{" "}

@@ -62,8 +62,8 @@ test("cinco vistas, calidad, URL, conexiones sin sincronizaciones", async ({
   for (const view of [
     "Publicaciones Mercado Libre",
     "Registros Tiendanube",
-    "Sin confirmación en ML",
-    "Sin confirmación en TN",
+    "Variantes sin publicación confirmada · ML",
+    "Variantes sin publicación confirmada · TN",
     "Catálogo Ecomm-App",
   ]) {
     await page

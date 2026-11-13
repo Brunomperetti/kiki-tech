@@ -87,7 +87,9 @@ def captured_listings(
     q: str = Query("", max_length=80),
     page: int = Query(1, ge=1, le=100000),
     limit: int = Query(25, ge=1, le=50),
-    linkage: Literal["all", "unlinked", "verified"] = "all",
+    linkage: Literal[
+        "all", "unlinked", "verified", "candidates", "conflicts", "no_match", "stale"
+    ] = "all",
     db: Session = Depends(get_db),
     session=Depends(require_session),
 ):

@@ -13,9 +13,9 @@ import { recommendedAction } from "./product-actions";
 import { SavedHistory } from "./SavedHistory";
 import {
   CommercialViews,
+  ChannelComparisonMatrix,
   ChannelListings,
   commercialViews,
-  loadListings,
   type CommercialView,
 } from "./CommercialViews";
 import { BatchPanel } from "./BatchPanel";
@@ -35,7 +35,6 @@ import {
   type CatalogPage,
   captureDate,
   loadDashboard,
-  adaptQueue,
   adaptVariant,
   validVariantId,
   queueFilters,
@@ -127,15 +126,6 @@ export function IntegrationCatalog() {
   const view = (params.get("view") || "ecomm") as CommercialView;
   const external = view === "ml" || view === "tn";
   const linkage = params.get("linkage") || "all";
-  const [listingCounts, setListingCounts] = useState<{
-    ml?: number;
-    tn?: number;
-  }>();
-  const [preparation, setPreparation] = useState<{
-    ml: number;
-    tn: number;
-    capturedAt: string | null;
-  }>();
   const rawPage = params.get("page") || "1",
     rawSize = params.get("limit") || "6";
   const page = Number(rawPage),
@@ -144,7 +134,15 @@ export function IntegrationCatalog() {
     q.length > 80 ||
     !validQueueFilter(filter) ||
     !Object.prototype.hasOwnProperty.call(commercialViews, view) ||
-    !["all", "unlinked", "verified"].includes(linkage) ||
+    ![
+      "all",
+      "unlinked",
+      "verified",
+      "candidates",
+      "conflicts",
+      "no_match",
+      "stale",
+    ].includes(linkage) ||
     !/^[1-9]\d*$/.test(rawPage) ||
     page > 100000 ||
     ![3, 6, 25, 50].includes(pageSize) ||
@@ -310,60 +308,6 @@ export function IntegrationCatalog() {
       active = false;
     };
   }, []);
-  useEffect(() => {
-    setPreparation(undefined);
-    if (!session || !runtimeReady || invalid || !data) return;
-    const c = new AbortController();
-    Promise.all(
-      (["ml", "tn"] as const).map((channel) =>
-        request(
-          `/api/ecomm-app/workspace/queue?q=&page=1&limit=3&sort=capture&filter=ready_for_channels%2B${channel}_unconfirmed`,
-          { signal: c.signal },
-        )
-          .then((response) => response.json())
-          .then((payload) =>
-            adaptQueue(
-              payload,
-              data,
-              "",
-              1,
-              3,
-              `ready_for_channels+${channel}_unconfirmed`,
-            ),
-          ),
-      ),
-    )
-      .then(([ml, tn]) => {
-        if (!c.signal.aborted && ml.lastAt === tn.lastAt)
-          setPreparation({
-            ml: ml.matches,
-            tn: tn.matches,
-            capturedAt: ml.lastAt,
-          });
-      })
-      .catch(() => {
-        /* Unknown is displayed as —, never a fabricated zero. */
-      });
-    return () => c.abort();
-  }, [revision, session, runtimeReady, invalid, data?.lastAt]);
-  useEffect(() => {
-    setListingCounts(undefined);
-    if (!session || !runtimeReady || invalid) return;
-    const c = new AbortController();
-    Promise.all([
-      loadListings("ml", "", 1, 3, "all", c.signal),
-      loadListings("tn", "", 1, 3, "all", c.signal),
-    ])
-      .then(([ml, tn]) => {
-        if (!c.signal.aborted)
-          setListingCounts({
-            ml: ml.available ? ml.distinct_publications : undefined,
-            tn: tn.available ? tn.distinct_publications : undefined,
-          });
-      })
-      .catch(() => {});
-    return () => c.abort();
-  }, [session, runtimeReady, revision, invalid]);
   useEffect(() => {
     setData(undefined);
     setError(undefined);
@@ -689,8 +633,12 @@ export function IntegrationCatalog() {
           value={view}
           counts={{
             ecomm: data?.total,
-            ml: listingCounts?.ml,
-            tn: listingCounts?.tn,
+            ml: data?.channelOverview?.sources.ml.available
+              ? data.channelOverview.comparison?.ml.distinct_publications
+              : undefined,
+            tn: data?.channelOverview?.sources.tn.available
+              ? data.channelOverview.comparison?.tn.distinct_publications
+              : undefined,
             ml_unconfirmed: data?.summary?.ml_unconfirmed,
             tn_unconfirmed: data?.summary?.tn_unconfirmed,
           }}
@@ -707,6 +655,19 @@ export function IntegrationCatalog() {
             })
           }
         />
+        <ChannelComparisonMatrix
+          comparison={data?.channelOverview?.comparison}
+          filter={filter}
+          onFilter={(value) =>
+            update({
+              filter: filter === value ? "all" : value,
+              view: "",
+              page: "",
+              product: "",
+              tab: "",
+            })
+          }
+        />
         <div className="k-preparation">
           <CatalogMetrics
             label="Preparación por canal"
@@ -714,9 +675,7 @@ export function IntegrationCatalog() {
               id: `${channel}-ready`,
               title: `Listos para ${channel === "ml" ? "Mercado Libre" : "Tiendanube"}`,
               value:
-                data && preparation?.capturedAt === data.lastAt
-                  ? preparation[channel]
-                  : "—",
+                data?.summary?.[`${channel}_ready_without_confirmation`] ?? "—",
               note: "Ficha completa interna, sin confirmación en este canal. Falta verificar identidad y vigencia; no publica.",
               active: filter === `ready_for_channels+${channel}_unconfirmed`,
               onClick: () =>
@@ -871,7 +830,9 @@ export function IntegrationCatalog() {
               <strong>
                 {data?.channelOverview?.validated &&
                 data.channelOverview.sources.ml.available
-                  ? data.channelOverview.confirmedMlListings
+                  ? (data.channelOverview.comparison?.ml
+                      .confirmed_publications ??
+                    data.channelOverview.confirmedMlListings)
                   : unavailable}
               </strong>
               <small>Publicaciones y variantes son entidades diferentes.</small>
@@ -1134,15 +1095,18 @@ export function IntegrationCatalog() {
                   </td>
                   {(["ml", "tn"] as const).map((channel) => {
                     const state = item.channels?.[channel];
-                    const label = state?.evidenceState
-                      ? channelLabels[state.evidenceState]
-                      : !state || state.status === "UNAVAILABLE"
-                        ? unavailable
-                        : state.status === "NO_EXACT_SKU_IN_SNAPSHOT"
-                          ? "Sin publicación confirmada"
-                          : state.status === "SKU_CANDIDATE"
-                            ? "Vinculación por revisar"
-                            : "Revisión necesaria";
+                    const label =
+                      state?.comparisonState === "no_match"
+                        ? "Sin coincidencia en esta captura"
+                        : state?.evidenceState
+                          ? channelLabels[state.evidenceState]
+                          : !state || state.status === "UNAVAILABLE"
+                            ? unavailable
+                            : state.status === "NO_EXACT_SKU_IN_SNAPSHOT"
+                              ? "Sin publicación confirmada"
+                              : state.status === "SKU_CANDIDATE"
+                                ? "Vinculación por revisar"
+                                : "Revisión necesaria";
                     return (
                       <td
                         key={channel}
@@ -1152,6 +1116,25 @@ export function IntegrationCatalog() {
                         }
                       >
                         <strong>{label}</strong>
+                        {!!state?.candidatesTotal && (
+                          <small>
+                            {state.candidatesTotal} candidatos · Identidad por
+                            revisar
+                          </small>
+                        )}
+                        {state?.snapshotAt && (
+                          <small>{captureDate(state.snapshotAt)}</small>
+                        )}
+                        <button
+                          disabled={!availableFeature("channels")}
+                          onClick={() =>
+                            update({ product: item.id, tab: "Canales" })
+                          }
+                        >
+                          {state?.candidatesTotal
+                            ? "Revisar candidatos"
+                            : "Ver evidencia del canal"}
+                        </button>
                         <small>
                           {state?.note ??
                             "Sin evidencia suficiente. No implica que no esté publicado."}

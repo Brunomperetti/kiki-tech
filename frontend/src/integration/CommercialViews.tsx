@@ -1,14 +1,21 @@
 import "./commercial-views.css";
 import { useEffect, useState } from "react";
-import { request, captureDate, validVariantId } from "./catalog-adapter";
+import {
+  request,
+  captureDate,
+  validVariantId,
+  comparisonStates,
+  type ChannelComparison,
+  type QueueFilter,
+} from "./catalog-adapter";
 import { channelLabels } from "./channel-labels";
 
 export const commercialViews = {
   ecomm: "Catálogo Ecomm-App",
   ml: "Publicaciones Mercado Libre",
   tn: "Registros Tiendanube",
-  ml_unconfirmed: "Sin confirmación en ML",
-  tn_unconfirmed: "Sin confirmación en TN",
+  ml_unconfirmed: "Variantes sin publicación confirmada · ML",
+  tn_unconfirmed: "Variantes sin publicación confirmada · TN",
 } as const;
 export type CommercialView = keyof typeof commercialViews;
 export type ListingRow = {
@@ -17,6 +24,9 @@ export type ListingRow = {
   title: string | null;
   sku: string | null;
   ecomm_ids: string[];
+  candidate_ecomm_ids?: string[];
+  candidate_variants_total?: number;
+  identity_ambiguous?: boolean;
   listing_status: string | null;
   evidence_state: string;
   captured_at: string | null;
@@ -192,6 +202,10 @@ export function ChannelListings({
           <option value="all">Todos los registros</option>
           <option value="unlinked">Sin Ecomm ID validado</option>
           <option value="verified">Con vinculación validada</option>
+          <option value="candidates">Con variantes candidatas</option>
+          <option value="conflicts">Conflictos o ambigüedades</option>
+          <option value="no_match">Sin variante candidata en captura</option>
+          <option value="stale">Captura desactualizada</option>
         </select>
       </label>
       {error && <p role="alert">{error}</p>}
@@ -255,6 +269,19 @@ export function ChannelListings({
                           Ver variante {id}
                         </button>
                       ))}
+                      {(r.candidate_ecomm_ids || [])
+                        .filter((id) => !r.ecomm_ids.includes(id))
+                        .map((id) => (
+                          <button key={id} onClick={() => onOpen(id)}>
+                            Revisar candidato {id}
+                          </button>
+                        ))}
+                      {!!r.candidate_variants_total && (
+                        <small>
+                          {r.candidate_variants_total} variantes candidatas; no
+                          son vínculos aprobados.
+                        </small>
+                      )}
                       {!r.ecomm_ids.length && (
                         <span>
                           Revisar identidad; no se crea una variante ficticia.
@@ -289,6 +316,120 @@ export function ChannelListings({
             </button>
           </footer>
         </>
+      )}
+    </section>
+  );
+}
+
+export function ChannelComparisonMatrix({
+  comparison,
+  filter,
+  onFilter,
+}: {
+  comparison?: Record<"ml" | "tn", ChannelComparison>;
+  filter: string;
+  onFilter: (value: QueueFilter) => void;
+}) {
+  const labels = {
+    verified: "Vínculos verificados",
+    candidates: "Coincidencias pendientes",
+    conflicts: "Conflictos o ambigüedades",
+    no_match: "Sin coincidencia en captura",
+    insufficient: "Evidencia insuficiente",
+    stale: "Captura desactualizada",
+  };
+  return (
+    <section
+      className="i-channel-comparison"
+      aria-label="Matriz de comparación de catálogos"
+    >
+      <h3>Comparación por variante Ecomm-App</h3>
+      <p>
+        Sin confirmación no significa «no publicado». Las coincidencias
+        requieren revisión humana. Las seis categorías de cada canal suman el
+        catálogo maestro; los registros capturados son entidades distintas.
+      </p>
+      {!comparison ? (
+        <p>
+          Comparación detallada no disponible en este backend. No se estiman
+          coincidencias a partir de los totales.
+        </p>
+      ) : (
+        <div className="i-comparison-grid">
+          {(["ml", "tn"] as const).map((channel) => {
+            const c = comparison[channel];
+            return (
+              <section key={channel} data-comparison-channel={channel}>
+                <h4>
+                  {channel === "ml"
+                    ? "Mercado Libre · API"
+                    : "Tiendanube · CSV"}
+                </h4>
+                <p>
+                  {c.captured_records} registros · {c.distinct_publications}{" "}
+                  {channel === "ml"
+                    ? "publicaciones distintas"
+                    : "productos distintos"}
+                </p>
+                <p>
+                  Captura: {captureDate(c.snapshot_at)} ·{" "}
+                  {c.freshness.age_hours === null
+                    ? "Antigüedad desconocida"
+                    : `${c.freshness.age_hours} h de antigüedad`}{" "}
+                  ·{" "}
+                  {c.freshness.fresh
+                    ? "Dentro del plazo de revisión"
+                    : "Sin vigencia para confirmar el estado actual"}
+                </p>
+                {!c.freshness.fresh && c.snapshot_at && (
+                  <p>
+                    La fuente no tiene vigencia para ninguna de las {c.variants}{" "}
+                    variantes. En las categorías se priorizan los conflictos;
+                    «Captura desactualizada» cuenta las restantes.
+                  </p>
+                )}
+                <p>
+                  {c.records_without_sku} registros sin SKU ·{" "}
+                  {c.records_without_valid_gtin} sin GTIN válido
+                </p>
+                <div className="k-quality-metrics">
+                  {comparisonStates.map((state) => {
+                    const value =
+                      `${channel}_comparison_${state}` as QueueFilter;
+                    return (
+                      <button
+                        key={state}
+                        aria-pressed={filter === value}
+                        onClick={() => onFilter(value)}
+                      >
+                        {labels[state]}{" "}
+                        <strong>{c.variant_states[state]}</strong>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p>
+                  {c.variants} variantes clasificadas ·{" "}
+                  {c.variants_with_candidates} con candidatos (pueden incluir
+                  conflictos o información vencida).
+                </p>
+                <p>
+                  {c.records_with_candidates} registros con candidatos +{" "}
+                  {c.records_without_candidate} sin candidato ={" "}
+                  {c.valid_records} registros válidos
+                  {c.invalid_records
+                    ? `; ${c.invalid_records} inválidos`
+                    : ""}. {c.verified_records} registros vinculados y vigentes.
+                </p>
+                <p>
+                  {channel === "ml"
+                    ? `${c.confirmed_publications} publicaciones distintas activas con vínculo verificado en captura; no es una consulta en vivo.`
+                    : "El CSV no demuestra publicación actual, incluso con vínculo revisado."}
+                </p>
+              </section>
+            );
+          })}
+        </div>
       )}
     </section>
   );
