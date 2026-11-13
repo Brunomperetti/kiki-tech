@@ -29,6 +29,15 @@ export type Variant = {
       candidatesTotal?: number;
       snapshotAt?: string | null;
       comparisonState?: string;
+      fresh?: boolean;
+      matchesPreview?: {
+        id: string | null;
+        slug?: string | null;
+        title: string | null;
+        identity_verified: boolean;
+        match_reasons: string[];
+        discrepancies: string[];
+      }[];
     }
   >;
   reason?: string;
@@ -40,11 +49,12 @@ export const comparisonStates = [
   "conflicts",
   "no_match",
   "insufficient",
-  "stale",
 ] as const;
 export type ComparisonState = (typeof comparisonStates)[number];
 export type ChannelComparison = {
   variants: number;
+  matching_independent_of_freshness: true;
+  stale_variants: number;
   variant_states: Record<ComparisonState, number>;
   captured_records: number;
   valid_records: number;
@@ -58,6 +68,7 @@ export type ChannelComparison = {
   verified_records: number;
   confirmed_publications: number;
   variants_with_candidates: number;
+  variants_with_pending_candidates: number;
   snapshot_at: string | null;
   freshness: {
     fresh: boolean;
@@ -326,14 +337,18 @@ export function adaptCatalog(
 }
 
 export const queueFilters = {
+  ml_pending_candidates: "Candidatos por revisar · ML",
+  tn_pending_candidates: "Candidatos por revisar · TN",
+  ml_found: "Coincidencias encontradas en ML",
+  tn_found: "Coincidencias encontradas en TN",
   ml_comparison_verified: "Vínculos verificados · ML",
-  ml_comparison_candidates: "Coincidencias pendientes · ML",
+  ml_comparison_candidates: "Coincidencias sin conflicto · ML",
   ml_comparison_conflicts: "Conflictos o ambigüedades · ML",
   ml_comparison_no_match: "Sin coincidencia en captura · ML",
   ml_comparison_insufficient: "Evidencia insuficiente · ML",
   ml_comparison_stale: "Captura desactualizada · ML",
   tn_comparison_verified: "Vínculos verificados · TN",
-  tn_comparison_candidates: "Coincidencias pendientes · TN",
+  tn_comparison_candidates: "Coincidencias sin conflicto · TN",
   tn_comparison_conflicts: "Conflictos o ambigüedades · TN",
   tn_comparison_no_match: "Sin coincidencia en captura · TN",
   tn_comparison_insufficient: "Evidencia insuficiente · TN",
@@ -499,6 +514,31 @@ export function adaptQueue(
           status: String(v.status),
           candidatesTotal: count(v.candidates_total ?? 0),
           snapshotAt: date(v.snapshot_at),
+          fresh:
+            typeof object(v.freshness).fresh === "boolean"
+              ? Boolean(object(v.freshness).fresh)
+              : undefined,
+          matchesPreview: (Array.isArray(v.matches_preview)
+            ? v.matches_preview
+            : []
+          ).map((raw: unknown) => {
+            const c = object(raw);
+            if (
+              (c.id !== null && typeof c.id !== "string") ||
+              (c.title !== null && typeof c.title !== "string") ||
+              typeof c.identity_verified !== "boolean" ||
+              !Array.isArray(c.match_reasons) ||
+              !Array.isArray(c.discrepancies)
+            )
+              throw new Error("Coincidencia de canal incompatible");
+            return c as {
+              id: string | null;
+              title: string | null;
+              identity_verified: boolean;
+              match_reasons: string[];
+              discrepancies: string[];
+            };
+          }),
           comparisonState:
             typeof v.comparison_state === "string"
               ? v.comparison_state
@@ -555,6 +595,11 @@ export function adaptQueue(
                 comparisonStates.map((k) => [k, count(states[k])]),
               );
               if (
+                count(c.variants_with_pending_candidates) >
+                  count(c.variants_with_candidates) ||
+                count(c.variants_with_candidates) > capture.total ||
+                c.matching_independent_of_freshness !== true ||
+                count(c.stale_variants) > capture.total ||
                 count(c.variants) !== capture.total ||
                 Object.values(totals).reduce((a, b) => a + b, 0) !==
                   capture.total
@@ -573,6 +618,7 @@ export function adaptQueue(
                 "verified_records",
                 "confirmed_publications",
                 "variants_with_candidates",
+                "variants_with_pending_candidates",
               ])
                 count(c[k]);
               if (

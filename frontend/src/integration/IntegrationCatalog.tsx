@@ -630,6 +630,7 @@ export function IntegrationCatalog() {
         className="i-commercial-overview"
       >
         <CommercialViews
+          showLegacyValidationViews={false}
           value={view}
           counts={{
             ecomm: data?.total,
@@ -655,8 +656,16 @@ export function IntegrationCatalog() {
             })
           }
         />
+        {(filter.includes("ml_unconfirmed") ||
+          filter.includes("tn_unconfirmed")) && (
+          <p className="n-notice">
+            Filtro histórico de confirmación: no es una lista de faltantes. Para
+            revisar diferencias, usá «Sin coincidencia en captura» del canal.
+          </p>
+        )}
         <ChannelComparisonMatrix
           comparison={data?.channelOverview?.comparison}
+          query={q}
           filter={filter}
           onFilter={(value) =>
             update({
@@ -1121,6 +1130,36 @@ export function IntegrationCatalog() {
                             {state.candidatesTotal} candidatos · Identidad por
                             revisar
                           </small>
+                        )}
+                        {(state?.matchesPreview || []).map((match, index) => (
+                          <div
+                            className="i-match-preview"
+                            key={`${match.id}-${index}`}
+                          >
+                            <strong>
+                              {channel === "tn"
+                                ? `Identificador URL CSV: ${match.slug || "No informado"}`
+                                : `ID ML: ${match.id || "No informado"}`}
+                            </strong>
+                            <small>
+                              {match.title || "Nombre no informado"}
+                            </small>
+                            <small>
+                              {match.identity_verified
+                                ? "Identidad revisada en esta captura"
+                                : "Candidato sin validación manual"}
+                            </small>
+                            {!!match.discrepancies.length && (
+                              <small>
+                                Discrepancias: {match.discrepancies.join(" · ")}
+                              </small>
+                            )}
+                          </div>
+                        ))}
+                        {state?.fresh === false && (
+                          <strong>
+                            Captura sin vigencia; coincidencias conservadas
+                          </strong>
                         )}
                         {state?.snapshotAt && (
                           <small>{captureDate(state.snapshotAt)}</small>

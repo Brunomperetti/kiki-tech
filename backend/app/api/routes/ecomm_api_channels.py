@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -97,6 +97,41 @@ def captured_listings(
 
     try:
         return listings(db, channel, query=q, page=page, limit=limit, linkage=linkage)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/channels/differences.csv")
+def differences_csv(
+    channel: Literal["ml", "tn"],
+    state: Literal[
+        "all",
+        "found",
+        "pending",
+        "verified",
+        "candidates",
+        "conflicts",
+        "no_match",
+        "insufficient",
+    ] = "no_match",
+    q: str = Query("", max_length=80),
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
+):
+    from ...services.ecomm_channel_export import export_differences
+
+    try:
+        content, count = export_differences(db, channel, state, q)
+        return Response(
+            content,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="kiki-{channel}-{state}.csv"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Kiki-Export-Variants": str(count),
+            },
+        )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 

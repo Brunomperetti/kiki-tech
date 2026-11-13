@@ -73,10 +73,6 @@ def comparison_bucket(evidence):
         "MULTIPLE_SKU_ROWS",
     }:
         return "conflicts"
-    if evidence.get("snapshot_available") and not evidence.get("freshness", {}).get(
-        "fresh"
-    ):
-        return "stale"
     if evidence.get("candidates_total"):
         return "candidates"
     if (
@@ -279,7 +275,9 @@ def _channel_result(
             **base,
             "status": "AMBIGUOUS_API_SKU",
             "matching_rows": len(rows),
-            "listing_ids": [_text(r.get("external_id") or r.get("slug")) for r in rows[:8]],
+            "listing_ids": [
+                _text(r.get("external_id") or r.get("slug")) for r in rows[:8]
+            ],
             "note": "El SKU Ecomm tiene varios dueños. Se muestran candidatos sin asignar publicaciones.",
         }
     if not rows:
@@ -579,10 +577,21 @@ def build_channel_coverage(
             if c["identity_verified"]
             and channel == "ml"
             and c["listing_status"] == "active"
+            and r[channel]["freshness"]["fresh"]
         }
         comparison[channel] = {
             "variants": len(records),
-            "variant_states": {
+            "matching_independent_of_freshness": True,
+            "deprecated_state_keys": ["stale"],
+            "stale_variants": sum(
+                r[channel]["snapshot_available"]
+                and not r[channel]["freshness"]["fresh"]
+                for r in records.values()
+            ),
+            "current_publication_absence_proven": False,
+            "capture_completeness": "NOT_PROVEN_BY_STORED_CONTRACT",
+            "variant_states": {"stale": 0}
+            | {  # Compatibility for PR #163 clients; NOT the freshness count.
                 k: buckets[channel][k]
                 for k in (
                     "verified",
@@ -590,7 +599,6 @@ def build_channel_coverage(
                     "conflicts",
                     "no_match",
                     "insufficient",
-                    "stale",
                 )
             },
             "captured_records": len(rows),
@@ -616,6 +624,9 @@ def build_channel_coverage(
             "records_without_candidate": len(valid) - len(matched_positions[channel]),
             "verified_records": len(verified_keys),
             "confirmed_publications": len(confirmed_ids),
+            "variants_with_pending_candidates": sum(
+                r[channel]["pending_candidates_count"] > 0 for r in records.values()
+            ),
             "variants_with_candidates": sum(
                 r[channel]["candidates_total"] > 0 for r in records.values()
             ),

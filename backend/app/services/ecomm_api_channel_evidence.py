@@ -246,12 +246,14 @@ def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
             blockers.append(
                 "La fila está validada para otro Ecomm ID; primero requiere revisión/revocación de su vinculación."
             )
-        if not age["fresh"]:
-            blockers.append(
-                "Captura desactualizada o sin fecha vigente; no se puede confirmar publicación."
-            )
+        # A prior human identity decision does not disappear merely because
+        # time passed. Freshness still blocks NEW reviews/current publication.
         if verified and blockers:
             verified = False
+        if not age["fresh"]:
+            blockers.append(
+                "Captura desactualizada o sin fecha vigente; actualizar antes de validar o afirmar publicación actual."
+            )
         candidates.append(
             {
                 "id": key,
@@ -300,8 +302,6 @@ def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
     state = (
         "IDENTITY_CONFLICT"
         if hard_conflict
-        else "STALE"
-        if base["snapshot_available"] and not age["fresh"]
         else "CONFIRMED_CAPTURE"
         if confirmed
         else "VERIFIED_LINK"
@@ -311,6 +311,10 @@ def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
         or any(c["review_state"] for c in candidates)
         else "CANDIDATE"
         if candidates
+        else "NO_MATCH_IN_CAPTURE"
+        if base["snapshot_available"]
+        and base.get("searchable_identity")
+        and base.get("capture_searchable")
         else "INSUFFICIENT_EVIDENCE"
     )
     note = {
@@ -319,7 +323,7 @@ def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
         if channel == "tn"
         else "Vínculo revisado, sin publicación activa confirmada en la captura.",
         "IDENTITY_CONFLICT": "Conflicto de identidad; no se confirma publicación ni se fusionan variantes.",
-        "STALE": "La captura perdió vigencia para esta revisión. No se puede inferir el estado actual.",
+        "NO_MATCH_IN_CAPTURE": "No encontrado en esta captura según los datos contrastables. No demuestra que no esté publicado actualmente.",
         "PENDING_VALIDATION": "Relación pendiente de validación por variante, presentación y cantidad.",
         "CANDIDATE": "Coincidencia candidata; no acredita una vinculación ni publicación confirmada.",
         "INSUFFICIENT_EVIDENCE": "Sin evidencia suficiente; no significa que el producto no esté publicado.",
@@ -332,8 +336,19 @@ def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
         "confirmed_listing_count": len(confirmed),
         "publication_observable": channel == "ml" and base["snapshot_available"],
         "freshness": age,
+        "current_publication_absence_proven": False,
+        "capture_completeness": "NOT_PROVEN_BY_STORED_CONTRACT",
         "candidates": candidates,
         "candidates_total": len(rows),
+        "pending_candidates_count": 0
+        if linked
+        else len(rows)
+        - len(candidates)
+        + sum(
+            not c["identity_verified"]
+            and not (c["review_state"] == "REVOKED" and c["review_current"])
+            for c in candidates
+        ),
         "candidates_truncated": len(rows) > len(candidates),
         "no_candidates_reason": None
         if rows

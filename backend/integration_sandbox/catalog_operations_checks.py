@@ -137,14 +137,15 @@ class CatalogueOperations(unittest.TestCase):
         self.date("MERCADOLIBRE_API", 48)
         stale = self.channel(q="MLA900000003")
         self.assertFalse(stale["items"][0]["confirmed_listing"])
-        self.assertEqual(stale["items"][0]["evidence_state"], "STALE")
+        self.assertEqual(stale["items"][0]["evidence_state"], "PENDING_VALIDATION")
 
     def test_tn_csv_never_confirms_current_publication_and_lists_all_rows(self):
         r = self.channel("tn")
         self.assertEqual(r["total_records"], 4)
         self.assertEqual(r["distinct_publications"], 4)
         self.assertTrue(all(not x["confirmed_listing"] for x in r["items"]))
-        self.assertTrue(all(x["evidence_state"] == "STALE" for x in r["items"]))
+        self.assertFalse(r["freshness"]["fresh"])
+        self.assertTrue(all(x["evidence_state"] != "STALE" for x in r["items"]))
         self.assertEqual(r["items"][0]["ecomm_ids"], [])
 
     def test_family_comparator_rules_reused_without_numerical_overreach(self):

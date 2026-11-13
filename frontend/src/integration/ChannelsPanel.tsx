@@ -215,6 +215,13 @@ export function ChannelsPanel({
                   ? `Revisión de vigencia: ${c.freshness.review_after_hours} horas.`
                   : "No hay una captura disponible."}
               </p>
+              {!c.freshness.fresh && c.snapshot_available && (
+                <p role="note">
+                  Captura vencida o sin fecha vigente. Los candidatos se
+                  conservan para revisión; no se acredita publicación actual ni
+                  se habilitan nuevas validaciones.
+                </p>
+              )}
               {channel === "tn" && (
                 <p>
                   Un registro de CSV, incluso con vínculo revisado, no demuestra
@@ -312,7 +319,7 @@ export function ChannelsPanel({
                     </p>
                     <p>
                       {row.identity_verified
-                        ? "Vínculo con revisión vigente"
+                        ? "Identidad revisada en esta captura"
                         : "Vínculo sin revisión vigente"}{" "}
                       · Revisión {row.revision} · Ecomm ID {id}
                     </p>
