@@ -1,0 +1,169 @@
+.r-research,
+.r-summary {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 14px 0;
+  color: #254638;
+}
+.r-notice,
+.r-summary {
+  background: #edf5eb;
+  border: 1px solid #cbdcc5;
+  border-radius: 10px;
+  padding: 15px;
+}
+.r-research label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.r-research select,
+.r-research textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #ccd9ce;
+  border-radius: 7px;
+  font: inherit;
+  background: white;
+}
+.r-document,
+.r-fact,
+.r-reference {
+  padding: 16px;
+  border: 1px solid #d5dfd6;
+  border-radius: 10px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+.r-document h4,
+.r-fact h4 {
+  margin: 0 0 10px;
+}
+.r-error {
+  padding: 12px;
+  background: #fff1e6;
+  color: #754326;
+  border-radius: 7px;
+  line-height: 1.7;
+}
+.r-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.r-state {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #edf1e8;
+}
+.r-approved {
+  background: #e1efda;
+  color: #365d2b;
+}
+.r-stale,
+.r-rejected {
+  background: #fbe8db;
+  color: #80432b;
+}
+.r-research summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+}
+.r-research blockquote {
+  margin: 12px 0;
+  padding: 12px;
+  border-left: 3px solid #94ae84;
+  background: #f6f8f4;
+  font-size: 12px;
+}
+.r-fragment {
+  padding: 8px 0;
+}
+.r-history {
+  border-top: 1px solid #dde5dc;
+  padding: 10px 0;
+}
+.r-reference dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.r-reference dd {
+  margin: 5px 0;
+}
+.r-reference small {
+  display: block;
+  color: #617460;
+  font-size: 10px;
+}
+@media (max-width: 760px) {
+  .r-reference dl {
+    grid-template-columns: 1fr;
+  }
+  .r-fact,
+  .r-document {
+    padding: 12px;
+  }
+  .r-actions button {
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+.p-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+.r-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.r-upload input:not([type="checkbox"]) {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.r-upload .r-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.r-upload > * {
+  min-width: 0;
+}
+.p-panel > * {
+  min-width: 0;
+}
+.p-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.p-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+}
+.p-field select {
+  max-width: 100%;
+}
+.a-research,
+.a-candidates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+}
+.a-research > *,
+.a-candidates > * {
+  min-width: 0;
+}
+.a-research pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,995 @@
+import {
+  CommercialViews,
+  ChannelListings,
+  type CommercialView,
+  commercialViews,
+} from "../integration/CommercialViews";
+import {
+  qualityFilterKeys,
+  queueFilters,
+} from "../integration/catalog-adapter";
+import { demoListings, demoQuality } from "./commercial-demo";
+import { DemoConnections } from "./DemoConnections";
+import {
+  CatalogFrame,
+  CatalogTable,
+  CatalogMetrics,
+  CatalogSearch,
+  ProductDrawer,
+} from "./CatalogView";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { KikiIcon as Icon } from "../components/KikiIcon";
+import {
+  candidateCount,
+  coverage,
+  channelMatches,
+  isConfirmed,
+  isReady,
+  channelDetail,
+  channelState,
+  inWorkState,
+  workLabels,
+  editorialState,
+  actionTab,
+  type WorkState,
+  createCatalog,
+  nextAction,
+  type Item,
+  type Job,
+} from "./operations-model";
+import { OperationalPanel } from "./OperationalPanel";
+import { OperationsCenter } from "./OperationsCenter";
+import "./dashboard.css";
+import "./operations.css";
+import "./simple-dashboard.css";
+import "./channel-dashboard.css";
+import { SettingsDialog } from "./SettingsDialog";
+import { IntegrationCatalog } from "../integration/IntegrationCatalog";
+const tabs = ["Ficha", "Evidencias", "IA", "Canales", "Historial"];
+const money = (n: number) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(n);
+function Pill({ value }: { value: string }) {
+  return (
+    <span
+      className={`d-pill ${value === "Preparada" || value === "Verificada" || value.startsWith("Publicado") || value === "Ficha aprobada" ? "good" : value === "Conflicto" || value === "Revisión necesaria" || value === "Datos incompletos" ? "bad" : "warm"}`}
+    >
+      {value === "Verificada" ? "✓ " : value === "Conflicto" ? "! " : ""}
+      {value}
+    </span>
+  );
+}
+export function PrototypeDashboard({
+  mode = "demo",
+}: {
+  mode?: "demo" | "integration";
+}) {
+  return mode === "integration" ? <IntegrationCatalog /> : <DemoDashboard />;
+}
+function DemoDashboard() {
+  const [urlParams, setParams] = useSearchParams();
+  const [params, setAcceptedParams] = useState(urlParams);
+  const [rows, setRows] = useState(createCatalog);
+  const [editorEpoch, setEditorEpoch] = useState(0);
+  const [dirty, setDirty] = useState(false);
+  const [pending, setPending] = useState<(() => void) | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [advanced, setAdvanced] = useState(false);
+  const [showPrices, setShowPrices] = useState(true);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const originRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const view = (params.get("view") || "ecomm") as CommercialView;
+  const external = view === "ml" || view === "tn";
+  const quality = params.get("quality") || "";
+  const listingPage = Number(params.get("listingPage") || "1");
+  const linkage = params.get("linkage") || "all";
+  const selected = rows.find((p) => p.id === params.get("product"));
+  const tab = tabs.includes(params.get("tab") || "")
+    ? params.get("tab")!
+    : "Ficha";
+  const q = params.get("q") || "",
+    status = params.get("status") || "",
+    brand = params.get("brand") || "",
+    channel = params.get("channel") || "",
+    conflict = params.get("conflict") || "",
+    action = params.get("action") || "",
+    work = params.get("work") || "",
+    mlFilter = params.get("mlState") || "",
+    tnFilter = params.get("tnState") || "";
+  function update(values: Record<string, string>) {
+    if (
+      !("view" in values) &&
+      ["mlState", "tnState", "work"].some((k) => k in values)
+    )
+      values = { ...values, view: "", linkage: "", listingPage: "" };
+    const run = () =>
+      setParams((previous) => {
+        const next = new URLSearchParams(previous);
+        Object.entries(values).forEach(([k, v]) =>
+          v ? next.set(k, v) : next.delete(k),
+        );
+        return next;
+      });
+    if (dirty) {
+      setPending(() => run);
+      return;
+    }
+    run();
+  }
+  function close() {
+    update({ product: "", tab: "" });
+    originRef.current?.focus();
+  }
+  useEffect(() => {
+    if (selected) {
+      originRef.current = document.activeElement as HTMLElement;
+      closeRef.current?.focus();
+    }
+  }, [selected?.id]);
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (pending) {
+        if (e.key === "Escape") setPending(null);
+        return;
+      }
+      if (e.key === "Escape") {
+        close();
+        return;
+      }
+      if (e.key === "Tab") {
+        const elements = panelRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled):not([tabindex="-1"]),a,input,textarea,select,[tabindex="0"]',
+        );
+        if (!elements?.length) return;
+        const first = elements[0],
+          last = elements[elements.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const old = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = old;
+    };
+  }, [selected?.id, dirty, pending]);
+  const filtered = rows
+    .filter(
+      (p) =>
+        [p.name, p.sku, p.brand, p.id, p.ean || "", p.barcode || ""]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(q.toLocaleLowerCase()) &&
+        (!status ||
+          (status === "Conflicto" ? p.conflict : p.status === status)) &&
+        (!quality || demoQuality(p, rows).includes(quality)) &&
+        inWorkState(p, work) &&
+        channelMatches(p, "ml", mlFilter) &&
+        (view === "tn_unconfirmed" || channelMatches(p, "tn", tnFilter)) &&
+        (!brand || p.brand === brand) &&
+        (!channel ||
+          (channel === "candidate"
+            ? candidateCount(p) > 0
+            : isConfirmed(p, channel === "ml" ? "ml" : "tn"))) &&
+        (!conflict || (conflict === "yes" ? p.conflict : !p.conflict)) &&
+        (!action || nextAction(p) === action),
+    )
+    .sort(
+      (a, b) =>
+        Number(b.conflict) - Number(a.conflict) ||
+        Number(b.status === "Pendiente") - Number(a.status === "Pendiente") ||
+        a.id.localeCompare(b.id),
+    );
+  const readyIds = ["ml-ready", "tn-ready"];
+  const ml = coverage(rows, "ml"),
+    tn = coverage(rows, "tn");
+  const indicators = [
+    {
+      id: "all",
+      title: "Ecomm-App · catálogo central",
+      value: new Set(rows.map((p) => p.id)).size,
+      note: "Variantes únicas · todas las presentaciones",
+      filter: { mlState: "", tnState: "", work: "" },
+    },
+    {
+      id: "ml-confirmed",
+      title: "Mercado Libre · confirmadas",
+      value: ml.publications,
+      note: `Publicaciones con evidencia · ${ml.variants} variantes`,
+      filter: { mlState: "confirmed" },
+    },
+    {
+      id: "tn-confirmed",
+      title: "Tiendanube · confirmadas",
+      value: tn.publications,
+      note: `Publicaciones con evidencia · ${tn.variants} variantes`,
+      filter: { tnState: "confirmed" },
+    },
+    {
+      id: "ml-unconfirmed",
+      title: "Sin confirmar en Mercado Libre",
+      value: ml.unconfirmed,
+      note: "Variantes · no significa sin publicar",
+      filter: { mlState: "unconfirmed" },
+    },
+    {
+      id: "tn-unconfirmed",
+      title: "Sin confirmar en Tiendanube",
+      value: tn.unconfirmed,
+      note: "Variantes · falta evidencia vigente",
+      filter: { tnState: "unconfirmed" },
+    },
+    {
+      id: "attention",
+      title: "Necesitan revisión",
+      value: rows.filter((p) => inWorkState(p, "attention")).length,
+      note: "Variantes · revisar bloqueos o evidencia",
+      filter: { work: "attention" },
+    },
+    {
+      id: "ml-ready",
+      title: "Listos para Mercado Libre",
+      value: ml.ready,
+      note: "Variantes · preparación interna, no publicación",
+      filter: { mlState: "ready" },
+    },
+    {
+      id: "tn-ready",
+      title: "Listos para Tiendanube",
+      value: tn.ready,
+      note: "Variantes · preparación interna, no publicación",
+      filter: { tnState: "ready" },
+    },
+  ];
+  const displayIndicators = indicators.map((card) => ({
+    ...card,
+    active:
+      card.id === "all"
+        ? !mlFilter &&
+          !tnFilter &&
+          !work &&
+          !q &&
+          !status &&
+          !brand &&
+          !channel &&
+          !conflict &&
+          !action
+        : Object.entries(card.filter).every(([k, v]) => params.get(k) === v),
+    onClick: () => {
+      if (card.id === "all")
+        update({
+          mlState: "",
+          tnState: "",
+          work: "",
+          status: "",
+          channel: "",
+          conflict: "",
+          action: "",
+          brand: "",
+          q: "",
+        });
+      else {
+        const entries = Object.entries(card.filter);
+        const active = entries.every(([k, v]) => params.get(k) === v);
+        update(
+          Object.fromEntries(entries.map(([k, v]) => [k, active ? "" : v])),
+        );
+      }
+    },
+  }));
+  function replaceProduct(p: Item) {
+    setRows((old) => old.map((row) => (row.id === p.id ? p : row)));
+    setDirty(false);
+  }
+  useEffect(() => {
+    if (urlParams.toString() === params.toString()) return;
+    if (dirty) {
+      const target = new URLSearchParams(urlParams);
+      setParams(params, { replace: true });
+      setPending(() => () => {
+        setAcceptedParams(target);
+        setParams(target);
+      });
+    } else setAcceptedParams(urlParams);
+  }, [urlParams, dirty, params, setParams]);
+  useEffect(() => {
+    if (!dirty) return;
+    const before = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    const click = (e: MouseEvent) => {
+      const anchor =
+        e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (anchor instanceof HTMLAnchorElement) {
+        const target = new URL(anchor.href);
+        if (
+          target.hash &&
+          target.origin === location.origin &&
+          target.pathname === location.pathname &&
+          target.search === location.search
+        )
+          return; // A jump inside the same editor keeps the current draft.
+      }
+      if (
+        anchor instanceof HTMLAnchorElement &&
+        new URL(anchor.href).origin === location.origin
+      ) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setPending(() => () => location.assign(anchor.href));
+      }
+    };
+    window.addEventListener("beforeunload", before);
+    document.addEventListener("click", click, true);
+    return () => {
+      window.removeEventListener("beforeunload", before);
+      document.removeEventListener("click", click, true);
+    };
+  }, [dirty]);
+
+  useEffect(() => {
+    if (params.get("tools") === "1" || params.get("tool"))
+      document
+        .getElementById("catalog-operations")
+        ?.scrollIntoView({ block: "start" });
+  }, [params.get("tools"), params.get("tool")]);
+  return (
+    <CatalogFrame
+      mode="demo"
+      onCatalog={() => {
+        document.getElementById("catalog-search")?.focus();
+        document.getElementById("catalog")?.scrollIntoView({ block: "start" });
+      }}
+      onHistory={() => update({ tool: "Trabajos y resultados", tools: "1" })}
+      onSettings={() => update({ settings: "1" })}
+      action={
+        <button
+          className="d-primary"
+          onClick={() =>
+            update({
+              work: "attention",
+              status: "",
+              channel: "",
+              conflict: "",
+              action: "",
+            })
+          }
+        >
+          Revisar productos <Icon name="arrow-right" size={17} />
+        </button>
+      }
+    >
+      <CommercialViews
+        value={view}
+        counts={{
+          ecomm: rows.length,
+          ml: demoListings(rows, "ml").distinct_publications,
+          tn: demoListings(rows, "tn").distinct_publications,
+          ml_unconfirmed: ml.unconfirmed,
+          tn_unconfirmed: rows.length,
+        }}
+        onChange={(next) =>
+          update({
+            view: next === "ecomm" ? "" : next,
+            mlState: next === "ml_unconfirmed" ? "unconfirmed" : "",
+            tnState: next === "tn_unconfirmed" ? "unconfirmed" : "",
+            quality: "",
+            work: "",
+            status: "",
+            brand: "",
+            channel: "",
+            conflict: "",
+            action: "",
+            q: "",
+            listingPage: "",
+            linkage: "",
+            product: "",
+            tab: "",
+          })
+        }
+      />
+      <div className="k-preparation">
+        <CatalogMetrics
+          label="Preparación por canal"
+          cards={displayIndicators.filter((card) => readyIds.includes(card.id))}
+        />
+      </div>
+      <details className="i-more-metrics">
+        <summary>Más indicadores comerciales</summary>
+        <CatalogMetrics
+          label="Cobertura comercial por canal"
+          cards={displayIndicators.filter((card) =>
+            ["ml-confirmed", "tn-confirmed", "attention"].includes(card.id),
+          )}
+        />
+      </details>
+      <details className="i-more-metrics">
+        <summary>Calidad del catálogo · demostración</summary>
+        <p>
+          Filtros calculados sobre fixtures. El formulario compartido de 18
+          campos se puede editar en memoria; el guardado persistente requiere el
+          backend aislado.
+        </p>
+        <div
+          className="k-quality-metrics"
+          role="group"
+          aria-label="Calidad de la demostración"
+        >
+          {qualityFilterKeys
+            .filter(
+              (k) =>
+                ![
+                  "ml_unconfirmed",
+                  "tn_unconfirmed",
+                  "proposals_pending",
+                ].includes(k),
+            )
+            .map((key) => (
+              <button
+                key={key}
+                aria-pressed={quality === key}
+                onClick={() =>
+                  update({
+                    view: external ? "" : view,
+                    quality: quality === key ? "" : key,
+                    product: "",
+                    tab: "",
+                  })
+                }
+              >
+                {queueFilters[key]}{" "}
+                <strong>
+                  {
+                    rows.filter((p) => demoQuality(p, rows).includes(key))
+                      .length
+                  }
+                </strong>
+              </button>
+            ))}
+        </div>
+      </details>
+      <p className="s-count-note">
+        Ecomm-App cuenta variantes; las vistas ML y TN muestran los registros
+        sintéticos del canal, incluso sin vinculación. Esos totales no se suman.
+        Una coincidencia no confirma publicación; un CSV no acredita vigencia
+        actual. Los filtros de ML y TN se combinan.
+      </p>
+      <div
+        className="s-toolbar"
+        role="region"
+        aria-label="Resumen del catálogo"
+      >
+        <span>
+          {new Set(rows.map((p) => p.family)).size} productos · {rows.length}{" "}
+          variantes en Ecomm-App
+        </span>
+
+        <button
+          onClick={() =>
+            update({
+              q: "",
+              mlState: "",
+              tnState: "",
+              work: "",
+              status: "",
+              brand: "",
+              channel: "",
+              conflict: "",
+              action: "",
+            })
+          }
+        >
+          Ver todo el catálogo
+        </button>
+      </div>
+      <section className="d-catalog" id="catalog">
+        <div className="d-section-head">
+          <div>
+            <h2>
+              Catálogo de productos <span>{rows.length} variantes</span>
+            </h2>
+            <p>
+              Ecomm-App es el origen de cada variante. Los canales aportan
+              evidencia.
+            </p>
+          </div>
+          <span className="d-snapshot">
+            <span /> Copia sintética · sin sincronización
+          </span>
+        </div>
+        <div className="d-filters">
+          <CatalogSearch
+            id="catalog-search"
+            value={q}
+            onChange={(value) => update({ q: value })}
+            placeholder="SKU, nombre, marca o Ecomm ID"
+          />
+          <select
+            aria-label="Estado"
+            value={status}
+            onChange={(e) => update({ status: e.target.value })}
+          >
+            <option value="">Todas las fichas</option>
+            <option value="Pendiente">Borrador sin aprobar</option>
+            <option value="Conflicto">Revisión necesaria</option>
+            <option value="Preparada">Ficha aprobada</option>
+          </select>
+          <select
+            aria-label="Marca"
+            value={brand}
+            onChange={(e) => update({ brand: e.target.value })}
+          >
+            <option value="">Todas las marcas</option>
+            {["Monte", "Nexo", "Casa Sur"].map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          {(["ml", "tn"] as const).map((c) => (
+            <label className="c-channel-filter" key={c}>
+              {c === "ml" ? "Mercado Libre" : "Tiendanube"}
+              <select
+                aria-label={
+                  c === "ml" ? "Estado Mercado Libre" : "Estado Tiendanube"
+                }
+                value={c === "ml" ? mlFilter : tnFilter}
+                onChange={(e) =>
+                  update({
+                    [c === "ml" ? "mlState" : "tnState"]: e.target.value,
+                  })
+                }
+              >
+                <option value="">Todas las variantes</option>
+                <option value="confirmed">Publicación confirmada</option>
+                <option value="unconfirmed">Sin publicación confirmada</option>
+                <option value="ready">Preparado internamente</option>
+                <option value="candidate">Vinculación por revisar</option>
+                <option value="stale">Información desactualizada</option>
+                <option value="unknown">Información desconocida</option>
+              </select>
+            </label>
+          ))}
+        </div>
+        <details className="s-advanced" open={advanced}>
+          <summary
+            onClick={(e) => {
+              e.preventDefault();
+              setAdvanced(!advanced);
+            }}
+          >
+            Más filtros y detalles
+          </summary>
+          <div className="o-extra-filters">
+            <label>
+              Conflicto
+              <select
+                aria-label="Conflicto"
+                value={conflict}
+                onChange={(e) => update({ conflict: e.target.value })}
+              >
+                <option value="">Con y sin conflicto</option>
+                <option value="yes">Con conflicto</option>
+                <option value="no">Sin conflicto</option>
+              </select>
+            </label>
+            <label>
+              Siguiente acción
+              <select
+                aria-label="Siguiente acción"
+                value={action}
+                onChange={(e) => update({ action: e.target.value })}
+              >
+                <option value="">Todas las acciones</option>
+                {[
+                  "Resolver conflicto",
+                  "Revisar evidencia",
+                  "Revisar IA",
+                  "Completar ficha",
+                  "Investigar con IA",
+                  "Revisar ficha",
+                  "Verificar antes de publicar",
+                  "Revisar publicaciones",
+                  "Preparar canal",
+                ].map((a) => (
+                  <option key={a}>{a}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="s-count-note">
+            {rows.reduce((n, p) => n + candidateCount(p), 0)} coincidencias por
+            revisar. No confirman publicación.
+          </p>
+        </details>
+        {(q ||
+          quality ||
+          work ||
+          status ||
+          brand ||
+          channel ||
+          conflict ||
+          action) && (
+          <div className="d-active-filters">
+            {work
+              ? workLabels[work as WorkState] || "Filtros activos"
+              : "Filtros activos"}{" "}
+            <button
+              onClick={() =>
+                update({
+                  quality: "",
+                  view: "",
+                  work: "",
+                  mlState: "",
+                  tnState: "",
+                  q: "",
+                  status: "",
+                  brand: "",
+                  channel: "",
+                  conflict: "",
+                  action: "",
+                })
+              }
+            >
+              Limpiar filtros ×
+            </button>
+          </div>
+        )}
+        {external ? (
+          <ChannelListings
+            channel={view}
+            q={q}
+            page={listingPage}
+            limit={6}
+            linkage={linkage}
+            local={demoListings(rows, view, q, listingPage, 6, linkage)}
+            onChange={(v) => update({ ...v, listingPage: v.page ?? "" })}
+            onOpen={(id) => update({ product: id, tab: "Canales" })}
+          />
+        ) : (
+          <>
+            <CatalogTable
+              headings={[
+                "Producto / Presentación / Ecomm ID",
+                "SKU / Marca",
+                showPrices ? "Precio / Stock" : "Disponibilidad",
+                "Mercado Libre",
+                "Tiendanube",
+                "Ficha y siguiente paso",
+                <span className="d-sr">Acciones</span>,
+              ]}
+            >
+              {filtered.map((p) => (
+                <tr
+                  key={p.id}
+                  className={selected?.id === p.id ? "d-selected" : ""}
+                >
+                  <td>
+                    <button
+                      className="d-product"
+                      onClick={() => update({ product: p.id, tab: "Ficha" })}
+                    >
+                      <span className={`d-thumbnail ${p.color}`}>
+                        {p.initials}
+                      </span>
+                      <span>
+                        <strong>{p.name}</strong>
+                        <small>
+                          {p.presentation} · {p.sku} · {p.id}
+                        </small>
+                        <span className="s-mobile-channels">
+                          <span>ML · {channelState(p, "ml")}</span>
+                          <span>TN · {channelState(p, "tn")}</span>
+                        </span>
+                      </span>
+                    </button>
+                  </td>
+                  <td>
+                    <strong className="d-sku">{p.sku}</strong>
+                    <small>{p.brand}</small>
+                  </td>
+                  <td>
+                    {showPrices && <strong>{money(p.price)}</strong>}
+                    <small>{p.stock} disponibles</small>
+                  </td>
+                  {(["ml", "tn"] as const).map((c) => (
+                    <td key={c} data-channel={c}>
+                      <Pill value={channelState(p, c)} />
+                      <small>{channelDetail(p, c)}</small>
+                    </td>
+                  ))}
+                  <td>
+                    <Pill value={editorialState(p)} />
+                    <small>{nextAction(p)}</small>
+                    <button
+                      className="o-quick"
+                      onClick={() =>
+                        update({
+                          product: p.id,
+                          tab: actionTab(p),
+                        })
+                      }
+                    >
+                      {nextAction(p)}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="d-open"
+                      aria-label={`Abrir ${p.id}`}
+                      onClick={() => update({ product: p.id, tab: "Ficha" })}
+                    >
+                      <Icon name="arrow-right" size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </CatalogTable>
+            {!filtered.length && (
+              <div className="d-empty">
+                <Icon name="search" size={30} />
+                <h3>No encontramos productos</h3>
+                <p>Probá otro nombre o quitá los filtros.</p>
+                <button
+                  onClick={() =>
+                    update({
+                      quality: "",
+                      view: "",
+                      work: "",
+                      mlState: "",
+                      tnState: "",
+                      q: "",
+                      status: "",
+                      brand: "",
+                      channel: "",
+                      conflict: "",
+                      action: "",
+                    })
+                  }
+                >
+                  Ver todo el catálogo
+                </button>
+              </div>
+            )}
+            <footer className="d-table-footer">
+              <span>
+                Mostrando {filtered.length} de {rows.length} variantes
+              </span>
+              <span>Identidad por Ecomm ID · nunca por SKU</span>
+            </footer>
+          </>
+        )}
+      </section>
+      <section
+        className="k-operations-summary"
+        aria-label="Acceso al centro de operaciones"
+      >
+        <div>
+          <strong>Centro de operaciones</strong>
+          <small>
+            Propuestas IA para varias variantes, preparación y resultados ·
+            simulación en memoria.
+          </small>
+        </div>
+        <button
+          aria-expanded={params.get("tools") === "1" || !!params.get("tool")}
+          aria-controls="catalog-operations"
+          onClick={() =>
+            update({
+              tools: params.get("tools") === "1" ? "" : "1",
+              tool: "",
+            })
+          }
+        >
+          Más acciones del catálogo
+        </button>
+      </section>
+      {(params.get("tools") === "1" || params.get("tool")) && (
+        <div id="catalog-operations">
+          <button
+            className="s-return"
+            onClick={() => {
+              document.getElementById("catalog")?.scrollIntoView();
+              document.getElementById("catalog-search")?.focus();
+            }}
+          >
+            Volver a búsqueda y productos ↑
+          </button>
+          <OperationsCenter
+            key={editorEpoch}
+            rows={rows}
+            active={params.get("tool") || ""}
+            onTool={(tool) => update({ tool })}
+            onChange={setRows}
+            onSelect={(product, tab) => update({ product, tab, tool: "" })}
+            jobs={jobs}
+            onJob={(job) => setJobs((old) => [...old, job])}
+            onDirty={setDirty}
+          />
+        </div>
+      )}
+      <details className="c-legend">
+        <summary>Cómo interpretar los estados de canal</summary>
+        <ul>
+          <li>
+            <strong>Publicado con evidencia:</strong> hay una referencia de
+            publicación y evidencia vigente de muestra.
+          </li>
+          <li>
+            <strong>Vinculación por revisar:</strong> la coincidencia es
+            candidata; requiere comparar la presentación y el Ecomm ID.
+          </li>
+          <li>
+            <strong>Sin publicación confirmada:</strong> no tenemos evidencia
+            suficiente. No demuestra que no esté publicado.
+          </li>
+          <li>
+            <strong>Listo para publicar:</strong> preparación interna completa;
+            revisar vigencia antes de cualquier publicación.
+          </li>
+          <li>
+            <strong>Información desactualizada o desconocida:</strong> no
+            permite confirmar el estado actual del canal.
+          </li>
+        </ul>
+      </details>
+      <p className="d-footnote">
+        <Icon name="help" size={15} /> Un SKU coincidente es una pista. Solo una
+        evidencia verificada confirma la publicación.
+      </p>
+      {selected && (
+        <ProductDrawer
+          id={selected.id}
+          title={selected.name}
+          subtitle={
+            <>
+              {selected.brand} · {selected.id}
+            </>
+          }
+          thumbnail={
+            <span className={`d-thumbnail ${selected.color}`}>
+              {selected.initials}
+            </span>
+          }
+          onClose={close}
+          closeRef={closeRef}
+          panelRef={panelRef}
+        >
+          <div className="d-drawer-status">
+            <Pill value={editorialState(selected)} />
+            <span>Catálogo central Ecomm-App</span>
+          </div>
+          <div
+            className="d-tabs"
+            role="tablist"
+            aria-label="Secciones de ficha"
+            onKeyDown={(e) => {
+              if (["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) {
+                e.preventDefault();
+                const i = tabs.indexOf(tab);
+                const next =
+                  e.key === "Home"
+                    ? 0
+                    : e.key === "End"
+                      ? tabs.length - 1
+                      : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+                        tabs.length;
+                update({ tab: tabs[next] });
+                document.getElementById(`tab-${tabs[next]}`)?.focus();
+              }
+            }}
+          >
+            {tabs.map((t) => (
+              <button
+                key={t}
+                role="tab"
+                className={t === "IA" ? "k-ai-tab" : undefined}
+                tabIndex={tab === t ? 0 : -1}
+                id={`tab-${t}`}
+                aria-controls="product-tabpanel"
+                aria-selected={tab === t}
+                onClick={() => update({ tab: t })}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <div
+            className="d-tab-content"
+            id="product-tabpanel"
+            role="tabpanel"
+            aria-labelledby={`tab-${tab}`}
+          >
+            <OperationalPanel
+              key={`${selected.id}-${editorEpoch}`}
+              product={selected}
+              tab={tab}
+              onChange={replaceProduct}
+              onTab={(next) => update({ tab: next })}
+              onDirty={setDirty}
+            />
+          </div>
+        </ProductDrawer>
+      )}
+      {params.get("settings") === "1" && (
+        <SettingsDialog
+          connections={<DemoConnections rows={rows} />}
+          advanced={advanced}
+          showPrices={showPrices}
+          onAdvanced={setAdvanced}
+          onPrices={setShowPrices}
+          onClose={() => update({ settings: "" })}
+        />
+      )}
+      {pending && (
+        <div
+          className="o-unsaved"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Cambios sin guardar"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setPending(null);
+              return;
+            }
+            if (e.key === "Tab") {
+              const buttons = e.currentTarget.querySelectorAll("button");
+              if (e.shiftKey && document.activeElement === buttons[0]) {
+                e.preventDefault();
+                buttons[buttons.length - 1].focus();
+              } else if (
+                !e.shiftKey &&
+                document.activeElement === buttons[buttons.length - 1]
+              ) {
+                e.preventDefault();
+                buttons[0].focus();
+              }
+            }
+          }}
+        >
+          <h3>Tenés cambios sin guardar</h3>
+          <p>
+            Podés seguir editando o descartar el trabajo pendiente. El catálogo
+            guardado no se modifica.
+          </p>
+          <button autoFocus onClick={() => setPending(null)}>
+            Seguir editando
+          </button>
+          <button
+            onClick={() => {
+              const run = pending;
+              setDirty(false);
+              setEditorEpoch((old) => old + 1);
+              setPending(null);
+              run();
+            }}
+          >
+            Descartar y continuar
+          </button>
+        </div>
+      )}
+    </CatalogFrame>
+  );
+}
+export function LegacyNotice() {
+  return (
+    <div className="d-legacy-banner">
+      Prototipo aislado · La herramienta original se conserva, pero sus
+      operaciones de red están deshabilitadas.{" "}
+      <a href="/">Volver al dashboard</a>
+    </div>
+  );
+}

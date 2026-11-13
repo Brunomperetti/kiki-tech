@@ -21,8 +21,17 @@ from .database.session import engine
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    Base.metadata.create_all(engine)
-    yield
+    # A v2 rollout requires an explicitly reviewed schema; never performs DDL.
+    # Preserve the historical bootstrap when v2 is disabled.
+    if get_settings().kiki_auto_create_schema and not get_settings().kiki_v2_enabled:
+        Base.metadata.create_all(engine)
+    from .database.session import SessionLocal
+    from .services.v2_lifecycle import start_executor, stop_executor
+    handle = start_executor(app, SessionLocal)
+    try:
+        yield
+    finally:
+        stop_executor(handle)
 
 
 def create_app(settings=None) -> FastAPI:
@@ -51,6 +60,34 @@ def create_app(settings=None) -> FastAPI:
     application.include_router(duplicate_review_router)
     application.include_router(ecomm_app_router)
     application.include_router(ecomm_api_workspace_router)
+    from .api.routes.v2 import router as v2_router, guard_request
+    from .database.session import SessionLocal
+    from fastapi import HTTPException
+    application.include_router(v2_router)
+
+    @application.middleware("http")
+    async def v2_boundary(request, call_next):
+        if request.headers.get("X-Kiki-UI") != "v2":
+            return await call_next(request)
+        try:
+            with SessionLocal() as db:
+                guard_request(request.url.path, request.method, db)
+            response = await call_next(request)
+        except HTTPException as exc:
+            response = JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        response.headers["X-Kiki-UI-Contract"] = "kiki-same-origin-v2-1"
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    from .api.routes.connections import router as connections_router
+    application.include_router(connections_router)
+    from .api.routes.documental_workspace import router as documental_router
+    application.include_router(documental_router)
+    from .api.routes.ecomm_api_channels import router as channel_router
+    application.include_router(channel_router)
+
+    from .api.routes.editorial_batches import router as editorial_router
+    application.include_router(editorial_router)
 
     @application.get("/health")
     def health():

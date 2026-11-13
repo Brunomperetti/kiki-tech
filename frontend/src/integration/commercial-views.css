@@ -1,0 +1,307 @@
+.k-commercial-views {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.k-commercial-views button {
+  background: white;
+  border: 1px solid #d3dfd7;
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: #285b4c;
+  font-size: 12px;
+  flex: 1;
+}
+.k-commercial-views button[aria-pressed="true"] {
+  background: #eaf2e7;
+  border-color: #75936a;
+}
+.k-commercial-views strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+.k-listings {
+  padding: 16px;
+}
+.k-listings p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.k-listings select {
+  padding: 8px;
+  border: 1px solid #cbd8cc;
+  border-radius: 8px;
+  max-width: 100%;
+}
+.k-listings-scroll {
+  overflow: auto;
+}
+.k-listings table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.k-listings th,
+.k-listings td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #dce5df;
+  vertical-align: top;
+}
+.k-listings small {
+  display: block;
+  margin-top: 6px;
+  color: #65775c;
+}
+.k-listings footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.k-quality-metrics {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.k-quality-metrics button {
+  padding: 8px 10px;
+  border: 1px solid #d3dfd7;
+  border-radius: 8px;
+  background: white;
+  color: #285b4c;
+  text-align: left;
+}
+.k-quality-metrics button[aria-pressed="true"] {
+  background: #eaf2e7;
+}
+.k-quality-metrics strong {
+  margin-left: 7px;
+}
+@media (max-width: 650px) {
+  .k-commercial-views button {
+    flex: 1 1 42%;
+    font-size: 11px;
+  }
+  .k-listings {
+    padding: 12px;
+  }
+  .k-listings th,
+  .k-listings td {
+    min-width: 130px;
+    padding: 9px;
+  }
+  .k-quality-metrics button {
+    font-size: 12px;
+  }
+}
+
+/* A working catalogue, with a compact header shared by both controllers. */
+.d-app .d-main {
+  padding-top: 18px !important;
+}
+.d-app .d-heading {
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.d-app .d-heading h1 {
+  font-size: 25px;
+  line-height: 1.2;
+  margin: 4px 0 7px;
+}
+.d-app .d-heading p {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.d-app .d-eyebrow {
+  display: none;
+}
+.d-app .d-topbar {
+  height: 46px;
+}
+.d-app .d-demo {
+  margin-bottom: 10px;
+  padding: 9px 12px;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric {
+  min-height: 82px;
+  padding: 9px 12px;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric strong {
+  font-size: 22px;
+  margin: 6px 0;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric > span {
+  font-size: 12px;
+}
+.d-app .i-commercial-overview > .c-metrics .d-metric small {
+  font-size: 10px;
+}
+@media (max-width: 760px) {
+  .d-app .d-sidebar {
+    padding: 10px 16px;
+  }
+  .d-app .d-sidebar nav {
+    margin-top: 8px;
+    gap: 4px;
+  }
+  .d-app .d-sidebar nav button {
+    min-height: 38px;
+    padding: 6px 9px;
+  }
+  .d-app .d-topbar {
+    min-height: 34px;
+    height: auto;
+    padding: 8px 16px;
+  }
+  .d-app .d-main {
+    padding: 14px 16px !important;
+  }
+  .d-app .d-heading h1 {
+    font-size: 21px;
+    max-width: none;
+  }
+  .d-app .d-heading > .d-primary {
+    margin-top: 9px;
+    padding: 8px 12px;
+  }
+  .d-app .d-demo {
+    font-size: 10px;
+    line-height: 1.45;
+  }
+  .d-app .s-count-note {
+    margin: 8px 0;
+    line-height: 1.4;
+  }
+}
+
+.d-app .k-preparation > .c-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+.k-preparation .d-metric {
+  min-height: 86px;
+  padding: 12px 15px;
+  border-left: 3px solid #80a769;
+}
+.k-preparation .d-metric > span {
+  font-size: 13px;
+}
+.k-preparation .d-metric strong {
+  font-size: 24px;
+  margin: 5px 0;
+}
+.k-preparation .d-metric small {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.d-tabs .k-ai-tab {
+  font-weight: 750;
+  color: #285544;
+  background: #edf5e7;
+  border-color: #8ba77a;
+}
+.d-tabs .k-ai-tab[aria-selected="true"] {
+  background: #285544;
+  color: #fff;
+}
+.k-ai-workflow {
+  border: 1px solid #bfd1b4;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 0 0 14px;
+  background: #f5f8f1;
+}
+.k-ai-workflow h3 {
+  margin: 0 0 10px;
+}
+.k-ai-workflow p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.k-ai-workflow .d-primary {
+  max-width: 100%;
+  white-space: normal;
+}
+.k-ai-entry {
+  margin-bottom: 12px;
+}
+.k-operations-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border: 1px solid #dce5df;
+  border-radius: 9px;
+  background: white;
+}
+.k-operations-summary small {
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+  color: #65775c;
+}
+.k-operations-caption {
+  font-size: 11px;
+  color: #53674e;
+}
+.k-open-editor {
+  font-size: 11px;
+  margin-top: 6px;
+}
+.i-secondary .c-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.i-secondary .d-metric {
+  min-height: 100px;
+  padding: 12px;
+}
+.i-secondary .d-metric strong {
+  font-size: 24px;
+  margin: 6px 0;
+}
+@media (max-width: 760px) {
+  .k-preparation .d-metric {
+    min-height: 96px;
+    padding: 10px;
+  }
+  .k-preparation .d-metric small {
+    font-size: 10px;
+  }
+  .k-operations-summary {
+    flex-wrap: wrap;
+  }
+  .i-secondary .c-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .k-operations-caption {
+    flex-basis: 100%;
+  }
+}
+/* Override the historical eight-card grid spans in the compact two-card row. */
+.d-app .k-preparation > .c-metrics > .d-metric:nth-child(n) {
+  grid-column: auto;
+  min-height: 90px;
+}
+.d-app .k-preparation .d-metric > span {
+  min-height: 0;
+}
+.d-app .i-more-metrics > .c-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.d-app .i-more-metrics > .c-metrics > .d-metric:nth-child(n) {
+  grid-column: auto;
+  min-height: 100px;
+}
+@media (max-width: 760px) {
+  .d-app .i-more-metrics > .c-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -4,6 +4,7 @@ A SKU match is NOT a verified linkage or proof of a correct listing. Missing
 SKU evidence in old snapshots does NOT prove an item is unpublished. Never
 use the historical Ecomm XLSX or ML spreadsheet as a fallback.
 """
+
 from collections import Counter, defaultdict
 
 from sqlalchemy import select
@@ -34,7 +35,9 @@ def _review_candidate(candidate, source_name, source_sku, *, is_combo, source_gt
         other = _text(candidate["ean"])
         if _valid_ean(source_gtin) and _valid_ean(other) and source_gtin != other:
             return "GTIN_CONFLICT"
-    if actual_name and variant_conflict(source_name, source_sku, actual_name, source_sku):
+    if actual_name and variant_conflict(
+        source_name, source_sku, actual_name, source_sku
+    ):
         return "PRESENTATION_CONFLICT"
     # A pack needs proof of composition; a matching string is insufficient.
     if is_combo:
@@ -42,38 +45,60 @@ def _review_candidate(candidate, source_name, source_sku, *, is_combo, source_gt
     return "SKU_CANDIDATE"
 
 
-def _channel_result(rows, *, snapshot_available, original_name, sku, is_combo,
-                    source_gtin, ambiguous_api_sku, name_field, snapshot_at,
-                    source):
+def _channel_result(
+    rows,
+    *,
+    snapshot_available,
+    original_name,
+    sku,
+    is_combo,
+    source_gtin,
+    ambiguous_api_sku,
+    name_field,
+    snapshot_at,
+    source,
+):
     base = {
-        "source": source, "snapshot_available": snapshot_available,
+        "source": source,
+        "snapshot_available": snapshot_available,
         "snapshot_at": snapshot_at,
-        "status": "UNAVAILABLE", "matching_rows": 0,
-        "listing_ids": [], "candidate_name": None,
+        "status": "UNAVAILABLE",
+        "matching_rows": 0,
+        "listing_ids": [],
+        "candidate_name": None,
         "candidate_quality": {
-            "title_present": False, "brand_present": False,
-            "description_present": False, "ean_present": False,
+            "title_present": False,
+            "brand_present": False,
+            "description_present": False,
+            "ean_present": False,
         },
-        "note": "", "confirmed_listing": False,
+        "note": "",
+        "confirmed_listing": False,
     }
     if not snapshot_available:
-        return {**base, "note": "Falta una captura del canal. No se puede afirmar si está publicado."}
+        return {
+            **base,
+            "note": "Falta una captura del canal. No se puede afirmar si está publicado.",
+        }
     if not sku or ambiguous_api_sku:
         return {
-            **base, "status": "AMBIGUOUS_API_SKU",
+            **base,
+            "status": "AMBIGUOUS_API_SKU",
             "note": "El SKU Ecomm falta o tiene varios dueños. No se asignan publicaciones.",
         }
     if not rows:
         return {
-            **base, "status": "NO_EXACT_SKU_IN_SNAPSHOT",
+            **base,
+            "status": "NO_EXACT_SKU_IN_SNAPSHOT",
             "note": "Sin coincidencia por SKU exacto en la copia; NO prueba ausencia real de publicación.",
         }
     if len(rows) != 1:
         return {
-            **base, "status": "MULTIPLE_SKU_ROWS", "matching_rows": len(rows),
+            **base,
+            "status": "MULTIPLE_SKU_ROWS",
+            "matching_rows": len(rows),
             "listing_ids": [
-                _text(row.get("external_id") or row.get("slug"))
-                for row in rows
+                _text(row.get("external_id") or row.get("slug")) for row in rows
             ][:8],
             "note": "El SKU apunta a varias filas del canal. Revisar variantes y duplicados.",
         }
@@ -88,32 +113,66 @@ def _channel_result(rows, *, snapshot_available, original_name, sku, is_combo,
         "GTIN_CONFLICT": "SKU igual, pero los GTIN válidos informados son diferentes.",
     }[kind]
     return {
-        **base, "status": kind, "matching_rows": 1,
+        **base,
+        "status": kind,
+        "matching_rows": 1,
         "listing_ids": [_text(row.get("external_id") or row.get("slug"))],
         "candidate_name": _text(row.get(name_field)) or None,
         "candidate_quality": {
             "title_present": bool(_text(row.get(name_field))),
             "brand_present": bool(_text(row.get("brand"))),
-            "description_present": bool(row.get("description_present")) if source == "TIENDANUBE_CSV" else False,
+            "description_present": bool(row.get("description_present"))
+            if source == "TIENDANUBE_CSV"
+            else False,
             "ean_present": bool(_valid_ean(row.get("ean_raw") or row.get("ean"))),
         },
-        "note": note, "confirmed_listing": False,
-        "listing_statuses": [_text(row.get("status"))] if source == "MERCADOLIBRE_API" else [],
+        "note": note,
+        "confirmed_listing": False,
+        "listing_statuses": [_text(row.get("status"))]
+        if source == "MERCADOLIBRE_API"
+        else [],
     }
 
 
-def build_channel_coverage(db, pages):
+def build_channel_coverage(
+    db, pages, *, api_validation=False, edits=None, now=None, snapshots=None
+):
     """Map all API variant IDs to independently classified channel evidence."""
-    ml_snap = db.scalar(select(CatalogSnapshot).where(
-        CatalogSnapshot.source == "MERCADOLIBRE_API"
-    ))
-    tn_snap = db.scalar(select(CatalogSnapshot).where(
-        CatalogSnapshot.source == "TIENDANUBE"
-    ))
+    ml_snap = (
+        snapshots.get("MERCADOLIBRE_API")
+        if snapshots is not None
+        else db.scalar(
+            select(CatalogSnapshot).where(CatalogSnapshot.source == "MERCADOLIBRE_API")
+        )
+    )
+    tn_snap = (
+        snapshots.get("TIENDANUBE")
+        if snapshots is not None
+        else db.scalar(
+            select(CatalogSnapshot).where(CatalogSnapshot.source == "TIENDANUBE")
+        )
+    )
     ml_rows = ml_snap.payload if ml_snap and isinstance(ml_snap.payload, list) else []
     tn_rows = tn_snap.payload if tn_snap and isinstance(tn_snap.payload, list) else []
     ml_available = bool(ml_rows)
     tn_available = bool(tn_rows)
+
+    if api_validation:
+        from datetime import datetime, timezone
+        from .ecomm_api_channel_evidence import (
+            load_reviews,
+            source_identity,
+            enrich,
+            row_key,
+        )
+
+        reviews = load_reviews(db)
+        reviews["row_counts"] = {
+            "ml": Counter(row_key("ml", r) for r in ml_rows if isinstance(r, dict)),
+            "tn": Counter(row_key("tn", r) for r in tn_rows if isinstance(r, dict)),
+        }
+        now = now or datetime.now(timezone.utc)
+        edits = edits or {}
 
     sku_owners = Counter()
     for page in pages:
@@ -161,71 +220,118 @@ def build_channel_coverage(db, pages):
                 sku = _text(var.get("sku"))
                 if not ident:
                     continue
-                name = _text(parent.get("description") or var.get("variant_description"))
+                name = _text(
+                    parent.get("description") or var.get("variant_description")
+                )
                 combo = var.get("is_combo") is True or parent.get("is_combo") is True
                 gtin = _text(var.get("gtin") or var.get("barcode"))
                 ambiguous = bool(sku and sku_owners[_sku(sku)] != 1)
                 ml = _channel_result(
-                    ml_index.get(_sku(sku), []), snapshot_available=ml_available,
-                    original_name=name, sku=sku, is_combo=combo,
-                    source_gtin=gtin, ambiguous_api_sku=ambiguous,
+                    ml_index.get(_sku(sku), []),
+                    snapshot_available=ml_available,
+                    original_name=name,
+                    sku=sku,
+                    is_combo=combo,
+                    source_gtin=gtin,
+                    ambiguous_api_sku=ambiguous,
                     name_field="title",
                     snapshot_at=ml_snap.updated_at.isoformat() if ml_snap else None,
                     source="MERCADOLIBRE_API",
                 )
                 tn = _channel_result(
-                    tn_index.get(_sku(sku), []), snapshot_available=tn_available,
-                    original_name=name, sku=sku, is_combo=combo,
-                    source_gtin=gtin, ambiguous_api_sku=ambiguous,
+                    tn_index.get(_sku(sku), []),
+                    snapshot_available=tn_available,
+                    original_name=name,
+                    sku=sku,
+                    is_combo=combo,
+                    source_gtin=gtin,
+                    ambiguous_api_sku=ambiguous,
                     name_field="name",
                     snapshot_at=tn_snap.updated_at.isoformat() if tn_snap else None,
                     source="TIENDANUBE_CSV",
                 )
-                both_candidate = ml["status"] == "SKU_CANDIDATE" and tn["status"] == "SKU_CANDIDATE"
+                if api_validation:
+                    identity = source_identity(
+                        parent, var, page.get("captured_at"), edits.get(ident)
+                    )
+                    ml = enrich(
+                        ml, "ml", ml_index.get(_sku(sku), []), identity, reviews, now
+                    )
+                    tn = enrich(
+                        tn, "tn", tn_index.get(_sku(sku), []), identity, reviews, now
+                    )
+                both_candidate = (
+                    ml["status"] == "SKU_CANDIDATE" and tn["status"] == "SKU_CANDIDATE"
+                )
                 neither_exact = (
                     ml["status"] == "NO_EXACT_SKU_IN_SNAPSHOT"
                     and tn["status"] == "NO_EXACT_SKU_IN_SNAPSHOT"
                 )
                 risk = any(
-                    item["status"] in (
-                        "MULTIPLE_SKU_ROWS", "PRESENTATION_CONFLICT",
-                        "GTIN_CONFLICT", "PACK_REVIEW", "AMBIGUOUS_API_SKU"
+                    item["status"]
+                    in (
+                        "MULTIPLE_SKU_ROWS",
+                        "PRESENTATION_CONFLICT",
+                        "GTIN_CONFLICT",
+                        "PACK_REVIEW",
+                        "AMBIGUOUS_API_SKU",
                     )
                     for item in (ml, tn)
                 )
                 combined = (
-                    "IDENTITY_REVIEW" if risk else
-                    "BOTH_CHANNELS_CANDIDATE" if both_candidate else
-                    "NO_EXACT_EVIDENCE_IN_BOTH_SNAPSHOTS" if neither_exact else
-                    "SOURCES_UNAVAILABLE" if not ml_available and not tn_available else
-                    "PARTIAL_CHANNEL_EVIDENCE"
+                    "IDENTITY_REVIEW"
+                    if risk
+                    else "BOTH_CHANNELS_CANDIDATE"
+                    if both_candidate
+                    else "NO_EXACT_EVIDENCE_IN_BOTH_SNAPSHOTS"
+                    if neither_exact
+                    else "SOURCES_UNAVAILABLE"
+                    if not ml_available and not tn_available
+                    else "PARTIAL_CHANNEL_EVIDENCE"
                 )
                 totals["ml"][ml["status"]] += 1
                 totals["tn"][tn["status"]] += 1
                 totals["combined"][combined] += 1
                 records[ident] = {
-                    "ecomm_id": ident, "sku": sku, "ml": ml, "tn": tn,
-                    "combined": combined, "review_required": risk,
+                    "ecomm_id": ident,
+                    "sku": sku,
+                    "ml": ml,
+                    "tn": tn,
+                    **({"identity": identity} if api_validation else {}),
+                    "combined": combined,
+                    "review_required": risk,
                     "never_confirmed_by_sku_alone": True,
                 }
 
     return {
         "items_by_id": records,
+        "api_validation_enabled": api_validation,
         "summary": {
             "api_variants": len(records),
-            "ml": dict(totals["ml"]), "tn": dict(totals["tn"]),
+            "ml": dict(totals["ml"]),
+            "tn": dict(totals["tn"]),
             "combined": dict(totals["combined"]),
             "ml_rows_unmatchable_variation_sku": ml_variations_missing_sku,
+            "confirmed_ml_listings": sum(
+                r["ml"].get("confirmed_listing_count", 0) for r in records.values()
+            ),
+            "verified_tn_rows": sum(
+                sum(c["identity_verified"] for c in r["tn"].get("candidates", []))
+                for r in records.values()
+            ),
+            "tn_publication_observable": False,
         },
         "sources": {
             "ecomm": STAGE_SOURCE,
             "ml": {
-                "name": "MERCADOLIBRE_API", "available": ml_available,
+                "name": "MERCADOLIBRE_API",
+                "available": ml_available,
                 "updated_at": ml_snap.updated_at.isoformat() if ml_snap else None,
                 "rows": len(ml_rows),
             },
             "tn": {
-                "name": "TIENDANUBE_CSV", "available": tn_available,
+                "name": "TIENDANUBE_CSV",
+                "available": tn_available,
                 "updated_at": tn_snap.updated_at.isoformat() if tn_snap else None,
                 "rows": len(tn_rows),
             },

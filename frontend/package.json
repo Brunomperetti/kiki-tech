@@ -5,7 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build"
+    "build": "tsc -b && vite build",
+    "build:integration": "tsc -b && node scripts/build-integration.mjs",
+    "build:production": "tsc -b && node scripts/build-production.mjs",
+    "test:integration": "playwright test --config playwright.integration.config.ts",
+    "test:pilot": "playwright test --config playwright.pilot.config.ts",
+    "test": "playwright test",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "react": "18.3.1",
@@ -13,6 +19,7 @@
     "react-router-dom": "6.28.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "typescript": "5.7.2",

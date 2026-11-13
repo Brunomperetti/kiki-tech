@@ -1,0 +1,62 @@
+{
+  "base_commit": "ea87954a45ed4785d66025c61e471da3382c16d6",
+  "data": "synthetic only; benchmark has no complete documents for all 5000 variants",
+  "postgresql": "16.6 disposable, Unix socket, network:none",
+  "ai_real_usd": 0,
+  "equivalent_benchmark": {
+    "variants": 5000,
+    "selection": "same explicit IDs, same capture, no complete documents",
+    "baseline_2q_sync": {
+      "seconds": 10.14,
+      "queries": 1407,
+      "python_peak_mib": 7.54
+    },
+    "new_http_enqueue": {
+      "seconds": 0.945,
+      "queries": 58,
+      "python_peak_mib": 7.06
+    },
+    "new_background_analysis": {
+      "seconds": 11.38,
+      "queries": 1057,
+      "python_peak_mib": 8.35
+    },
+    "summaries_hash_and_all_identity_versions_equal": true,
+    "new_total": {
+      "seconds": 12.325,
+      "queries": 1115,
+      "note": "enqueue plus background analysis; recoverability overhead increases total time"
+    }
+  },
+  "backend_and_gateway_passed": 208,
+  "legacy_backend_passed": 484,
+  "new_autonomous_backend_passed": 15,
+  "real_worker_death_two_executors_and_backend_restart": "PASS: 1000 unique tasks, no commercial writes",
+  "demo_playwright_passed": 46,
+  "queue_benchmark": {
+    "variants": 5000,
+    "page_limit": 50,
+    "queries": 8,
+    "seconds": 2.39,
+    "python_peak_mib": 27.74,
+    "response_bytes": 134357
+  },
+  "connected_playwright_passed": 138,
+  "authentic_pilot_playwright_passed": 2,
+  "scenario_playwright_passed": {
+    "channels": 8,
+    "batches": 8,
+    "autonomous": 8
+  },
+  "total_playwright_passed": 210,
+  "static_checks": {
+    "typescript": "PASS",
+    "build": "PASS",
+    "integration_build": "PASS",
+    "ruff": "PASS",
+    "format_changed_modules": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "production_calls": 0,
+  "production_changes": 0
+}

@@ -1,0 +1,40 @@
+{
+  "base_commit": "96a7f36c8970cce7c497da52daec25c3a4a89fd5",
+  "data": "six synthetic variants and synthetic channels; authentic user-supplied Hileret PDF; no genuine Ecomm identity",
+  "backend_and_gateway_passed": 210,
+  "legacy_backend_passed": 484,
+  "playwright_suites_passed": {
+    "integral-final": [
+      4
+    ],
+    "regresion": [
+      138,
+      2
+    ],
+    "canales": [
+      8
+    ],
+    "lotes": [
+      8
+    ],
+    "demo": [
+      46
+    ]
+  },
+  "playwright_total_passed": 206,
+  "openai": {
+    "original_service_read_only_integrated": true,
+    "live_generation_enabled": false,
+    "real_calls": 0,
+    "usd_authorized": "0.00",
+    "monetary_budget_implementation_not_verified": true
+  },
+  "external_research": {
+    "real_network_enabled": false,
+    "live_calls": 0,
+    "https_transport_validated_with_simulators": true
+  },
+  "windows": "WSL2 procedure documented; actual Windows session not available",
+  "production_access": false,
+  "exact_up_presentation_smoke": "PASS: strict HTTPS, login, six variants, no paid quota, authentic PDF, save/reload, disposal"
+}

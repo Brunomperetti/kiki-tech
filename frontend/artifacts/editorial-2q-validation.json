@@ -1,0 +1,31 @@
+{
+  "queue": {
+    "variants": 5000,
+    "queue_seconds": 3.776,
+    "queries": 8,
+    "python_peak_mb": 27.71,
+    "response_bytes": 134357
+  },
+  "batch": {
+    "preview_variants": 5000,
+    "preview_seconds": 6.56,
+    "step_items": 5,
+    "step_seconds": 0.083
+  },
+  "base_commit": "523237fd7977cb51d63c1e2a395d9d2cb7d60428",
+  "data": "exclusively synthetic",
+  "postgresql": "16.6 disposable / Unix socket",
+  "real_ai_usd": 0,
+  "backend_test_modules_passed": 185,
+  "gateway_passed": 8,
+  "legacy_backend_passed": 484,
+  "actual_disposable_backend_restart": "PASS",
+  "demo_playwright_passed": 46,
+  "batch_playwright_passed": 8,
+  "benchmark_scope": "5000 synthetic captured variants, without 5000 complete commercial records or full documents",
+  "connected_regression_playwright_passed": 138,
+  "authentic_hileret_playwright_passed": 2,
+  "channels_playwright_passed": 8,
+  "total_playwright_passed": 202,
+  "total_backend_and_gateway_passed": 677
+}

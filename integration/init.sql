@@ -1,0 +1,4 @@
+CREATE ROLE kiki_integration LOGIN PASSWORD 'kiki-synthetic-only'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+CREATE DATABASE kiki_integration OWNER kiki_integration;
+COMMENT ON DATABASE kiki_integration IS 'KIKI_LOCAL_SYNTHETIC_2B';

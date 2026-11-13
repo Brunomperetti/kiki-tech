@@ -220,7 +220,8 @@ class EcommApiProductWorkspace:
         return pages
 
     def _source(self, ecomm_id: str) -> dict:
-        if not ecomm_id or len(ecomm_id) > 120:
+        from ..integrations.ecomm_app.api_catalog_browser import api_variant_row, valid_variant_id
+        if not valid_variant_id(ecomm_id):
             raise ValueError("ID de variante Ecomm inválido.")
         matches = []
         for page in self._source_pages():
@@ -230,6 +231,7 @@ class EcommApiProductWorkspace:
                         continue
                     if str(variant.get("id")) == ecomm_id:
                         matches.append({
+                            **api_variant_row(parent, variant, page.get("captured_at")),
                             "ecomm_id": ecomm_id,
                             "sku": str(variant.get("sku") or "").strip(),
                             "product_name": str(parent.get("description") or "").strip(),
@@ -278,6 +280,8 @@ class EcommApiProductWorkspace:
         normalized = _canonical_fields(fields)
         _validate(normalized, status)
         source = self._source(ecomm_id)
+        if source.get("identity_blockers"):
+            raise ValueError("Identidad contradictoria: barcode y gtin discrepan. Guardado bloqueado.")
         edit = self.db.scalar(
             select(EcommApiProductEdit)
             .where(EcommApiProductEdit.ecomm_id == ecomm_id)
