@@ -519,3 +519,37 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Ecomm-App GTIN evidence: intentionally independent of catalog master and channel state */
+.k-gtin-import,
+.k-gtin-evidence {
+  background: #f7faf7;
+  border: 1px solid #d4e4d8;
+  border-radius: 12px;
+  padding: 15px 17px;
+  margin: 12px 0;
+}
+.k-gtin-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; }
+.k-gtin-head strong, .k-gtin-evidence > strong { color: #174634; font-size: 16px; }
+.k-gtin-head p, .k-gtin-note, .k-gtin-evidence p { font-size: 12px; line-height: 1.5; margin: 5px 0; }
+.k-gtin-head > span { white-space: nowrap; color: #35624e; font-size: 12px; font-weight: 600; }
+.k-gtin-numbers { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin: 13px 0; }
+.k-gtin-numbers > div { background: white; border: 1px solid #e0eae2; border-radius: 8px; padding: 10px; display: grid; gap: 4px; }
+.k-gtin-numbers b { font-size: 23px; color: #183f30; }
+.k-gtin-numbers small { color: #53655b; font-size: 11px; }
+.k-gtin-upload { margin-top: 12px; }
+.k-gtin-upload summary { cursor: pointer; font-size: 13px; font-weight: 700; }
+.k-gtin-upload input { margin: 10px 10px 10px 0; font-size: 12px; max-width: 100%; }
+.k-gtin-upload button { background: #245540; color: white; border: 0; border-radius: 7px; padding: 9px 12px; cursor: pointer; }
+.k-gtin-upload button:disabled { opacity: .5; cursor: default; }
+.k-gtin-error { color: #ad2d25; font-weight: 650; }
+.k-gtin-success { color: #236040; font-weight: 650; }
+.k-gtin-evidence { margin: 10px 0 6px; padding: 12px; }
+.k-gtin-code { font-size: 21px; font-weight: 750; margin-top: 8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.k-gtin-evidence small { font-size: 11px; color: #526f5f; line-height: 1.45; }
+@media (max-width: 780px) {
+  .k-gtin-numbers { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .k-gtin-head { flex-direction: column; gap: 3px; }
+  .k-gtin-numbers b { font-size: 19px; }
+}
