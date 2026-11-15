@@ -343,20 +343,24 @@ def build_channel_coverage(
     include_reverse=False,
 ):
     """Map all API variant IDs to independently classified channel evidence."""
-    ml_snap = (
-        snapshots.get("MERCADOLIBRE_API")
-        if snapshots is not None
-        else db.scalar(
-            select(CatalogSnapshot).where(CatalogSnapshot.source == "MERCADOLIBRE_API")
-        )
-    )
-    tn_snap = (
-        snapshots.get("TIENDANUBE")
-        if snapshots is not None
-        else db.scalar(
-            select(CatalogSnapshot).where(CatalogSnapshot.source == "TIENDANUBE")
-        )
-    )
+    from .ecomm_gtin_export_service import SOURCE as GTIN_EXPORT_SOURCE
+
+    if snapshots is None:
+        captures = {
+            capture.source: capture
+            for capture in db.scalars(
+                select(CatalogSnapshot).where(
+                    CatalogSnapshot.source.in_(
+                        ["MERCADOLIBRE_API", "TIENDANUBE", GTIN_EXPORT_SOURCE]
+                    )
+                )
+            )
+        }
+    else:
+        captures = snapshots
+    ml_snap = captures.get("MERCADOLIBRE_API")
+    tn_snap = captures.get("TIENDANUBE")
+    gtin_export_snap = captures.get(GTIN_EXPORT_SOURCE)
     ml_rows = ml_snap.payload if ml_snap and isinstance(ml_snap.payload, list) else []
     tn_rows = tn_snap.payload if tn_snap and isinstance(tn_snap.payload, list) else []
     ml_available = ml_snap is not None and isinstance(ml_snap.payload, list)
@@ -426,7 +430,7 @@ def build_channel_coverage(
     }
     from .ecomm_gtin_export_service import safe_gtin_candidates_for_pages
 
-    export_codes = safe_gtin_candidates_for_pages(db, pages)
+    export_codes = safe_gtin_candidates_for_pages(db, pages, export_record=gtin_export_snap)
     records = {}
     totals = {"ml": Counter(), "tn": Counter(), "combined": Counter()}
     for page in pages:
