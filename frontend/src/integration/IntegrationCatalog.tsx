@@ -722,14 +722,18 @@ export function IntegrationCatalog() {
           />
         </details>
         <section className="i-more-metrics i-quality" aria-label="Calidad del catálogo">
-          <h3>Calidad del catálogo</h3>
+          <h3>Auditoría real del inventario Ecomm-App</h3>
           <p className="s-count-note">
-            Datos reales de la API Ecomm-App y el Excel GTIN vinculado por Ecomm ID + SKU.
-            Los códigos compartidos no prueban productos duplicados.
+            Se analizan todas las variantes de la captura API y los GTIN del Excel, no solamente
+            las fichas editadas en KIKI. Tocá un indicador para ver los productos correspondientes.
           </p>
-          <div className="k-quality-metrics" role="group" aria-label="Calidad de GTIN y SKU">
-            {(["ean_missing", "ean_repeated", "sku_repeated", "barcode_gtin_conflict"] as const).map((key) => (
-              <button type="button" key={key} aria-pressed={filter.split("+").includes(key)}
+          <div className="k-quality-metrics" role="group" aria-label="Auditoría de datos del inventario">
+            {([
+              "ean_missing", "ean_repeated",
+              "source_title_short", "source_variant_short",
+            ] as const).map((key) => (
+              <button type="button" key={key}
+                aria-pressed={filter.split("+").includes(key)}
                 onClick={() => update({
                   view: "", filter: filter.split("+").includes(key) ? "" : key,
                   page: "", product: "", tab: "",
@@ -740,10 +744,35 @@ export function IntegrationCatalog() {
             ))}
           </div>
           <p className="s-count-note">
-            <strong>Desde la API de Ecomm-App:</strong> {data?.summary?.source_name_present ?? "—"} variantes con nombre
-            · {data?.summary?.source_variant_description_present ?? "—"} con descripción de variante.
-            Los códigos GTIN válidos del Excel se informan arriba.
+            <strong>Datos efectivamente presentes en la captura:</strong>{" "}
+            {data?.summary?.source_name_present ?? "—"} con nombre original;{" "}
+            {data?.summary?.source_variant_description_present ?? "—"} con presentación.
+            «Breve» significa menos de 25 caracteres: es una señal para revisar,
+            no prueba que el texto esté mal.
           </p>
+          <details className="i-more-metrics">
+            <summary>Integridad de nombres, SKU y campos de origen</summary>
+            <div className="k-quality-metrics" role="group" aria-label="Integridad de captura Ecomm-App">
+              {([
+                "source_title_missing", "source_variant_missing",
+                "sku_repeated", "barcode_gtin_conflict",
+              ] as const).map(key => (
+                <button type="button" key={key} aria-pressed={filter.split("+").includes(key)}
+                  onClick={() => update({
+                    view: "", filter: filter.split("+").includes(key) ? "" : key,
+                    page: "", product: "", tab: "",
+                  })}
+                >
+                  {queueFilters[key]} <strong>{data?.summary?.[key] ?? "—"}</strong>
+                </button>
+              ))}
+            </div>
+            <p className="s-count-note">
+              Imágenes y categorías no se conservan en la captura actual de KIKI:
+              no podemos afirmar cuántos productos las tienen o no en Ecomm-App.
+              Los GTIN del Excel se incorporan solo con Ecomm ID y SKU coincidentes.
+            </p>
+          </details>
           <details className="i-more-metrics">
             <summary>Campos pendientes en fichas editoriales iniciadas</summary>
             <p className="s-count-note">

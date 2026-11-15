@@ -64,3 +64,53 @@ def test_mismatched_export_never_changes_quality():
         "rows": [{"ecomm_id": "101", "sku": "OLD", "gtin": "7793396000039"}],
     }])
     assert export_quality_for_pages(api_page(), snapshot) == {}
+
+
+
+def test_source_quality_measures_real_api_fields_not_editorial_overlay():
+    pages = api_page()
+    index = identity_index(pages)
+    source = {
+        "ecomm_id": "101", "sku": "A-1", "gtin_raw": None, "barcode": None,
+        "product_name": "Producto con nombre completo y detallado",
+        "variant_description": "Presentación larga con suficientes caracteres",
+    }
+    complete = flags(source, None, index)
+    assert "source_title_missing" not in complete
+    assert "source_variant_missing" not in complete
+    assert "source_title_short" not in complete
+    assert "source_variant_short" not in complete
+    assert "short_description_missing" not in complete
+
+    title_short = flags({**source, "product_name": "Corto"}, None, index)
+    assert "source_title_short" in title_short
+    assert "source_variant_short" not in title_short
+
+    variant_short = flags({**source, "variant_description": "50 g"}, None, index)
+    assert "source_variant_short" in variant_short
+    assert "source_title_short" not in variant_short
+
+    absent = flags({**source, "product_name": None, "variant_description": ""}, None, index)
+    assert "source_title_missing" in absent
+    assert "source_variant_missing" in absent
+    assert "source_title_short" not in absent
+    assert "source_variant_short" not in absent
+
+
+def test_source_quality_keeps_same_flags_when_editorial_fiche_is_started():
+    pages = api_page()
+    index = identity_index(pages)
+    source = {
+        "ecomm_id": "101", "sku": "A-1", "gtin_raw": None, "barcode": None,
+        "product_name": "Producto breve",
+        "variant_description": "750 g",
+    }
+    untouched = flags(source, None, index)
+    started = flags(source, SimpleNamespace(fields={}), index)
+    source_keys = {
+        "source_title_short", "source_variant_short",
+        "source_title_missing", "source_variant_missing",
+    }
+    assert set(untouched) & source_keys == set(started) & source_keys
+    assert "commercial_incomplete" not in untouched
+    assert "commercial_incomplete" in started
