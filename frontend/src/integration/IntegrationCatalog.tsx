@@ -24,6 +24,7 @@ import {
   CatalogFrame,
   CatalogTable,
   CatalogSearch,
+  CatalogMetrics,
   ProductDrawer,
 } from "../prototype/CatalogView";
 import { FormEvent, useEffect, useRef, useState } from "react";
@@ -694,6 +695,216 @@ export function IntegrationCatalog() {
             })
           }
         />
+        </details>
+        <details className="i-more-metrics k-preparation">
+          <summary>Preparación interna para publicar (requiere validación)</summary>
+          <CatalogMetrics
+            label="Preparación por canal"
+            cards={(["ml", "tn"] as const).map((channel) => ({
+              id: `${channel}-ready`,
+              title: `Listos para ${channel === "ml" ? "Mercado Libre" : "Tiendanube"}`,
+              value:
+                data?.summary?.[`${channel}_ready_without_confirmation`] ?? "—",
+              note: "Ficha completa interna, sin confirmación en este canal. Falta verificar identidad y vigencia; no publica.",
+              active: filter === `ready_for_channels+${channel}_unconfirmed`,
+              onClick: () =>
+                update({
+                  filter:
+                    filter === `ready_for_channels+${channel}_unconfirmed`
+                      ? ""
+                      : `ready_for_channels+${channel}_unconfirmed`,
+                  view: "",
+                  page: "",
+                  product: "",
+                  tab: "",
+                }),
+            }))}
+          />
+        </details>
+        <section className="i-more-metrics i-quality" aria-label="Calidad del catálogo">
+          <h3>Calidad del catálogo</h3>
+          <p className="s-count-note">
+            Datos reales de la API Ecomm-App y el Excel GTIN vinculado por Ecomm ID + SKU.
+            Los códigos compartidos no prueban productos duplicados.
+          </p>
+          <div className="k-quality-metrics" role="group" aria-label="Calidad de GTIN y SKU">
+            {(["ean_missing", "ean_repeated", "sku_repeated", "barcode_gtin_conflict"] as const).map((key) => (
+              <button type="button" key={key} aria-pressed={filter.split("+").includes(key)}
+                onClick={() => update({
+                  view: "", filter: filter.split("+").includes(key) ? "" : key,
+                  page: "", product: "", tab: "",
+                })}
+              >
+                {queueFilters[key]} <strong>{data?.summary?.[key] ?? "—"}</strong>
+              </button>
+            ))}
+          </div>
+          <p className="s-count-note">
+            <strong>Desde la API de Ecomm-App:</strong> {data?.summary?.source_name_present ?? "—"} variantes con nombre
+            · {data?.summary?.source_variant_description_present ?? "—"} con descripción de variante.
+            Los códigos GTIN válidos del Excel se informan arriba.
+          </p>
+          <details className="i-more-metrics">
+            <summary>Campos pendientes en fichas editoriales iniciadas</summary>
+            <p className="s-count-note">
+              Solo se cuentan las fichas que alguien empezó a editar en KIKI.
+              No confundir con los campos originales que ya trae Ecomm-App.
+            </p>
+            <div className="k-quality-metrics" role="group" aria-label="Fichas iniciadas pendientes">
+              {([
+                "short_description_missing", "long_description_missing", "commercial_title_missing",
+                "category_missing", "subcategory_missing", "attributes_missing", "images_missing",
+                "video_unrecorded", "seo_missing", "commercial_incomplete",
+              ] as const).map(key => (
+                <button type="button" key={key} aria-pressed={filter.split("+").includes(key)}
+                  onClick={() => update({
+                    view: "", filter: filter.split("+").includes(key) ? "" : key,
+                    page: "", product: "", tab: "",
+                  })}
+                >
+                  {queueFilters[key]} <strong>{data?.summary?.[key] ?? "—"}</strong>
+                </button>
+              ))}
+            </div>
+          </details>
+          <details className="i-more-metrics">
+            <summary>Revisiones adicionales de SKU y familias</summary>
+            <div className="k-quality-metrics" role="group" aria-label="SKU y familias para revisar">
+              {(["possible_duplicates", "sku_family", "proposals_pending"] as const).map(key => (
+                <button type="button" key={key} aria-pressed={filter.split("+").includes(key)}
+                  onClick={() => update({
+                    view: "", filter: filter.split("+").includes(key) ? "" : key,
+                    page: "", product: "", tab: "",
+                  })}
+                >
+                  {queueFilters[key]} <strong>{data?.summary?.[key] ?? "—"}</strong>
+                </button>
+              ))}
+            </div>
+          </details>
+        </section>
+        <details className="i-more-metrics i-secondary">
+          <summary>Más indicadores comerciales</summary>
+          <CatalogMetrics
+            label="Indicadores editoriales adicionales"
+            cards={[
+              ...(
+                [
+                  "identity",
+                  "untouched",
+                  "draft",
+                  "ready",
+                  "ready_for_channels",
+                  "pack",
+                ] as const
+              ).map((key) => ({
+                id: key,
+                title: queueFilters[key],
+                value: data?.summary?.[key] ?? "—",
+                note:
+                  key === "ready_for_channels"
+                    ? "No confirma publicación en canales"
+                    : "Calculado sobre el catálogo completo",
+                active: filter === key,
+                onClick: () =>
+                  update({
+                    filter: filter === key ? "" : key,
+                    page: "",
+                    product: "",
+                    tab: "",
+                  }),
+              })),
+            ]}
+          />
+          <p className="s-count-note">
+            Totales del catálogo completo, no sólo de esta página. Una variante
+            puede necesitar varias tareas. La ficha editorial y la publicación
+            de cada canal son estados distintos.
+          </p>
+          <CatalogMetrics
+            label="Indicadores adicionales de canales"
+            cards={[
+              ["ml_confirmed", "Variantes con ML confirmado"],
+              ["tn_verified", "Vínculos TN verificados"],
+              ["channel_candidates", "Candidatos pendientes"],
+              ["channel_conflicts", "Conflictos de canal"],
+              ["channel_no_evidence", "Sin evidencia suficiente"],
+              ["channel_stale", "Capturas desactualizadas"],
+            ].map(([key, title]) => ({
+              id: key,
+              title,
+              value:
+                data?.channelOverview?.validated &&
+                !(
+                  key === "ml_confirmed" &&
+                  !data.channelOverview.sources.ml.available
+                ) &&
+                !(
+                  key === "tn_verified" &&
+                  !data.channelOverview.sources.tn.available
+                )
+                  ? (data.summary?.[key] ?? "—")
+                  : unavailable,
+              note:
+                key === "ml_confirmed"
+                  ? "Publicación en captura ML revisada; no es estado en vivo"
+                  : key === "tn_verified"
+                    ? "Vínculos revisados; el CSV no confirma publicación actual"
+                    : "Variantes únicas; las tareas pueden superponerse",
+              active: filter === key,
+              onClick: () =>
+                update({
+                  filter: filter === key ? "" : key,
+                  page: "",
+                  product: "",
+                  tab: "",
+                }),
+            }))}
+          />
+          <section
+            className="i-coverage"
+            aria-label="Alcance de la evidencia de canales"
+          >
+            <div>
+              <span>Publicación Tiendanube</span>
+              <strong>Sin dato verificable de publicación</strong>
+              <small>
+                El contrato CSV no demuestra publicación actual. No se inventa
+                un total.
+              </small>
+            </div>
+            <div>
+              <span>Publicaciones ML confirmadas en captura</span>
+              <strong>
+                {data?.channelOverview?.validated &&
+                data.channelOverview.sources.ml.available
+                  ? (data.channelOverview.comparison?.ml
+                      .confirmed_publications ??
+                    data.channelOverview.confirmedMlListings)
+                  : unavailable}
+              </strong>
+              <small>Publicaciones y variantes son entidades diferentes.</small>
+            </div>
+            {(["ml", "tn"] as const).map((c) => (
+              <div key={c}>
+                <span>
+                  {c === "ml"
+                    ? "Captura Mercado Libre"
+                    : "Importación CSV Tiendanube"}
+                </span>
+                <strong>
+                  {captureDate(
+                    data?.channelOverview?.sources[c].updatedAt ?? null,
+                  )}
+                </strong>
+                <small>
+                  {data?.channelOverview?.sources[c].available
+                    ? "Copia disponible; consultar vigencia por producto"
+                    : "Sin captura disponible; no demuestra ausencia de publicación"}
+                </small>
+              </div>
+            ))}
+          </section>
         </details>
       </section>
       <section className="d-catalog" aria-label="Catálogo Ecomm-App">
