@@ -313,6 +313,7 @@ test("captura vencida conserva coincidencias TN, lista diferencias y exporta CSV
       "/api/ecomm-app/workspace/queue?limit=50&sort=capture",
     )
   ).json();
+  await page.getByText("Ver análisis detallado y exportaciones por canal", { exact: true }).click();
   const matrix = page.getByLabel("Matriz de comparación de catálogos", {
     exact: true,
   });
