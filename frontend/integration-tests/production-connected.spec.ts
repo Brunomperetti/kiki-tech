@@ -70,25 +70,27 @@ test("vistas de captura y diferencias, calidad, URL, conexiones sin sincronizaci
       .click();
     await expect(page.locator(".d-catalog")).toBeVisible();
   }
-  await page.getByText("Calidad del catálogo", { exact: true }).click();
+  await page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true }).click();
+  await page.getByText("Diagnósticos técnicos de la captura API", { exact: true }).click();
   await page
-    .getByRole("button", { name: /EAN no informado en Ecomm-App/ })
+    .getByRole("button", { name: /Sin GTIN en respuesta API/ })
     .click();
   await expect(page).toHaveURL(/filter=ean_missing/);
   await page.reload();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
-  await page.getByText("Calidad del catálogo", { exact: true }).click();
+  await page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true }).click();
+  await page.getByText("Diagnósticos técnicos de la captura API", { exact: true }).click();
   await page
     .getByRole("button", { name: /SKU repetido · no confirma duplicados/ })
     .click();
   await expect(page).toHaveURL(/filter=sku_repeated/);
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
   await page
-    .getByRole("button", { name: /EAN repetido · revisar presentaciones/ })
+    .getByRole("button", { name: /GTIN repetido en respuesta API/ })
     .click();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(0);
   await page
-    .getByRole("button", { name: /EAN no informado en Ecomm-App/ })
+    .getByRole("button", { name: /Sin GTIN en respuesta API/ })
     .click();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
   await page

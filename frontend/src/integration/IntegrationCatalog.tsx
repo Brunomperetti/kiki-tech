@@ -721,37 +721,40 @@ export function IntegrationCatalog() {
             }))}
           />
         </div>
-        <details
-          className="i-more-metrics i-quality"
-          open={advanced}
-          onToggle={(e) => setAdvanced(e.currentTarget.open)}
-        >
-          <summary>Calidad del catálogo</summary>
-          <h3>Calidad del catálogo · candidatos para revisión</h3>
+        <details className="i-more-metrics i-quality">
+          <summary>Campos editoriales por completar en KIKI (opcional)</summary>
+          <p className="s-count-note">
+            Son datos todavía no trabajados en las fichas editoriales de KIKI.
+            No indican que falten en el inventario de Ecomm-App ni en los canales.
+            Los GTIN de la exportación ya están contabilizados arriba.
+          </p>
           <div
             className="k-quality-metrics"
             role="group"
-            aria-label="Indicadores de calidad"
+            aria-label="Campos pendientes en fichas editoriales KIKI"
           >
             {qualityFilterKeys
-              .filter(
-                (key) => !["ml_unconfirmed", "tn_unconfirmed"].includes(key),
-              )
+              .filter((key) => [
+                "short_description_missing",
+                "long_description_missing",
+                "commercial_title_missing",
+                "category_missing",
+                "subcategory_missing",
+                "attributes_missing",
+                "images_missing",
+                "video_unrecorded",
+                "seo_missing",
+                "commercial_incomplete",
+              ].includes(key))
               .map((key) => (
                 <button
                   type="button"
                   key={key}
                   aria-pressed={filter.split("+").includes(key)}
                   onClick={() => {
-                    const base =
-                      view === "ml_unconfirmed" || view === "tn_unconfirmed"
-                        ? view
-                        : "";
                     update({
-                      view: base || "",
-                      filter: filter.split("+").includes(key)
-                        ? base
-                        : [base, key].filter(Boolean).join("+"),
+                      view: "",
+                      filter: filter.split("+").includes(key) ? "" : key,
                       page: "",
                       product: "",
                       tab: "",
@@ -763,6 +766,42 @@ export function IntegrationCatalog() {
                 </button>
               ))}
           </div>
+          <details className="i-more-metrics">
+            <summary>Diagnósticos técnicos de la captura API</summary>
+            <p className="s-count-note">
+              Estos contadores analizan solamente la respuesta de la API; no
+              incluyen los GTIN incorporados desde el Excel.
+            </p>
+            <div className="k-quality-metrics" role="group" aria-label="Diagnósticos de la API">
+              {qualityFilterKeys
+                .filter((key) => [
+                  "ean_missing",
+                  "ean_repeated",
+                  "sku_repeated",
+                  "possible_duplicates",
+                  "sku_family",
+                  "barcode_gtin_conflict",
+                  "proposals_pending",
+                ].includes(key))
+                .map((key) => (
+                  <button
+                    type="button"
+                    key={key}
+                    aria-pressed={filter.split("+").includes(key)}
+                    onClick={() => update({
+                      view: "",
+                      filter: filter.split("+").includes(key) ? "" : key,
+                      page: "",
+                      product: "",
+                      tab: "",
+                    })}
+                  >
+                    {queueFilters[key]}{" "}
+                    <strong>{data?.summary?.[key] ?? "—"}</strong>
+                  </button>
+                ))}
+            </div>
+          </details>
         </details>
         <details className="i-more-metrics i-secondary">
           <summary>Más indicadores comerciales</summary>
