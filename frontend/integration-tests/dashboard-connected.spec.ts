@@ -21,21 +21,15 @@ test("indicadores globales del backend filtran sin sumar tareas superpuestas", a
   page,
 }) => {
   await login(page);
-  await page.getByText("Más indicadores comerciales", { exact: true }).click();
+  // Totals remain authoritative in the backend, while the main dashboard
+  // presents only actionable channel differences. Filters remain available.
   const response = await page.request.get(`${queuePath}?sort=capture`);
   const body = await response.json();
-  for (const key of [
-    "identity",
-    "untouched",
-    "draft",
-    "ready",
-    "ready_for_channels",
-    "pack",
-  ])
-    await expect(page.locator(`[data-metric="${key}"] strong`)).toHaveText(
-      String(body.summary[key]),
-    );
-  await page.locator('[data-metric="identity"]').click();
+  for (const key of ["identity", "untouched", "draft", "ready", "ready_for_channels", "pack"]) {
+    expect(Number.isSafeInteger(body.summary[key])).toBe(true);
+  }
+  await expect(page.locator(".k-business-gap-card")).toHaveCount(4);
+  await page.getByLabel("Filtrar catálogo").selectOption("identity");
   await expect(page).toHaveURL(/filter=identity/);
   await expect(rows(page)).toHaveCount(2);
   await expect(page.getByTestId("total").locator("strong")).toHaveText("6");

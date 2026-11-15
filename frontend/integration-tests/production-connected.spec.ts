@@ -70,28 +70,21 @@ test("vistas de captura y diferencias, calidad, URL, conexiones sin sincronizaci
       .click();
     await expect(page.locator(".d-catalog")).toBeVisible();
   }
-  await page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true }).click();
-  await page.getByText("Diagnósticos técnicos de la captura API", { exact: true }).click();
-  await page
-    .getByRole("button", { name: /Sin GTIN en respuesta API/ })
-    .click();
+  // Keep business dashboard simple; quality filters are still available
+  // via the existing product table, not a wall of misleading KPIs.
+  await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true })).toHaveCount(0);
+  await page.getByTestId("total").click();
+  await page.getByLabel("Filtrar catálogo").selectOption("ean_missing");
   await expect(page).toHaveURL(/filter=ean_missing/);
   await page.reload();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
-  await page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true }).click();
-  await page.getByText("Diagnósticos técnicos de la captura API", { exact: true }).click();
-  await page
-    .getByRole("button", { name: /SKU repetido · no confirma duplicados/ })
-    .click();
+  await page.getByLabel("Filtrar catálogo").selectOption("sku_repeated");
   await expect(page).toHaveURL(/filter=sku_repeated/);
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
-  await page
-    .getByRole("button", { name: /GTIN repetido en respuesta API/ })
-    .click();
+  await page.getByLabel("Filtrar catálogo").selectOption("ean_repeated");
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(0);
-  await page
-    .getByRole("button", { name: /Sin GTIN en respuesta API/ })
-    .click();
+  await page.getByLabel("Filtrar catálogo").selectOption("ean_missing");
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
   await page
     .getByRole("button", { name: "Centro de conexiones", exact: true })

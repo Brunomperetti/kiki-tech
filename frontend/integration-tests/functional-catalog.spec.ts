@@ -60,6 +60,7 @@ test("vistas de captura y diferencias: registros huérfanos, CSV sin vigencia y 
     }),
   ).toHaveCount(0);
   await page.getByTestId("total").click();
+  await page.getByText("Ver análisis detallado y exportaciones por canal", { exact: true }).click();
   const comparison = page.getByLabel("Matriz de comparación de catálogos", {
     exact: true,
   });
@@ -68,12 +69,8 @@ test("vistas de captura y diferencias: registros huérfanos, CSV sin vigencia y 
 test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar variantes", async ({
   page,
 }, info) => {
-  await page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true }).click();
-  await page.getByText("Diagnósticos técnicos de la captura API", { exact: true }).click();
-  const quality = page.getByRole("group", { name: "Diagnósticos de la API" });
-  const metric = quality.getByRole("button", { name: /^GTIN repetido en respuesta API/ });
-  await expect(metric.locator("strong")).toHaveText("2");
-  await metric.click();
+  await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Filtrar catálogo").selectOption("ean_repeated");
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
   await expect(page.locator('[data-ecomm-id="900003"]')).toContainText("250 g");
   await expect(page.locator('[data-ecomm-id="900004"]')).toBeVisible();
@@ -215,10 +212,9 @@ test("preparación calculada por canal, CTA IA y publicación confirmada se mant
     });
     expect(saved.status()).toBe(200);
     await page.reload();
-    for (const channel of ["ml", "tn"])
-      await expect(
-        page.locator(`[data-metric="${channel}-ready"] strong`),
-      ).toHaveText("1");
+    const totalsBeforeReview = await (await page.request.get("/api/ecomm-app/workspace/queue?sort=capture")).json();
+    expect(totalsBeforeReview.summary.ml_ready_without_confirmation).toBe(1);
+    expect(totalsBeforeReview.summary.tn_ready_without_confirmation).toBe(1);
     const r = await (await page.request.get(root + "/channels")).json();
     const c = r.ml.candidates.find(
       (c: { id: string }) => c.id === "MLA900000003",
@@ -248,37 +244,18 @@ test("preparación calculada por canal, CTA IA y publicación confirmada se mant
     expect(result.status()).toBe(200);
     linked = true;
     await page.reload();
-    await expect(page.locator('[data-metric="ml-ready"] strong')).toHaveText(
-      "0",
-    );
-    await expect(page.locator('[data-metric="tn-ready"] strong')).toHaveText(
-      "1",
-    );
-    await page.locator('[data-metric="tn-ready"]').click();
+    const totalsAfterReview = await (await page.request.get("/api/ecomm-app/workspace/queue?sort=capture")).json();
+    expect(totalsAfterReview.summary.ml_ready_without_confirmation).toBe(0);
+    expect(totalsAfterReview.summary.tn_ready_without_confirmation).toBe(1);
+    await page.getByLabel("Filtrar catálogo").selectOption("ready_for_channels");
+    await page.getByLabel("Combinar filtro de catálogo").selectOption("tn_unconfirmed");
     await expect(page).toHaveURL(/filter=ready_for_channels%2Btn_unconfirmed/);
     await expect(page.locator("[data-ecomm-id]")).toHaveCount(1);
     await expect(page.locator('[data-ecomm-id="900003"]')).toBeVisible();
-    await expect(page.locator('[data-metric="tn-ready"]')).toContainText(
-      "no publica",
-    );
     await page.getByTestId("total").click();
     await expect(page.getByTestId("total").locator("strong")).toHaveText("6");
     await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
-    await expect(page.locator('[data-metric="tn-ready"] strong')).toHaveText(
-      "1",
-    );
-    const coverage = await page
-      .getByRole("region", { name: "Preparación por canal" })
-      .evaluate((element) => {
-        const cards = Array.from(element.querySelectorAll("button"));
-        return (
-          cards.reduce(
-            (sum, card) => sum + card.getBoundingClientRect().width,
-            0,
-          ) / element.getBoundingClientRect().width
-        );
-      });
-    expect(coverage).toBeGreaterThan(0.9);
+    await expect(page.locator(".k-preparation")).toHaveCount(0);
     await page.screenshot({
       path: `artifacts/ux-final-connected-dashboard-${info.project.name}.png`,
       fullPage: info.project.name === "mobile",
