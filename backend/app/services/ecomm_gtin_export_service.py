@@ -234,15 +234,19 @@ class EcommExportGtin:
         }
 
 
-def safe_gtin_candidates_for_pages(db, pages):
+_UNFETCHED = object()
+
+
+def safe_gtin_candidates_for_pages(db, pages, *, export_record=_UNFETCHED):
     """Only non-combo, VALID_UNIQUE export codes, mapped by exact API ID+SKU.
 
     The manual export remains secondary retrieval evidence. It is never
     substituted for authoritative variants[].gtin or used as an approval.
     If *any* current Ecomm variant mismatches, reject the whole supplement.
     """
-    record = db.scalar(
-        select(CatalogSnapshot).where(CatalogSnapshot.source == SOURCE)
+    record = (
+        db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == SOURCE))
+        if export_record is _UNFETCHED else export_record
     )
     payload = record.payload[0] if record and isinstance(record.payload, list) and record.payload else None
     if not isinstance(payload, dict) or payload.get("version") != SCHEMA_VERSION:
