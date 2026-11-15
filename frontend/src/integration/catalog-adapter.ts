@@ -353,6 +353,10 @@ export const queueFilters = {
   tn_comparison_no_match: "Sin coincidencia en captura · TN",
   tn_comparison_insufficient: "Evidencia insuficiente · TN",
   tn_comparison_stale: "Captura desactualizada · TN",
+  source_title_short: "Nombre de origen breve (<25 caracteres)",
+  source_variant_short: "Presentación de origen breve (<25 caracteres)",
+  source_title_missing: "Sin nombre en captura Ecomm-App",
+  source_variant_missing: "Sin presentación en captura Ecomm-App",
   ean_missing: "Sin GTIN válido · API + Excel",
   ean_repeated: "GTIN compartido · revisar presentaciones",
   sku_repeated: "SKU repetido · no confirma duplicados",
@@ -701,6 +705,10 @@ export function captureDate(value: string | null) {
 }
 
 export const qualityFilterKeys = [
+  "source_title_short",
+  "source_variant_short",
+  "source_title_missing",
+  "source_variant_missing",
   "ean_missing",
   "ean_repeated",
   "sku_repeated",
