@@ -77,25 +77,26 @@ export function GtinExportPanel({
     }
   }
 
-  return <section className="k-gtin-import" aria-label="GTIN de exportación Ecomm-App">
+  const usable = (summary?.valid_unique ?? 0) + (summary?.valid_repeated ?? 0) + (summary?.pack_review ?? 0);
+  const missingOrInvalid = (summary?.invalid ?? 0) + (summary?.missing ?? 0);
+  return <section className="k-gtin-import k-gtin-compact" aria-label="Estado de GTIN de Ecomm-App">
     <div className="k-gtin-head">
-      <div><strong>GTIN de Ecomm-App</strong>
-        <p>Exportación manual, asociada por Ecomm ID y SKU. No modifica canales ni el inventario original.</p>
+      <div>
+        <strong>GTIN del inventario Ecomm-App</strong>
+        <p>{summary?.current
+          ? <><b>{usable.toLocaleString("es-AR")} códigos con GTIN válido</b> de {summary.variants?.toLocaleString("es-AR")} variantes · {missingOrInvalid.toLocaleString("es-AR")} sin GTIN válido.</>
+          : summary?.available
+            ? "La captura API cambió desde que se incorporó el Excel; hay que recotejarlo."
+            : "La API no entrega GTIN; podés incorporarlos desde la exportación oficial."}
+        </p>
       </div>
-      <span>{summary?.current ? "Captura cotejada" : summary?.available ? "Captura desactualizada" : "Sin archivo incorporado"}</span>
+      <span>{summary?.current ? "Excel incorporado" : summary?.available ? "Revisar exportación" : "Sin exportación"}</span>
     </div>
-    {summary?.available && <div className="k-gtin-numbers">
-      <div><b>{summary.variants?.toLocaleString("es-AR") ?? "—"}</b><small>Variantes en exportación</small></div>
-      <div><b>{summary.valid_unique?.toLocaleString("es-AR") ?? "—"}</b><small>GTIN únicos, no combos</small></div>
-      <div><b>{(summary.valid_repeated ?? 0) + (summary.pack_review ?? 0)}</b><small>Repetidos / packs por revisar</small></div>
-      <div><b>{(summary.invalid ?? 0) + (summary.missing ?? 0)}</b><small>Inválidos / ausentes</small></div>
-    </div>}
-    {summary?.available && <p className="k-gtin-note">Archivo: {summary.source_filename} · Incorporado: {date(summary.imported_at)}. {summary.note}
-      {summary.current === false && <strong> La API actual cambió: no se usan estos GTIN hasta recotejar otra exportación.</strong>}
-    </p>}
+    {summary?.current && <small className="k-gtin-note">Dentro de los válidos: {summary.valid_unique?.toLocaleString("es-AR")} únicos no combo · {summary.valid_repeated?.toLocaleString("es-AR")} repetidos · {summary.pack_review?.toLocaleString("es-AR")} packs para revisión. Fuente: Excel Ecomm-App · {date(summary.imported_at)}.</small>}
     <details className="k-gtin-upload">
-      <summary>{summary?.available ? "Actualizar exportación GTIN" : "Incorporar Excel GTIN de Ecomm-App"}</summary>
-      <p>Descargá el inventario desde Ecomm-App con «Código de barra» marcado. Se validará que los IDs y SKU coincidan exactamente con el catálogo API.</p>
+      <summary>{summary?.available ? "Ver origen / actualizar GTIN" : "Incorporar Excel de Ecomm-App"}</summary>
+      {summary?.available && <p>Archivo: {summary.source_filename}. Los GTIN de exportación no son una confirmación de la API y nunca aprueban publicaciones automáticamente.</p>}
+      <p>Descargá Ecomm-App con «Código de barra» marcado. KIKI valida Ecomm ID y SKU contra la captura API completa antes de guardar.</p>
       <input aria-label="Excel GTIN de Ecomm-App" type="file" accept=".xlsx" disabled={busy || !canWrite()}
         onChange={event => { setFile(event.currentTarget.files?.[0] ?? null); setError(""); }} />
       <button type="button" onClick={() => void importFile()} disabled={busy || !file || !canWrite()}>

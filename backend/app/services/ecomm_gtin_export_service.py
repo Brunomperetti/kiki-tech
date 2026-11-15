@@ -232,3 +232,63 @@ class EcommExportGtin:
             "imported_at": snap["imported_at"],
             "note": "Evidencia de exportación manual Ecomm-App, no confirmación API ni autorización de publicación.",
         }
+
+
+_UNFETCHED = object()
+
+
+def safe_gtin_candidates_for_pages(db, pages, *, export_record=_UNFETCHED):
+    """Only non-combo, VALID_UNIQUE export codes, mapped by exact API ID+SKU.
+
+    The manual export remains secondary retrieval evidence. It is never
+    substituted for authoritative variants[].gtin or used as an approval.
+    If *any* current Ecomm variant mismatches, reject the whole supplement.
+    """
+    record = (
+        db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == SOURCE))
+        if export_record is _UNFETCHED else export_record
+    )
+    payload = record.payload[0] if record and isinstance(record.payload, list) and record.payload else None
+    if not isinstance(payload, dict) or payload.get("version") != SCHEMA_VERSION:
+        return {}
+    rows = payload.get("rows")
+    if not isinstance(rows, list):
+        return {}
+    live = {}
+    for page in pages:
+        for parent in page.get("items") or []:
+            for var in parent.get("variants") or []:
+                if not isinstance(var, dict) or var.get("invalid"):
+                    continue
+                ident = _as_text(var.get("id"))
+                if not ident or ident in live:
+                    return {}
+                live[ident] = {
+                    "sku": _as_text(var.get("sku")),
+                    "combo": bool(var.get("is_combo") is True or parent.get("is_combo") is True),
+                    "api_gtin": _as_text(var.get("gtin") or var.get("barcode")),
+                }
+    if len(live) != len(rows) or len(live) != payload.get("variants"):
+        return {}
+    result = {}
+    seen = set()
+    for row in rows:
+        eid = row.get("ecomm_id")
+        if not isinstance(eid, str) or eid not in live or eid in seen:
+            return {}
+        seen.add(eid)
+        current = live[eid]
+        if row.get("sku") != current["sku"]:
+            return {}
+        code = row.get("gtin")
+        if (
+            row.get("status") == "VALID_UNIQUE"
+            and not row.get("is_combo")
+            and not current["combo"]
+            and not current["api_gtin"]
+            and isinstance(code, str)
+            and _gtin_check_digit_valid(code)
+            and code
+        ):
+            result[eid] = code
+    return result

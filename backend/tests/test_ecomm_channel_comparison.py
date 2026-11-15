@@ -229,7 +229,9 @@ def test_3001_variants_exact_reconciliation_and_constant_queries(db):
     m = build_channel_coverage(db, pages(products), api_validation=True, now=NOW)
     duration = perf_counter() - began
     event.remove(db.bind, "before_cursor_execute", trace)
-    assert len(statements) == 4
+    # Fetch channel snapshots and GTIN supplement together; never exceed
+    # the original four-query budget for the full catalog.
+    assert 1 <= len(statements) <= 4
     assert all(s.lstrip().upper().startswith("SELECT") for s in statements)
     for channel, records in [("ml", 2844), ("tn", 550)]:
         stats = m["summary"]["comparison"][channel]

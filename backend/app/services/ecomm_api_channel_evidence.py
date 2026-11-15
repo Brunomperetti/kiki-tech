@@ -148,6 +148,11 @@ def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
         current = bool(api_review and source.get("fingerprint") == token)
         verified = bool(current and state == "APPROVED")
         blockers = list(identity.get("identity_blockers") or [])
+        reasons = (match_signals or {}).get(id(row), [])
+        if "EXPORT_GTIN_CANDIDATE_REVIEW" in reasons and "SKU_EXACT" not in reasons:
+            blockers.append(
+                "GTIN coincidente solo con el Excel de Ecomm-App; confirmar identidad y presentación antes de vincular."
+            )
         if not key or (channel == "ml" and len(key) > 70) or key_counts[key] != 1:
             blockers.append(
                 "Identificador de canal ausente o repetido; no permite validar una fila única."
@@ -260,7 +265,7 @@ def enrich(base, channel, rows, identity, reviews, now, *, match_signals=None):
                 "slug": row.get("slug") if channel == "tn" else None,
                 "token": token,
                 "title": actual_name or None,
-                "match_reasons": (match_signals or {}).get(id(row), ["SKU_EXACT"]),
+                "match_reasons": reasons or ["SKU_EXACT"],
                 "discrepancies": sorted(set(discrepancies)),
                 "comparison": {
                     "ecomm_title": expected_name.strip(),
