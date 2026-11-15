@@ -241,3 +241,46 @@ def test_missing_source_name_is_real_gap_not_missing_optimized_title(tmp_path):
         # No trustworthy name means no automated AI proposal.
         assert build_queue(db,filter_name="ai_eligible")["total"] == 0
         assert view["summary"]["missing_title"] == 0
+
+
+
+def test_source_audit_counts_and_filters_cover_full_catalog(tmp_path):
+    engine = db_fixture(tmp_path)
+    with Session(engine) as db:
+        stage = db.scalar(select(CatalogSnapshot).where(
+            CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
+        ))
+        changed = deepcopy(stage.payload)
+        changed[0]["items"][0]["description"] = "Magnesio"
+        changed[0]["items"][0]["variants"][0]["variant_description"] = "750 g"
+        changed[0]["items"][1]["description"] = (
+            "Presentación comercial completa Magnesio y Potasio"
+        )
+        changed[0]["items"][1]["variants"][0]["variant_description"] = (
+            "Presentación comercial completa de 60 cápsulas"
+        )
+        stage.payload = changed
+        db.commit()
+
+        summary = build_queue(db)["summary"]
+        assert summary["source_title_short"] == 1
+        assert summary["source_variant_short"] == 1
+        assert summary["source_title_missing"] == 0
+        assert summary["source_variant_missing"] == 0
+        assert summary["source_name_present"] == 2
+        assert summary["source_variant_description_present"] == 2
+        assert summary["short_description_missing"] == 0  # No editorial work yet.
+
+        title = build_queue(db, filter_name="source_title_short")
+        variant = build_queue(db, filter_name="source_variant_short")
+        assert title["total"] == 1
+        assert title["items"][0]["ecomm_id"] == "101"
+        assert variant["total"] == 1
+        assert variant["items"][0]["ecomm_id"] == "101"
+        assert title["summary"]["total"] == 2  # Summary always entire catalog.
+
+        EcommApiProductWorkspace(db).save("101", payload(), "DRAFT", 0)
+        after_edit = build_queue(db, filter_name="source_title_short")
+        assert after_edit["total"] == 1
+        assert after_edit["summary"]["source_title_short"] == 1
+        assert after_edit["summary"]["editorial_started"] == 1
