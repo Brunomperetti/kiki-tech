@@ -49,8 +49,6 @@ async function read(page: Page, id = "900003"): Promise<ChannelReport> {
 }
 const row = (page: Page, id = "MLA900000003") =>
   page.locator(`[data-channel-panel="ml"] [data-channel-row="${id}"]`);
-const metrics = (page: Page) =>
-  page.getByLabel("Cobertura por canal", { exact: true });
 async function fill(page: Page, ident = "MLA900000003", qty = "1") {
   const card = row(page, ident);
   await card
@@ -72,7 +70,6 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
 }, info) => {
   const initial = await read(page);
   expect(initial.ml.confirmed_listing).toBe(false);
-  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await open(page);
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
     /Coincidencia candidata|Vinculación pendiente/,
@@ -88,11 +85,8 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
     "Publicación confirmada en captura",
   );
-  await expect(
-    metrics(page)
-      .getByRole("button", { name: /Variantes con ML confirmado/ })
-      .locator("strong"),
-  ).toHaveText("1");
+  const queueAfterLink = await (await page.request.get("/api/ecomm-app/workspace/queue?sort=capture")).json();
+  expect(queueAfterLink.summary.ml_confirmed).toBe(1);
   await expect(page.locator('[data-channel-panel="tn"]')).toContainText(
     "Captura vencida",
   );
@@ -122,10 +116,7 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
     .click();
   await expect(row(page)).toContainText("Cantidad declarada por operador: 1");
   await page.getByRole("button", { name: "Cerrar ficha", exact: true }).click();
-  await page.getByText("Más indicadores comerciales", { exact: true }).click();
-  await metrics(page)
-    .getByRole("button", { name: /Variantes con ML confirmado/ })
-    .click();
+  await page.getByLabel("Filtrar catálogo").selectOption("ml_confirmed");
   await expect(page.locator("tbody tr[data-ecomm-id]")).toHaveCount(1);
   await expect(page).toHaveURL(/filter=ml_confirmed/);
   await page.reload();
@@ -179,10 +170,7 @@ test("pack x2 y x6 siguen separados; mismo EAN no transfiere publicación y barc
 test("sin evidencia no significa no publicado; conserva búsqueda, selección, cinco pestañas y URL", async ({
   page,
 }) => {
-  await page.getByText("Más indicadores comerciales", { exact: true }).click();
-  await metrics(page)
-    .getByRole("button", { name: /Candidatos pendientes/ })
-    .click();
+  await page.getByLabel("Filtrar catálogo").selectOption("channel_candidates");
   await expect(page).toHaveURL(/filter=channel_candidates/);
   await page.getByLabel("Buscar productos", { exact: true }).fill("900004");
   await page.getByRole("button", { name: "Buscar", exact: true }).click();
@@ -220,7 +208,6 @@ test("revocación conserva historial y retira confirmación sin cambiar la ficha
   const before = await (
     await page.request.get("/api/ecomm-app/workspace/900003")
   ).json();
-  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await open(page);
   const card = row(page);
   await fill(page);
@@ -231,11 +218,8 @@ test("revocación conserva historial y retira confirmación sin cambiar la ficha
   await expect(page.locator('[data-channel-panel="ml"]')).not.toContainText(
     "Publicación confirmada en captura",
   );
-  await expect(
-    metrics(page)
-      .getByRole("button", { name: /Variantes con ML confirmado/ })
-      .locator("strong"),
-  ).toHaveText("0");
+  const queueAfterRevoke = await (await page.request.get("/api/ecomm-app/workspace/queue?sort=capture")).json();
+  expect(queueAfterRevoke.summary.ml_confirmed).toBe(0);
   const after = await (
     await page.request.get("/api/ecomm-app/workspace/900003")
   ).json();
@@ -254,6 +238,7 @@ test("matriz reconcilia variantes y registros, filtra en la misma tabla y abre e
   );
   expect(response.status()).toBe(200);
   const queue = await response.json();
+  await page.getByText("Ver análisis detallado y exportaciones por canal", { exact: true }).click();
   const matrix = page.getByLabel("Matriz de comparación de catálogos", {
     exact: true,
   });
