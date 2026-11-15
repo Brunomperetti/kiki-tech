@@ -428,9 +428,12 @@ def build_channel_coverage(
         )
         for channel, valid in [("ml", ml_valid), ("tn", tn_valid)]
     }
-    from .ecomm_gtin_export_service import safe_gtin_candidates_for_pages
+    from .ecomm_gtin_export_service import (
+        safe_gtin_candidates_for_pages, export_quality_for_pages,
+    )
 
     export_codes = safe_gtin_candidates_for_pages(db, pages, export_record=gtin_export_snap)
+    export_quality = export_quality_for_pages(pages, gtin_export_snap)
     records = {}
     totals = {"ml": Counter(), "tn": Counter(), "combined": Counter()}
     for page in pages:
@@ -655,6 +658,7 @@ def build_channel_coverage(
 
     return {
         "items_by_id": records,
+        "export_gtin_quality": export_quality,
         **({"candidate_ids_by_position": reverse} if include_reverse else {}),
         "api_validation_enabled": api_validation,
         "summary": {
