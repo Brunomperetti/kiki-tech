@@ -48,6 +48,7 @@ import {
 import "./integration.css";
 import { PersistentWorkspace } from "./PersistentWorkspace";
 import { GtinExportPanel, GtinExportEvidence } from "./GtinExportPanel";
+import { ChannelGapSummary } from "./ChannelGapSummary";
 import { stateLabels, getWorkspace } from "./workspace-adapter";
 import { MamaPilotLauncher } from "./MamaPilot";
 import { mamaPilotId, type MamaReport } from "./mama-pilot";
@@ -627,6 +628,19 @@ export function IntegrationCatalog() {
           · {captureDate(data?.lastAt ?? null)}
         </span>
       </div>
+      <ChannelGapSummary
+        comparison={data?.channelOverview?.comparison}
+        filter={filter}
+        view={view}
+        linkage={linkage}
+        onForward={(channel) => update({
+          filter: `${channel}_comparison_no_match`,
+          view: "", linkage: "", page: "", product: "", tab: "",
+        })}
+        onReverse={(channel) => update({
+          view: channel, filter: "", linkage: "no_match", q: "", page: "", product: "", tab: "",
+        })}
+      />
       {session && <GtinExportPanel csrf={session.csrf_token} onImported={() => { setGtinRevision(n => n + 1); retry(n => n + 1); }} />}
       <section
         aria-label="Cobertura por canal"
@@ -666,6 +680,8 @@ export function IntegrationCatalog() {
             revisar diferencias, usá «Sin coincidencia en captura» del canal.
           </p>
         )}
+        <details className="i-more-metrics i-channel-details">
+          <summary>Ver análisis detallado y exportaciones por canal</summary>
         <ChannelComparisonMatrix
           comparison={data?.channelOverview?.comparison}
           query={q}
@@ -680,6 +696,7 @@ export function IntegrationCatalog() {
             })
           }
         />
+        </details>
         <div className="k-preparation">
           <CatalogMetrics
             label="Preparación por canal"
