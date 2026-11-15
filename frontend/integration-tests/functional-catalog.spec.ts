@@ -71,7 +71,9 @@ test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar 
 }, info) => {
   await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Calidad del catálogo" })).toBeVisible();
-  await page.getByLabel("Filtrar catálogo").selectOption("ean_repeated");
+  await page.getByRole("group", { name: "Calidad de GTIN y SKU" })
+    .getByRole("button", { name: /GTIN compartido/ }).click();
+  await expect(page).toHaveURL(/filter=ean_repeated/);
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
   await expect(page.locator('[data-ecomm-id="900003"]')).toContainText("250 g");
   await expect(page.locator('[data-ecomm-id="900004"]')).toBeVisible();
