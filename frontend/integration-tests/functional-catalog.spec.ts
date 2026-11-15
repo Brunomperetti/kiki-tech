@@ -71,7 +71,7 @@ test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar 
 }, info) => {
   await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Calidad del catálogo" })).toBeVisible();
-  await page.getByRole("group", { name: "Calidad de GTIN y SKU" })
+  await page.getByRole("group", { name: "Auditoría de datos del inventario" })
     .getByRole("button", { name: /GTIN compartido/ }).click();
   await expect(page).toHaveURL(/filter=ean_repeated/);
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
@@ -94,6 +94,21 @@ test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar 
   await page.goBack();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
 });
+test("auditoría de origen filtra variantes sin confundirlas con edición KIKI", async ({ page }) => {
+  const audit = page.getByRole("group", { name: "Auditoría de datos del inventario" });
+  await expect(audit).toBeVisible();
+  await expect(page.getByText("Imágenes y categorías no se conservan en la captura actual de KIKI", { exact: false })).toHaveCount(0);
+  await audit.getByRole("button", { name: /Nombre de origen breve/ }).click();
+  await expect(page).toHaveURL(/filter=source_title_short/);
+  await page.reload();
+  await expect(page.getByLabel("Filtrar catálogo")).toHaveValue("source_title_short");
+  await audit.getByRole("button", { name: /Presentación de origen breve/ }).click();
+  await expect(page).toHaveURL(/filter=source_variant_short/);
+  await expect(page.getByLabel("Filtrar catálogo")).toHaveValue("source_variant_short");
+  await page.getByText("Integridad de nombres, SKU y campos de origen", { exact: true }).click();
+  await expect(page.getByText("no podemos afirmar cuántos productos las tienen o no", { exact: false })).toBeVisible();
+});
+
 test("configuración, exportación e historial reutilizan contratos existentes", async ({
   page,
 }, info) => {
