@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from app.database.models import CatalogSnapshot, EcommApiProductEdit
 from app.integrations.ecomm_app.catalog_stage import STAGE_SOURCE, stage_status
-from .ecomm_channel_coverage_service import build_channel_coverage, channel_sku, channel_codes
+from .ecomm_channel_coverage_service import (
+    build_channel_coverage,
+    channel_sku,
+    channel_codes,
+)
 from .ecomm_api_channel_evidence import row_key, age_info
 
 
@@ -86,6 +90,11 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
             coverage["items_by_id"][ident][channel]["comparison_state"] == "conflicts"
             for ident in candidate_ids
         )
+        pending = any(
+            coverage["items_by_id"][ident][channel]["evidence_state"]
+            == "PENDING_VALIDATION"
+            for ident in candidate_ids
+        )
         title = str(raw.get("title" if channel == "ml" else "name") or "").strip()
         sku = str(
             raw.get("variant_sku")
@@ -98,12 +107,10 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
         state = (
             "CONFIRMED_CAPTURE"
             if channel == "ml" and ids and status == "active" and age["fresh"]
-            else "STALE"
-            if snap and not age["fresh"]
             else "VERIFIED_LINK"
             if ids
             else "PENDING_VALIDATION"
-            if conflict
+            if conflict or pending
             else "CANDIDATE"
             if candidate_ids
             else "NO_MATCH_IN_CAPTURE"
@@ -123,6 +130,7 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
             "listing_status": status,
             "evidence_state": state,
             "captured_at": at,
+            "freshness": age,
             "confirmed_listing": state == "CONFIRMED_CAPTURE",
         }
         if (

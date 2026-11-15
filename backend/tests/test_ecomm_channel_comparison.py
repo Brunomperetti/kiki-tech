@@ -171,7 +171,8 @@ def test_stale_capture_exposes_candidates_but_never_current_confirmation(db):
     m = captures(db, [product()], [ml()], [tn()], hours=100)
     for channel in ["ml", "tn"]:
         c = m["items_by_id"]["1"][channel]
-        assert c["comparison_state"] == "stale"
+        assert c["comparison_state"] == "candidates"
+        assert not c["freshness"]["fresh"]
         assert c["candidates_total"] == 1
         assert not c["candidates"][0]["can_review"]
         assert m["summary"]["comparison"][channel]["freshness"]["age_hours"] == 100
@@ -262,7 +263,6 @@ def test_queue_comparison_filters_equal_exclusive_totals(db):
             "conflicts",
             "no_match",
             "insufficient",
-            "stale",
         ]:
             name = f"{channel}_comparison_{state}"
             result = build_queue(db, sort="capture", filter_name=name)

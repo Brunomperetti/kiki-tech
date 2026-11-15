@@ -136,11 +136,17 @@ class Channels(unittest.TestCase):
         self.assertFalse(result["tn"]["confirmed_listing"])
 
     def test_stale_tn_csv_and_ml_capture_block_approval_and_confirmation(self):
-        self.assertEqual(self.report()["tn"]["evidence_state"], "STALE")
+        tn = self.report()["tn"]
+        self.assertIn(tn["evidence_state"], {"CANDIDATE", "PENDING_VALIDATION"})
+        self.assertGreater(tn["candidates_total"], 0)
+        self.assertFalse(tn["freshness"]["fresh"])
         self.review()
         self.date("MERCADOLIBRE_API", 48)
         report = self.report()
-        self.assertEqual(report["ml"]["evidence_state"], "STALE")
+        # Changing the capture timestamp changes the fingerprint, unlike
+        # merely advancing time; keep the prior decision but require review.
+        self.assertEqual(report["ml"]["evidence_state"], "PENDING_VALIDATION")
+        self.assertFalse(report["ml"]["candidates"][0]["review_current"])
         self.assertFalse(report["ml"]["confirmed_listing"])
         self.assertEqual(
             self.client.post(
@@ -185,7 +191,7 @@ class Channels(unittest.TestCase):
 
     def test_missing_channel_and_missing_match_never_mean_not_published(self):
         empty = self.report("900005")
-        self.assertEqual(empty["ml"]["evidence_state"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(empty["ml"]["evidence_state"], "NO_MATCH_IN_CAPTURE")
         self.assertFalse(empty["ml"]["confirmed_listing"])
         with SessionLocal() as db:
             db.execute(
@@ -508,6 +514,106 @@ class Channels(unittest.TestCase):
         self.assertEqual(results[0][1], results[1][1])
         self.assertLessEqual(results[1][1], 6)
         print("2P performance size/SQL/seconds:", results, flush=True)
+
+    def test_expired_tn_keeps_found_variants_and_reconciles_independent_filters(self):
+        queue = self.ok(
+            self.client.get(ROOT + "queue", params={"sort": "capture", "limit": 50})
+        )
+        stats = queue["channel_coverage"]["summary"]["comparison"]["tn"]
+        self.assertFalse(stats["freshness"]["fresh"])
+        self.assertGreater(stats["variants_with_candidates"], 0)
+        self.assertGreater(stats["variants_with_pending_candidates"], 0)
+        pending = self.ok(
+            self.client.get(
+                ROOT + "queue", params={"filter": "tn_pending_candidates", "limit": 50}
+            )
+        )
+        self.assertEqual(pending["total"], stats["variants_with_pending_candidates"])
+        self.assertEqual(sum(stats["variant_states"].values()), 6)
+        self.assertEqual(stats["variant_states"]["stale"], 0)
+        self.assertEqual(stats["stale_variants"], 6)
+        found = self.ok(
+            self.client.get(ROOT + "queue", params={"filter": "tn_found", "limit": 50})
+        )
+        self.assertEqual(found["total"], stats["variants_with_candidates"])
+        self.assertTrue(
+            all(
+                row["channel_coverage"]["tn"]["evidence_state"] != "STALE"
+                for row in found["items"]
+            )
+        )
+        stale = self.ok(
+            self.client.get(
+                ROOT + "queue", params={"filter": "tn_comparison_stale", "limit": 50}
+            )
+        )
+        self.assertEqual(stale["total"], 6)
+
+    def test_csv_authentication_exact_ids_and_no_commercial_or_capture_changes(self):
+        import csv
+        import io
+
+        path = ROOT + "channels/differences.csv"
+        anon = TestClient(application, base_url="https://127.0.0.1:8443")
+        try:
+            self.assertEqual(anon.get(path, params={"channel": "ml"}).status_code, 401)
+        finally:
+            anon.close()
+        with SessionLocal() as db:
+            before = [
+                (r.source, deepcopy(r.payload))
+                for r in db.scalars(
+                    select(CatalogSnapshot).order_by(CatalogSnapshot.source)
+                )
+            ]
+        ficha = self.ok(self.client.get(ROOT + "900003"))
+        for channel in ("ml", "tn"):
+            response = self.client.get(path, params={"channel": channel})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers["Cache-Control"], "no-store")
+            self.assertIn("attachment", response.headers["Content-Disposition"])
+            rows = list(
+                csv.DictReader(
+                    io.StringIO(response.content.decode("utf-8-sig")), delimiter=";"
+                )
+            )
+            queue = self.ok(
+                self.client.get(
+                    ROOT + "queue",
+                    params={
+                        "filter": channel + "_comparison_no_match",
+                        "sort": "capture",
+                        "limit": 50,
+                    },
+                )
+            )
+            self.assertEqual(
+                [r["ecomm_id"] for r in rows], [r["ecomm_id"] for r in queue["items"]]
+            )
+            self.assertTrue(
+                all(
+                    r["ausencia_publicacion_actual_acreditada"] == "NO_ACREDITADA"
+                    for r in rows
+                )
+            )
+        self.assertEqual(
+            self.client.get(path, params={"channel": "other"}).status_code, 422
+        )
+        self.assertEqual(self.client.post(path, json={}).status_code, 403)
+        after = self.ok(self.client.get(ROOT + "900003"))
+        self.assertEqual(
+            (after["fields"], after["version"]), (ficha["fields"], ficha["version"])
+        )
+        with SessionLocal() as db:
+            self.assertEqual(
+                before,
+                [
+                    (r.source, r.payload)
+                    for r in db.scalars(
+                        select(CatalogSnapshot).order_by(CatalogSnapshot.source)
+                    )
+                ],
+            )
 
 
 if __name__ == "__main__":

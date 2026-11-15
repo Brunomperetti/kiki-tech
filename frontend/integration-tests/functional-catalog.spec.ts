@@ -23,10 +23,10 @@ test.beforeEach(async ({ page, context }) => {
   await page.getByRole("button", { name: "Ingresar", exact: true }).click();
   await expect(page.getByTestId("total").locator("strong")).toHaveText("6");
 });
-test("cinco vistas: registros huérfanos, CSV sin vigencia y maestro sin identidades inventadas", async ({
+test("vistas de captura y diferencias: registros huérfanos, CSV sin vigencia y maestro sin identidades inventadas", async ({
   page,
 }, info) => {
-  await expect(nav(page).getByRole("button")).toHaveCount(5);
+  await expect(nav(page).getByRole("button")).toHaveCount(3);
   await page.screenshot({
     path: `artifacts/functional-catalog-dashboard-${info.project.name}.png`,
     fullPage: false,
@@ -52,18 +52,18 @@ test("cinco vistas: registros huérfanos, CSV sin vigencia y maestro sin identid
   const tn = page.getByRole("region", { name: "Registros Tiendanube" });
   await expect(tn.locator("[data-channel-record]")).toHaveCount(5);
   await expect(tn).toContainText("registro-tn-sin-vinculo");
-  await expect(tn).toContainText("Información desactualizada");
+  await expect(tn).toContainText("sin vigencia");
   await expect(tn).not.toContainText("Publicación confirmada en captura");
-  for (const label of [
-    /^Variantes sin publicación confirmada · ML/,
-    /^Variantes sin publicación confirmada · TN/,
-  ]) {
-    await nav(page).getByRole("button", { name: label }).click();
-    await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
-    await expect(page.locator(".i-pagination")).toContainText(
-      "6 variantes en la captura",
-    );
-  }
+  await expect(
+    nav(page).getByRole("button", {
+      name: /Variantes sin publicación confirmada/,
+    }),
+  ).toHaveCount(0);
+  await page.getByTestId("total").click();
+  const comparison = page.getByLabel("Matriz de comparación de catálogos", {
+    exact: true,
+  });
+  await expect(comparison).toContainText("Coincidencias encontradas");
 });
 test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar variantes", async ({
   page,

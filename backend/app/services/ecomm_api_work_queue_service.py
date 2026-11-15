@@ -67,12 +67,19 @@ COMPARISON_STATES = (
     "conflicts",
     "no_match",
     "insufficient",
-    "stale",
 )
 FILTERS |= {
     f"{channel}_comparison_{state}"
     for channel in ("ml", "tn")
     for state in COMPARISON_STATES
+}
+FILTERS |= {
+    "ml_found",
+    "tn_found",
+    "ml_pending_candidates",
+    "tn_pending_candidates",
+    "ml_comparison_stale",
+    "tn_comparison_stale",
 }
 FILTERS |= set(QUALITY_FILTERS)
 
@@ -163,6 +170,14 @@ def _queue_item(
     ml = (coverage or {}).get("ml") or {"status": "UNAVAILABLE"}
     tn = (coverage or {}).get("tn") or {"status": "UNAVAILABLE"}
     for channel, evidence in (("ml", ml), ("tn", tn)):
+        if evidence.get("pending_candidates_count", 0) > 0:
+            flags.append(channel + "_pending_candidates")
+        if evidence.get("candidates_total", 0) > 0:
+            flags.append(channel + "_found")
+        if evidence.get("snapshot_available") and not evidence.get("freshness", {}).get(
+            "fresh"
+        ):
+            flags.append(channel + "_comparison_stale")
         if evidence.get("comparison_state") in COMPARISON_STATES:
             flags.append(f"{channel}_comparison_{evidence['comparison_state']}")
         if evidence.get("confirmed_listing"):
@@ -306,6 +321,7 @@ def build_queue(
     limit=25,
     sort="priority",
     selection_ids_only=False,
+    export_rows=False,
 ):
     if sort not in {"priority", "capture"}:
         raise ValueError("Orden de catálogo inválido.")
@@ -437,6 +453,17 @@ def build_queue(
         rows.sort(key=lambda x: (x["priority"], x["sku"].casefold(), x["ecomm_id"]))
     if selection_ids_only:
         return {"selected_ids": [row["ecomm_id"] for row in rows]}
+    if export_rows:
+        if len(rows) > 10000:
+            raise ValueError(
+                "La exportación supera 10.000 variantes; acotá la búsqueda."
+            )
+        return {
+            "items": rows,
+            "total": len(rows),
+            "source": STAGE_SOURCE,
+            "sources": channel_matrix["sources"],
+        }
     offset = (page - 1) * limit
     visible = rows[offset : offset + limit]
     # The table needs states/metadata, not every row's document-sized review history.
@@ -450,6 +477,26 @@ def build_queue(
                     key: value
                     for key, value in coverage[channel].items()
                     if key != "candidates"
+                }
+                | {
+                    "matches_preview": [
+                        {
+                            key: c.get(key)
+                            for key in (
+                                "id",
+                                "slug",
+                                "title",
+                                "sku",
+                                "gtin",
+                                "brand",
+                                "identity_verified",
+                                "match_reasons",
+                                "discrepancies",
+                                "blockers",
+                            )
+                        }
+                        for c in coverage[channel].get("candidates", [])[:3]
+                    ]
                 }
                 for channel in ("ml", "tn")
             },

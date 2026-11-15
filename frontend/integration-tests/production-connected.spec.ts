@@ -56,14 +56,12 @@ async function open(page: Page, tab = "Ficha") {
   if (tab !== "Ficha")
     await page.getByRole("tab", { name: tab, exact: true }).click();
 }
-test("cinco vistas, calidad, URL, conexiones sin sincronizaciones", async ({
+test("vistas de captura y diferencias, calidad, URL, conexiones sin sincronizaciones", async ({
   page,
 }, info) => {
   for (const view of [
     "Publicaciones Mercado Libre",
     "Registros Tiendanube",
-    "Variantes sin publicación confirmada · ML",
-    "Variantes sin publicación confirmada · TN",
     "Catálogo Ecomm-App",
   ]) {
     await page

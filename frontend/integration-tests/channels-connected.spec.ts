@@ -94,7 +94,7 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
       .locator("strong"),
   ).toHaveText("1");
   await expect(page.locator('[data-channel-panel="tn"]')).toContainText(
-    "Información desactualizada",
+    "Captura vencida",
   );
   await expect(page.locator('[data-channel-panel="tn"]')).toContainText(
     "no demuestra que siga publicado actualmente",
@@ -206,7 +206,7 @@ test("sin evidencia no significa no publicado; conserva búsqueda, selección, c
     "Sin coincidencia en esta captura",
   );
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
-    "no significa que el producto no esté publicado",
+    "No demuestra que no esté publicado actualmente",
   );
   expect(
     await page.evaluate(
@@ -258,16 +258,13 @@ test("matriz reconcilia variantes y registros, filtra en la misma tabla y abre e
     exact: true,
   });
   await expect(matrix).toBeVisible();
-  await expect(matrix).toContainText(
-    "Sin confirmación no significa «no publicado»",
-  );
+  await expect(matrix).toContainText("La antigüedad se informa por separado");
   const labels = {
     verified: "Vínculos verificados",
-    candidates: "Coincidencias pendientes",
+    candidates: "Coincidencias sin conflicto",
     conflicts: "Conflictos o ambigüedades",
     no_match: "Sin coincidencia en captura",
     insufficient: "Evidencia insuficiente",
-    stale: "Captura desactualizada",
   };
   for (const channel of ["ml", "tn"] as const) {
     const stats = queue.channel_coverage.summary.comparison[channel];
@@ -313,7 +310,7 @@ test("matriz reconcilia variantes y registros, filtra en la misma tabla y abre e
   await page.reload();
   await expect(matrix).toBeVisible();
   await page.screenshot({
-    path: `artifacts/comparacion-catalogos-${info.project.name}.png`,
+    path: `artifacts/diferencias-catalogos-${info.project.name}.png`,
     fullPage: true,
   });
   expect(
@@ -321,4 +318,115 @@ test("matriz reconcilia variantes y registros, filtra en la misma tabla y abre e
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("captura vencida conserva coincidencias TN, lista diferencias y exporta CSV autenticado sin escrituras", async ({
+  page,
+}) => {
+  const queue = await (
+    await page.request.get(
+      "/api/ecomm-app/workspace/queue?limit=50&sort=capture",
+    )
+  ).json();
+  const matrix = page.getByLabel("Matriz de comparación de catálogos", {
+    exact: true,
+  });
+  const tn = matrix.locator('[data-comparison-channel="tn"]');
+  const stats = queue.channel_coverage.summary.comparison.tn;
+  expect(stats.freshness.fresh).toBe(false);
+  expect(stats.variants_with_candidates).toBeGreaterThan(0);
+  expect(stats.stale_variants).toBe(6);
+  expect(stats.variants_with_pending_candidates).toBeGreaterThan(0);
+  await expect(
+    tn
+      .getByRole("button", { name: /^Candidatos por revisar/ })
+      .locator("strong"),
+  ).toHaveText(String(stats.variants_with_pending_candidates));
+  await tn.getByRole("button", { name: /^Candidatos por revisar/ }).click();
+  await expect(page).toHaveURL(/filter=tn_pending_candidates/);
+  await expect(page.locator("tbody tr[data-ecomm-id]")).toHaveCount(
+    stats.variants_with_pending_candidates,
+  );
+  await page.getByTestId("total").click();
+
+  await expect(
+    tn
+      .getByRole("button", { name: /^Coincidencias encontradas/ })
+      .locator("strong"),
+  ).toHaveText(String(stats.variants_with_candidates));
+  await expect(tn).toContainText("Las coincidencias se conservan");
+  await expect(
+    page
+      .getByRole("navigation", { name: "Vistas comerciales" })
+      .getByRole("button", { name: /Variantes sin publicación confirmada/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('[data-ecomm-id="900003"] [data-channel="ml"]'),
+  ).toContainText("ID ML: MLA900000003");
+  await expect(
+    page.locator('[data-ecomm-id="900003"] [data-channel="tn"]'),
+  ).toContainText("Identificador URL CSV: chia-sintetica");
+  await tn.getByRole("button", { name: /^Coincidencias encontradas/ }).click();
+  await expect(page).toHaveURL(/filter=tn_found/);
+  await expect(page.locator("tbody tr[data-ecomm-id]")).toHaveCount(
+    stats.variants_with_candidates,
+  );
+  await page.reload();
+  await expect(page.locator("tbody tr[data-ecomm-id]")).toHaveCount(
+    stats.variants_with_candidates,
+  );
+  await tn
+    .getByRole("button", { name: /^Sin coincidencia en captura/ })
+    .click();
+  await expect(page).toHaveURL(/filter=tn_comparison_no_match/);
+  await expect(page.locator("tbody tr[data-ecomm-id]")).toHaveCount(
+    stats.variant_states.no_match,
+  );
+  await expect(tn).toContainText(
+    "No encontrado en la captura no significa «no publicado actualmente»",
+  );
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    tn
+      .getByRole("button", {
+        name: "Exportar no encontrados · TN",
+        exact: true,
+      })
+      .click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("kiki-tn-no_match.csv");
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const text = Buffer.concat(chunks).toString("utf8");
+  expect(text).toContain("ecomm_id;sku;nombre_ecomm");
+  expect(text).toContain("NO_ACREDITADA");
+  const csv = await page.request.get(
+    "/api/ecomm-app/workspace/channels/differences.csv?channel=tn",
+  );
+  expect(csv.status()).toBe(200);
+  expect(csv.headers()["cache-control"]).toBe("no-store");
+  expect(csv.headers()["x-kiki-export-variants"]).toBe(
+    String(stats.variant_states.no_match),
+  );
+  const forged = await page.evaluate(() => {
+    const anchor = document.createElement("a");
+    const url = URL.createObjectURL(
+      new Blob(["synthetic"], { type: "text/csv" }),
+    );
+    anchor.href = url;
+    anchor.download = "kiki-tn-no_match.csv";
+    document.body.appendChild(anchor);
+    const allowed = anchor.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    return allowed;
+  });
+  expect(forged).toBe(false);
+  const writes = calls
+    .get(page)!
+    .filter((p) => p.startsWith("POST ") && !p.includes("/auth/login"));
+  expect(writes).toEqual([]);
 });

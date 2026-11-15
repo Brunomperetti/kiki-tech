@@ -1,5 +1,7 @@
 # Comparación de catálogos por variante Ecomm-App
 
+> Informe histórico de PR #163. La vigencia ya no debe ser una categoría excluyente; ver `CHANNEL-DIFFERENCES.md` para su corrección.
+
 Base: `main`, commit `3533f0c`. Rama `fix/catalog-channel-comparison`. La corrección no consulta proveedores, no modifica capturas ni decisiones y no requiere migraciones o variables nuevas.
 
 ## Problema y resultado

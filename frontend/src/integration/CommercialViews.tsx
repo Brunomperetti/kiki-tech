@@ -1,3 +1,4 @@
+import { downloadReviewCsv } from "./csv-download";
 import "./commercial-views.css";
 import { useEffect, useState } from "react";
 import {
@@ -47,6 +48,7 @@ export type Listings = {
   external_writes_enabled: false;
   query?: string;
   linkage?: string;
+  freshness?: { fresh: boolean; age_hours: number | null };
 };
 export async function loadListings(
   channel: "ml" | "tn",
@@ -115,25 +117,31 @@ export function CommercialViews({
   value,
   counts,
   onChange,
+  showLegacyValidationViews = true,
 }: {
+  showLegacyValidationViews?: boolean;
   value: CommercialView;
   counts: Partial<Record<CommercialView, number>>;
   onChange: (v: CommercialView) => void;
 }) {
   return (
     <nav className="k-commercial-views" aria-label="Vistas comerciales">
-      {Object.entries(commercialViews).map(([key, label]) => (
-        <button
-          type="button"
-          key={key}
-          data-testid={key === "ecomm" ? "total" : undefined}
-          data-metric={key === "ecomm" ? "all" : undefined}
-          aria-pressed={value === key}
-          onClick={() => onChange(key as CommercialView)}
-        >
-          {label} <strong>{counts[key as CommercialView] ?? "—"}</strong>
-        </button>
-      ))}
+      {Object.entries(commercialViews)
+        .filter(
+          ([key]) => showLegacyValidationViews || !key.endsWith("unconfirmed"),
+        )
+        .map(([key, label]) => (
+          <button
+            type="button"
+            key={key}
+            data-testid={key === "ecomm" ? "total" : undefined}
+            data-metric={key === "ecomm" ? "all" : undefined}
+            aria-pressed={value === key}
+            onClick={() => onChange(key as CommercialView)}
+          >
+            {label} <strong>{counts[key as CommercialView] ?? "—"}</strong>
+          </button>
+        ))}
     </nav>
   );
 }
@@ -223,6 +231,12 @@ export function ChannelListings({
             publicaciones distintas · Captura:{" "}
             {data.available ? captureDate(data.captured_at) : "No disponible"}
           </p>
+          {data.freshness?.fresh === false && (
+            <p>
+              Captura sin vigencia: coincidencias conservadas, publicación
+              actual sin acreditar.
+            </p>
+          )}
           <p>{data.policy}</p>
           <div className="k-listings-scroll">
             <table>
@@ -325,18 +339,44 @@ export function ChannelComparisonMatrix({
   comparison,
   filter,
   onFilter,
+  query = "",
 }: {
   comparison?: Record<"ml" | "tn", ChannelComparison>;
   filter: string;
   onFilter: (value: QueueFilter) => void;
+  query?: string;
 }) {
+  const [exporting, setExporting] = useState("");
+  const [exportError, setExportError] = useState("");
+  async function download(
+    channel: "ml" | "tn",
+    state: "no_match" | "all" | "pending",
+  ) {
+    setExporting(channel + state);
+    setExportError("");
+    try {
+      const params = new URLSearchParams({ channel, state, q: query });
+      const response = await request(
+        "/api/ecomm-app/workspace/channels/differences.csv?" + params,
+      );
+      if (!response.headers.get("Content-Type")?.startsWith("text/csv"))
+        throw new Error("La respuesta no es un CSV válido.");
+      const blob = await response.blob();
+      if (!blob.size || blob.size > 10 * 1024 * 1024)
+        throw new Error("Exportación fuera de los límites permitidos.");
+      downloadReviewCsv(blob, `kiki-${channel}-${state}.csv`);
+    } catch (error) {
+      setExportError((error as Error).message);
+    } finally {
+      setExporting("");
+    }
+  }
   const labels = {
     verified: "Vínculos verificados",
-    candidates: "Coincidencias pendientes",
+    candidates: "Coincidencias sin conflicto",
     conflicts: "Conflictos o ambigüedades",
     no_match: "Sin coincidencia en captura",
     insufficient: "Evidencia insuficiente",
-    stale: "Captura desactualizada",
   };
   return (
     <section
@@ -345,10 +385,12 @@ export function ChannelComparisonMatrix({
     >
       <h3>Comparación por variante Ecomm-App</h3>
       <p>
-        Sin confirmación no significa «no publicado». Las coincidencias
-        requieren revisión humana. Las seis categorías de cada canal suman el
-        catálogo maestro; los registros capturados son entidades distintas.
+        Coincidencias y diferencias de la captura, por Ecomm ID. Las
+        coincidencias requieren revisión humana. Las cinco categorías de cada
+        canal suman el catálogo maestro. La antigüedad se informa por separado y
+        no borra coincidencias.
       </p>
+      {exportError && <p role="alert">{exportError}</p>}
       {!comparison ? (
         <p>
           Comparación detallada no disponible en este backend. No se estiman
@@ -381,11 +423,33 @@ export function ChannelComparisonMatrix({
                     ? "Dentro del plazo de revisión"
                     : "Sin vigencia para confirmar el estado actual"}
                 </p>
+                <button
+                  aria-pressed={filter === `${channel}_found`}
+                  onClick={() => onFilter(`${channel}_found`)}
+                >
+                  Coincidencias encontradas{" "}
+                  <strong>{c.variants_with_candidates}</strong>
+                </button>
+                <button
+                  aria-pressed={filter === `${channel}_pending_candidates`}
+                  onClick={() => onFilter(`${channel}_pending_candidates`)}
+                >
+                  Candidatos por revisar{" "}
+                  <strong>{c.variants_with_pending_candidates}</strong>
+                </button>
+                <p>
+                  Encontrados y por revisar se superponen con las cinco
+                  categorías; no se suman al catálogo.
+                </p>
+                <p>
+                  Incluye candidatos y vínculos con revisión; una coincidencia
+                  con discrepancias no confirma identidad.
+                </p>
                 {!c.freshness.fresh && c.snapshot_at && (
                   <p>
-                    La fuente no tiene vigencia para ninguna de las {c.variants}{" "}
-                    variantes. En las categorías se priorizan los conflictos;
-                    «Captura desactualizada» cuenta las restantes.
+                    Captura vencida para {c.stale_variants} variantes. Las
+                    coincidencias se conservan; el estado actual del canal
+                    requiere una captura nueva autorizada.
                   </p>
                 )}
                 <p>
@@ -409,6 +473,32 @@ export function ChannelComparisonMatrix({
                   })}
                 </div>
                 <p>
+                  No encontrado en la captura no significa «no publicado
+                  actualmente». La captura almacenada no acredita su alcance
+                  completo.
+                </p>
+                <button
+                  disabled={!!exporting}
+                  onClick={() => download(channel, "no_match")}
+                >
+                  Exportar no encontrados · {channel.toUpperCase()}
+                </button>
+                <button
+                  disabled={!!exporting}
+                  onClick={() => download(channel, "all")}
+                >
+                  Exportar comparación completa · {channel.toUpperCase()}
+                </button>
+                <button
+                  disabled={!!exporting}
+                  onClick={() => download(channel, "pending")}
+                >
+                  Exportar candidatos por revisar · {channel.toUpperCase()}
+                </button>
+                {exporting.startsWith(channel) && (
+                  <p role="status">Preparando CSV de revisión…</p>
+                )}
+                <p>
                   {c.variants} variantes clasificadas ·{" "}
                   {c.variants_with_candidates} con candidatos (pueden incluir
                   conflictos o información vencida).
@@ -419,7 +509,8 @@ export function ChannelComparisonMatrix({
                   {c.valid_records} registros válidos
                   {c.invalid_records
                     ? `; ${c.invalid_records} inválidos`
-                    : ""}. {c.verified_records} registros vinculados y vigentes.
+                    : ""}. {c.verified_records} registros con identidad revisada
+                  en esta captura.
                 </p>
                 <p>
                   {channel === "ml"

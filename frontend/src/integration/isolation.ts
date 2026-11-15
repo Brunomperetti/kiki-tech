@@ -1,3 +1,4 @@
+import { isPermittedCsvDownload } from "./csv-download";
 declare const __KIKI_INTEGRATION__: boolean;
 export const gatewayOrigin = "https://127.0.0.1:8443";
 const allowed = new Set([
@@ -8,6 +9,7 @@ const allowed = new Set([
   "GET /api/ecomm-app/stage/catalog",
   "GET /api/ecomm-app/workspace/queue",
   "GET /api/ecomm-app/workspace/channels/listings",
+  "GET /api/ecomm-app/workspace/channels/differences.csv",
   "GET /api/ecomm-app/workspace/saved",
   "GET /api/ecomm-app/workspace/master-export",
   "GET /api/test-discovery/pilot-status",
@@ -147,6 +149,7 @@ export function installIntegrationIsolation() {
           ? event.target.closest("a[href]")
           : null;
       if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (isPermittedCsvDownload(anchor)) return;
       const url = new URL(anchor.href, location.origin);
       if (
         url.origin === gatewayOrigin &&

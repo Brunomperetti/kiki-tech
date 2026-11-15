@@ -135,6 +135,8 @@ class Handler(BaseHTTPRequestHandler):
             )
             if PRODUCTION_COMPAT and self.command == "GET" and re.fullmatch(r"/api/ecomm-app/workspace/90000[1-6]/documents/local-[a-f0-9]{32}/original/[1-8]",path.path):
                 max_response = MAX_HTTP_BODY
+            if self.command == "GET" and path.path == "/api/ecomm-app/workspace/channels/differences.csv":
+                max_response = 10 * 1024 * 1024  # Same bounded CSV contract; all other routes unchanged.
             body = upstream.read(max_response + 1)
             if len(body) > max_response:
                 raise OSError("Response too large")
@@ -142,6 +144,8 @@ class Handler(BaseHTTPRequestHandler):
             for key, value in upstream.getheaders():
                 if key.lower() in {
                     "content-type",
+                    "content-disposition",
+                    "x-kiki-export-variants",
                     "set-cookie",
                     "content-security-policy",
                     "cache-control",
