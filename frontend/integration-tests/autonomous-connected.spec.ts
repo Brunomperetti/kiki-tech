@@ -63,36 +63,11 @@ async function cancel(page: Page) {
 test("tabla accesible, indicadores completos sin duplicación y cinco pestañas conservadas", async ({
   page,
 }, info) => {
-  const secondary = page.locator(".i-secondary");
-  await expect(secondary).not.toHaveAttribute("open", "");
-  await expect(
-    page.locator(".k-preparation .c-metrics [data-metric]"),
-  ).toHaveCount(2);
-  for (const id of [
-    "all",
-    "identity",
-    "ml_confirmed",
-    "tn_verified",
-    "untouched",
-    "draft",
-    "ready",
-    "ready_for_channels",
-    "pack",
-    "channel_candidates",
-    "channel_conflicts",
-    "channel_no_evidence",
-    "channel_stale",
-  ])
-    await expect(page.locator(`[data-metric="${id}"]`)).toHaveCount(1);
-  const tops = await page
-    .locator(".k-preparation .c-metrics [data-metric]")
-    .evaluateAll((cards) =>
-      cards.map((card) => card.getBoundingClientRect().top),
-    );
-  if (info.project.name === "desktop") expect(new Set(tops).size).toBe(1);
-  else {
-    expect(tops[0]).toBe(tops[1]);
-  }
+  // Business metrics replace the former editorial readiness wall.
+  await expect(page.getByRole("region", { name: "Diferencias principales entre catálogos" })).toBeVisible();
+  await expect(page.locator(".k-business-gap-card")).toHaveCount(4);
+  await expect(page.locator(".k-preparation")).toHaveCount(0);
+  await expect(page.locator(".i-secondary")).toHaveCount(0);
   const y = await page
     .locator(".i-table")
     .evaluate((el) => el.getBoundingClientRect().top + scrollY);
@@ -107,9 +82,6 @@ test("tabla accesible, indicadores completos sin duplicación y cinco pestañas 
     path: `artifacts/operations-2r-dashboard-${info.project.name}.png`,
     fullPage: false,
   });
-  await page.getByText("Más indicadores comerciales", { exact: true }).click();
-  await expect(page.locator('[data-metric="pack"]')).toBeVisible();
-  await page.getByText("Más indicadores comerciales", { exact: true }).click();
   await page
     .locator('[data-ecomm-id="900001"]')
     .getByRole("button", { name: "Ver ficha", exact: true })
