@@ -47,6 +47,7 @@ import {
 } from "./catalog-adapter";
 import "./integration.css";
 import { PersistentWorkspace } from "./PersistentWorkspace";
+import { GtinExportPanel, GtinExportEvidence } from "./GtinExportPanel";
 import { stateLabels, getWorkspace } from "./workspace-adapter";
 import { MamaPilotLauncher } from "./MamaPilot";
 import { mamaPilotId, type MamaReport } from "./mama-pilot";
@@ -121,6 +122,7 @@ export function IntegrationCatalog() {
   const [error, setError] = useState<CatalogError>();
   const [loading, setLoading] = useState(false);
   const [revision, retry] = useState(0);
+  const [gtinRevision, setGtinRevision] = useState(0);
   const q = params.get("q") || "";
   const filter = (params.get("filter") || "all") as QueueFilter;
   const view = (params.get("view") || "ecomm") as CommercialView;
@@ -625,6 +627,7 @@ export function IntegrationCatalog() {
           · {captureDate(data?.lastAt ?? null)}
         </span>
       </div>
+      {session && <GtinExportPanel csrf={session.csrf_token} onImported={() => { setGtinRevision(n => n + 1); retry(n => n + 1); }} />}
       <section
         aria-label="Cobertura por canal"
         className="i-commercial-overview"
@@ -1352,6 +1355,7 @@ export function IntegrationCatalog() {
               : "CONSULTA DE VARIANTE"
           }
         >
+          <GtinExportEvidence ecommId={selected.id} revision={gtinRevision} />
           <PersistentWorkspace
             key={selected.id}
             proposalId={
