@@ -292,3 +292,51 @@ def safe_gtin_candidates_for_pages(db, pages, *, export_record=_UNFETCHED):
         ):
             result[eid] = code
     return result
+
+
+def export_quality_for_pages(pages, export_record):
+    """Validated, per-Ecomm-ID GTIN evidence for quality filters.
+
+    The exported spreadsheet is supplemental. Its IDs and SKUs must match the
+    entire current API capture. Never mistake a pack's shared GTIN for its
+    independently confirmed identity. Return no evidence on any mismatch.
+    """
+    payload = (
+        export_record.payload[0]
+        if export_record and isinstance(export_record.payload, list)
+        and export_record.payload else None
+    )
+    if not isinstance(payload, dict) or payload.get("version") != SCHEMA_VERSION:
+        return {}
+    raw = payload.get("rows")
+    if not isinstance(raw, list):
+        return {}
+    api = {}
+    for page in pages:
+        for parent in page.get("items") or []:
+            for v in parent.get("variants") or []:
+                if not isinstance(v, dict) or v.get("invalid"):
+                    continue
+                eid = _as_text(v.get("id"))
+                if not eid or eid in api:
+                    return {}
+                api[eid] = _as_text(v.get("sku"))
+    if len(api) != len(raw) or len(raw) != payload.get("variants"):
+        return {}
+    evidence = {}
+    for row in raw:
+        eid = row.get("ecomm_id")
+        if (
+            not isinstance(eid, str)
+            or eid in evidence
+            or eid not in api
+            or api[eid] != row.get("sku")
+        ):
+            return {}
+        code = row.get("gtin")
+        evidence[eid] = (
+            code
+            if isinstance(code, str) and _gtin_check_digit_valid(code)
+            else ""
+        )
+    return evidence

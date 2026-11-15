@@ -66,8 +66,9 @@ test("tabla accesible, indicadores completos sin duplicación y cinco pestañas 
   // Business metrics replace the former editorial readiness wall.
   await expect(page.getByRole("region", { name: "Diferencias principales entre catálogos" })).toBeVisible();
   await expect(page.locator(".k-business-gap-card")).toHaveCount(4);
-  await expect(page.locator(".k-preparation")).toHaveCount(0);
-  await expect(page.locator(".i-secondary")).toHaveCount(0);
+  await expect(page.locator(".k-preparation")).toHaveCount(1);
+  await expect(page.locator(".i-secondary")).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Calidad del catálogo" })).toBeVisible();
   const y = await page
     .locator(".i-table")
     .evaluate((el) => el.getBoundingClientRect().top + scrollY);

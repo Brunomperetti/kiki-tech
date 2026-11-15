@@ -27,7 +27,7 @@ LABELS = {
 }
 
 
-def identity_index(pages):
+def identity_index(pages, export_gtin_by_id=None):
     rows = [
         v
         for p in pages
@@ -39,7 +39,16 @@ def identity_index(pages):
     def sku(v):
         return str(v.get("sku") or "").strip()
 
-    codes = Counter(str(v.get("gtin") or v.get("barcode") or "").strip() for v in rows)
+    export_gtin_by_id = export_gtin_by_id or {}
+
+    def gtin(v):
+        # API is primary, an ID+SKU-validated spreadsheet is only a supplement.
+        return str(
+            v.get("gtin") or v.get("barcode")
+            or export_gtin_by_id.get(str(v.get("id")), "")
+        ).strip()
+
+    codes = Counter(gtin(v) for v in rows)
     owners = Counter(sku(v).casefold() for v in rows)
     groups = defaultdict(set)
     for v in rows:
@@ -67,13 +76,17 @@ def identity_index(pages):
             families.update(
                 s for s in members if compare_family_skus(pivot, s)["related"]
             )
-    return codes, owners, families
+    return codes, owners, families, export_gtin_by_id
 
 
 def flags(source, edit, index):
-    codes, owners, families = index
-    fields = (edit.fields or {}) if edit else {}
-    code = str(source.get("gtin_raw") or source.get("barcode") or "").strip()
+    codes, owners, families, export_gtin_by_id = index
+    started = edit is not None
+    fields = (edit.fields or {}) if started else {}
+    code = str(
+        source.get("gtin_raw") or source.get("barcode")
+        or export_gtin_by_id.get(str(source.get("ecomm_id")), "")
+    ).strip()
     sku = str(source.get("sku") or "").strip()
     barcode, gtin = source.get("barcode"), source.get("gtin_raw")
     repeated_code = bool(code and codes[code] > 1)
@@ -84,7 +97,7 @@ def flags(source, edit, index):
 
     media = fields.get("media") or []
     values = {
-        "commercial_incomplete": not _readiness({**blank_fields(), **fields})["ready"],
+        "commercial_incomplete": started and not _readiness({**blank_fields(), **fields})["ready"],
         "ean_missing": not code,
         "ean_repeated": repeated_code,
         "sku_repeated": repeated_sku,
@@ -94,14 +107,14 @@ def flags(source, edit, index):
         "barcode_gtin_conflict": bool(
             barcode and gtin and str(barcode).strip() != str(gtin).strip()
         ),
-        "short_description_missing": not present("short_description"),
-        "long_description_missing": not present("description"),
-        "commercial_title_missing": not present("title"),
-        "category_missing": not present("category"),
-        "subcategory_missing": not present("subcategory"),
-        "attributes_missing": not bool(fields.get("attributes")),
-        "images_missing": not any(m.get("kind") == "IMAGE" for m in media),
-        "video_unrecorded": not any(m.get("kind") == "VIDEO" for m in media),
-        "seo_missing": not (present("seo_title") and present("seo_description")),
+        "short_description_missing": started and not present("short_description"),
+        "long_description_missing": started and not present("description"),
+        "commercial_title_missing": started and not present("title"),
+        "category_missing": started and not present("category"),
+        "subcategory_missing": started and not present("subcategory"),
+        "attributes_missing": started and not bool(fields.get("attributes")),
+        "images_missing": started and not any(m.get("kind") == "IMAGE" for m in media),
+        "video_unrecorded": started and not any(m.get("kind") == "VIDEO" for m in media),
+        "seo_missing": started and not (present("seo_title") and present("seo_description")),
     }
     return [key for key, value in values.items() if value]

@@ -72,8 +72,8 @@ test("vistas de captura y diferencias, calidad, URL, conexiones sin sincronizaci
   }
   // Keep business dashboard simple; quality filters are still available
   // via the existing product table, not a wall of misleading KPIs.
-  await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Calidad del catálogo" })).toBeVisible();
   await page.getByTestId("total").click();
   await page.getByLabel("Filtrar catálogo").selectOption("ean_missing");
   await expect(page).toHaveURL(/filter=ean_missing/);

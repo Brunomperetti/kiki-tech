@@ -368,7 +368,7 @@ def build_queue(
         if isinstance(v, dict) and not v.get("invalid") and _value(v.get("sku"))
     )
     rows = []
-    quality = identity_index(pages)
+    quality = identity_index(pages, channel_matrix.get("export_gtin_quality"))
     counts = Counter()
     term = query.casefold().strip()
     for p in pages:
@@ -414,6 +414,7 @@ def build_queue(
                     )
                 counts["total"] += 1
                 counts["source_name_present"] += int(item["source_name_present"])
+                counts["source_variant_description_present"] += int(bool(_value(source.get("variant_description"))))
                 counts["source_name_missing"] += int(not item["source_name_present"])
                 counts["editorial_started"] += int(item["commercial_edit_started"])
                 counts["editorial_brand_saved"] += int(bool(item["proposed_brand"]))
@@ -519,6 +520,7 @@ def build_queue(
             "ml_ready_without_confirmation": counts["ml_ready_without_confirmation"],
             "tn_ready_without_confirmation": counts["tn_ready_without_confirmation"],
             "source_name_present": counts["source_name_present"],
+            "source_variant_description_present": counts["source_variant_description_present"],
             "source_name_missing": counts["source_name_missing"],
             "editorial_started": counts["editorial_started"],
             "editorial_brand_saved": counts["editorial_brand_saved"],

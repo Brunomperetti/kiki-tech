@@ -69,8 +69,11 @@ test("vistas de captura y diferencias: registros huérfanos, CSV sin vigencia y 
 test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar variantes", async ({
   page,
 }, info) => {
-  await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(0);
-  await page.getByLabel("Filtrar catálogo").selectOption("ean_repeated");
+  await expect(page.getByText("Más indicadores comerciales", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Calidad del catálogo" })).toBeVisible();
+  await page.getByRole("group", { name: "Calidad de GTIN y SKU" })
+    .getByRole("button", { name: /GTIN compartido/ }).click();
+  await expect(page).toHaveURL(/filter=ean_repeated/);
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
   await expect(page.locator('[data-ecomm-id="900003"]')).toContainText("250 g");
   await expect(page.locator('[data-ecomm-id="900004"]')).toBeVisible();
@@ -255,7 +258,7 @@ test("preparación calculada por canal, CTA IA y publicación confirmada se mant
     await page.getByTestId("total").click();
     await expect(page.getByTestId("total").locator("strong")).toHaveText("6");
     await expect(page.locator("[data-ecomm-id]")).toHaveCount(6);
-    await expect(page.locator(".k-preparation")).toHaveCount(0);
+    await expect(page.locator(".k-preparation")).toHaveCount(1);
     await page.screenshot({
       path: `artifacts/ux-final-connected-dashboard-${info.project.name}.png`,
       fullPage: info.project.name === "mobile",
