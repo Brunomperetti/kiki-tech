@@ -60,6 +60,7 @@ test("vistas de captura y diferencias: registros huérfanos, CSV sin vigencia y 
     }),
   ).toHaveCount(0);
   await page.getByTestId("total").click();
+  await page.getByText("Ver análisis detallado y exportaciones por canal", { exact: true }).click();
   const comparison = page.getByLabel("Matriz de comparación de catálogos", {
     exact: true,
   });
