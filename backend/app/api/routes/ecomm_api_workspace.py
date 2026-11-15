@@ -2,7 +2,7 @@
 
 from typing import Literal, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from ...services.ecomm_ai_proposal_inbox_service import list_ecomm_ai_proposals
 from ...services.ecomm_api_brand_hints_service import EcommApiBrandHints
 from ...services.ecomm_api_work_queue_service import build_queue
 from ...services.ecomm_secondary_ean_evidence import EcommLegacyEanEvidence
+from ...services.ecomm_gtin_export_service import EcommExportGtin, MAX_BYTES
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -150,6 +151,53 @@ def work_queue(
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
+
+
+
+@router.get("/gtin-export/summary")
+def gtin_export_summary(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Read evidence from the manually imported Ecomm inventory export."""
+    try:
+        return EcommExportGtin(db).summary()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/gtin-export/{ecomm_id}")
+def gtin_export_evidence(
+    ecomm_id: str,
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    try:
+        return EcommExportGtin(db).evidence(ecomm_id)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/gtin-export")
+async def import_gtin_export(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _session=Depends(require_csrf),
+):
+    """Only saves ID+SKU+GTIN evidence in a separate row. No catalog/vendor changes."""
+    try:
+        if file.content_type not in (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/octet-stream",
+        ):
+            raise ValueError("Solo se acepta la exportación oficial .xlsx de Ecomm-App.")
+        content = await file.read(MAX_BYTES + 1)
+        return EcommExportGtin(db).import_file(content, file.filename or "")
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    finally:
+        await file.close()
 
 
 @router.get("/ean-evidence/summary")
