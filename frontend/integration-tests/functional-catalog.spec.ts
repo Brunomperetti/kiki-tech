@@ -68,9 +68,10 @@ test("vistas de captura y diferencias: registros huérfanos, CSV sin vigencia y 
 test("calidad calculada, intersección, búsqueda y URL recuperable sin mezclar variantes", async ({
   page,
 }, info) => {
-  await page.getByText("Calidad del catálogo", { exact: true }).click();
-  const quality = page.getByRole("group", { name: "Indicadores de calidad" });
-  const metric = quality.getByRole("button", { name: /^EAN repetido/ });
+  await page.getByText("Campos editoriales por completar en KIKI (opcional)", { exact: true }).click();
+  await page.getByText("Diagnósticos técnicos de la captura API", { exact: true }).click();
+  const quality = page.getByRole("group", { name: "Diagnósticos de la API" });
+  const metric = quality.getByRole("button", { name: /^GTIN repetido en respuesta API/ });
   await expect(metric.locator("strong")).toHaveText("2");
   await metric.click();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(2);
