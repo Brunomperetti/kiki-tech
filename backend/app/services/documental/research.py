@@ -244,6 +244,105 @@ class Research:
                 )
         return issues
 
+    @staticmethod
+    def _equivalence_record(item, doc):
+        """Latest explicit decision for this exact document, never shared by EAN/SKU."""
+        for event in reversed(item.history or []):
+            if event.get("action") != "DOCUMENT_IDENTITY_REVIEW":
+                continue
+            detail = event.get("detail") or {}
+            if detail.get("document_id") == doc.id:
+                return detail
+        return None
+
+    def identity_blockers(self, item, doc):
+        issues = self.identity_issues(item.identity, doc.body)
+        record = self._equivalence_record(item, doc)
+        if not record or record.get("decision") != "APPROVED":
+            return issues
+        if (
+            record.get("ecomm_id") != item.ecomm_id
+            or record.get("identity_digest") != item.identity_digest
+            or record.get("document_version") != doc.version
+            or record.get("document_hash") != doc.digest
+            or record.get("source_name") != item.identity.get("name")
+            or record.get("source_presentation") != item.identity.get("presentation")
+            or record.get("document_name") != doc.body.get("identity", {}).get("name")
+            or record.get("document_presentation") != doc.body.get("identity", {}).get("presentation")
+            or item.identity.get("is_combo") is not False
+            or doc.body.get("source", {}).get("review_state") != "REVIEWED"
+            or doc.body.get("parse_status") != "TEXT_EXTRACTED"
+        ):
+            return issues
+        # Human decision waives only the stated nomenclature and package-size
+        # differences; not EAN, SKU, brand, manufacturer or sale type.
+        issues = [
+            issue for issue in issues
+            if not issue.startswith(("Nombre incompatible", "Presentación incompatible"))
+        ]
+        editorial = item.identity.get("editorial_presentation")
+        if editorial == doc.body["identity"]["presentation"]:
+            issues = [issue for issue in issues if not issue.startswith("La presentación editorial")]
+        return issues
+
+    def review_document_identity(
+        self, ident, expected_version, document_id, document_version, decision, reason
+    ):
+        if decision not in {"APPROVED", "REVOKED"}:
+            raise ValueError("Decisión de identidad no permitida.")
+        if len(reason.strip()) < 20:
+            raise ValueError("Indicá cómo contrastaste el producto con la fuente (20 caracteres).")
+        item = self.dossier(ident)
+        self.expect(item, expected_version)
+        doc = self._document(document_id)
+        self.validate_document(ident, doc)
+        if not doc or doc.version != document_version:
+            raise ValueError("Documento inexistente o cambió de versión.")
+        if doc.body.get("associated_ecomm_id") != ident:
+            raise ValueError("La equivalencia solo puede vincular el documento de esta variante.")
+        if decision == "APPROVED":
+            if (
+                item.identity.get("is_combo") is not False
+                or doc.body.get("source", {}).get("review_state") != "REVIEWED"
+                or doc.body.get("parse_status") != "TEXT_EXTRACTED"
+            ):
+                raise ValueError("Requiere unidad individual y procedencia documental revisada.")
+            identity = doc.body.get("identity", {})
+            if not all(str(identity.get(k) or "").strip() for k in ("name", "presentation")):
+                raise ValueError("La fuente debe identificar explícitamente nombre y presentación.")
+            original = self.identity_issues(item.identity, doc.body)
+            if not any(x.startswith(("Nombre incompatible", "Presentación incompatible")) for x in original):
+                raise ValueError("Sin diferencias de identidad nominal que requieran conciliación.")
+            disallowed = [
+                x for x in original if not x.startswith((
+                    "Nombre incompatible", "Presentación incompatible",
+                    "La presentación editorial",
+                ))
+            ]
+            if disallowed or self.additional_blockers(item, doc) or doc.body.get("parser_blockers"):
+                raise ValueError("Existen discrepancias de EAN, tipo de venta u otros bloqueos.")
+        else:
+            current = self._equivalence_record(item, doc)
+            if not current or current.get("decision") != "APPROVED":
+                raise ValueError("No hay una conciliación aprobada vigente para revocar.")
+        record = {
+            "ecomm_id": ident,
+            "document_id": doc.id,
+            "document_version": doc.version,
+            "document_hash": doc.digest,
+            "identity_digest": item.identity_digest,
+            "source_name": item.identity.get("name"),
+            "source_presentation": item.identity.get("presentation"),
+            "document_name": doc.body.get("identity", {}).get("name"),
+            "document_presentation": doc.body.get("identity", {}).get("presentation"),
+            "decision": decision,
+            "reason": reason.strip(),
+            "reviewer": self.actor,
+        }
+        self.commit_change(item, deepcopy(item.facts), "DOCUMENT_IDENTITY_REVIEW", record)
+        self.refresh(item)
+        return self.serialize(item)
+
     def dossier(self, ident):
         item = self.db.get(self.Dossier, ident)
         try:
@@ -342,7 +441,7 @@ class Research:
 
     def blockers(self, item, fact, *, include_conflicts=True):
         doc = self._document(fact["document_id"])
-        issues = self.identity_issues(item.identity, doc.body)
+        issues = self.identity_blockers(item, doc)
         issues.extend(self.additional_blockers(item, doc))
         if fact["ecomm_id"] != item.ecomm_id:
             issues.append("El hecho no pertenece a esta variante Ecomm-App.")
@@ -401,7 +500,14 @@ class Research:
                 issues.append(
                     "Falta una unidad explícita y respaldada por el documento."
                 )
-        if fact["presentation"] != item.identity["presentation"]:
+        doc_presentation = doc.body.get("identity", {}).get("presentation")
+        record = self._equivalence_record(item, doc)
+        matched_alias = bool(
+            record and record.get("decision") == "APPROVED"
+            and not self.identity_blockers(item, doc)
+            and fact["presentation"] == doc_presentation
+        )
+        if fact["presentation"] != item.identity["presentation"] and not matched_alias:
             issues.append("La presentación del hecho no corresponde a la variante.")
         if fact["field"] == "certification_evidence" and not re.search(
             r"\d", fact["value"]
@@ -530,7 +636,7 @@ class Research:
                     "version": doc.version,
                     "hash": doc.digest,
                     "body": public_body(doc.body),
-                    "issues": self.identity_issues(item.identity, doc.body),
+                    "issues": self.identity_blockers(item, doc),
                     "versions": [v["version"] for v in self.fixtures.get(doc.id, [])],
                     "history": [
                         {**h, "body": public_body(h["body"])} for h in doc.history
