@@ -485,6 +485,7 @@ def parse(name, mime, encoded, *, web_snapshot=False):
             if ":" in line
         ]
     )
+    page_ambiguous = False
     if web_snapshot and extension == ".html":
         # Pages often publish composition in a description paragraph instead
         # of a labelled field. Keep only exact, brief, product-scoped fragments.
@@ -502,7 +503,7 @@ def parse(name, mime, encoded, *, web_snapshot=False):
             value, location, quote = extracts[0]
             entries.append(("características", value, None, location, quote))
         elif len(extracts) > 1:
-            entries.append(("características", "", None, "", ""))
+            page_ambiguous = True
     if json_values is None:
         # A bounded single row of a passive HTML/PDF nutritional table, never pair unrelated lines.
         for loc, line in sections.items():
@@ -516,6 +517,11 @@ def parse(name, mime, encoded, *, web_snapshot=False):
             if row and ALIASES.get(normalized(row[1]), "").startswith("nutrition."):
                 entries.append((row[1], row[2], None, loc, line))
     values, warnings, ambiguous = {}, [], set()
+    if page_ambiguous:
+        warnings.append(
+            "Más de una declaración descriptiva de composición: "
+            "requiere revisión del original; no se extrajo característica."
+        )
     for label, literal, unit, location, quote in entries:
         field = ALIASES.get(normalized(label))
         if not field or not literal.strip():
