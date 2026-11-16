@@ -172,7 +172,7 @@ def test_real_naming_discrepancy_flows_to_versioned_internal_draft(tmp_path, mon
             if key in {
                 "presentation", "title", "short_title", "description",
                 "short_description", "seo_title", "seo_description", "details",
-                "attributes",
+                "attributes", "seo_keywords",
             }
         }
         reviewed_proposal = service.review(
@@ -199,6 +199,8 @@ def test_real_naming_discrepancy_flows_to_versioned_internal_draft(tmp_path, mon
         persisted = EcommApiProductWorkspace(db).get(IDENT)
         assert persisted["fields"]["presentation"] == "250 g"
         assert persisted["fields"]["title"] == "Mix Ensaladas y Sopas · 250 g"
+        assert persisted["fields"]["short_title"] == "Mix Ensaladas y Sopas"
+        assert persisted["fields"]["seo_keywords"] == "Mix Ensaladas y Sopas, 250 g"
         assert persisted["version"] == 1
         assert len(persisted["history"]) == 1
         doc_reloaded = db.get(Document, DOCUMENT_ID)
