@@ -53,7 +53,7 @@ def synthetic_document():
     return {
         "id": DOCUMENT_ID,
         "version": 1,
-        "synthetic": False,
+        "synthetic": True,
         "associated_ecomm_id": IDENT,
         "identity": {
             "name": "Mix Ensaladas y Sopas",
@@ -79,7 +79,7 @@ def synthetic_document():
             "review_state": "REVIEWED",
             "reference_url": "https://fabricante-prueba.invalid/mix-250g",
         },
-        "provenance": "local://sha256/" + "1" * 64,
+        "provenance": "fixture://natural-seed-fictitious-document",
         "parse_status": "TEXT_EXTRACTED",
         "parser_blockers": [],
         "parser_warnings": [],
@@ -194,6 +194,11 @@ def test_real_naming_discrepancy_flows_to_versioned_internal_draft(tmp_path, mon
         assert saved["status"] == "DRAFT"
         assert saved["fields"]["presentation"] == "250 g"
         assert saved["external_writes_enabled"] is False
+        assert saved["readiness"]["ready"] is False
+        assert "primary_source" in saved["readiness"]["missing"]
+        assert "images" in saved["readiness"]["missing"]
+        assert "category" in saved["readiness"]["missing"]
+        assert "subcategory" in saved["readiness"]["missing"]
 
     with Session(engine) as db:
         persisted = EcommApiProductWorkspace(db).get(IDENT)
