@@ -196,3 +196,46 @@ def test_unquoted_or_tampered_source_identity_cannot_be_reconciled(tamper):
     with pytest.raises(ValueError, match="citas literales"):
         approve(service, case, doc)
     assert case.history == []
+
+
+
+def test_reviewed_manufacturer_size_survives_internal_draft_save_without_data_drift():
+    """The real pilot needs a 250 g editorial presentation unlike Ecomm's raw title."""
+    service, case, doc = setup_case()
+    canonical = identity_digest(case.identity)
+    approve(service, case, doc)
+    assert service.equivalence_current(case, doc)
+    assert service.identity_blockers(case, doc) == []
+
+    # Simulate the internal editor saving the *approved* manufacturer size.
+    case.identity["editorial_presentation"] = "250 g"
+    assert identity_digest(case.identity) == canonical
+    assert service.equivalence_current(case, doc)
+    assert service.identity_blockers(case, doc) == []
+
+    # A later arbitrary edit is NOT an approved synonym. It blocks the facts,
+    # even though the editorial overlay does not define Ecomm's primary key.
+    case.identity["editorial_presentation"] = "500 g"
+    assert identity_digest(case.identity) == canonical
+    errors = service.identity_blockers(case, doc)
+    assert any("presentación editorial KIKI" in error for error in errors)
+    assert errors  # no usable evidence until the operator fixes the mismatch
+
+    # Restoring the documented size is not a fresh approval; the original
+    # source, document and review are still bound to this exact identity.
+    case.identity["editorial_presentation"] = "250 g"
+    assert service.identity_blockers(case, doc) == []
+    case.identity["sku"] = "OTHER-SKU"
+    case.identity_digest = identity_digest(case.identity)
+    assert service.identity_blockers(case, doc)
+
+
+def test_source_presentation_remains_canonical_and_cannot_be_rewritten_by_editor():
+    service, case, doc = setup_case()
+    approve(service, case, doc)
+    original = case.identity_digest
+    case.identity["presentation"] = "500 g"
+    case.identity_digest = identity_digest(case.identity)
+    assert case.identity_digest != original
+    assert not service.equivalence_current(case, doc)
+    assert service.identity_blockers(case, doc)
