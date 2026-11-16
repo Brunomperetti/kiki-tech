@@ -432,6 +432,15 @@ export function DocumentImport({
               revisar citas, identidad y procedencia antes de aprobar.
             </p>
           )}
+          {document.body.source?.capture_mode === "ALLOWLISTED_HTTPS_FETCH" && (
+            <p role="note">
+              Página obtenida por KIKI mediante HTTPS y dominio autorizado.
+              Se comprobó el permiso de robots.txt y la identidad TLS,
+              y se archivó el original con SHA-256. Esto NO confirma que
+              corresponda al SKU: la identidad, procedencia y hechos todavía
+              requieren revisión humana.
+            </p>
+          )}
           <p>{document.body.source!.note}</p>
           <p>
             Fabricante declarado:{" "}
