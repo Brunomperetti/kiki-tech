@@ -103,6 +103,28 @@ class Research:
             raise ValueError("Identidad bloqueada: barcode y gtin discrepan.")
         edit = self.edit_record(ident)
         fields = edit.fields if edit else {}
+        ean = source["gtin"]
+        ean_provenance = "Captura API; no equivale a verificación del fabricante"
+        if not ean:
+            # Only *unique, non-combo* barcodes with exact Ecomm ID+SKU and a
+            # complete, unchanged API capture can be considered. This merely
+            # supplies a reference for source matching. It is NOT a verified
+            # manufacturer assertion and never approves documentary facts.
+            from app.services.ecomm_gtin_export_service import (
+                safe_gtin_candidates_for_pages,
+            )
+
+            export_candidates = safe_gtin_candidates_for_pages(
+                self.db, self.workspace_type(self.db)._source_pages()
+            )
+            candidate = export_candidates.get(ident)
+            if candidate:
+                ean = candidate
+                ean_provenance = (
+                    "Excel de inventario Ecomm-App: ID y SKU exactos, GTIN único "
+                    "y válido, variante no combo. Solo referencia para contrastar "
+                    "con el fabricante; no verificado por API ni por fabricante."
+                )
         return {
             "ecomm_id": ident,
             "name": source["product_name"],
@@ -110,19 +132,18 @@ class Research:
             "presentation": source["variant_description"],
             "is_combo": source["is_combo"],
             "parent_is_combo": source.get("parent_is_combo"),
-            "ean": source["gtin"],
+            "ean": ean,
             "barcode": source.get("barcode"),
             "gtin_raw": source.get("gtin_raw"),
             "brand": source.get("brand"),
             "manufacturer": source.get("manufacturer"),
             "editorial_presentation": fields.get("presentation") or None,
             "provenance": {
-                k: "Captura API; no equivale a verificación del fabricante"
-                for k in ("name", "presentation", "ean")
-            }
-            | {
-                k: "Campo KIKI de contraste; no aprobado por defecto"
-                for k in ("brand", "manufacturer")
+                "name": "Captura API; no equivale a verificación del fabricante",
+                "presentation": "Captura API; no equivale a verificación del fabricante",
+                "ean": ean_provenance,
+                "brand": "Campo KIKI de contraste; no aprobado por defecto",
+                "manufacturer": "Campo KIKI de contraste; no aprobado por defecto",
             },
         }
 
