@@ -222,10 +222,21 @@ class Research:
                 issues.append(
                     "Documento asociado a otro Ecomm ID; no se reutiliza por SKU/EAN."
                 )
-            if body["identity"].get("is_combo") is None or (
-                body["identity"]["is_combo"] != reference["is_combo"]
+            document_sale_type = body["identity"].get("is_combo")
+            # Manufacturers commonly identify an individual retail product by
+            # its *exact name and presentation* without an explicit "unidad"
+            # field. Absence must not block all ordinary, non-combo evidence.
+            # Pack/kit identities remain strict: no inherited unit EAN, no
+            # assumption about contents or the actual pack presentation.
+            if document_sale_type is not None and (
+                document_sale_type != reference["is_combo"]
             ):
-                issues.append("Tipo de venta (unidad/pack) ausente o incompatible.")
+                issues.append("Tipo de venta (unidad/pack) incompatible.")
+            elif reference["is_combo"] is True and document_sale_type is not True:
+                issues.append(
+                    "Pack/kit sin tipo de venta explícito en el documento; "
+                    "no se puede acreditar la presentación del pack."
+                )
         return issues
 
     def dossier(self, ident):
