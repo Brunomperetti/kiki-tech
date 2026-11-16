@@ -31,6 +31,27 @@ Consulta **de solo lectura** a los snapshots Ecomm API y Excel importado en KIKI
    - Es apoyo para búsqueda de identidad, **no reemplaza ficha técnica, etiqueta
      ni documentación oficial**.
 
+## Matriz de hechos del piloto (relectura pública 16/11/2026)
+
+Esta es una **preselección documental**, no una aprobación ni una ficha escrita
+en KIKI. Las URLs siguen siendo fuentes externas: registrar fecha, fragmento
+y versión antes de aceptar cualquier dato.
+
+| Campo candidato | Respaldo hallado | Decisión segura |
+| --- | --- | --- |
+| Nombre comercial | Sitio Natural Seed: «Mix Ensaladas y Sopas» | Candidato a contraste con el nombre de Ecomm, nunca sustitución automática |
+| Presentación | Sitio Natural Seed: «Peso 250 g» | Candidato para esta presentación, sujeto a identidad Ecomm ID+SKU |
+| Descripción general | Sitio Natural Seed: mezcla de tres frutos secos y tres semillas al oreganato | Solo dato descriptivo acotado; contrastar etiqueta antes de precisar composición |
+| GTIN/EAN `7798180790097` | Excel Ecomm + SKU visible en New Garden | **Solo pista**, no GTIN certificado por fabricante |
+| Ingredientes específicos | Listado en New Garden, no detallado en la página oficial consultada | **No aprobar** como especificación de fabricante sin etiqueta/ficha técnica |
+| «Sin TACC» o «libre de gluten» | Declaración de New Garden | **No aprobar certificación/claim** sin respaldo documental específico vigente |
+| Beneficios nutricionales o de salud | Alegaciones comerciales en los sitios | **No generar automáticamente** alegaciones de salud o valores nutricionales |
+
+Ningún campo de esta matriz fue ingresado, aprobado, publicado ni exportado.
+La próxima prueba aislada debe demostrar que el sistema conserva la fuente
+y el fragmento por campo, diferencia candidatura de hecho aprobado, bloquea
+contradicciones y deja un borrador interno recuperable tras recargar.
+
 **Estado:** `PENDIENTE_VERIFICACION`. Es un buen primer caso porque el catálogo
 tiene ID y SKU exactos y existen una página de la marca y otra con código.
 No se verificó una correspondencia oficial inequívoca del código con el fabricante.
