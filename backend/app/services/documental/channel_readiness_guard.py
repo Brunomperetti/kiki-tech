@@ -17,6 +17,48 @@ from .storage import digest
 
 
 REQUIRED = frozenset({"product_name", "presentation"})
+TAXONOMY_FIELDS = ("category", "subcategory")
+
+
+def _commercial_coverage(fields, approved):
+    """Exact, reviewed facts only; names/units must match the canonical editor."""
+    from .proposals import TEXT
+
+    missing = []
+    for key in TAXONOMY_FIELDS:
+        values = approved.get(key, [])
+        if not fields.get(key) or values != [fields[key]]:
+            missing.append(key)
+
+    # A label typed by the operator is not provenance. Every display attribute
+    # must correspond exactly to one current, approved, source-quoted fact.
+    required_attributes = []
+    for fact_key, label in TEXT.items():
+        for fact in approved.get(fact_key, []):
+            candidate = {
+                "name": label,
+                "value": fact,
+            }
+            required_attributes.append(candidate)
+    allowed = {(row["name"], row["value"]) for row in required_attributes}
+    for index, row in enumerate(fields.get("attributes") or [], 1):
+        if (row.get("name"), row.get("value")) not in allowed:
+            missing.append(f"attributes[{index}]")
+    if not fields.get("attributes"):
+        missing.append("attributes")
+
+    return {
+        "verified": not missing,
+        "missing": missing,
+        "attributes_supported": len(fields.get("attributes") or []) - sum(
+            code.startswith("attributes[") for code in missing
+        ),
+        "taxonomy_supported": all(key not in missing for key in TAXONOMY_FIELDS),
+        # A URL in the editor is not a copyright licence. The next acceptance
+        # gate needs a separately reviewed proof of usage rights for each file.
+        "media_rights_verified": False,
+        "media_rights_status": "PENDIENTE_ACREDITAR_DERECHOS",
+    }
 
 
 def require_primary_evidence(db, session, ecomm_id, fields):
@@ -81,17 +123,27 @@ def require_primary_evidence(db, session, ecomm_id, fields):
             # differences; it never overrides contradictory EAN, pack or brand.
             if research.identity_blockers(dossier, doc):
                 continue
-            valid = {
-                fact["field"]: fact["value"]
-                for fact in dossier.facts
+            facts = [
+                fact for fact in dossier.facts
                 if fact["document_id"] == doc.id
                 and fact["state"] == "APPROVED"
                 and fact.get("reviewer")
                 and fact.get("verification_digest")
                 and not research.blockers(dossier, fact)
-            }
-            if not REQUIRED.issubset(valid):
+            ]
+            approved = {}
+            for fact in facts:
+                value = fact["value"] + (
+                    " " + fact["unit"] if fact.get("unit") else ""
+                )
+                approved.setdefault(fact["field"], []).append(value)
+            # Conflicting duplicate facts never silently select an arbitrary
+            # reviewed value or pass a taxonomy label by coincidence.
+            if any(len(values) != 1 for values in approved.values()):
                 continue
+            if not REQUIRED.issubset(approved):
+                continue
+            valid = {key: values[0] for key, values in approved.items()}
             name = valid["product_name"]
             if (
                 valid["presentation"] != fields["presentation"]
@@ -99,11 +151,17 @@ def require_primary_evidence(db, session, ecomm_id, fields):
                 or fields.get("title") != name + " · " + fields["presentation"]
             ):
                 continue
-            # This proves only the existence of an intact primary source
-            # supporting identity. Taxonomy, media rights and each additional
-            # commercial claim require separate approval before publication.
+            coverage = _commercial_coverage(fields, approved)
+            if not coverage["verified"]:
+                raise ValueError(
+                    "Faltan hechos documentales aprobados para la taxonomía "
+                    "o atributos de esta ficha: " + ", ".join(coverage["missing"])
+                )
+            # The current gate proves identity, taxonomy and listed attributes
+            # only. A photo URL never constitutes permission to reproduce it.
             return {
                 "ready": True,
+                "commercial_coverage": coverage,
                 "document_id": doc.id,
                 "document_version": doc.version,
                 "document_sha256": origin["sha256"],
