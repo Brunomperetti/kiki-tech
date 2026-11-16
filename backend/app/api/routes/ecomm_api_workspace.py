@@ -3,6 +3,7 @@
 from typing import Literal, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,7 @@ from ...services.ecomm_api_brand_hints_service import EcommApiBrandHints
 from ...services.ecomm_api_work_queue_service import build_queue
 from ...services.ecomm_secondary_ean_evidence import EcommLegacyEanEvidence
 from ...services.ecomm_gtin_export_service import EcommExportGtin, MAX_BYTES
+from ...services.research_manifest_service import build_research_manifest
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -152,6 +154,28 @@ def work_queue(
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
+
+
+@router.get("/research/manifest.csv")
+def research_manifest(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Export strictly eligible Ecomm research candidates, never approved facts."""
+    try:
+        body, count = build_research_manifest(db)
+        return Response(
+            body,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": 'attachment; filename="kiki-investigacion-gtin-unico.csv"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Kiki-Research-Candidates": str(count),
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get("/gtin-export/summary")
