@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     kiki_editorial_review_soon_days: int = Field(default=7, ge=1, le=30)
     kiki_channel_workspace_enabled: bool = False
     kiki_document_workspace_enabled: bool = False
+    # Explicit pilot allowlist. No network access until every value is set.
+    kiki_document_source_fetch_enabled: bool = False
+    kiki_document_source_fetch_hosts: str = ""
+    kiki_document_source_fetch_pilot_id: str = ""
     kiki_ai_enabled: bool = False
     # Default-off UI controls; existing provider/worker flags remain required.
     kiki_auto_create_schema: bool = True
