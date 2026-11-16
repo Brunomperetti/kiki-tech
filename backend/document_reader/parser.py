@@ -149,6 +149,108 @@ class PassiveHTML(HTMLParser):
         self.current.append(value)
 
 
+
+class PageSnapshotHTML(HTMLParser):
+    """Non-rendering extraction of a user-saved manufacturer HTML page.
+
+    No CSS/JS, external URLs, DOM execution or fetch. Only a unique H1 and
+    unambiguous weight/presentation table row produce identity *candidates*.
+    """
+
+    OMIT = frozenset({
+        "head", "script", "style", "noscript", "template", "svg", "iframe",
+        "object", "embed", "form", "nav", "footer", "canvas",
+    })
+    VOID = frozenset({
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
+    })
+    BLOCK = frozenset({"p", "li", "h1", "h2", "h3", "th", "td"})
+    WEIGHT = re.compile(r"\d{1,5}(?:[.,]\d{1,3})?\s*(?:g|gr|kg|ml|l)\b", re.I)
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tags, self.omit = [], 0
+        self.blocks, self.cells, self.headings = [], [], []
+        self.capture = None
+        self.tr_cells = []
+        self.events = 0
+        self.total_text = 0
+
+    def handle_starttag(self, tag, attrs):
+        self.events += 1
+        if self.events > 15000 or len(self.tags) > 100:
+            raise ValueError("HTML de página demasiado complejo.")
+        attrs = dict(attrs)
+        hidden = (
+            tag in self.OMIT or "hidden" in attrs
+            or (attrs.get("aria-hidden") or "").casefold() == "true"
+            or bool(re.search(r"(?:display\s*:\s*none|visibility\s*:\s*hidden)",
+                              attrs.get("style") or "", re.I))
+        )
+        if tag in self.VOID:
+            return
+        ignored = self.omit > 0 or hidden
+        self.tags.append((tag, ignored))
+        if ignored:
+            self.omit += 1
+            return
+        if tag == "tr":
+            self.tr_cells = []
+        if tag in self.BLOCK:
+            self.capture = {"tag": tag, "text": [], "line": self.getpos()[0]}
+
+    def handle_endtag(self, tag):
+        if not self.tags:
+            return
+        # A closing tag for unrelated markup must not end a hidden subtree.
+        top, ignored = self.tags[-1]
+        if top != tag:
+            return
+        self.tags.pop()
+        if ignored:
+            self.omit -= 1
+            return
+        if tag in self.BLOCK and self.capture and self.capture["tag"] == tag:
+            value = " ".join(" ".join(self.capture["text"]).split())
+            if value:
+                if tag == "h1":
+                    self.headings.append((self.capture["line"], value))
+                elif tag in {"th", "td"} and "tr" in (x[0] for x in self.tags):
+                    self.tr_cells.append(value)
+                elif tag not in {"th", "td"}:
+                    self.blocks.append((tag, self.capture["line"], value))
+            self.capture = None
+        if tag == "tr" and len(self.tr_cells) >= 2:
+            self.cells.append(tuple(self.tr_cells[:3]))
+            self.tr_cells = []
+
+    def handle_data(self, data):
+        if self.omit or not self.capture:
+            return
+        self.total_text += len(data)
+        if self.total_text > MAX_TEXT:
+            raise ValueError("Texto visible de página superior al límite.")
+        self.capture["text"].append(data)
+
+    def sections(self):
+        result = {}
+        if len(self.headings) == 1:
+            line, title = self.headings[0]
+            if len(title) <= 180:
+                result[f"web/h1/linea/{line}"] = "Nombre: " + title
+        for i, row in enumerate(self.cells, 1):
+            label, value = row[0].strip(), row[1].strip()
+            if normalized(label) in {"peso", "presentacion", "contenido neto"}:
+                if len(value) <= 40 and self.WEIGHT.fullmatch(value):
+                    result[f"web/tabla/fila/{i}"] = "Presentación: " + value
+        for i, (tag, line, value) in enumerate(self.blocks, 1):
+            if len(value) <= 2000:
+                result[f"web/{tag}/linea/{line}/bloque/{i}"] = value
+        return result
+
+
+
 def pdf_sections(raw):
     from .hileret_brochure import matches, STREAM_LIMIT, TOTAL_STREAM_LIMIT
 
@@ -259,7 +361,7 @@ def pdf_sections(raw):
     return sections
 
 
-def parse(name, mime, encoded):
+def parse(name, mime, encoded, *, web_snapshot=False):
     extension = safe_filename(name)
     if mime != MIMES[extension]:
         raise ValueError("El MIME no corresponde a la extensión permitida.")
@@ -279,16 +381,24 @@ def parse(name, mime, encoded):
         except UnicodeError:
             raise ValueError("El documento debe usar UTF-8.") from None
         if (
-            len(text) > MAX_TEXT
+            len(text) > (MAX_BYTES if web_snapshot and extension == ".html" else MAX_TEXT)
             or any(ord(c) < 32 and c not in "\n\r\t" for c in text)
             or re.search("[\u202a-\u202e\u2066-\u2069]", text)
         ):
             raise ValueError("Texto excesivo o con controles inseguros.")
+        if web_snapshot and extension != ".html":
+            raise ValueError("Las capturas web solo admiten archivo HTML.")
         if extension == ".html":
-            html = PassiveHTML()
-            html.feed(text)
-            html.flush()
-            sections = dict(html.fragments)
+            if web_snapshot:
+                page = PageSnapshotHTML()
+                page.feed(text)
+                page.close()
+                sections = page.sections()
+            else:
+                html = PassiveHTML()
+                html.feed(text)
+                html.flush()
+                sections = dict(html.fragments)
         elif extension == ".json":
             data = json.loads(text)
             if not isinstance(data, dict) or len(data) > 40:
