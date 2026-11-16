@@ -89,7 +89,12 @@ class Handler(socketserver.StreamRequestHandler):
                     "secret_environment_present": any(k in os.environ for k in ("DATABASE_URL", "KIKI_AI_API_KEY", "APP_SESSION_SECRET", "ECOMM_APP_API_TOKEN", "ML_CLIENT_SECRET")),
                 }}
             else:
-                result = {"ok": True, "result": parse(body["filename"], body["content_type"], body["content_base64"])}
+                if type(body.get("web_snapshot", False)) is not bool:
+                    raise ValueError("Modo de captura no válido.")
+                result = {"ok": True, "result": parse(
+                    body["filename"], body["content_type"], body["content_base64"],
+                    web_snapshot=body.get("web_snapshot", False),
+                )}
         except Exception:
             # Parser exceptions can contain document text; never log/echo untrusted contents.
             result = {
