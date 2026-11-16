@@ -125,7 +125,13 @@ def test_operator_saved_page_is_archived_before_any_identity_or_fact_approval(
         assert draft["fields"]["seo_keywords"]["value"] == "Mix Ensaladas y Sopas, 250 g"
         assert "description" in draft["fields"]
         assert "3 frutos secos + 3 semillas al oreganato" in draft["fields"]["description"]["value"]
-        assert "características" not in str(draft["fields"]).casefold() or "Características" in draft["fields"]["description"]["value"]
+        assert "Características" in draft["fields"]["description"]["value"]
+        assert any(
+            row["name"] == "Características verificables"
+            and row["value"] == "3 frutos secos + 3 semillas al oreganato"
+            for row in draft["fields"]["attributes"]["value"]
+        )
+        assert len(draft["fields"]["description"]["evidence_ids"]) == 3
         assert "ingredientes" not in draft["fields"]["description"]["value"].casefold()
         assert "vitamina" not in draft["fields"]["description"]["value"].casefold()
         assert "category" not in draft["fields"]
