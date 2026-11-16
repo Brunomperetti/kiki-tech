@@ -17,10 +17,15 @@ PARSER_SOCKET = "/document-parser/parser.sock"
 
 
 def parse_local(body, *, max_request=MAX_REQUEST):
+    if body.web_snapshot and (
+        body.kind != "FILE" or not body.filename.lower().endswith(".html")
+        or body.content_type != "text/html"
+    ):
+        raise ValueError("La captura web debe ser un archivo HTML auténtico guardado localmente.")
     request = json.dumps(
         {
             key: getattr(body, key)
-            for key in ("filename", "content_type", "content_base64")
+            for key in ("filename", "content_type", "content_base64", "web_snapshot")
         }
     ).encode()
     if len(body.content_base64) > 699_052:
@@ -113,6 +118,12 @@ class LocalDocuments:
         case = self.research.dossier(ident)
         self.research.expect(case, body.expected_version)
         valid_url(body.reference_url)
+        if body.web_snapshot and (
+            body.kind != "FILE" or not body.filename.lower().endswith(".html")
+            or body.content_type != "text/html"
+            or not body.reference_url or body.declared_consulted_at is None
+        ):
+            raise ValueError("La captura web requiere HTML original, URL HTTPS y fecha de consulta.")
         if not body.authorized_local_processing:
             raise ValueError(
                 "Se requiere autorización expresa para procesar este documento localmente."
@@ -198,6 +209,7 @@ class LocalDocuments:
                 "reference_url": body.reference_url,
                 "registered_at": now(),
                 "registered_by": self.research.actor,
+                "capture_mode": "USER_SAVED_WEB_HTML" if body.web_snapshot else "LOCAL_REFERENCE_OR_FILE",
                 "review_state": "PENDING",
                 "reviewer": None,
                 "reviewed_at": None,
