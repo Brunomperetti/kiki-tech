@@ -288,14 +288,15 @@ export function ResearchPanel({
               fusionan variantes.
             </p>
             <dl>
-              {["name", "presentation", "ean", "brand", "manufacturer"].map(
+              {["name", "presentation", "presentation_lookup_hint", "ean", "brand", "manufacturer"].map(
                 (key) => (
                   <div key={key}>
                     <dt>
                       {
                         {
                           name: "Nombre original",
-                          presentation: "Presentación",
+                          presentation: "Presentación original (sin normalizar)",
+                          presentation_lookup_hint: "Medida candidata para investigar",
                           ean: "EAN de contraste",
                           brand: "Marca de contraste",
                           manufacturer: "Fabricante de contraste",
