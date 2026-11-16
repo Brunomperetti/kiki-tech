@@ -17,6 +17,7 @@ from ...services.ecomm_api_work_queue_service import build_queue
 from ...services.ecomm_secondary_ean_evidence import EcommLegacyEanEvidence
 from ...services.ecomm_gtin_export_service import EcommExportGtin, MAX_BYTES
 from ...services.research_manifest_service import build_research_manifest
+from ...services.research_batch_plan_service import build_research_batch_plan
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -154,6 +155,20 @@ def work_queue(
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
+
+
+@router.get("/research/plan")
+def research_batch_plan(
+    limit: int = Query(default=10, ge=1, le=20),
+    offset: int = Query(default=0, ge=0, le=10000),
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Read-only research scheduling for the complete API catalog, no network."""
+    try:
+        return build_research_batch_plan(db, limit=limit, offset=offset)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get("/research/manifest.csv")
