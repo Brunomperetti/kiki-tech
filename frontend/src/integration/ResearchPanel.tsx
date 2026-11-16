@@ -101,6 +101,7 @@ export function ResearchPanel({
   const [message, setMessage] = useState("");
   const [selected, select] = useState("alm-tecnica");
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [identityReason, setIdentityReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, reload] = useState(0);
   const rootRef = useRef<HTMLElement>(null);
@@ -131,6 +132,18 @@ export function ResearchPanel({
     return () => controller.abort();
   }, [id, revision]);
   const document = data?.documents.find((d) => d.id === selected);
+  const latestIdentityReview = [...(data?.history ?? [])].reverse()
+    .find((entry) => entry.action === "DOCUMENT_IDENTITY_REVIEW"
+      && typeof entry.detail === "object" && entry.detail !== null
+      && (entry.detail as Record<string, unknown>).document_id === selected);
+  const identityDecision = latestIdentityReview?.detail as Record<string, unknown> | undefined;
+  const identityReviewCurrent = !!document && !!data && !!identityDecision
+    && identityDecision.decision === "APPROVED"
+    && identityDecision.document_version === document.version
+    && identityDecision.document_hash === document.hash
+    && identityDecision.ecomm_id === id
+    && identityDecision.source_name === data.identity.name
+    && identityDecision.source_presentation === data.identity.presentation;
   async function mutate(path: string, body: unknown) {
     setBusy(true);
     setError("");
@@ -171,6 +184,22 @@ export function ResearchPanel({
       decision,
       reason: notes[fact.id]?.trim() || "",
     });
+  }
+  async function reviewIdentity(decision: "APPROVED" | "REVOKED") {
+    if (!data || !document || !window.confirm(
+      decision === "APPROVED"
+        ? "¿Confirmás que revisaste el documento original y que corresponde a esta variante y presentación? No se certifica ningún GTIN ni se publica."
+        : "¿Revocar la equivalencia de identidad? Los hechos afectados perderán su aprobación vigente.",
+    )) return;
+    await mutate(
+      `/api/ecomm-app/workspace/${encodeURIComponent(id)}/documents/${encodeURIComponent(document.id)}/identity-review`,
+      {
+        expected_version: data.version,
+        document_version: document.version,
+        decision,
+        reason: identityReason.trim(),
+      },
+    );
   }
   async function reviseDocument() {
     if (
@@ -342,6 +371,57 @@ export function ResearchPanel({
                 {document.body.kind} · Versión {document.version} ·{" "}
                 {document.body.provenance}
               </p>
+              {production && document.body.synthetic === false && (
+                <section aria-label="Conciliación de identidad del fabricante" className="r-document">
+                  <h4>¿Es realmente el mismo producto?</h4>
+                  <p>
+                    Ecomm-App puede usar una descripción distinta de la del fabricante.
+                    Compará el nombre, el tamaño y la etiqueta original antes de
+                    registrar equivalencia. Esto no verifica EAN, ingredientes,
+                    certificaciones ni permite publicar automáticamente.
+                  </p>
+                  <p>
+                    <strong>Origen Ecomm:</strong> {String(data.identity.name || "Sin datos")}
+                    {" · "}{String(data.identity.presentation || "Sin datos")}
+                  </p>
+                  <p>
+                    <strong>Documento:</strong> {String(document.body.identity.name || "Sin datos")}
+                    {" · "}{String(document.body.identity.presentation || "Sin datos")}
+                  </p>
+                  {identityReviewCurrent && (
+                    <p role="status">Equivalencia revisada para esta versión del documento.
+                      Los demás controles de evidencia siguen vigentes.</p>
+                  )}
+                  <label>
+                    Motivo y comprobación de la identidad
+                    <textarea
+                      aria-label="Motivo de equivalencia del fabricante"
+                      maxLength={600}
+                      minLength={20}
+                      value={identityReason}
+                      onChange={(event) => setIdentityReason(event.target.value)}
+                    />
+                  </label>
+                  <div className="r-actions">
+                    {!identityReviewCurrent && (
+                      <button type="button" disabled={
+                        busy || identityReason.trim().length < 20
+                        || document.body.parse_status !== "TEXT_EXTRACTED"
+                        || document.body.source?.review_state !== "REVIEWED"
+                      } onClick={() => void reviewIdentity("APPROVED")}>
+                        Registrar equivalencia revisada
+                      </button>
+                    )}
+                    {identityReviewCurrent && (
+                      <button type="button" disabled={busy || identityReason.trim().length < 20}
+                        onClick={() => void reviewIdentity("REVOKED")}>
+                        Revocar equivalencia
+                      </button>
+                    )}
+                  </div>
+                  <small>Si hay EAN contradictorio, pack o atributos incompatibles, el servidor rechazará la conciliación.</small>
+                </section>
+              )}
               {document.issues.length > 0 && (
                 <div role="note" className="r-error">
                   <strong>
