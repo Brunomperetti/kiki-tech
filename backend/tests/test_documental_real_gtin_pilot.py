@@ -162,3 +162,44 @@ def test_suspended_export_changes_identity_fingerprint_and_requires_new_evidence
     # Attribution alone is display metadata, not a factual identity field.
     copy = {**with_excel, "provenance": {"ean": "Otra frase de procedencia"}}
     assert identity_digest(with_excel) == identity_digest(copy)
+
+
+
+def test_official_product_page_without_unit_marker_can_be_reviewed_by_exact_identity():
+    """Real manufacturers often omit 'tipo de venta: unidad' entirely."""
+    ref = research().reference(ID)
+    document = {
+        "identity": {
+            "name": ref["name"], "presentation": ref["presentation"],
+            "ean": None, "is_combo": None,
+        },
+        "associated_ecomm_id": ID,
+    }
+    assert Research.identity_issues(ref, document) == []
+    # A changed presentation, foreign Ecomm ID or incompatible printed GTIN
+    # still blocks approval; sale-type omission does not override identity.
+    changed = {**document, "identity": {**document["identity"], "presentation": "1 kg"}}
+    assert any("Presentación" in issue for issue in Research.identity_issues(ref, changed))
+    alien = {**document, "associated_ecomm_id": "999999"}
+    assert any("otro Ecomm ID" in issue for issue in Research.identity_issues(ref, alien))
+    ean_conflict = {**document, "identity": {**document["identity"], "ean": "7798180790097"}}
+    assert any("pista GTIN" in issue for issue in Research.identity_issues(ref, ean_conflict))
+
+
+def test_pack_requires_explicit_sale_type_even_when_name_and_presentation_match():
+    ref = research().reference(ID)
+    ref["is_combo"] = True
+    ref["parent_is_combo"] = True
+    document = {
+        "identity": {
+            "name": ref["name"], "presentation": ref["presentation"],
+            "ean": None, "is_combo": None,
+        },
+        "associated_ecomm_id": ID,
+    }
+    missing_type = Research.identity_issues(ref, document)
+    assert any("Pack/kit" in issue for issue in missing_type)
+    unit_type = {**document, "identity": {**document["identity"], "is_combo": False}}
+    assert any("incompatible" in issue for issue in Research.identity_issues(ref, unit_type))
+    explicit_pack = {**document, "identity": {**document["identity"], "is_combo": True}}
+    assert Research.identity_issues(ref, explicit_pack) == []
