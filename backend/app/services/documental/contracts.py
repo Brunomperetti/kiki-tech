@@ -19,6 +19,15 @@ class FactReview(BaseModel):
     reason: str = Field(min_length=10, max_length=600)
 
 
+class DocumentIdentityReview(BaseModel):
+    """Explicit per-source name/presentation reconciliation; never EAN approval."""
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    document_version: int = Field(ge=1)
+    decision: Literal["APPROVED", "REVOKED"]
+    reason: str = Field(min_length=20, max_length=600)
+
+
 class Revision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1)
