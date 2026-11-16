@@ -107,7 +107,7 @@ def test_operator_saved_page_is_archived_before_any_identity_or_fact_approval(
         extraction = service.research.extract(
             IDENT, reviewed["version"], doc_id, latest_doc.version,
         )
-        assert len([fact for fact in extraction["facts"] if fact["document_id"] == doc_id]) == 2
+        assert len([fact for fact in extraction["facts"] if fact["document_id"] == doc_id]) == 3
         assert all(not f["verified"] for f in extraction["facts"])
         # A proposal from unapproved facts is empty: human approval is mandatory.
         assert Proposals(db, user).latest(IDENT)["authorized_facts"] == []
@@ -123,7 +123,11 @@ def test_operator_saved_page_is_archived_before_any_identity_or_fact_approval(
         assert draft["fields"]["title"]["value"] == "Mix Ensaladas y Sopas · 250 g"
         assert draft["fields"]["short_title"]["value"] == "Mix Ensaladas y Sopas"
         assert draft["fields"]["seo_keywords"]["value"] == "Mix Ensaladas y Sopas, 250 g"
-        assert "description" not in draft["fields"]
+        assert "description" in draft["fields"]
+        assert "3 frutos secos + 3 semillas al oreganato" in draft["fields"]["description"]["value"]
+        assert "características" not in str(draft["fields"]).casefold() or "Características" in draft["fields"]["description"]["value"]
+        assert "ingredientes" not in draft["fields"]["description"]["value"].casefold()
+        assert "vitamina" not in draft["fields"]["description"]["value"].casefold()
         assert "category" not in draft["fields"]
         assert "media" not in draft["fields"]
         assert not draft["saved_to_product_fields"]
