@@ -37,6 +37,7 @@ class Revision(BaseModel):
 class Incorporate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["FILE", "URL"]
+    web_snapshot: Literal[True, False] = False
     expected_version: int = Field(ge=0)
     filename: str = Field(default="", max_length=120)
     content_type: str = Field(default="", max_length=80)
