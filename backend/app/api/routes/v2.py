@@ -48,6 +48,7 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
             actual = {i["name"] for i in inspector.get_indexes(table)}
             batches_missing.extend(sorted(names - actual))
     documents = config.kiki_document_workspace_enabled and not documents_missing
+    reader = bool(documents and reader_probe and reader_available())
     return {
         "contract": "kiki-same-origin-v2-1",
         "synthetic": synthetic,
@@ -55,7 +56,15 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
         "writes": config.kiki_v2_writes_enabled,
         "connections": config.kiki_v2_connections_enabled,
         "documents": documents,
-        "document_upload": bool(documents and reader_probe and reader_available()),
+        "document_upload": reader,
+        # Only a single registered pilot ID on exactly allowlisted hosts.
+        # The API validates all settings again before making a GET.
+        "document_fetch": bool(
+            reader and config.kiki_document_parser_kernel_required
+            and config.kiki_document_source_fetch_enabled
+            and config.kiki_document_source_fetch_hosts.strip()
+            and config.kiki_document_source_fetch_pilot_id.strip()
+        ),
         "channels": config.kiki_channel_workspace_enabled,
         "batches": documents and config.kiki_editorial_batches_enabled and not batches_missing,
         "executor": config.kiki_editorial_executor_enabled,
