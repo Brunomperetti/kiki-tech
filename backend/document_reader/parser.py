@@ -172,7 +172,7 @@ class PageSnapshotHTML(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.tags, self.omit = [], 0
         self.blocks, self.cells, self.headings = [], [], []
-        self.capture = None
+        self.captures = []
         self.tr_cells = []
         self.events = 0
         self.total_text = 0
@@ -198,7 +198,7 @@ class PageSnapshotHTML(HTMLParser):
         if tag == "tr":
             self.tr_cells = []
         if tag in self.BLOCK:
-            self.capture = {"tag": tag, "text": [], "line": self.getpos()[0]}
+            self.captures.append({"tag": tag, "text": [], "line": self.getpos()[0]})
 
     def handle_endtag(self, tag):
         if not self.tags:
@@ -211,27 +211,28 @@ class PageSnapshotHTML(HTMLParser):
         if ignored:
             self.omit -= 1
             return
-        if tag in self.BLOCK and self.capture and self.capture["tag"] == tag:
-            value = " ".join(" ".join(self.capture["text"]).split())
+        if tag in self.BLOCK and self.captures and self.captures[-1]["tag"] == tag:
+            active = self.captures.pop()
+            value = " ".join(" ".join(active["text"]).split())
             if value:
                 if tag == "h1":
-                    self.headings.append((self.capture["line"], value))
+                    self.headings.append((active["line"], value))
                 elif tag in {"th", "td"} and "tr" in (x[0] for x in self.tags):
                     self.tr_cells.append(value)
                 elif tag not in {"th", "td"}:
-                    self.blocks.append((tag, self.capture["line"], value))
-            self.capture = None
+                    self.blocks.append((tag, active["line"], value))
         if tag == "tr" and len(self.tr_cells) >= 2:
             self.cells.append(tuple(self.tr_cells[:3]))
             self.tr_cells = []
 
     def handle_data(self, data):
-        if self.omit or not self.capture:
+        if self.omit or not self.captures:
             return
         self.total_text += len(data)
         if self.total_text > MAX_TEXT:
             raise ValueError("Texto visible de página superior al límite.")
-        self.capture["text"].append(data)
+        for active in self.captures:
+            active["text"].append(data)
 
     def sections(self):
         result = {}
