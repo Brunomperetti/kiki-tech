@@ -39,3 +39,32 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  documental-schema-sandbox:
+    runs-on: ubuntu-latest
+    # Disposable PostgreSQL 18. No Render database, production data or providers.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: kiki_ci_synthetic
+          POSTGRES_USER: kiki_ci
+          POSTGRES_PASSWORD: synthetic_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kiki_ci -d kiki_ci_synthetic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install 'psycopg[binary]==3.2.3'
+      - name: Check migration safety on an ephemeral database
+        working-directory: backend
+        env:
+          KIKI_CI_SYNTHETIC_ONLY: "1"
+        run: python -m integration_sandbox.ci_migration_smoke
