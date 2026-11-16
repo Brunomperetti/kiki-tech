@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     kiki_document_source_fetch_enabled: bool = False
     kiki_document_source_fetch_hosts: str = ""
     kiki_document_source_fetch_pilot_id: str = ""
+    # Separate guarded activation: source checkbox alone cannot make a pilot
+    # fiche READY_FOR_CHANNELS without documentary source and approved facts.
+    kiki_document_channel_guard_enabled: bool = False
+    kiki_document_channel_guard_pilot_id: str = ""
     kiki_ai_enabled: bool = False
     # Default-off UI controls; existing provider/worker flags remain required.
     kiki_auto_create_schema: bool = True
