@@ -6,7 +6,7 @@ import {
 } from "./runtime";
 import { GenerationReadiness } from "./GenerationReadiness";
 import { ChannelsPanel } from "./ChannelsPanel";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   CommercialBackofficeFields,
   assessCommercialReadiness,
@@ -42,6 +42,7 @@ import { isAuxiliaryPilot, isHileret } from "./hileret-pilot";
 
 type Props = {
   proposalId?: number;
+  gtinEvidence?: ReactNode;
   variant: Variant;
   csrf: string;
   username: string;
@@ -60,6 +61,7 @@ const show = (value: unknown) =>
 export function PersistentWorkspace({
   variant,
   proposalId,
+  gtinEvidence,
   csrf,
   username,
   tab,
@@ -424,6 +426,7 @@ export function PersistentWorkspace({
             )}
             {tab === "Ficha" && (
               <>
+                {gtinEvidence}
                 <button
                   className="k-ai-entry"
                   disabled={saving || researchBusy || proposalBusy}
