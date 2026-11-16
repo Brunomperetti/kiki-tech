@@ -89,6 +89,7 @@ export type ResearchDocument = {
   hash: string;
   versions: number[];
   issues: string[];
+  identity_reconciliation?: { decision: string; current: boolean; reviewer?: string | null };
   body: {
     title: string;
     kind: string;
