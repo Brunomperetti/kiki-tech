@@ -327,7 +327,7 @@ def get_edit(
     _session=Depends(require_session),
 ):
     try:
-        return EcommApiProductWorkspace(db).get(ecomm_id)
+        return EcommApiProductWorkspace(db).get(ecomm_id, session=_session)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
