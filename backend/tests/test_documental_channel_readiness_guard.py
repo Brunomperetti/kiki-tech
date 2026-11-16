@@ -79,7 +79,9 @@ def install_fake_source(db):
     """Create an actual-shaped *fictitious* local original and approve three facts."""
     doc = db.get(Document, "local-" + "a" * 32)
     body = deepcopy(synthetic_document())
-    raw = b"FABRICANTE DE PRUEBA: Fuente de laboratorio, no documento real."
+    # Keep the fictional original bytes consistent with its own quoted lines.
+    # This still is NOT a manufacturer file or an actual source approval.
+    raw = "\n".join(body["sections"].values()).encode("utf-8")
     checksum = sha256(raw).hexdigest()
     body.update({
         "synthetic": False,
