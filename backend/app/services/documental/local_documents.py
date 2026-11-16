@@ -209,7 +209,11 @@ class LocalDocuments:
                 "reference_url": body.reference_url,
                 "registered_at": now(),
                 "registered_by": self.research.actor,
-                "capture_mode": "USER_SAVED_WEB_HTML" if body.web_snapshot else "LOCAL_REFERENCE_OR_FILE",
+                "capture_mode": (
+                    "ALLOWLISTED_HTTPS_FETCH" if source_retrieval
+                    else "USER_SAVED_WEB_HTML" if body.web_snapshot
+                    else "LOCAL_REFERENCE_OR_FILE"
+                ),
                 "review_state": "PENDING",
                 "reviewer": None,
                 "reviewed_at": None,
