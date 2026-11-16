@@ -114,7 +114,7 @@ class LocalDocuments:
         doc.body, doc.digest = body, digest(body)
         self.db.flush()
 
-    def incorporate(self, ident, body, parsed, *, acquisition=None):
+    def incorporate(self, ident, body, parsed, *, acquisition=None, source_retrieval=None):
         case = self.research.dossier(ident)
         self.research.expect(case, body.expected_version)
         valid_url(body.reference_url)
@@ -216,6 +216,14 @@ class LocalDocuments:
                 "review_reason": None,
             },
         }
+        if source_retrieval:
+            # Network receipt is evidence of a TLS retrieval, *not* a
+            # manufacturer identity decision or claim approval.
+            if body.kind != "FILE" or not body.web_snapshot:
+                raise ValueError("La obtención solo permite original HTML archivado.")
+            if source_retrieval["sha256"] != original["sha256"]:
+                raise ValueError("El documento obtenido no coincide con el SHA-256 recibido.")
+            content["retrieval"] = source_retrieval
         if acquisition:
             content["retrieval"] = {
                 **acquisition["trace"],
@@ -235,7 +243,8 @@ class LocalDocuments:
             case,
             deepcopy(case.facts),
             "DOCUMENT_INCORPORATED",
-            {"document_id": key, "version": doc.version},
+            {"document_id": key, "version": doc.version,
+             "source_fetched": source_retrieval is not None},
         )
         if acquisition:
             run = deepcopy(acquisition["run_snapshot"])
