@@ -236,3 +236,59 @@ def test_pilot_route_rejects_no_reader_before_network(tmp_path, monkeypatch):
     with Session(engine) as db:
         with pytest.raises(HTTPException, match="Lector documental aislado"):
             route.fetch_manufacturer("7518949", body, db, SimpleNamespace(id=1))
+
+
+
+@pytest.mark.parametrize("path", ["/robots.txt", "/producto/mix-ensaladas-y-sopas/"])
+def test_network_or_tls_failure_returns_safe_error_and_no_archived_document(path):
+    class BrokenTransport(FakeTransport):
+        def get(self, host, ip, endpoint, limit):
+            if endpoint == path:
+                raise TimeoutError("internal TLS diagnostics not for operator")
+            return super().get(host, ip, endpoint, limit)
+
+    with pytest.raises(ValueError, match="HTTPS"):
+        fetch_html(
+            URL, HOST, resolver=Resolver(), transport=BrokenTransport(),
+        )
+
+
+def test_robots_failure_rolls_back_empty_dossier_and_never_writes_product(
+    tmp_path, monkeypatch,
+):
+    import app.api.routes.documental_workspace as route
+    import app.services.documental.research as research_module
+    from app.services.documental.storage import Dossier
+    from app.database.models import EcommApiProductEdit
+    from fastapi import HTTPException
+    from sqlalchemy import select
+
+    monkeypatch.setattr(
+        research_module, "get_settings",
+        lambda: SimpleNamespace(kiki_admin_username="test"),
+    )
+    engine, _ = prepare(tmp_path)
+    monkeypatch.setattr(route, "get_settings", lambda: SimpleNamespace(
+        kiki_document_source_fetch_enabled=True,
+        kiki_document_source_fetch_hosts=HOST,
+        kiki_document_source_fetch_pilot_id="7518949",
+        kiki_document_parser_kernel_required=True,
+    ))
+    monkeypatch.setattr(route, "reader_available", lambda: True)
+    monkeypatch.setattr(
+        route, "fetch_html",
+        lambda *_args: (_ for _ in ()).throw(
+            ValueError("robots.txt no autoriza el acceso a este producto.")
+        ),
+    )
+    body = ManufacturerFetch(
+        expected_version=0, reference_url=URL,
+        provenance_note="Archivo público bloqueado por el fabricante.",
+        authorized_local_processing=True,
+    )
+    with Session(engine) as db:
+        with pytest.raises(HTTPException, match="robots.txt no autoriza"):
+            route.fetch_manufacturer("7518949", body, db, SimpleNamespace(id=1))
+        assert db.get(Dossier, "7518949") is None
+        assert db.scalars(select(EcommApiProductEdit)).all() == []
+        assert len(db.query(Document).all()) == 1  # preloaded synthetic sample
