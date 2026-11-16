@@ -151,10 +151,12 @@ class PassiveHTML(HTMLParser):
 
 
 class PageSnapshotHTML(HTMLParser):
-    """Non-rendering extraction of a user-saved manufacturer HTML page.
+    """Non-rendering extraction of a saved, source-preserved manufacturer page.
 
-    No CSS/JS, external URLs, DOM execution or fetch. Only a unique H1 and
-    unambiguous weight/presentation table row produce identity *candidates*.
+    A unique H1, an unambiguous size and a narrowly matched *literal*
+    composition fragment are unapproved candidates. Product-specific
+    WooCommerce descriptive sections are the only source for free text.
+    No CSS/JS, resource fetch, inferred ingredients or nutritional claims.
     """
 
     OMIT = frozenset({
@@ -167,6 +169,16 @@ class PageSnapshotHTML(HTMLParser):
     })
     BLOCK = frozenset({"p", "li", "h1", "h2", "h3", "th", "td"})
     WEIGHT = re.compile(r"\d{1,5}(?:[.,]\d{1,3})?\s*(?:g|gr|kg|ml|l)\b", re.I)
+    PRODUCT_AREAS = {
+        "woocommerce-tabs", "woocommerce-product-details__short-description",
+        "tab-description",
+    }
+    # Narrow pilot pattern: only an exact manufacturer sentence fragment,
+    # never extended marketing prose or inferred specific ingredients.
+    MIX_CLAIM = re.compile(
+        r"\bcontiene\s+(\d{1,2}\s+frutos\s+secos\s*\+\s*"
+        r"\d{1,2}\s+semillas\s+al\s+oreganato)\b", re.I,
+    )
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -174,6 +186,7 @@ class PageSnapshotHTML(HTMLParser):
         self.blocks, self.cells, self.headings = [], [], []
         self.captures = []
         self.tr_cells = []
+        self.product_depth = 0
         self.events = 0
         self.total_text = 0
 
@@ -182,35 +195,49 @@ class PageSnapshotHTML(HTMLParser):
         if self.events > 15000 or len(self.tags) > 100:
             raise ValueError("HTML de página demasiado complejo.")
         attrs = dict(attrs)
+        classes = set((attrs.get("class") or "").lower().split())
         hidden = (
             tag in self.OMIT or "hidden" in attrs
             or (attrs.get("aria-hidden") or "").casefold() == "true"
+            or bool(classes & {"hidden", "sr-only", "visually-hidden", "d-none", "screen-reader-text"})
             or bool(re.search(r"(?:display\s*:\s*none|visibility\s*:\s*hidden)",
                               attrs.get("style") or "", re.I))
         )
         if tag in self.VOID:
             return
         ignored = self.omit > 0 or hidden
-        self.tags.append((tag, ignored))
+        in_product = bool(
+            self.product_depth or
+            (classes & self.PRODUCT_AREAS) or
+            (attrs.get("id") or "").lower() in self.PRODUCT_AREAS
+        ) and not ignored
+        self.tags.append((tag, ignored, in_product))
         if ignored:
             self.omit += 1
             return
+        if in_product:
+            self.product_depth += 1
         if tag == "tr":
             self.tr_cells = []
         if tag in self.BLOCK:
-            self.captures.append({"tag": tag, "text": [], "line": self.getpos()[0]})
+            self.captures.append({
+                "tag": tag, "text": [], "line": self.getpos()[0],
+                "product_description": in_product,
+            })
 
     def handle_endtag(self, tag):
         if not self.tags:
             return
         # A closing tag for unrelated markup must not end a hidden subtree.
-        top, ignored = self.tags[-1]
+        top, ignored, in_product = self.tags[-1]
         if top != tag:
             return
         self.tags.pop()
         if ignored:
             self.omit -= 1
             return
+        if in_product:
+            self.product_depth -= 1
         if tag in self.BLOCK and self.captures and self.captures[-1]["tag"] == tag:
             active = self.captures.pop()
             value = " ".join(" ".join(active["text"]).split())
@@ -220,7 +247,9 @@ class PageSnapshotHTML(HTMLParser):
                 elif tag in {"th", "td"} and "tr" in (x[0] for x in self.tags):
                     self.tr_cells.append(value)
                 elif tag not in {"th", "td"}:
-                    self.blocks.append((tag, active["line"], value))
+                    self.blocks.append((
+                        tag, active["line"], value, active["product_description"]
+                    ))
         if tag == "tr" and len(self.tr_cells) >= 2:
             self.cells.append(tuple(self.tr_cells[:3]))
             self.tr_cells = []
@@ -245,9 +274,10 @@ class PageSnapshotHTML(HTMLParser):
             if normalized(label) in {"peso", "presentacion", "contenido neto"}:
                 if len(value) <= 40 and self.WEIGHT.fullmatch(value):
                     result[f"web/tabla/fila/{i}"] = "Presentación: " + value
-        for i, (tag, line, value) in enumerate(self.blocks, 1):
+        for i, (tag, line, value, product_description) in enumerate(self.blocks, 1):
             if len(value) <= 2000:
-                result[f"web/{tag}/linea/{line}/bloque/{i}"] = value
+                prefix = "web/product" if product_description and tag == "p" else "web"
+                result[f"{prefix}/{tag}/linea/{line}/bloque/{i}"] = value
         return result
 
 
@@ -455,6 +485,24 @@ def parse(name, mime, encoded, *, web_snapshot=False):
             if ":" in line
         ]
     )
+    if web_snapshot and extension == ".html":
+        # Pages often publish composition in a description paragraph instead
+        # of a labelled field. Keep only exact, brief, product-scoped fragments.
+        # Never lift generic nutrition, health claims or nearby product cards.
+        extracts = []
+        for location, quote in sections.items():
+            if not location.startswith("web/product/p/"):
+                continue
+            matches = list(PageSnapshotHTML.MIX_CLAIM.finditer(quote))
+            for match in matches:
+                extracts.append((match.group(1), location, quote))
+        # Two differing composition claims are ambiguous, not a licence to
+        # pick whichever one looks best.
+        if len(extracts) == 1:
+            value, location, quote = extracts[0]
+            entries.append(("características", value, None, location, quote))
+        elif len(extracts) > 1:
+            entries.append(("características", "", None, "", ""))
     if json_values is None:
         # A bounded single row of a passive HTML/PDF nutritional table, never pair unrelated lines.
         for loc, line in sections.items():
