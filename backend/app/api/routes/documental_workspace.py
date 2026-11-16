@@ -130,53 +130,60 @@ def fetch_manufacturer(
         )
 
     def operation():
-        # Fail before making an external request if the isolated reader,
-        # source identity or optimistic version is unavailable.
-        if (
-            not config.kiki_document_parser_kernel_required
-            or not reader_available()
-        ):
-            raise ValueError(
-                "Lector documental aislado obligatorio antes de consultar al fabricante."
-            )
-        research = Research(db, session)
-        item = research.dossier(ecomm_id)
-        research.expect(item, body.expected_version)
-        today = datetime.now(timezone.utc).date()
-        for event in item.history or []:
+        try:
+            # Fail before making an external request if the isolated reader,
+            # source identity or optimistic version is unavailable.
             if (
-                event.get("action") == "DOCUMENT_INCORPORATED"
-                and (event.get("detail") or {}).get("source_fetched")
+                not config.kiki_document_parser_kernel_required
+                or not reader_available()
             ):
-                try:
-                    date = datetime.fromisoformat(event["at"]).date()
-                except (KeyError, TypeError, ValueError):
-                    raise ValueError("Historial de consultas inválido; contacto externo bloqueado.") from None
-                if date == today:
-                    raise ValueError(
-                        "El piloto admite una consulta automática diaria por variante."
-                    )
-        original, receipt = fetch_html(
-            body.reference_url, config.kiki_document_source_fetch_hosts
-        )
-        imported = Incorporate(
-            kind="FILE",
-            web_snapshot=True,
-            expected_version=body.expected_version,
-            filename="fabricante-" + receipt["sha256"][:16] + ".html",
-            content_type="text/html",
-            content_base64=base64.b64encode(original).decode("ascii"),
-            provenance_note=body.provenance_note,
-            reference_url=body.reference_url,
-            declared_official=False,
-            declared_consulted_at=datetime.now(timezone.utc),
-            authorized_local_processing=True,
-        )
-        parsed = parse_local(imported)
-        db.expire_all()  # Re-read versions before the mutation after slow I/O.
-        return LocalDocuments(db, session).incorporate(
-            ecomm_id, imported, parsed, source_retrieval=receipt
-        )
+                raise ValueError(
+                    "Lector documental aislado obligatorio antes de consultar al fabricante."
+                )
+            research = Research(db, session)
+            item = research.dossier(ecomm_id)
+            research.expect(item, body.expected_version)
+            today = datetime.now(timezone.utc).date()
+            for event in item.history or []:
+                if (
+                    event.get("action") == "DOCUMENT_INCORPORATED"
+                    and (event.get("detail") or {}).get("source_fetched")
+                ):
+                    try:
+                        date = datetime.fromisoformat(event["at"]).date()
+                    except (KeyError, TypeError, ValueError):
+                        raise ValueError("Historial de consultas inválido; contacto externo bloqueado.") from None
+                    if date == today:
+                        raise ValueError(
+                            "El piloto admite una consulta automática diaria por variante."
+                        )
+            original, receipt = fetch_html(
+                body.reference_url, config.kiki_document_source_fetch_hosts
+            )
+            imported = Incorporate(
+                kind="FILE",
+                web_snapshot=True,
+                expected_version=body.expected_version,
+                filename="fabricante-" + receipt["sha256"][:16] + ".html",
+                content_type="text/html",
+                content_base64=base64.b64encode(original).decode("ascii"),
+                provenance_note=body.provenance_note,
+                reference_url=body.reference_url,
+                declared_official=False,
+                declared_consulted_at=datetime.now(timezone.utc),
+                authorized_local_processing=True,
+            )
+            parsed = parse_local(imported)
+            db.expire_all()  # Re-read versions before the mutation after slow I/O.
+            return LocalDocuments(db, session).incorporate(
+                ecomm_id, imported, parsed, source_retrieval=receipt
+            )
+
+        except Exception:
+            # A denied robots.txt or failed parse must not commit even an
+            # empty research dossier. execute() may commit safe invalidations.
+            db.rollback()
+            raise
 
     return execute(db, operation)
 
