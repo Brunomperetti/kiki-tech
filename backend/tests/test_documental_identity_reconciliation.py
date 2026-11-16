@@ -50,6 +50,22 @@ def setup_case(*, ean=None, sale=None, state="REVIEWED", combo=False):
             "source": {"review_state": state},
             "parse_status": "TEXT_EXTRACTED",
             "parser_blockers": [],
+            "sections": {
+                "texto/linea/1": "Nombre: Mix Ensaladas y Sopas",
+                "texto/linea/2": "Presentación: 250 g",
+            },
+            "identity_evidence": {
+                "name": {
+                    "value": "Mix Ensaladas y Sopas",
+                    "location": "texto/linea/1",
+                    "quote": "Nombre: Mix Ensaladas y Sopas",
+                },
+                "presentation": {
+                    "value": "250 g",
+                    "location": "texto/linea/2",
+                    "quote": "Presentación: 250 g",
+                },
+            },
         },
     )
     research = Research.__new__(Research)
@@ -165,3 +181,18 @@ def test_review_metadata_cannot_approve_commercial_claim_or_gtin():
     assert case.identity["ean"] is None
     assert case.identity["lookup_gtin"] == LOOKUP
     assert not any("CERTIFIC" in str(event) for event in case.history)
+
+
+
+@pytest.mark.parametrize("tamper", ["missing_quote", "wrong_size", "missing_section"])
+def test_unquoted_or_tampered_source_identity_cannot_be_reconciled(tamper):
+    service, case, doc = setup_case()
+    if tamper == "missing_quote":
+        doc.body["identity_evidence"]["name"]["quote"] = "Nombre no existe"
+    elif tamper == "wrong_size":
+        doc.body["identity_evidence"]["presentation"]["value"] = "500 g"
+    else:
+        doc.body["sections"].pop("texto/linea/1")
+    with pytest.raises(ValueError, match="citas literales"):
+        approve(service, case, doc)
+    assert case.history == []
