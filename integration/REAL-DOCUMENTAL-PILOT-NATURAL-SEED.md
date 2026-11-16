@@ -15,6 +15,7 @@ Consulta **de solo lectura** a los snapshots Ecomm API y Excel importado en KIKI
 - Estado de GTIN en Excel: `VALID_UNIQUE`
 - La variante debe volver a validarse como **no combo** y contra la captura vigente
   al ejecutar el piloto. El GTIN del Excel **no es una certificación de fabricante**.
+- **Discrepancia nominal a resolver:** la captura Ecomm usa `Mix Semillas P/ Ensaladas Sopas Natural Seed X 250gr` mientras la página oficial muestra `Mix Ensaladas y Sopas`. Coinciden la finalidad y la presentación declarada, pero **no es igualdad textual ni validación automática**. El operador debe contrastar la etiqueta/presentación auténtica antes de aprobar vínculos, atributos y nombres editoriales.
 
 ## Fuentes públicas encontradas
 
