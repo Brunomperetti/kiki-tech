@@ -124,17 +124,43 @@ class Proposals:
         name = by_field.get("product_name")
         presentation = by_field.get("presentation")
         if name and presentation:
-            title = name["value"] + " · " + presentation["value"]
-            for key in ("title", "short_title", "seo_title"):
+            long_title = name["value"] + " · " + presentation["value"]
+            add(
+                "title", long_title, ["product_name", "presentation"],
+                [name["value"], presentation["value"]],
+            )
+            # Short title is the *documented* product name, not a cut-off of
+            # the long title that could lose half a brand, variant or quantity.
+            add("short_title", name["value"], ["product_name"], [name["value"]])
+            add(
+                "seo_title", long_title, ["product_name", "presentation"],
+                [name["value"], presentation["value"]],
+            )
+
+            # Indexing keywords may only use independently approved identity
+            # and taxonomy labels. No AI, inferred search terms, nutrition,
+            # health claims or third-party barcode assumptions.
+            candidates = ("brand", "product_name", "presentation", "category", "subcategory")
+            chosen, seen = [], set()
+            for candidate_key in candidates:
+                fact = by_field.get(candidate_key)
+                if not fact or not isinstance(fact.get("value"), str):
+                    continue
+                text = " ".join(fact["value"].split())
+                token = text.casefold()
+                if not text or token in seen:
+                    continue
+                chosen.append((candidate_key, text))
+                seen.add(token)
+            if chosen:
                 add(
-                    key,
-                    title,
-                    ["product_name", "presentation"],
-                    [name["value"], presentation["value"]],
+                    "seo_keywords", ", ".join(text for _, text in chosen),
+                    [key for key, _ in chosen],
+                    [text for _, text in chosen],
                 )
         else:
             missing.append(
-                "Títulos: falta nombre o presentación con respaldo aprobado."
+                "Títulos y palabras clave SEO: falta nombre o presentación con respaldo aprobado."
             )
         rows, keys = [], []
         for key, label in TEXT.items():
@@ -195,7 +221,7 @@ class Proposals:
         missing.extend(
             [
                 "Multimedia y fuentes manuales: se conservan exactamente; no se inventan recursos ni derechos.",
-                "EAN, notas y palabras clave: no se generan ni se consideran verificados por la IA.",
+                "EAN y notas: no se generan ni se consideran verificados por la IA. Las palabras clave SEO solo provienen de identidad y taxonomía aprobadas.",
             ]
         )
         return fields, missing
