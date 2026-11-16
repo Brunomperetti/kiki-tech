@@ -149,6 +149,31 @@ export function DocumentImport({
       );
     });
   }
+  async function fetchManufacturerSource() {
+    if (!authorized || !url.startsWith("https://") || note.trim().length < 10)
+      return onError("La consulta requiere URL HTTPS, motivo y autorización.");
+    if (!window.confirm(
+      "¿Consultar UNA página pública del fabricante? KIKI validará el dominio, robots.txt y TLS, archivará el HTML, y dejará TODOS los datos pendientes de revisión. No publica ni modifica canales."
+    )) return;
+    await perform(async () => {
+      const value = await changeResearch(
+        id,
+        `${basePath(id)}/fetch-manufacturer`,
+        {
+          expected_version: data.version,
+          reference_url: url,
+          provenance_note: note,
+          authorized_local_processing: true,
+        },
+        csrf,
+      );
+      setAuthorized(false);
+      onResult(
+        value,
+        "HTML original obtenido por HTTPS y archivado en KIKI. Revisá identidad, procedencia y cada hecho antes de generar una ficha."
+      );
+    });
+  }
   async function review(decision: string) {
     if (
       !document ||
@@ -320,6 +345,25 @@ export function DocumentImport({
         >
           Incorporar documentación
         </button>
+        {capabilities?.document_fetch === true && (
+          <div className="r-document" role="group" aria-label="Consulta puntual de fabricante">
+            <h4>Obtener una página del fabricante (piloto)</h4>
+            <p>
+              Solo para la variante piloto y dominios habilitados. KIKI comprueba
+              robots.txt y TLS, no sigue redirecciones y conserva el HTML
+              original. No busca masivamente, no certifica EAN, no aprueba
+              hechos ni publica. Si la web bloquea el acceso, usá la carga manual.
+            </p>
+            <button
+              type="button"
+              disabled={busy || !authorized || note.trim().length < 10
+                || !url.startsWith("https://")}
+              onClick={() => void fetchManufacturerSource()}
+            >
+              Consultar y archivar página autorizada
+            </button>
+          </div>
+        )}
       </details>
       {local && document && (
         <section
