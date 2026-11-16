@@ -19,7 +19,7 @@ from app.services.documental.contracts import (
     Provenance,
 )
 from app.services.documental.contracts import FactReview
-from app.services.documental.contracts import DocumentIdentityReview, ManufacturerFetch, Incorporate
+from app.services.documental.contracts import DocumentIdentityReview, ManufacturerFetch
 
 
 def enabled():
