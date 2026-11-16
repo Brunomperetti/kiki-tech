@@ -47,6 +47,7 @@ import {
 import "./integration.css";
 import { PersistentWorkspace } from "./PersistentWorkspace";
 import { GtinExportPanel, GtinExportEvidence } from "./GtinExportPanel";
+import { downloadReviewCsv } from "./csv-download";
 import { ChannelGapSummary } from "./ChannelGapSummary";
 import { stateLabels, getWorkspace } from "./workspace-adapter";
 import { MamaPilotLauncher } from "./MamaPilot";
@@ -76,6 +77,8 @@ export function IntegrationCatalog() {
     [historyOpen, setHistoryOpen] = useState(false),
     [advanced, setAdvanced] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [researchExportBusy, setResearchExportBusy] = useState(false);
+  const [researchExportError, setResearchExportError] = useState("");
   const [dirty, setDirty] = useState(false);
   const [editorBusy, setEditorBusy] = useState(false);
   const [pinned, setPinned] = useState<Variant>();
@@ -432,6 +435,21 @@ export function IntegrationCatalog() {
       setBusy(false);
     }
   }
+  async function exportResearchManifest() {
+    setResearchExportBusy(true);
+    setResearchExportError("");
+    try {
+      // Authentication and same-origin contract are enforced by request().
+      // Export is research planning only; it does not certify GTIN or sources.
+      const response = await request("/api/ecomm-app/workspace/research/manifest.csv");
+      const file = await response.blob();
+      downloadReviewCsv(file, "kiki-investigacion-gtin-unico.csv");
+    } catch (error) {
+      setResearchExportError(error instanceof Error ? error.message : "No se pudo exportar.");
+    } finally {
+      setResearchExportBusy(false);
+    }
+  }
   async function logout() {
     if (!session) return;
     if (
@@ -742,6 +760,21 @@ export function IntegrationCatalog() {
                 {queueFilters[key]} <strong>{data?.summary?.[key] ?? "—"}</strong>
               </button>
             ))}
+          </div>
+          <div className="k-research-export" aria-label="Investigación documental por lotes">
+            <button
+              type="button"
+              onClick={() => void exportResearchManifest()}
+              disabled={loading || researchExportBusy || !data?.summary?.research_gtin_unique}
+            >
+              {researchExportBusy ? "Preparando investigación…" : "Exportar lista de investigación con GTIN único"}
+            </button>
+            <small>
+              {data?.summary?.research_gtin_unique ?? "—"} variantes aptas para buscar
+              documentación del fabricante. Son pistas de búsqueda: ninguna fuente
+              está aprobada ni se modifica el catálogo.
+            </small>
+            {researchExportError && <p role="alert">{researchExportError}</p>}
           </div>
           <p className="s-count-note">
             <strong>Datos efectivamente presentes en la captura:</strong>{" "}
