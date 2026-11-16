@@ -1,0 +1,258 @@
+"""Source-backed channel readiness is strict and OFF by default.
+
+Tests use a disposable SQLite fixture and fictitious original bytes; they
+never represent an approved customer product or access any real manufacturer.
+"""
+import base64
+from copy import deepcopy
+from hashlib import sha256
+from types import SimpleNamespace
+
+import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.database.models import CatalogSnapshot, EcommApiProductEdit
+from app.services.documental.research import Research
+from app.services.documental.storage import Document, digest
+from app.services.ecomm_api_product_workspace_service import (
+    EcommApiProductWorkspace, blank_fields,
+)
+from test_documental_complete_draft_flow import (
+    IDENT, prepare, synthetic_document,
+)
+
+
+URL = "https://fabricante-prueba.invalid/mix-250g"
+
+
+def complete_fields():
+    fields = blank_fields()
+    fields.update({
+        "brand": "Natural Seed",
+        "manufacturer": "Natural Seed",
+        "title": "Mix Ensaladas y Sopas · 250 g",
+        "short_title": "Mix Ensaladas y Sopas",
+        "short_description": "Mix Ensaladas y Sopas · 250 g.",
+        "description": (
+            "Mix Ensaladas y Sopas · 250 g.\n"
+            "Características verificables: 3 frutos secos y 3 semillas al oreganato."
+        ),
+        "details": "Características verificables: 3 frutos secos y 3 semillas al oreganato.",
+        "presentation": "250 g",
+        "category": "Categoría de prueba",
+        "subcategory": "Subcategoría de prueba",
+        "seo_title": "Mix Ensaladas y Sopas · 250 g",
+        "seo_description": "Mix Ensaladas y Sopas · 250 g.",
+        "seo_keywords": "Mix Ensaladas y Sopas, 250 g",
+        "attributes": [{
+            "name": "Características verificables",
+            "value": "3 frutos secos y 3 semillas al oreganato",
+        }],
+        "media": [{
+            "kind": "IMAGE",
+            "url": "https://fabricante-prueba.invalid/imagen.png",
+            "alt": "Imagen ficticia",
+            "source_url": URL,
+        }],
+        "sources": [{
+            "kind": "FABRICANTE",
+            "name": "Fabricante de prueba",
+            "url": URL,
+            "note": "Revisé nombre, presentación e identidad del documento.",
+            "verified": True,
+        }],
+    })
+    return fields
+
+
+def setting(enabled=True, pilot=IDENT, workspace=True):
+    return SimpleNamespace(
+        kiki_document_channel_guard_enabled=enabled,
+        kiki_document_channel_guard_pilot_id=pilot,
+        kiki_document_workspace_enabled=workspace,
+        kiki_admin_username="test",
+    )
+
+
+def install_fake_source(db):
+    """Create an actual-shaped *fictitious* local original and approve three facts."""
+    doc = db.get(Document, "local-" + "a" * 32)
+    body = deepcopy(synthetic_document())
+    raw = b"FABRICANTE DE PRUEBA: Fuente de laboratorio, no documento real."
+    checksum = sha256(raw).hexdigest()
+    body.update({
+        "synthetic": False,
+        "origin_kind": "FILE",
+        "version": 1,
+        "provenance": "local://sha256/" + checksum,
+        "original": {
+            "content_type": "text/plain",
+            "filename": "solo-prueba.txt",
+            "size": len(raw),
+            "sha256": checksum,
+        },
+        "original_base64": base64.b64encode(raw).decode("ascii"),
+    })
+    body["source"].update({
+        "reference_url": URL,
+        "review_state": "REVIEWED",
+        "reviewer": "Operador sintético",
+        "review_reason": "Contrasté el original sintético de prueba.",
+        "reviewed_at": "2026-11-15T09:00:00+00:00",
+    })
+    body["identity"]["brand"] = "Natural Seed"
+    body["identity"]["manufacturer"] = "Natural Seed"
+    doc.body = body
+    doc.digest = digest(body)
+    db.flush()
+
+    user = SimpleNamespace(id=1)
+    research = Research(db, user)
+    current = research.dossier(IDENT)
+    reviewed = research.review_document_identity(
+        IDENT, current.version, doc.id, doc.version, "APPROVED",
+        "Comparé el nombre y presentación contra el archivo original ficticio.",
+    )
+    result = research.extract(IDENT, reviewed["version"], doc.id, doc.version)
+    for candidate in result["facts"]:
+        current = research.dossier(IDENT)
+        fact = next(x for x in current.facts if x["id"] == candidate["id"])
+        result = research.review(
+            IDENT, current.version, fact["id"], fact["version"], "APPROVED",
+            "Cita documental de prueba verificada en archivo original ficticio.",
+        )
+    return doc, user
+
+
+def test_flag_off_preserves_current_legacy_editor_behavior(tmp_path, monkeypatch):
+    from app.core import config
+    monkeypatch.setattr(config, "get_settings", lambda: setting(enabled=False))
+    engine, _ = prepare(tmp_path)
+    with Session(engine) as db:
+        fields = complete_fields()
+        result = EcommApiProductWorkspace(db).save(
+            IDENT, fields, "READY_FOR_CHANNELS", 0
+        )
+        assert result["status"] == "READY_FOR_CHANNELS"
+        assert result["version"] == 1
+        assert result["readiness"]["ready"] is True
+
+
+def test_guard_blocks_manual_verified_checkbox_without_archived_source(
+    tmp_path, monkeypatch,
+):
+    from app.core import config
+    import app.services.documental.research as research_module
+
+    monkeypatch.setattr(config, "get_settings", lambda: setting())
+    monkeypatch.setattr(research_module, "get_settings", lambda: setting())
+    engine, _ = prepare(tmp_path)
+    with Session(engine) as db:
+        editor = EcommApiProductWorkspace(db)
+        fields = complete_fields()
+        with pytest.raises(ValueError, match="sesión autenticada"):
+            editor.save(IDENT, fields, "READY_FOR_CHANNELS", 0)
+        with pytest.raises(ValueError, match="Fuente primaria documental"):
+            editor.save(IDENT, fields, "READY_FOR_CHANNELS", 0,
+                        session=SimpleNamespace(id=1))
+        db.rollback()
+        assert db.scalars(select(EcommApiProductEdit)).all() == []
+        # Drafts remain permitted: the guard must not block legitimate editing.
+        saved = editor.save(IDENT, fields, "DRAFT", 0)
+        assert saved["status"] == "DRAFT"
+
+
+@pytest.mark.parametrize("mutation", [
+    "removed_original", "tampered_original", "wrong_source_url",
+    "pending_source", "unverified_source_checkbox", "wrong_presentation",
+    "wrong_short_title", "wrong_sku", "fake_document",
+])
+def test_guard_fails_closed_on_absent_or_invalid_source(
+    tmp_path, monkeypatch, mutation
+):
+    from app.core import config
+    import app.services.documental.research as research_module
+
+    monkeypatch.setattr(config, "get_settings", lambda: setting())
+    monkeypatch.setattr(research_module, "get_settings", lambda: setting())
+    engine, _ = prepare(tmp_path)
+    with Session(engine) as db:
+        doc, user = install_fake_source(db)
+        fields = complete_fields()
+        if mutation == "removed_original":
+            doc.body = {**doc.body, "original_base64": ""}
+        elif mutation == "tampered_original":
+            doc.body = {**doc.body, "original_base64": base64.b64encode(b"NO").decode()}
+        elif mutation == "wrong_source_url":
+            fields["sources"][0]["url"] = "https://otra-fuente.invalid/producto"
+        elif mutation == "pending_source":
+            updated = deepcopy(doc.body)
+            updated["source"]["review_state"] = "PENDING"
+            doc.body = updated
+        elif mutation == "unverified_source_checkbox":
+            fields["sources"][0]["verified"] = False
+        elif mutation == "wrong_presentation":
+            fields["presentation"] = "500 g"
+        elif mutation == "wrong_short_title":
+            fields["short_title"] = "Otro producto"
+        elif mutation == "wrong_sku":
+            stage = db.scalar(select(CatalogSnapshot).where(
+                CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
+            ))
+            mutated = deepcopy(stage.payload)
+            mutated[0]["items"][0]["variants"][0]["sku"] = "XXX"
+            stage.payload = mutated
+            db.flush()
+        else:
+            updated = deepcopy(doc.body)
+            updated["synthetic"] = True
+            doc.body = updated
+        db.flush()
+        with pytest.raises(ValueError):
+            EcommApiProductWorkspace(db).save(
+                IDENT, fields, "READY_FOR_CHANNELS", 0, session=user
+            )
+        db.rollback()
+        assert not db.scalars(select(EcommApiProductEdit)).all()
+
+
+def test_original_with_approved_identity_allows_guarded_channel_ready(
+    tmp_path, monkeypatch
+):
+    from app.core import config
+    import app.services.documental.research as research_module
+
+    monkeypatch.setattr(config, "get_settings", lambda: setting())
+    monkeypatch.setattr(research_module, "get_settings", lambda: setting())
+    engine, original_capture = prepare(tmp_path)
+    with Session(engine) as db:
+        _, user = install_fake_source(db)
+        editor = EcommApiProductWorkspace(db)
+        fields = complete_fields()
+        result = editor.save(IDENT, fields, "READY_FOR_CHANNELS", 0, session=user)
+        assert result["status"] == "READY_FOR_CHANNELS"
+        assert result["readiness"]["ready"] is True
+        assert result["external_writes_enabled"] is False
+        reread = editor.get(IDENT)
+        assert reread["version"] == 1
+        current = Research(db, user).dossier(IDENT)
+        assert len([fact for fact in current.facts if fact["state"] == "APPROVED"]) == 3
+        assert db.get(Document, "local-" + "a" * 32).body["original"]["size"] > 0
+        assert db.scalar(select(CatalogSnapshot).where(
+            CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
+        )).payload == original_capture
+
+        # Revocation invalidates new review; no checklist-only bypass.
+        from app.services.documental.contracts import Provenance
+        from app.services.documental.local_documents import LocalDocuments
+        doc = db.get(Document, "local-" + "a" * 32)
+        LocalDocuments(db, user).provenance(IDENT, doc.id, Provenance(
+            expected_document_version=doc.version,
+            decision="REVOKED",
+            reason="Fuente de prueba revocada tras nueva inspección.",
+        ))
+        with pytest.raises(ValueError):
+            editor.confirm_monthly_review(IDENT, 1, session=user)
+        with pytest.raises(ValueError):
+            editor.save(IDENT, fields, "READY_FOR_CHANNELS", 1, session=user)
