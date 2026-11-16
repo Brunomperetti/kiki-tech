@@ -357,7 +357,8 @@ def save_edit(
                 ecomm_id, proposal_id, proposal_revision, body
             )
         return EcommApiProductWorkspace(db).save(
-            ecomm_id, body.fields.model_dump(), body.status, body.expected_version
+            ecomm_id, body.fields.model_dump(), body.status, body.expected_version,
+            session=_session,
         )
     except ValueError as exc:
         db.rollback()
