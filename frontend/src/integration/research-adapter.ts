@@ -117,6 +117,7 @@ export type ResearchDocument = {
       declared_manufacturer?: string | null;
       declared_consulted_at?: string | null;
       declared_official: boolean;
+      capture_mode?: "USER_SAVED_WEB_HTML" | "LOCAL_REFERENCE_OR_FILE";
       note: string;
       reference_url: string;
       registered_at: string;
