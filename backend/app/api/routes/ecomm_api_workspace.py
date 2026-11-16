@@ -314,7 +314,7 @@ def confirm_monthly_review(
     """Audit a verified monthly refresh without modifying source or channel."""
     try:
         return EcommApiProductWorkspace(db).confirm_monthly_review(
-            ecomm_id, body.expected_version
+            ecomm_id, body.expected_version, session=_session
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
