@@ -176,7 +176,7 @@ def test_real_naming_discrepancy_flows_to_versioned_internal_draft(tmp_path, mon
             }
         }
         reviewed_proposal = service.review(
-            IDENT, proposed["id"], proposed["revision"], decisions,
+            IDENT, proposed["draft_id"], proposed["revision"], decisions,
         )
         fields = blank_fields()
         for key, decision in decisions.items():
@@ -187,7 +187,7 @@ def test_real_naming_discrepancy_flows_to_versioned_internal_draft(tmp_path, mon
                 return fields
 
         saved = service.apply(
-            IDENT, proposed["id"], reviewed_proposal["revision"],
+            IDENT, proposed["draft_id"], reviewed_proposal["revision"],
             SimpleNamespace(expected_version=0, status="DRAFT", fields=FieldsPayload()),
         )
         assert saved["version"] == 1
