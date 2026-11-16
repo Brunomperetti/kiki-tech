@@ -48,6 +48,7 @@ import "./integration.css";
 import { PersistentWorkspace } from "./PersistentWorkspace";
 import { GtinExportPanel, GtinExportEvidence } from "./GtinExportPanel";
 import { downloadReviewCsv } from "./csv-download";
+import { ResearchBatchPlanner } from "./ResearchBatchPlanner";
 import { ChannelGapSummary } from "./ChannelGapSummary";
 import { stateLabels, getWorkspace } from "./workspace-adapter";
 import { MamaPilotLauncher } from "./MamaPilot";
@@ -761,6 +762,12 @@ export function IntegrationCatalog() {
               </button>
             ))}
           </div>
+          <ResearchBatchPlanner
+            onSearch={(sku) => update({
+              q: sku, filter: "research_gtin_unique",
+              page: "", product: "", tab: "",
+            })}
+          />
           <div className="k-research-export" aria-label="Investigación documental por lotes">
             <button
               type="button"
