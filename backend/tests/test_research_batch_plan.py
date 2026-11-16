@@ -59,7 +59,8 @@ def test_no_valid_unique_excel_code_yields_manual_research_not_fabrication(tmp_p
         assert plan["total_variants"] == 2
         assert plan["eligible_total"] == 0
         assert plan["items"] == []
-        assert plan["buckets"]["gtin_lookup_unavailable"] == 1
+        # Fixture has no presentation *and* no export; presentation blocks first.
+        assert plan["buckets"]["presentation_missing"] == 1
         assert plan["buckets"]["pack_review"] == 1
         assert sum(plan["buckets"].values()) == 2
 
@@ -98,5 +99,5 @@ def test_missing_capture_does_not_produce_partial_research_cohort(tmp_path):
         stage.payload = deepcopy(stage.payload)
         stage.payload[0]["total_pages"] = 2
         db.commit()
-        with pytest.raises(ValueError, match="incompleta"):
+        with pytest.raises(ValueError, match="no está completa"):
             build_research_batch_plan(db)
