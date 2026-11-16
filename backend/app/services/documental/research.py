@@ -255,24 +255,28 @@ class Research:
                 return detail
         return None
 
+    def equivalence_current(self, item, doc):
+        record = self._equivalence_record(item, doc)
+        return bool(
+            record
+            and record.get("decision") == "APPROVED"
+            and record.get("ecomm_id") == item.ecomm_id
+            and record.get("identity_digest") == item.identity_digest
+            and record.get("document_version") == doc.version
+            and record.get("document_hash") == doc.digest
+            and record.get("source_name") == item.identity.get("name")
+            and record.get("source_presentation") == item.identity.get("presentation")
+            and record.get("document_name") == doc.body.get("identity", {}).get("name")
+            and record.get("document_presentation") == doc.body.get("identity", {}).get("presentation")
+            and item.identity.get("is_combo") is False
+            and doc.body.get("associated_ecomm_id") == item.ecomm_id
+            and doc.body.get("source", {}).get("review_state") == "REVIEWED"
+            and doc.body.get("parse_status") == "TEXT_EXTRACTED"
+        )
+
     def identity_blockers(self, item, doc):
         issues = self.identity_issues(item.identity, doc.body)
-        record = self._equivalence_record(item, doc)
-        if not record or record.get("decision") != "APPROVED":
-            return issues
-        if (
-            record.get("ecomm_id") != item.ecomm_id
-            or record.get("identity_digest") != item.identity_digest
-            or record.get("document_version") != doc.version
-            or record.get("document_hash") != doc.digest
-            or record.get("source_name") != item.identity.get("name")
-            or record.get("source_presentation") != item.identity.get("presentation")
-            or record.get("document_name") != doc.body.get("identity", {}).get("name")
-            or record.get("document_presentation") != doc.body.get("identity", {}).get("presentation")
-            or item.identity.get("is_combo") is not False
-            or doc.body.get("source", {}).get("review_state") != "REVIEWED"
-            or doc.body.get("parse_status") != "TEXT_EXTRACTED"
-        ):
+        if not self.equivalence_current(item, doc):
             return issues
         # Human decision waives only the stated nomenclature and package-size
         # differences; not EAN, SKU, brand, manufacturer or sale type.
@@ -659,6 +663,15 @@ class Research:
                     "hash": doc.digest,
                     "body": public_body(doc.body),
                     "issues": self.identity_blockers(item, doc),
+                    "identity_reconciliation": {
+                        "decision": (
+                            self._equivalence_record(item, doc) or {}
+                        ).get("decision", "NONE"),
+                        "current": self.equivalence_current(item, doc),
+                        "reviewer": (
+                            self._equivalence_record(item, doc) or {}
+                        ).get("reviewer"),
+                    },
                     "versions": [v["version"] for v in self.fixtures.get(doc.id, [])],
                     "history": [
                         {**h, "body": public_body(h["body"])} for h in doc.history
