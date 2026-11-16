@@ -132,18 +132,9 @@ export function ResearchPanel({
     return () => controller.abort();
   }, [id, revision]);
   const document = data?.documents.find((d) => d.id === selected);
-  const latestIdentityReview = [...(data?.history ?? [])].reverse()
-    .find((entry) => entry.action === "DOCUMENT_IDENTITY_REVIEW"
-      && typeof entry.detail === "object" && entry.detail !== null
-      && (entry.detail as Record<string, unknown>).document_id === selected);
-  const identityDecision = latestIdentityReview?.detail as Record<string, unknown> | undefined;
-  const identityReviewCurrent = !!document && !!data && !!identityDecision
-    && identityDecision.decision === "APPROVED"
-    && identityDecision.document_version === document.version
-    && identityDecision.document_hash === document.hash
-    && identityDecision.ecomm_id === id
-    && identityDecision.source_name === data.identity.name
-    && identityDecision.source_presentation === data.identity.presentation;
+  // Trust the server-side decision bound to document version and API identity.
+  // The UI must not infer a valid approval from partial metadata.
+  const identityReviewCurrent = document?.identity_reconciliation?.current === true;
   async function mutate(path: string, body: unknown) {
     setBusy(true);
     setError("");
