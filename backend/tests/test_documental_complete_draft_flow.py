@@ -4,7 +4,6 @@ The name/size and source text are synthetic fixtures modelled after the real
 Natural Seed naming discrepancy. There is NO web access, official source
 verification, AI invocation, provider traffic or customer database connection.
 """
-from copy import deepcopy
 from types import SimpleNamespace
 
 from sqlalchemy import create_engine, select
