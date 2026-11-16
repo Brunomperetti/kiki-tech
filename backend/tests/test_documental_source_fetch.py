@@ -197,7 +197,7 @@ def test_pilot_route_enforces_flags_identity_source_and_daily_quota(tmp_path, mo
         doc = db.get(Document, doc_id)
         assert doc.body["source"]["review_state"] == "PENDING"
         assert doc.body["source"]["declared_official"] is False
-        assert doc.body["source"]["capture_mode"] == "USER_SAVED_WEB_HTML"
+        assert doc.body["source"]["capture_mode"] == "ALLOWLISTED_HTTPS_FETCH"
         assert doc.body["original"]["sha256"] == sha256(HTML).hexdigest()
         assert doc.body["retrieval"]["tls_hostname_verified"] is True
         assert doc.body["retrieval"]["network_enabled"] is True
