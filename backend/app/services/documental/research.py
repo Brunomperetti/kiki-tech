@@ -103,9 +103,13 @@ class Research:
             raise ValueError("Identidad bloqueada: barcode y gtin discrepan.")
         edit = self.edit_record(ident)
         fields = edit.fields if edit else {}
-        ean = source["gtin"]
-        ean_provenance = "Captura API; no equivale a verificación del fabricante"
-        if not ean:
+        # The API barcode and a lookup-only Excel hint MUST remain separate.
+        # Manufacturer documents may not print the EAN even when name, brand
+        # and presentation match. A lookup hint must not become an approved
+        # fact or an obligatory barcode claim in every source document.
+        lookup_gtin = None
+        lookup_provenance = "Sin código externo apto para búsqueda"
+        if not source["gtin"]:
             # Only *unique, non-combo* barcodes with exact Ecomm ID+SKU and a
             # complete, unchanged API capture can be considered. This merely
             # supplies a reference for source matching. It is NOT a verified
@@ -119,11 +123,11 @@ class Research:
             )
             candidate = export_candidates.get(ident)
             if candidate:
-                ean = candidate
-                ean_provenance = (
+                lookup_gtin = candidate
+                lookup_provenance = (
                     "Excel de inventario Ecomm-App: ID y SKU exactos, GTIN único "
-                    "y válido, variante no combo. Solo referencia para contrastar "
-                    "con el fabricante; no verificado por API ni por fabricante."
+                    "y válido, variante no combo. Solo pista de búsqueda, "
+                    "no GTIN certificado por API ni por fabricante."
                 )
         return {
             "ecomm_id": ident,
@@ -132,7 +136,8 @@ class Research:
             "presentation": source["variant_description"],
             "is_combo": source["is_combo"],
             "parent_is_combo": source.get("parent_is_combo"),
-            "ean": ean,
+            "ean": source["gtin"],
+            "lookup_gtin": lookup_gtin,
             "barcode": source.get("barcode"),
             "gtin_raw": source.get("gtin_raw"),
             "brand": source.get("brand"),
@@ -141,7 +146,8 @@ class Research:
             "provenance": {
                 "name": "Captura API; no equivale a verificación del fabricante",
                 "presentation": "Captura API; no equivale a verificación del fabricante",
-                "ean": ean_provenance,
+                "ean": "Captura API; no equivale a verificación del fabricante",
+                "lookup_gtin": lookup_provenance,
                 "brand": "Campo KIKI de contraste; no aprobado por defecto",
                 "manufacturer": "Campo KIKI de contraste; no aprobado por defecto",
             },
