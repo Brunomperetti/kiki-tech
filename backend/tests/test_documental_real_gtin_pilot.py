@@ -111,6 +111,39 @@ def test_no_export_gtin_when_evidence_is_ineligible_or_stale(modified):
     assert "Sin código externo" in ref["provenance"]["lookup_gtin"]
 
 
+def test_export_index_is_loaded_once_per_guarded_research_request():
+    candidate = research()
+    calls = []
+    old_scalar = candidate.db.scalar
+
+    def counted_scalar(statement):
+        calls.append(statement)
+        return old_scalar(statement)
+
+    candidate.db = SimpleNamespace(scalar=counted_scalar)
+    assert candidate.reference(ID)["lookup_gtin"] == CODE
+    assert candidate.reference(ID)["lookup_gtin"] == CODE
+    # Multiple references to the same snapshot share one validated index.
+    assert len(calls) == 1
+    # A new Research request does not inherit the previous map.
+    assert research(excel=row(status="VALID_REPEATED")).reference(ID)["lookup_gtin"] is None
+
+
+def test_repeated_gtin_is_rejected_even_if_export_status_says_unique():
+    other_id, other_sku = "6708523", "5222"
+    captured = stage()
+    captured[0]["items"][0]["variants"].append({
+        "id": other_id, "sku": other_sku, "is_combo": False,
+        "gtin": None, "barcode": None,
+    })
+    record = {"version": 1, "variants": 2, "rows": [
+        row(), {**row(), "ecomm_id": other_id, "sku": other_sku},
+    ]}
+    ref = research(pages=captured, record=record).reference(ID)
+    assert ref["lookup_gtin"] is None
+    assert ref["ean"] is None
+
+
 def test_canonical_api_gtin_takes_priority_and_avoids_export_query():
     candidate = research()
     candidate.source_record = lambda _: source(gtin=CODE)
