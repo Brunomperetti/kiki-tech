@@ -161,7 +161,12 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None):
     transport = transport if transport is not None else HTTPSFetcher()
     ip = vetted_ip(host, resolver)
 
-    robots = transport.get(host, ip, "/robots.txt", MAX_ROBOTS_BYTES)
+    try:
+        robots = transport.get(host, ip, "/robots.txt", MAX_ROBOTS_BYTES)
+    except (OSError, http.client.HTTPException):
+        raise ValueError(
+            "No se pudo consultar robots.txt por HTTPS. No se accedió al producto."
+        ) from None
     if (
         robots.status != 200
         or ipaddress.ip_address(robots.remote_ip) != ipaddress.ip_address(ip)
@@ -191,7 +196,12 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None):
     except UnicodeError:
         raise ValueError("robots.txt requiere texto UTF-8 válido.") from None
 
-    result = transport.get(host, ip, path, MAX_SOURCE_BYTES)
+    try:
+        result = transport.get(host, ip, path, MAX_SOURCE_BYTES)
+    except (OSError, http.client.HTTPException):
+        raise ValueError(
+            "Consulta HTTPS al fabricante no disponible; no se archivó contenido."
+        ) from None
     if result.status != 200:
         raise ValueError(
             "El fabricante no entregó la página HTML pública. "
