@@ -118,9 +118,15 @@ class Research:
                 safe_gtin_candidates_for_pages,
             )
 
-            export_candidates = safe_gtin_candidates_for_pages(
-                self.db, self.workspace_type(self.db)._source_pages()
-            )
+            # A Research instance is scoped to one guarded request/transaction.
+            # Build the validated export index once when several references are
+            # checked together; never reuse it across HTTP requests.
+            export_candidates = getattr(self, "_export_gtin_candidates", None)
+            if export_candidates is None:
+                export_candidates = safe_gtin_candidates_for_pages(
+                    self.db, self.workspace_type(self.db)._source_pages()
+                )
+                self._export_gtin_candidates = export_candidates
             candidate = export_candidates.get(ident)
             if candidate:
                 lookup_gtin = candidate
