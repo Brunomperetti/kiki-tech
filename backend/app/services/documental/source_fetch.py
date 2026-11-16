@@ -177,7 +177,7 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None):
     try:
         rules = robots.body.decode("utf-8-sig")
         if not re.search(r"(?im)^\s*user-agent\s*:", rules):
-            raise ValueError
+            raise ValueError("No se pudo verificar robots.txt: faltan reglas válidas.")
         robot = RobotFileParser()
         robot.parse(rules.splitlines())
         if not robot.can_fetch(ROBOT_AGENT, url):
