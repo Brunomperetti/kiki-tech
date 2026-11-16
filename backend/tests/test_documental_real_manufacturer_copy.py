@@ -37,7 +37,7 @@ def test_official_manufacturer_minimal_copy_never_adds_unsubstantiated_claims():
     # from Research before any draft generation can be persisted.
     content, missing = Proposals.generate_fields(candidates)
     assert content["title"]["value"] == "Mix Ensaladas y Sopas · 250 g"
-    assert content["short_title"]["value"] == "Mix Ensaladas y Sopas · 250 g"
+    assert content["short_title"]["value"] == "Mix Ensaladas y Sopas"
     assert content["description"]["evidence_ids"] == [
         "manufacturer-name", "manufacturer-size", "manufacturer-characteristics"
     ]
@@ -47,7 +47,9 @@ def test_official_manufacturer_minimal_copy_never_adds_unsubstantiated_claims():
     assert all("colesterol" not in str(row).casefold() for row in content.values())
     assert all("7798180790097" not in str(row) for row in content.values())
     assert "category" not in content and "subcategory" not in content
-    assert "media" not in content and "seo_keywords" not in content
+    assert "media" not in content
+    assert content["seo_keywords"]["value"] == "Mix Ensaladas y Sopas, 250 g"
+    assert content["seo_keywords"]["evidence_ids"] == ["manufacturer-name", "manufacturer-size"]
     assert any("sin evidencia aprobada" in reason for reason in missing)
     assert MANUFACTURER_URL.startswith("https://")
     assert RETAILER_URL.startswith("https://")
