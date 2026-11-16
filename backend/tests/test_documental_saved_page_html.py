@@ -68,6 +68,12 @@ def test_saved_realistic_manufacturer_html_extracts_only_literal_product_identit
     assert size_evidence["location"].startswith("web/tabla/")
     fields = {claim["field"] for claim in doc["claims"]}
     assert "product_name" in fields and "presentation" in fields
+    assert "characteristics" in fields
+    characteristic = next(c for c in doc["claims"] if c["field"] == "characteristics")
+    assert characteristic["value"] == "3 frutos secos + 3 semillas al oreganato"
+    assert characteristic["location"].startswith("web/product/p/")
+    assert characteristic["quote"] in doc["sections"][characteristic["location"]]
+    assert characteristic["value"] in characteristic["quote"]
     assert not any(
         x in repr(doc).casefold()
         for x in ["producto falso", "9999999999999", "sin tacc", "alert(1)", "malicioso.invalid"]
@@ -118,3 +124,34 @@ def test_untrusted_html_does_not_follow_urls_or_promote_alt_attributes():
     assert "7798180790097" not in repr(doc)
     assert "internal.invalid" not in repr(doc)
     assert "100 kg" not in repr(doc)
+
+
+def test_unrelated_page_text_is_not_composition_evidence():
+    outside = (
+        "<p>Otro producto contiene 9 frutos secos + 7 semillas al oreganato.</p>"
+        "<div class='other-card'>Otra ficha</div>"
+    )
+    html = saved_page().replace("<main>", outside + "<main>")
+    claims = [f for f in parsed(html)["claims"] if f["field"] == "characteristics"]
+    assert len(claims) == 1
+    assert claims[0]["value"] == "3 frutos secos + 3 semillas al oreganato"
+
+
+def test_hidden_description_does_not_create_extra_claim():
+    html = saved_page(extra_html=(
+        '<p class="sr-only">contiene 8 frutos secos + 9 semillas al oreganato</p>'
+        '<p aria-hidden="true">contiene 2 frutos secos + 4 semillas al oreganato</p>'
+    ))
+    facts = [f for f in parsed(html)["claims"] if f["field"] == "characteristics"]
+    assert len(facts) == 1
+    assert facts[0]["value"].startswith("3 frutos secos")
+
+
+def test_ambiguous_product_descriptions_block_automatic_composition_extraction():
+    html = saved_page(extra_html=(
+        "<p>Además contiene 5 frutos secos + 2 semillas al oreganato.</p>"
+    ))
+    result = parsed(html)
+    assert not [f for f in result["claims"] if f["field"] == "characteristics"]
+    assert any("declaración descriptiva" in e for e in result["parser_blockers"])
+    assert not any(f["field"] == "ingredients" for f in result["claims"])
