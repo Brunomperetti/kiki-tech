@@ -35,12 +35,16 @@ def fact_digest(fact):
 
 
 def identity_digest(reference):
-    # Provenance display and copying the exact canonical presentation to the editor
-    # do not change the variant. Genuine contradictory editorial values still do.
-    # Display-only research hints cannot invalidate approved identity or facts.
-    values = {k: v for k, v in reference.items() if k not in {"provenance", "presentation_lookup_hint"}}
-    if values.get("editorial_presentation") == values.get("presentation"):
-        values["editorial_presentation"] = None
+    # Commercial presentation is an editorial overlay, not the canonical Ecomm
+    # identity. Saving a *reviewed* manufacturer's size must not invalidate
+    # approved facts merely because the text differs from the original API.
+    # Every document is still checked against the editorial presentation in
+    # identity_issues(), which blocks unrelated sizes and revokes evidence.
+    # SKU, EAN, source presentation, combo type and lookup GTIN stay signed.
+    values = {
+        key: value for key, value in reference.items()
+        if key not in {"provenance", "presentation_lookup_hint", "editorial_presentation"}
+    }
     return digest(values)
 
 
