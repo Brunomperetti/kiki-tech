@@ -66,13 +66,23 @@ def research(*, excel=None, pages=None, record=None):
 def test_unique_non_combo_excel_gtin_is_attributed_reference_only():
     ref = research().reference(ID)
     assert ref["ecomm_id"] == ID and ref["sku"] == SKU
-    assert ref["ean"] == CODE
-    assert "Excel" in ref["provenance"]["ean"]
-    assert "no verificado" in ref["provenance"]["ean"]
+    assert ref["ean"] is None  # Never promote a spreadsheet lookup to official API EAN.
+    assert ref["lookup_gtin"] == CODE
+    assert "Excel" in ref["provenance"]["lookup_gtin"]
+    assert "no GTIN certificado" in ref["provenance"]["lookup_gtin"]
     assert not Research.identity_issues(ref, {
         "identity": {
             "name": ref["name"], "presentation": ref["presentation"],
             "ean": CODE, "is_combo": False,
+        },
+        "associated_ecomm_id": ID,
+    })
+    # An authentic manufacturer page is not required to publish an EAN,
+    # provided product name, presentation and unit type match.
+    assert not Research.identity_issues(ref, {
+        "identity": {
+            "name": ref["name"], "presentation": ref["presentation"],
+            "ean": None, "is_combo": False,
         },
         "associated_ecomm_id": ID,
     })
@@ -81,7 +91,7 @@ def test_unique_non_combo_excel_gtin_is_attributed_reference_only():
                      "ean": "7798180790097", "is_combo": False},
         "associated_ecomm_id": ID,
     })
-    assert any("EAN incompatible" in problem for problem in wrong)
+    assert any("pista GTIN" in problem for problem in wrong)
 
 
 @pytest.mark.parametrize("modified", [
@@ -97,7 +107,8 @@ def test_unique_non_combo_excel_gtin_is_attributed_reference_only():
 def test_no_export_gtin_when_evidence_is_ineligible_or_stale(modified):
     ref = research(**modified).reference(ID)
     assert ref["ean"] is None
-    assert "Captura API" in ref["provenance"]["ean"]
+    assert ref["lookup_gtin"] is None
+    assert "Sin código externo" in ref["provenance"]["lookup_gtin"]
 
 
 def test_canonical_api_gtin_takes_priority_and_avoids_export_query():
@@ -106,13 +117,14 @@ def test_canonical_api_gtin_takes_priority_and_avoids_export_query():
     candidate.db = SimpleNamespace(scalar=lambda _: pytest.fail("No extra export lookup"))
     ref = candidate.reference(ID)
     assert ref["ean"] == CODE
+    assert ref["lookup_gtin"] is None
     assert "Captura API" in ref["provenance"]["ean"]
 
 
 def test_suspended_export_changes_identity_fingerprint_and_requires_new_evidence():
     with_excel = research().reference(ID)
     without = research(excel=row(sku="WRONG")).reference(ID)
-    assert with_excel["ean"] == CODE and without["ean"] is None
+    assert with_excel["lookup_gtin"] == CODE and without["lookup_gtin"] is None
     assert identity_digest(with_excel) != identity_digest(without)
     # Attribution alone is display metadata, not a factual identity field.
     copy = {**with_excel, "provenance": {"ean": "Otra frase de procedencia"}}
