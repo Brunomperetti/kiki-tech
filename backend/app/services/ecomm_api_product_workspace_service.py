@@ -274,11 +274,29 @@ class EcommApiProductWorkspace:
         )
         return self._serialize(edit, source)
 
-    def save(self, ecomm_id: str, fields: dict, status: str, expected_version: int) -> dict:
+    def save(
+        self, ecomm_id: str, fields: dict, status: str, expected_version: int,
+        *, session=None,
+    ) -> dict:
         if expected_version < 0:
             raise ValueError("Número de versión inválido.")
         normalized = _canonical_fields(fields)
         _validate(normalized, status)
+        # Keep the legacy editor and all channel integrations unchanged until
+        # explicit pilot activation; all direct calls fail closed when guarded.
+        if status == "READY_FOR_CHANNELS":
+            from app.core.config import get_settings
+
+            config = get_settings()
+            if (
+                config.kiki_document_channel_guard_enabled
+                and ecomm_id == config.kiki_document_channel_guard_pilot_id
+            ):
+                if not config.kiki_document_workspace_enabled:
+                    raise ValueError("El expediente documental debe estar habilitado.")
+                from .documental.channel_readiness_guard import require_primary_evidence
+
+                require_primary_evidence(self.db, session, ecomm_id, normalized)
         source = self._source(ecomm_id)
         if source.get("identity_blockers"):
             raise ValueError("Identidad contradictoria: barcode y gtin discrepan. Guardado bloqueado.")
