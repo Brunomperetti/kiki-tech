@@ -71,6 +71,15 @@ class Incorporate(BaseModel):
         return value
 
 
+class ManufacturerFetch(BaseModel):
+    """One explicit operator-initiated manufacturer page, never bulk crawling."""
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    reference_url: str = Field(min_length=16, max_length=1000)
+    provenance_note: str = Field(min_length=10, max_length=600)
+    authorized_local_processing: Literal[True]
+
+
 class Provenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_document_version: int = Field(ge=1)
