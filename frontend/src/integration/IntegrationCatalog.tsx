@@ -1420,8 +1420,10 @@ export function IntegrationCatalog() {
               : "CONSULTA DE VARIANTE"
           }
         >
-          <GtinExportEvidence ecommId={selected.id} revision={gtinRevision} />
           <PersistentWorkspace
+            gtinEvidence={
+              <GtinExportEvidence ecommId={selected.id} revision={gtinRevision} />
+            }
             key={selected.id}
             proposalId={
               params.has("proposal")
