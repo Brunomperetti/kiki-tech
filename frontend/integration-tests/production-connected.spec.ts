@@ -104,6 +104,26 @@ test("vistas de captura y diferencias, calidad, URL, conexiones sin sincronizaci
     .getByRole("dialog")
     .screenshot({ path: `artifacts/v2-conexiones-${info.project.name}.png` });
 });
+test("ficha amplia utiliza casi todo el viewport y mantiene una zona de scroll", async ({ page }) => {
+  await open(page);
+  const dialog = page.getByRole("dialog", { name: "Ficha 900006" });
+  const size = page.viewportSize();
+  const rect = await dialog.boundingBox();
+  expect(size).not.toBeNull();
+  expect(rect).not.toBeNull();
+  if (size && rect) {
+    expect(rect.width).toBeGreaterThan(Math.min(size.width - 48, 790));
+    expect(rect.height).toBeGreaterThan(size.height * 0.88);
+  }
+  const tabPanel = dialog.getByRole("tabpanel");
+  await expect(tabPanel).toBeVisible();
+  expect(await tabPanel.evaluate((node) => getComputedStyle(node).overflowY)).toBe("auto");
+  await page.getByRole("tab", { name: "Canales" }).click();
+  await expect(page.getByRole("tab", { name: "Canales" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Ficha" }).click();
+  await expect(page.getByLabel("Título completo", { exact: true })).toBeVisible();
+});
+
 test("editor original 18 campos, guardado, recuperación, cinco pestañas e historial", async ({
   page,
 }, info) => {
