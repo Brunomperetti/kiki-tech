@@ -194,6 +194,16 @@ class Research:
                 issues.append(
                     f"{label} incompatible o ausente: referencia «{expected}» / documento «{actual or 'sin datos'}»."
                 )
+        # A validated Excel GTIN is a lookup hint. Do not demand that every
+        # manufacturer's document print it, but reject an explicit conflicting
+        # EAN on a document before any fact can be approved.
+        hint = reference.get("lookup_gtin")
+        claimed = body["identity"].get("ean")
+        if hint and claimed and str(hint).strip() != str(claimed).strip():
+            issues.append(
+                "EAN declarado en documento incompatible con la pista GTIN "
+                "del Excel Ecomm-App; revisar variante y presentación."
+            )
         if (
             reference.get("editorial_presentation")
             and reference["editorial_presentation"] != reference["presentation"]
