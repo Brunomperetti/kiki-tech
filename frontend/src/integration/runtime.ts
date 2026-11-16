@@ -9,6 +9,7 @@ export type Capabilities = {
   connections: boolean;
   documents: boolean;
   document_upload: boolean;
+  document_fetch: boolean;
   channels: boolean;
   batches: boolean;
   executor: boolean;
@@ -39,6 +40,7 @@ export function configureRuntime(value?: unknown) {
       c.connections,
       c.documents,
       c.document_upload,
+      c.document_fetch,
       c.channels,
       c.batches,
       c.executor,
