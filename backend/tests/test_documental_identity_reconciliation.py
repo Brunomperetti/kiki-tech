@@ -139,7 +139,7 @@ def test_revocation_resumes_identity_blockers_and_requires_new_version():
     assert result["version"] == 2
     assert case.history[-1]["detail"]["decision"] == "REVOKED"
     assert service.identity_blockers(case, doc)
-    with pytest.raises(ValueError, match="no hay una conciliación"):
+    with pytest.raises(ValueError, match="No hay una conciliación"):
         service.review_document_identity(
             ID, 2, doc.id, doc.version, "REVOKED",
             "La equivalencia anterior ya había sido revocada con motivo.",
@@ -167,7 +167,7 @@ def test_incomplete_document_identity_and_cross_variant_rejected():
         approve(service, case, doc)
     doc.body["identity"]["name"] = "Mix Ensaladas y Sopas"
     doc.body["associated_ecomm_id"] = "7777"
-    with pytest.raises(ValueError, match="otra variante|solo puede"):
+    with pytest.raises(ValueError, match="no asociado al Ecomm ID exacto"):
         approve(service, case, doc)
     assert case.history == []
 
