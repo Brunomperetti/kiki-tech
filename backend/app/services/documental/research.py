@@ -310,6 +310,28 @@ class Research:
             identity = doc.body.get("identity", {})
             if not all(str(identity.get(k) or "").strip() for k in ("name", "presentation")):
                 raise ValueError("La fuente debe identificar explícitamente nombre y presentación.")
+            # A typed name/size alone cannot certify a relationship. Both
+            # identity values must be backed by verbatim, locatable fragments
+            # from the saved original document.
+            identity_evidence = doc.body.get("identity_evidence") or {}
+            sections = doc.body.get("sections") or {}
+            for key in ("name", "presentation"):
+                record = identity_evidence.get(key) or {}
+                location = record.get("location")
+                quote = record.get("quote")
+                value = str(identity[key]).strip()
+                if (
+                    record.get("value") != identity[key]
+                    or not isinstance(location, str)
+                    or not isinstance(quote, str)
+                    or not isinstance(sections.get(location), str)
+                    or quote not in sections[location]
+                    or value.casefold() not in quote.casefold()
+                ):
+                    raise ValueError(
+                        "Nombre y presentación requieren citas literales ubicables "
+                        "en el documento original."
+                    )
             original = self.identity_issues(item.identity, doc.body)
             if not any(x.startswith(("Nombre incompatible", "Presentación incompatible")) for x in original):
                 raise ValueError("Sin diferencias de identidad nominal que requieran conciliación.")
