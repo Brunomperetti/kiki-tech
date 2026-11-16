@@ -16,6 +16,7 @@ from app.services.documental.contracts import (
     Provenance,
 )
 from app.services.documental.contracts import FactReview
+from app.services.documental.contracts import DocumentIdentityReview
 
 
 def enabled():
@@ -85,6 +86,24 @@ def review_fact(
             body.expected_fact_version,
             body.decision,
             body.reason,
+        ),
+    )
+
+
+@router.post("/{ecomm_id}/documents/{document_id}/identity-review")
+def review_identity(
+    ecomm_id: str,
+    document_id: str,
+    body: DocumentIdentityReview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """A reviewed source may have a different commercial name, never a different SKU."""
+    return execute(
+        db,
+        lambda: Research(db, session).review_document_identity(
+            ecomm_id, body.expected_version, document_id,
+            body.document_version, body.decision, body.reason,
         ),
     )
 
