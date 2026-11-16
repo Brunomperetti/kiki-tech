@@ -358,7 +358,9 @@ class EcommApiProductWorkspace:
         return self._serialize(edit, source)
 
 
-    def confirm_monthly_review(self, ecomm_id: str, expected_version: int) -> dict:
+    def confirm_monthly_review(
+        self, ecomm_id: str, expected_version: int, *, session=None
+    ) -> dict:
         """Record explicit source re-verification, without changing any product data."""
         source = self._source(ecomm_id)
         edit = self.db.scalar(
@@ -374,6 +376,18 @@ class EcommApiProductWorkspace:
             raise ValueError("La ficha necesita estar completa y lista para canales.")
         if edit.source_sku != source["sku"]:
             raise ValueError("El SKU cambió. Verificá la identidad de la variante.")
+        from app.core.config import get_settings
+
+        config = get_settings()
+        if (
+            config.kiki_document_channel_guard_enabled
+            and ecomm_id == config.kiki_document_channel_guard_pilot_id
+        ):
+            if not config.kiki_document_workspace_enabled:
+                raise ValueError("El expediente documental debe estar habilitado.")
+            from .documental.channel_readiness_guard import require_primary_evidence
+
+            require_primary_evidence(self.db, session, ecomm_id, edit.fields)
         now = _now()
         event = {
             "at": now.isoformat(), "version": edit.version + 1,
