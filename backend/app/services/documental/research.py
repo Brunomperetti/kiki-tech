@@ -37,7 +37,8 @@ def fact_digest(fact):
 def identity_digest(reference):
     # Provenance display and copying the exact canonical presentation to the editor
     # do not change the variant. Genuine contradictory editorial values still do.
-    values = {k: v for k, v in reference.items() if k != "provenance"}
+    # Display-only research hints cannot invalidate approved identity or facts.
+    values = {k: v for k, v in reference.items() if k not in {"provenance", "presentation_lookup_hint"}}
     if values.get("editorial_presentation") == values.get("presentation"):
         values["editorial_presentation"] = None
     return digest(values)
@@ -135,11 +136,14 @@ class Research:
                     "y válido, variante no combo. Solo pista de búsqueda, "
                     "no GTIN certificado por API ni por fabricante."
                 )
+        from .presentation_hint import candidate as size_candidate
+
         return {
             "ecomm_id": ident,
             "name": source["product_name"],
             "sku": source["sku"],
             "presentation": source["variant_description"],
+            "presentation_lookup_hint": size_candidate(source),
             "is_combo": source["is_combo"],
             "parent_is_combo": source.get("parent_is_combo"),
             "ean": source["gtin"],
@@ -152,6 +156,7 @@ class Research:
             "provenance": {
                 "name": "Captura API; no equivale a verificación del fabricante",
                 "presentation": "Captura API; no equivale a verificación del fabricante",
+                "presentation_lookup_hint": "Medida encontrada en el texto original de Ecomm; solo pista para contrastar con etiqueta y fabricante, nunca presentación certificada.",
                 "ean": "Captura API; no equivale a verificación del fabricante",
                 "lookup_gtin": lookup_provenance,
                 "brand": "Campo KIKI de contraste; no aprobado por defecto",
