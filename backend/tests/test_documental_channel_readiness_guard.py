@@ -234,8 +234,11 @@ def test_original_with_approved_identity_allows_guarded_channel_ready(
         assert result["status"] == "READY_FOR_CHANNELS"
         assert result["readiness"]["ready"] is True
         assert result["external_writes_enabled"] is False
-        reread = editor.get(IDENT)
+        reread = editor.get(IDENT, session=user)
         assert reread["version"] == 1
+        assert reread["documentary_gate"]["enabled"] is True
+        assert reread["documentary_gate"]["ready"] is True
+        assert reread["readiness"]["ready"] is True
         current = Research(db, user).dossier(IDENT)
         assert len([fact for fact in current.facts if fact["state"] == "APPROVED"]) == 3
         assert db.get(Document, "local-" + "a" * 32).body["original"]["size"] > 0
@@ -252,6 +255,11 @@ def test_original_with_approved_identity_allows_guarded_channel_ready(
             decision="REVOKED",
             reason="Fuente de prueba revocada tras nueva inspección.",
         ))
+        invalidated = editor.get(IDENT, session=user)
+        assert invalidated["status"] == "READY_FOR_CHANNELS"  # historical, not silently rewritten
+        assert invalidated["documentary_gate"]["ready"] is False
+        assert invalidated["readiness"]["ready"] is False
+        assert "documentary_primary_source" in invalidated["readiness"]["missing"]
         with pytest.raises(ValueError):
             editor.confirm_monthly_review(IDENT, 1, session=user)
         with pytest.raises(ValueError):
