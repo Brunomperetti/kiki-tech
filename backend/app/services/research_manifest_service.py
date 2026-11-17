@@ -1,6 +1,6 @@
 """Authenticated read-only research manifest; no source approval or vendor writes.
 
-One row per Ecomm ID/SKU with a unique eligible Excel GTIN lookup hint.
+One row per Ecomm ID/SKU with a unique eligible API barcode lookup hint.
 It is a research workload, NOT a manufacturer's evidence or a commercial fiche.
 """
 import csv
@@ -8,12 +8,12 @@ from io import StringIO
 
 from .ecomm_api_product_workspace_service import EcommApiProductWorkspace
 from .ecomm_api_work_queue_service import build_queue
-from .ecomm_gtin_export_service import safe_gtin_candidates_for_pages
+from .ecomm_api_barcode_service import api_candidates_for_pages
 
 MAX_ROWS = 5000
 HEADER = (
     "ecomm_id", "sku", "nombre_ecomm", "presentacion_ecomm",
-    "gtin_excel_solo_busqueda", "busqueda_sugerida",
+    "barcode_api_solo_busqueda", "busqueda_sugerida",
     "estado_fuente", "url_fabricante", "cita_fuente", "fecha_verificacion",
 )
 
@@ -27,9 +27,9 @@ def _cell(value):
 
 
 def build_research_manifest(db):
-    # Both computations validate the *entire* API capture and Excel ID+SKU map.
+    # The same completed API capture supplies IDs, SKU and barcode.
     pages = EcommApiProductWorkspace(db)._source_pages()
-    candidates = safe_gtin_candidates_for_pages(db, pages)
+    candidates = api_candidates_for_pages(pages)
     work = build_queue(db, filter_name="research_gtin_unique", export_rows=True)
     rows = work["items"]
     if len(rows) > MAX_ROWS:
@@ -57,7 +57,7 @@ def build_research_manifest(db):
             _cell(row["sku"]),
             name,
             presentation,
-            gtin,  # A validated lookup hint; never an official API EAN.
+            gtin,  # API code with check digit; never manufacturer-certified identity.
             _cell(f'"{name}" "{presentation}" {gtin} fabricante'),
             "PENDIENTE_VERIFICACION_FABRICANTE",
             "", "", "",

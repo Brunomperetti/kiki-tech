@@ -19,7 +19,7 @@ from .ecomm_api_product_workspace_service import (
     review_schedule,
 )
 from .ecomm_channel_coverage_service import build_channel_coverage
-from .ecomm_gtin_export_service import safe_gtin_candidates_for_pages
+from .ecomm_api_barcode_service import api_candidates_for_pages
 from .ecomm_catalog_quality import (
     LABELS as QUALITY_FILTERS,
     identity_index,
@@ -362,9 +362,8 @@ def build_queue(
         api_validation=get_settings().kiki_channel_workspace_enabled,
         edits=edits,
     )
-    # Excel GTIN remains a lookup hint, never a verified manufacturer claim.
-    # One full ID+SKU validation for this request; no supplier calls or writes.
-    research_gtin_candidates = safe_gtin_candidates_for_pages(db, pages)
+    # Barcode / GTIN lookup hints come solely from the completed API capture.
+    research_gtin_candidates = api_candidates_for_pages(pages)
     sku_owners = Counter(
         _value(v.get("sku")).casefold()
         for p in pages
@@ -373,7 +372,7 @@ def build_queue(
         if isinstance(v, dict) and not v.get("invalid") and _value(v.get("sku"))
     )
     rows = []
-    quality = identity_index(pages, channel_matrix.get("export_gtin_quality"))
+    quality = identity_index(pages)
     counts = Counter()
     term = query.casefold().strip()
     for p in pages:

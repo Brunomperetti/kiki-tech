@@ -19,6 +19,8 @@ def eligible(db):
     ))
     pages = deepcopy(stage.payload)
     pages[0]["items"][0]["variants"][0]["variant_description"] = "30 cápsulas"
+    pages[0]["items"][0]["variants"][0]["barcode"] = "7798353193212"
+    pages[0]["items"][1]["variants"][0]["barcode"] = "8410771100656"
     pages[0]["items"][1]["variants"][0]["variant_description"] = "Pack x2 60 cápsulas"
     stage.payload = pages
     export = CatalogSnapshot(source="ECOMM_APP_GTIN_EXPORT", payload=[{
@@ -52,7 +54,7 @@ def test_research_manifest_has_sourced_identity_not_fabricated_manufacturer(tmp_
         product = dict(zip(HEADER, rows[1]))
         assert product["ecomm_id"] == "101"
         assert product["sku"] == "2500"
-        assert product["gtin_excel_solo_busqueda"] == "7798353193212"
+        assert product["barcode_api_solo_busqueda"] == "7798353193212"
         assert product["estado_fuente"] == "PENDIENTE_VERIFICACION_FABRICANTE"
         assert "7798353193212" in product["busqueda_sugerida"]
         assert product["url_fabricante"] == product["cita_fuente"] == ""
@@ -64,41 +66,40 @@ def test_research_manifest_has_sourced_identity_not_fabricated_manufacturer(tmp_
         assert db.scalars(select(EcommApiProductEdit)).all() == []
 
 
-def test_research_manifest_fails_closed_when_export_is_stale_or_repeated(tmp_path):
+def test_historic_export_cannot_change_api_research_candidates(tmp_path):
     engine = db_fixture(tmp_path)
     with Session(engine) as db:
         stage, export = eligible(db)
+        # Even a tampered old Excel cannot change the API-only manifest.
         export.payload = [{
             **export.payload[0],
-            "rows": [{**export.payload[0]["rows"][0], "sku": "changed"},
-                     export.payload[0]["rows"][1]],
+            "rows": [
+                {**export.payload[0]["rows"][0], "sku": "changed",
+                 "gtin": "0000000000000"},
+                {**export.payload[0]["rows"][1], "gtin": "0000000000000",
+                 "status": "VALID_UNIQUE"},
+            ],
         }]
         db.commit()
         body, count = build_research_manifest(db)
-        assert count == 0
-        assert len(parse(body)) == 1
-        # Do not expose a conflicting unique GTIN even with a forged status.
-        stale = deepcopy(export.payload)
-        stale[0]["rows"][0]["sku"] = "2500"
-        stale[0]["rows"][1]["gtin"] = stale[0]["rows"][0]["gtin"]
-        stale[0]["rows"][1]["status"] = "VALID_UNIQUE"
-        export.payload = stale
+        assert count == 1 and len(parse(body)) == 2
+        assert "7798353193212" in body
+        assert "0000000000000" not in body
+
+        pages = deepcopy(stage.payload)
+        pages[0]["items"][0]["variants"][0]["barcode"] = "3"
+        stage.payload = pages
         db.commit()
         body, count = build_research_manifest(db)
-        assert count == 0
-        assert len(parse(body)) == 1
-        # Lack of presentation also excludes candidate.
-        stale = deepcopy(export.payload)
-        stale[0]["rows"][1]["gtin"] = "8410771100656"
-        stale[0]["rows"][1]["status"] = "PACK_REVIEW"
-        export.payload = stale
+        assert count == 0 and len(parse(body)) == 1
+
         pages = deepcopy(stage.payload)
+        pages[0]["items"][0]["variants"][0]["barcode"] = "7798353193212"
         pages[0]["items"][0]["variants"][0].pop("variant_description")
         stage.payload = pages
         db.commit()
         body, count = build_research_manifest(db)
-        assert count == 0
-        assert len(parse(body)) == 1
+        assert count == 0 and len(parse(body)) == 1
 
 
 def test_formula_injection_not_interpreted_as_spreadsheet_formula():

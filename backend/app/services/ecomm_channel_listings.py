@@ -30,7 +30,7 @@ def listings(db, channel, *, query="", page=1, limit=25, linkage="all"):
         for r in db.scalars(
             select(CatalogSnapshot).where(
                 CatalogSnapshot.source.in_(
-                    [STAGE_SOURCE, "MERCADOLIBRE_API", "TIENDANUBE", "ECOMM_APP_GTIN_EXPORT"]
+                    [STAGE_SOURCE, "MERCADOLIBRE_API", "TIENDANUBE"]
                 )
             )
         )

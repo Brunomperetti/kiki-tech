@@ -2,7 +2,7 @@
 
 from typing import Literal, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
@@ -14,8 +14,7 @@ from ...services.ecomm_ai_editor_service import EcommAiEditor
 from ...services.ecomm_ai_proposal_inbox_service import list_ecomm_ai_proposals
 from ...services.ecomm_api_brand_hints_service import EcommApiBrandHints
 from ...services.ecomm_api_work_queue_service import build_queue
-from ...services.ecomm_secondary_ean_evidence import EcommLegacyEanEvidence
-from ...services.ecomm_gtin_export_service import EcommExportGtin, MAX_BYTES
+from ...services.ecomm_api_barcode_service import api_summary, api_evidence
 from ...services.research_manifest_service import build_research_manifest
 from ...services.research_batch_plan_service import build_research_batch_plan
 
@@ -193,75 +192,49 @@ def research_manifest(
         raise HTTPException(409, str(exc)) from None
 
 
-@router.get("/gtin-export/summary")
-def gtin_export_summary(
+@router.get("/api-barcode/summary")
+def api_barcode_summary(
     db: Session = Depends(get_db),
     _session=Depends(require_session),
 ):
-    """Read evidence from the manually imported Ecomm inventory export."""
+    """Complete Ecomm-App API capture only; no historic Excel or CSV."""
     try:
-        return EcommExportGtin(db).summary()
+        return api_summary(db)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
 
-@router.get("/gtin-export/{ecomm_id}")
-def gtin_export_evidence(
+@router.get("/api-barcode/{ecomm_id}")
+def api_barcode_evidence(
     ecomm_id: str,
     db: Session = Depends(get_db),
     _session=Depends(require_session),
 ):
     try:
-        return EcommExportGtin(db).evidence(ecomm_id)
+        return api_evidence(db, ecomm_id)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/gtin-export/summary")
+@router.get("/gtin-export/{ecomm_id}")
+@router.get("/ean-evidence/summary")
+@router.get("/ean-evidence/{ecomm_id}")
+def retired_ecomm_spreadsheet_routes(_session=Depends(require_session)):
+    """Retired Ecomm spreadsheet evidence; historical rows remain untouched."""
+    raise HTTPException(
+        410,
+        "Ecomm-App se consulta exclusivamente por API. La evidencia histórica "
+        "de Excel está archivada y no participa en la operación.",
+    )
 
 
 @router.post("/gtin-export")
-async def import_gtin_export(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _session=Depends(require_csrf),
-):
-    """Only saves ID+SKU+GTIN evidence in a separate row. No catalog/vendor changes."""
-    try:
-        if file.content_type not in (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/octet-stream",
-        ):
-            raise ValueError("Solo se acepta la exportación oficial .xlsx de Ecomm-App.")
-        content = await file.read(MAX_BYTES + 1)
-        return EcommExportGtin(db).import_file(content, file.filename or "")
-    except ValueError as exc:
-        db.rollback()
-        raise HTTPException(409, str(exc)) from None
-    finally:
-        await file.close()
-
-
-@router.get("/ean-evidence/summary")
-def legacy_ean_summary(
-    db: Session = Depends(get_db),
-    _session=Depends(require_session),
-):
-    """Only conservative EAN suggestions; Ecomm catalog identity stays API-only."""
-    try:
-        return EcommLegacyEanEvidence(db).summary()
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from None
-
-
-@router.get("/ean-evidence/{ecomm_id}")
-def legacy_ean_candidate(
-    ecomm_id: str,
-    db: Session = Depends(get_db),
-    _session=Depends(require_session),
-):
-    """Never approve or write EAN automatically from old XLSX records."""
-    try:
-        return EcommLegacyEanEvidence(db).get(ecomm_id)
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from None
+def retired_ecomm_spreadsheet_upload(_session=Depends(require_csrf)):
+    """Never accept further Ecomm spreadsheet data."""
+    raise HTTPException(
+        410, "La importación de Excel Ecomm-App está deshabilitada; usá la API."
+    )
 
 
 @router.get("/taxonomy")
