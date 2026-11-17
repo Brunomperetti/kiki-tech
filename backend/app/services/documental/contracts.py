@@ -28,6 +28,21 @@ class DocumentIdentityReview(BaseModel):
     reason: str = Field(min_length=20, max_length=600)
 
 
+class MediaRightsReview(BaseModel):
+    """Explicit asset-specific usage permission in a reviewed original."""
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    document_version: int = Field(ge=1)
+    media_kind: Literal["IMAGE", "VIDEO"]
+    media_url: str = Field(min_length=9, max_length=1000)
+    source_url: str = Field(min_length=9, max_length=1000)
+    decision: Literal["APPROVED", "REVOKED"]
+    licence_basis: Literal["OWNER_AUTHORIZATION", "DOCUMENTED_LICENSE"]
+    location: str = Field(min_length=1, max_length=200)
+    quote: str = Field(min_length=30, max_length=1500)
+    reason: str = Field(min_length=25, max_length=600)
+
+
 class Revision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=1)
