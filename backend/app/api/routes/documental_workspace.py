@@ -19,7 +19,8 @@ from app.services.documental.contracts import (
     Provenance,
 )
 from app.services.documental.contracts import FactReview
-from app.services.documental.contracts import DocumentIdentityReview, ManufacturerFetch
+from app.services.documental.contracts import DocumentIdentityReview, ManufacturerFetch, MediaRightsReview
+from app.services.documental.media_rights import review_media_rights
 
 
 def enabled():
@@ -107,6 +108,26 @@ def review_identity(
         lambda: Research(db, session).review_document_identity(
             ecomm_id, body.expected_version, document_id,
             body.document_version, body.decision, body.reason,
+        ),
+    )
+
+
+@router.post("/{ecomm_id}/documents/{document_id}/media-rights")
+def review_asset_permissions(
+    ecomm_id: str,
+    document_id: str,
+    body: MediaRightsReview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Review an explicit original written grant for a specific asset URL."""
+    return execute(
+        db,
+        lambda: review_media_rights(
+            Research(db, session),
+            ecomm_id, body.expected_version, document_id, body.document_version,
+            body.media_url, body.media_kind, body.source_url, body.decision,
+            body.licence_basis, body.location, body.quote, body.reason,
         ),
     )
 
