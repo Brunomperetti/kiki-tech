@@ -117,6 +117,13 @@ class HTTPSFetcher:
     def get(self, hostname, ip, path, byte_limit):
         connection = _PinnedHTTPSConnection(hostname, ip)
         try:
+            # Verify the pinned TCP peer while the verified TLS socket is
+            # still attached. http.client.getresponse() may set sock=None
+            # as soon as the server sends Connection: close.
+            connection.connect()
+            remote = connection.sock.getpeername()[0]
+            if ipaddress.ip_address(remote) != ipaddress.ip_address(ip):
+                raise ValueError("Conexión no corresponde a la IP validada.")
             connection.request(
                 "GET", path,
                 headers={
@@ -128,9 +135,6 @@ class HTTPSFetcher:
                 },
             )
             result = connection.getresponse()
-            remote = connection.sock.getpeername()[0]
-            if ipaddress.ip_address(remote) != ipaddress.ip_address(ip):
-                raise ValueError("Conexión no corresponde a la IP validada.")
             if result.status != 200:
                 return Result(result.status, "", b"", remote)
             declared = result.getheader("Content-Length")

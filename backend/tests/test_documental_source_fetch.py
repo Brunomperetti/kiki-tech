@@ -292,3 +292,101 @@ def test_robots_failure_rolls_back_empty_dossier_and_never_writes_product(
         assert db.get(Dossier, "7518949") is None
         assert db.scalars(select(EcommApiProductEdit)).all() == []
         assert len(db.query(Document).all()) == 1  # preloaded synthetic sample
+
+
+
+def test_https_peer_is_verified_before_getresponse_detaches_socket(monkeypatch):
+    """Regression for production 500: server sends Connection: close.
+
+    Python's http.client.HTTPConnection.getresponse() may detach and clear
+    self.sock before returning a readable HTTPResponse. The pinned peer must
+    already have been checked, rather than dereferencing sock after response.
+    """
+    from app.services.documental import source_fetch
+
+    calls = []
+
+    class Socket:
+        def getpeername(self):
+            calls.append("getpeername")
+            return (PUBLIC_IP, 443)
+
+    class Response:
+        status = 200
+
+        def getheader(self, name, default=None):
+            return {
+                "Content-Type": "text/plain",
+                "Content-Length": "27",
+                "Content-Encoding": "identity",
+            }.get(name, default)
+
+        def read(self, limit):
+            assert limit == source_fetch.MAX_ROBOTS_BYTES + 1
+            return b"User-agent: *\nDisallow: /\n"
+
+    class Connection:
+        def __init__(self, host, ip):
+            assert host == HOST and ip == PUBLIC_IP
+            self.sock = None
+
+        def connect(self):
+            assert self.sock is None
+            self.sock = Socket()
+            calls.append("connect")
+
+        def request(self, method, path, headers):
+            assert self.sock is not None
+            assert method == "GET" and path == "/robots.txt"
+            assert headers["Connection"] == "close"
+            calls.append("request")
+
+        def getresponse(self):
+            assert self.sock is not None
+            self.sock = None  # mirrors the real stdlib closed-connection path
+            calls.append("getresponse")
+            return Response()
+
+        def close(self):
+            calls.append("close")
+
+    monkeypatch.setattr(source_fetch, "_PinnedHTTPSConnection", Connection)
+    result = source_fetch.HTTPSFetcher().get(
+        HOST, PUBLIC_IP, "/robots.txt", source_fetch.MAX_ROBOTS_BYTES,
+    )
+    assert result.status == 200
+    assert result.remote_ip == PUBLIC_IP
+    assert result.body == b"User-agent: *\nDisallow: /\n"
+    assert calls == [
+        "connect", "getpeername", "request", "getresponse", "close"
+    ]
+
+
+def test_https_rejects_mismatched_peer_before_sending_request(monkeypatch):
+    from app.services.documental import source_fetch
+
+    calls = []
+
+    class Socket:
+        def getpeername(self):
+            return ("93.184.216.35", 443)
+
+    class Connection:
+        def __init__(self, host, ip):
+            self.sock = None
+
+        def connect(self):
+            self.sock = Socket()
+
+        def request(self, *args, **kwargs):
+            calls.append("network request attempted")
+
+        def close(self):
+            calls.append("closed")
+
+    monkeypatch.setattr(source_fetch, "_PinnedHTTPSConnection", Connection)
+    with pytest.raises(ValueError, match="IP validada"):
+        source_fetch.HTTPSFetcher().get(
+            HOST, PUBLIC_IP, "/robots.txt", source_fetch.MAX_ROBOTS_BYTES,
+        )
+    assert calls == ["closed"]
