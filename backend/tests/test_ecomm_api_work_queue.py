@@ -287,66 +287,48 @@ def test_source_audit_counts_and_filters_cover_full_catalog(tmp_path):
 
 
 
-def test_research_queue_uses_only_unique_matching_excel_gtin_as_lookup_hint(tmp_path):
+def test_research_queue_uses_unique_api_barcode_and_ignores_old_excel(tmp_path):
     engine = db_fixture(tmp_path)
     with Session(engine) as db:
         stage = db.scalar(select(CatalogSnapshot).where(
             CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
         ))
-        api = deepcopy(stage.payload)
-        api[0]["items"][0]["variants"][0]["variant_description"] = "30 cápsulas"
-        api[0]["items"][1]["variants"][0]["variant_description"] = "Pack x2 60 cápsulas"
-        stage.payload = api
-        export = CatalogSnapshot(source="ECOMM_APP_GTIN_EXPORT", payload=[{
+        pages = deepcopy(stage.payload)
+        pages[0]["items"][0]["variants"][0]["variant_description"] = "30 cápsulas"
+        pages[0]["items"][0]["variants"][0]["barcode"] = "7798353193212"
+        pages[0]["items"][1]["variants"][0]["variant_description"] = "Pack x2 60 cápsulas"
+        pages[0]["items"][1]["variants"][0]["barcode"] = "8410771100656"
+        stage.payload = pages
+        db.add(CatalogSnapshot(source="ECOMM_APP_GTIN_EXPORT", payload=[{
             "version": 1, "variants": 2,
-            "rows": [
-                {"ecomm_id": "101", "sku": "2500", "gtin": "7798353193212",
-                 "status": "VALID_UNIQUE", "is_combo": False},
-                {"ecomm_id": "102", "sku": "2500400", "gtin": "8410771100656",
-                 "status": "PACK_REVIEW", "is_combo": True},
-            ],
-        }])
-        db.add(export)
+            "rows": [{"ecomm_id": "101", "sku": "wrong", "gtin": "0000000000000"}],
+        }]))
         db.commit()
         view = build_queue(db, filter_name="research_gtin_unique")
         assert view["total"] == 1
         assert view["summary"]["research_gtin_unique"] == 1
         assert view["items"][0]["ecomm_id"] == "101"
-        assert view["items"][0]["source_gtin_present"] is False
-        assert "research_gtin_unique" in view["items"][0]["flags"]
-        # The GTIN remains in evidence; it is not promoted to source API EAN.
-        assert view["items"][0]["source"]["gtin"] is None
+        assert view["items"][0]["source_gtin_present"] is True
+        assert view["items"][0]["source"]["barcode"] == "7798353193212"
         assert build_queue(db, filter_name="research_gtin_unique+pack")["total"] == 0
 
-        # Tampered export: falsely labelled "unique" but same GTIN twice.
-        bad = deepcopy(export.payload)
-        bad[0]["rows"][1]["gtin"] = bad[0]["rows"][0]["gtin"]
-        bad[0]["rows"][1]["status"] = "VALID_UNIQUE"
-        bad[0]["rows"][1]["is_combo"] = False
-        export.payload = bad
+        # An API collision invalidates uniqueness; old Excel cannot restore it.
+        bad = deepcopy(stage.payload)
+        bad[0]["items"][1]["variants"][0]["barcode"] = "7798353193212"
+        stage.payload = bad
         db.commit()
         assert build_queue(db, filter_name="research_gtin_unique")["total"] == 0
 
-        # Drift in an unrelated SKU suspends the entire Excel hint, not just that row.
-        stale = deepcopy(export.payload)
-        stale[0]["rows"][1]["sku"] = "SKU-CHANGED"
-        export.payload = stale
-        db.commit()
-        assert build_queue(db)["summary"]["research_gtin_unique"] == 0
 
-
-def test_research_queue_excludes_missing_presentation_even_with_unique_gtin(tmp_path):
+def test_research_queue_excludes_missing_presentation_even_with_api_barcode(tmp_path):
     engine = db_fixture(tmp_path)
     with Session(engine) as db:
-        db.add(CatalogSnapshot(source="ECOMM_APP_GTIN_EXPORT", payload=[{
-            "version": 1, "variants": 2,
-            "rows": [
-                {"ecomm_id": "101", "sku": "2500", "gtin": "7798353193212",
-                 "status": "VALID_UNIQUE", "is_combo": False},
-                {"ecomm_id": "102", "sku": "2500400", "gtin": "8410771100656",
-                 "status": "PACK_REVIEW", "is_combo": True},
-            ],
-        }]))
+        stage = db.scalar(select(CatalogSnapshot).where(
+            CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
+        ))
+        pages = deepcopy(stage.payload)
+        pages[0]["items"][0]["variants"][0]["barcode"] = "7798353193212"
+        stage.payload = pages
         db.commit()
         # Both synthetic API variants lack explicit variant description.
         assert build_queue(db, filter_name="research_gtin_unique")["total"] == 0
