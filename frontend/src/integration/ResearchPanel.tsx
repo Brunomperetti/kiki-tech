@@ -88,9 +88,11 @@ export function ResearchPanel({
   workspaceVersion,
   autoStart,
   onStarted,
+  media,
 }: {
   id: string;
   csrf: string;
+  media: Array<{ kind: "IMAGE" | "VIDEO"; url: string; source_url: string; alt: string }>;
   onBusy: (busy: boolean) => void;
   workspaceVersion: number;
   autoStart: number;
@@ -102,6 +104,10 @@ export function ResearchPanel({
   const [selected, select] = useState("alm-tecnica");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [identityReason, setIdentityReason] = useState("");
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaLocation, setMediaLocation] = useState("");
+  const [mediaReason, setMediaReason] = useState("");
+  const [licenceBasis, setLicenceBasis] = useState<"OWNER_AUTHORIZATION" | "DOCUMENTED_LICENSE">("OWNER_AUTHORIZATION");
   const [busy, setBusy] = useState(false);
   const [revision, reload] = useState(0);
   const rootRef = useRef<HTMLElement>(null);
@@ -135,6 +141,13 @@ export function ResearchPanel({
   // Trust the server-side decision bound to document version and API identity.
   // The UI must not infer a valid approval from partial metadata.
   const identityReviewCurrent = document?.identity_reconciliation?.current === true;
+  const selectedMedia = media.find((item) => item.url === mediaUrl) || media[0];
+  const mediaGrantHistory = [...(data?.history || [])].reverse().find((event) => {
+    if (event.action !== "MEDIA_RIGHTS_REVIEW" || !event.detail || !selectedMedia)
+      return false;
+    const detail = event.detail as Record<string, unknown>;
+    return detail.media_url === selectedMedia.url && detail.kind === selectedMedia.kind;
+  });
   async function mutate(path: string, body: unknown) {
     setBusy(true);
     setError("");
@@ -189,6 +202,29 @@ export function ResearchPanel({
         document_version: document.version,
         decision,
         reason: identityReason.trim(),
+      },
+    );
+  }
+  async function reviewMediaRights(decision: "APPROVED" | "REVOKED") {
+    if (!data || !document || !selectedMedia || !window.confirm(
+      decision === "APPROVED"
+        ? "¿Revisaste el documento original y comprobaste el permiso explícito de uso comercial para esta URL exacta? Esto registra tu revisión, no publica ni verifica automáticamente la titularidad."
+        : "¿Revocar esta autorización de uso? La ficha dejará de cumplir el control para canales.",
+    )) return;
+    const quote = document.body.sections[mediaLocation] || "";
+    await mutate(
+      `/api/ecomm-app/workspace/${encodeURIComponent(id)}/documents/${encodeURIComponent(document.id)}/media-rights`,
+      {
+        expected_version: data.version,
+        document_version: document.version,
+        media_kind: selectedMedia.kind,
+        media_url: selectedMedia.url,
+        source_url: selectedMedia.source_url,
+        decision,
+        licence_basis: licenceBasis,
+        location: mediaLocation,
+        quote,
+        reason: mediaReason.trim(),
       },
     );
   }
@@ -411,6 +447,90 @@ export function ResearchPanel({
                     )}
                   </div>
                   <small>Si hay EAN contradictorio, pack o atributos incompatibles, el servidor rechazará la conciliación.</small>
+                </section>
+              )}
+              {production && document.body.synthetic === false && media.length > 0 && (
+                <section className="r-document" aria-label="Autorizaciones para imágenes y videos">
+                  <h4>Permisos de uso multimedia</h4>
+                  <p>
+                    La presencia de una foto o video en una web pública no concede
+                    permiso de reutilización. Seleccioná el archivo comercial y
+                    un documento original que autorice expresamente su uso.
+                    Es obligatorio conservar el texto literal y justificar la
+                    revisión; el permiso se registra para una sola URL y versión.
+                  </p>
+                  <label>
+                    Recurso de esta ficha
+                    <select aria-label="Imagen o video para revisar derechos"
+                      value={selectedMedia?.url || ""}
+                      disabled={busy}
+                      onChange={(event) => setMediaUrl(event.target.value)}>
+                      {media.map((item) => (
+                        <option key={item.kind + item.url} value={item.url}>
+                          {item.kind === "IMAGE" ? "Imagen" : "Video"} · {item.url}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Ubicación de la autorización en el documento seleccionado
+                    <select aria-label="Fragmento original con permiso de uso"
+                      value={mediaLocation} disabled={busy}
+                      onChange={(event) => setMediaLocation(event.target.value)}>
+                      <option value="">Elegí el fragmento que autoriza el uso</option>
+                      {Object.entries(document.body.sections).map(([location, quote]) => (
+                        <option key={location} value={location}>
+                          {location} · {quote.slice(0, 85)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {mediaLocation && (
+                    <blockquote>{document.body.sections[mediaLocation]}</blockquote>
+                  )}
+                  <label>
+                    Base de autorización
+                    <select aria-label="Base del permiso multimedia"
+                      disabled={busy} value={licenceBasis}
+                      onChange={(event) => setLicenceBasis(
+                        event.target.value as "OWNER_AUTHORIZATION" | "DOCUMENTED_LICENSE"
+                      )}>
+                      <option value="OWNER_AUTHORIZATION">Autorización expresa del titular</option>
+                      <option value="DOCUMENTED_LICENSE">Licencia documentada para uso comercial</option>
+                    </select>
+                  </label>
+                  <label>
+                    Motivo de revisión y alcance del permiso
+                    <textarea aria-label="Justificación del permiso multimedia"
+                      minLength={25} maxLength={600} value={mediaReason}
+                      onChange={(event) => setMediaReason(event.target.value)}
+                    />
+                  </label>
+                  {mediaGrantHistory && (
+                    <p role="note">
+                      Última decisión registrada para este recurso:{" "}
+                      {String((mediaGrantHistory.detail as Record<string, unknown>).decision)}
+                      . Puede perder vigencia si cambia el documento, el archivo
+                      o la identidad. KIKI comprueba esa vigencia al preparar la ficha.
+                    </p>
+                  )}
+                  <div className="r-actions">
+                    <button type="button" disabled={
+                      busy || !selectedMedia || !mediaLocation ||
+                      mediaReason.trim().length < 25 ||
+                      document.body.source?.review_state !== "REVIEWED"
+                    } onClick={() => void reviewMediaRights("APPROVED")}>
+                      Registrar permiso documentado
+                    </button>
+                    <button type="button" disabled={
+                      busy || !selectedMedia || !mediaLocation ||
+                      mediaReason.trim().length < 25 ||
+                      !mediaGrantHistory ||
+                      (mediaGrantHistory.detail as Record<string, unknown>).decision !== "APPROVED"
+                    } onClick={() => void reviewMediaRights("REVOKED")}>
+                      Revocar permiso
+                    </button>
+                  </div>
                 </section>
               )}
               {document.issues.length > 0 && (
