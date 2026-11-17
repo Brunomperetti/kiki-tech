@@ -207,7 +207,7 @@ def test_guard_blocks_manual_verified_checkbox_without_archived_source(
     "invented_long_description", "invented_short_description",
     "invented_details", "invented_seo_title",
     "invented_seo_description", "invented_seo_keywords",
-    "invented_brand", "invented_manufacturer",
+    "invented_brand", "invented_manufacturer", "unverified_ean",
 ])
 def test_guard_fails_closed_on_absent_or_invalid_source(
     tmp_path, monkeypatch, mutation
@@ -245,6 +245,10 @@ def test_guard_fails_closed_on_absent_or_invalid_source(
             fields["attributes"].append({
                 "name": "Sin gluten", "value": "Sí",
             })
+        elif mutation == "unverified_ean":
+            # An apparently valid barcode from a retailer/Excel is NOT a
+            # manufacturer-reviewed individual EAN for the exact SKU.
+            fields["proposed_gtin"] = "7798180790097"
         elif mutation.startswith("invented_"):
             key = {
                 "invented_long_description": "description",
