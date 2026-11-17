@@ -184,10 +184,6 @@ export function BatchPanel({
   async function run() {
     if (!batch) return;
     await act(async () => {
-      if (!batch.autonomous)
-        throw new Error(
-          "El backend no tiene habilitada la ejecución autónoma; no se confirmó el lote.",
-        );
       await api(`/${batch.id}/start`, csrf, {
         confirm: true,
         expected_revision: batch.revision,
@@ -198,7 +194,20 @@ export function BatchPanel({
       await list();
     });
   }
+  async function processManualStep() {
+    if (!batch || batch.autonomous || !["PENDING", "RUNNING"].includes(batch.state))
+      return;
+    await act(async () => {
+      // Explicit single bounded backend step. Never starts a browser-side
+      // loop or an always-on executor; the operator controls every group.
+      await api(`/${batch.id}/step`, csrf, { resume_interrupted: false });
+      await detail(batch.id);
+      await list();
+    });
+  }
   useEffect(() => {
+    // Never poll the backend every 1.5s when the operator closed the drawer.
+    if (!expanded) return;
     const timer = window.setInterval(() => {
       list().catch((e) => {
         if (mounted.current) setError(e.message);
@@ -213,7 +222,7 @@ export function BatchPanel({
         });
     }, 1500);
     return () => window.clearInterval(timer);
-  }, [batch?.id, batch?.state, batch?.page, batch?.cancel_requested, jobsPage]);
+  }, [expanded, batch?.id, batch?.state, batch?.page, batch?.cancel_requested, jobsPage]);
   useEffect(() => {
     if (!expanded) return;
     const previous = document.body.style.overflow;
@@ -290,7 +299,7 @@ export function BatchPanel({
             dialogLabel="Lotes editoriales"
             closeLabel="Cerrar lotes"
             title="Trabajo por lotes"
-            subtitle="La ejecución continúa en el backend aunque cierres este panel o el navegador."
+            subtitle="Los pasos manuales se ejecutan solamente cuando pulsás Procesar siguiente grupo. No hay trabajador permanente ni publicaciones automáticas."
             thumbnail={<span className="d-thumbnail">≡</span>}
             caption="OPERACIÓN DEL CATÁLOGO"
             closeRef={closeRef}
@@ -404,12 +413,22 @@ export function BatchPanel({
                     {batch.state === "PREVIEW" && (
                       <button
                         className="d-primary"
-                        disabled={locked || !batch.autonomous}
+                        disabled={locked}
                         onClick={run}
                       >
-                        Confirmar e iniciar lote
+                        {batch.autonomous ? "Confirmar e iniciar lote" : "Confirmar lote para procesar por pasos"}
                       </button>
                     )}
+                    {!batch.autonomous &&
+                      ["PENDING", "RUNNING"].includes(batch.state) && (
+                        <button
+                          className="d-primary"
+                          disabled={locked || batch.cancel_requested}
+                          onClick={processManualStep}
+                        >
+                          Procesar siguiente grupo (hasta 5 variantes)
+                        </button>
+                      )}
                     {batch.state === "PREPARING" && (
                       <p role="status">
                         Analizando {batch.progress.prepared} de {batch.total}{" "}
