@@ -285,7 +285,7 @@ export function IntegrationCatalog() {
     pendingGapJump.current = null;
     element.scrollIntoView({ block: "start", behavior: "auto" });
     element.focus({ preventScroll: true });
-  }, [view, filter, linkage, invalid]);
+  }, [view, filter, linkage, invalid, !!data]);
   function backToGapSummary() {
     document.getElementById("kiki-channel-summary")?.scrollIntoView({
       block: "start", behavior: "auto",
