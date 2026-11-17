@@ -39,6 +39,13 @@ def _commercial_coverage(research, item, fields, approved):
         if not fields.get(key) or values != [fields[key]]:
             missing.append(key)
 
+    # The editor's checksum validation only checks the format. It cannot
+    # establish that an individual EAN belongs to this exact SKU. A candidate
+    # from the Excel export is never enough to pass this gate.
+    proposed_gtin = fields.get("proposed_gtin") or ""
+    if proposed_gtin and approved.get("ean") != [proposed_gtin]:
+        missing.append("proposed_gtin_unverified")
+
     # A label typed by the operator is not provenance. Every display attribute
     # must correspond exactly to one current, approved, source-quoted fact.
     required_attributes = []
