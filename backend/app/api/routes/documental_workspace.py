@@ -9,6 +9,7 @@ from app.core.security import require_session, require_csrf
 from app.database.session import get_db
 from app.services.documental.research import Research
 from app.services.documental.proposals import Proposals
+from app.services.documental.source_links import suggest_reviewed_sources
 from app.services.documental.local_documents import LocalDocuments, parse_local, reader_available
 from app.services.documental.source_fetch import fetch_html
 from app.services.documental.contracts import (
@@ -56,6 +57,17 @@ def evidence(
         return service.serialize(service.dossier(ecomm_id))
 
     return execute(db, operation)
+
+
+@router.get("/{ecomm_id}/sources/suggestions")
+def suggest_sources(
+    ecomm_id: str, db: Session = Depends(get_db), session=Depends(require_session)
+):
+    """No publication, approval, source upload or commercial write."""
+    return execute(
+        db,
+        lambda: suggest_reviewed_sources(Research(db, session), ecomm_id),
+    )
 
 
 @router.post("/{ecomm_id}/evidence/extract")
