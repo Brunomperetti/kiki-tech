@@ -163,9 +163,13 @@ def _product_match(row, url):
     matched = sorted(words & slug)
     if not matched or (numbers and not numbers.issubset(slug)):
         return None
-    # Prefer multiple descriptive tokens, but one distinctive token remains
-    # a candidate only, never an identity approval or verified manufacturer.
-    if len(matched) == 1 and len(matched[0]) < 5:
+    # A brand alone cannot match every other product of that brand.
+    # Multiple descriptive words require at least two literal overlaps;
+    # a single word needs to be distinctive. This still yields candidates
+    # only, never verified identity or commercial facts.
+    if (len(words) > 1 and len(matched) < 2) or (
+        len(words) == 1 and (not matched or len(matched[0]) < 5)
+    ):
         return None
     description_numbers = {
         token for token in _tokens(row.get("variant_description"))
