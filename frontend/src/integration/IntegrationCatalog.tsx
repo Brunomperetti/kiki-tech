@@ -126,7 +126,6 @@ export function IntegrationCatalog() {
   const [error, setError] = useState<CatalogError>();
   const [loading, setLoading] = useState(false);
   const [revision, retry] = useState(0);
-  const [gtinRevision, setGtinRevision] = useState(0);
   const q = params.get("q") || "";
   const filter = (params.get("filter") || "all") as QueueFilter;
   const view = (params.get("view") || "ecomm") as CommercialView;
@@ -696,7 +695,7 @@ export function IntegrationCatalog() {
         onForward={(channel) => navigateGap(channel, "forward")}
         onReverse={(channel) => navigateGap(channel, "reverse")}
       />
-      {session && <GtinExportPanel csrf={session.csrf_token} onImported={() => { setGtinRevision(n => n + 1); retry(n => n + 1); }} />}
+      {session && <GtinExportPanel csrf={session.csrf_token} />}
       <section
         aria-label="Cobertura por canal"
         className="i-commercial-overview"
@@ -780,7 +779,7 @@ export function IntegrationCatalog() {
         <section className="i-more-metrics i-quality" aria-label="Calidad del catálogo">
           <h3>Auditoría real del inventario Ecomm-App</h3>
           <p className="s-count-note">
-            Se analizan todas las variantes de la captura API y los GTIN del Excel, no solamente
+            Se analizan todas las variantes y códigos de la captura API, no solamente
             las fichas editadas en KIKI. Tocá un indicador para ver los productos correspondientes.
           </p>
           <div className="k-quality-metrics" role="group" aria-label="Auditoría de datos del inventario">
@@ -847,7 +846,7 @@ export function IntegrationCatalog() {
             <p className="s-count-note">
               Imágenes y categorías no se conservan en la captura actual de KIKI:
               no podemos afirmar cuántos productos las tienen o no en Ecomm-App.
-              Los GTIN del Excel se incorporan solo con Ecomm ID y SKU coincidentes.
+              Los códigos de barras se consultan únicamente desde la API de Ecomm-App.
             </p>
           </details>
           <details className="i-more-metrics">
@@ -1521,7 +1520,7 @@ export function IntegrationCatalog() {
         >
           <PersistentWorkspace
             gtinEvidence={
-              <GtinExportEvidence ecommId={selected.id} revision={gtinRevision} />
+              <GtinExportEvidence ecommId={selected.id} />
             }
             key={selected.id}
             proposalId={
