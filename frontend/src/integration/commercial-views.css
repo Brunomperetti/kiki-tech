@@ -1,3 +1,38 @@
+.k-gap-result-target {
+  scroll-margin-top: 16px;
+  outline-offset: 4px;
+}
+.k-gap-result-target:focus {
+  outline: 2px solid #497a63;
+}
+.k-gap-list-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px solid #b6cdb9;
+  border-radius: 9px;
+  background: #f5f9f3;
+  color: #234f40;
+  font-size: 13px;
+}
+.k-gap-list-banner strong {
+  flex: 1 1 230px;
+}
+.k-gap-list-banner span {
+  flex: 2 1 300px;
+}
+.k-gap-list-banner button {
+  border: 1px solid #b6cdb9;
+  background: white;
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: inherit;
+  cursor: pointer;
+}
 .k-commercial-views {
   display: flex;
   gap: 7px;

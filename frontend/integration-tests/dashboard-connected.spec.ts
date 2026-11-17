@@ -372,3 +372,42 @@ for (const suffix of [
     await expect(rows(page)).toHaveCount(0);
   });
 }
+
+
+test("cuatro atajos Ver lista llevan a la lista exacta, limpian búsqueda y permiten volver", async ({
+  page,
+}) => {
+  await login(page);
+  const overview = page.getByLabel("Diferencias principales entre catálogos");
+  const cards = overview.locator(".k-business-gap-card");
+  await expect(cards).toHaveCount(4);
+  const cases = [
+    { idx: 0, path: /filter=ml_comparison_no_match/, selector: "#kiki-catalog-results",
+      label: /Lista: Ecomm-App sin coincidencia en Mercado Libre/ },
+    { idx: 1, path: /filter=tn_comparison_no_match/, selector: "#kiki-catalog-results",
+      label: /Lista: Ecomm-App sin coincidencia en Tiendanube/ },
+    { idx: 2, path: /view=ml.*linkage=no_match/, selector: "#kiki-channel-results",
+      label: /Lista: Mercado Libre sin candidato en Ecomm-App/ },
+    { idx: 3, path: /view=tn.*linkage=no_match/, selector: "#kiki-channel-results",
+      label: /Lista: Tiendanube sin candidato en Ecomm-App/ },
+  ];
+  for (const current of cases) {
+    // Existing search cannot silently narrow a global indicator.
+    await page.getByLabel("Buscar productos", { exact: true }).fill("Lentejas");
+    await page.getByRole("button", { name: "Buscar", exact: true }).click();
+    await cards.nth(current.idx).click();
+    await expect(page).toHaveURL(current.path);
+    await expect(page).not.toHaveURL(/[?&]q=/);
+    const list = page.locator(current.selector);
+    await expect(list).toBeFocused();
+    await expect(list).toContainText(current.label);
+    const visibleCount = Number((await cards.nth(current.idx).locator("strong").innerText())
+      .replace(/\./g, ""));
+    const shownCount = list.locator(".k-gap-list-banner");
+    await expect(shownCount).toContainText(
+      new Intl.NumberFormat("es-AR").format(visibleCount),
+    );
+    await list.getByRole("button", { name: "Volver a indicadores" }).click();
+    await expect(overview).toBeInViewport();
+  }
+});

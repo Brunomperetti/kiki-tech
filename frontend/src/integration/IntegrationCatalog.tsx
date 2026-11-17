@@ -201,7 +201,13 @@ export function IntegrationCatalog() {
   const panelRef = useRef<HTMLElement>(null);
   const navigationPermit = useRef<string | null>(null);
   const navigationAttempt = useRef<string | null>(null);
-  function update(values: Record<string, string>) {
+  // A dashboard shortcut must land on its resulting list, not stay up at the cards.
+  const pendingGapJump = useRef<{
+    view: CommercialView;
+    filter: QueueFilter;
+    linkage: string;
+  } | null>(null);
+  function update(values: Record<string, string>): boolean {
     if (values.filter !== undefined && !("view" in values)) {
       const parts = values.filter.split("+");
       values = {
@@ -244,10 +250,46 @@ export function IntegrationCatalog() {
             "Hay cambios sin guardar. ¿Descartarlos y continuar?",
           )))
     )
-      return;
+      return false;
     navigationAttempt.current = null;
     navigationPermit.current = next.toString();
     setParams(next);
+    return true;
+  }
+  function navigateGap(channel: "ml" | "tn", direction: "forward" | "reverse") {
+    const nextFilter = direction === "forward" ? `${channel}_comparison_no_match` as QueueFilter : "all";
+    const nextView: CommercialView = direction === "forward" ? "ecomm" : channel;
+    const nextLinkage = direction === "reverse" ? "no_match" : "all";
+    const navigated = update({
+      filter: direction === "forward" ? nextFilter : "",
+      view: direction === "reverse" ? channel : "",
+      linkage: direction === "reverse" ? "no_match" : "",
+      // These are *global* gap counts. An earlier search must not silently
+      // narrow the list the user opened from the dashboard.
+      q: "", page: "", product: "", tab: "", proposal: "",
+    });
+    if (navigated) pendingGapJump.current = {
+      view: nextView, filter: nextFilter, linkage: nextLinkage,
+    };
+  }
+  useEffect(() => {
+    const target = pendingGapJump.current;
+    if (
+      !target || invalid || target.view !== view ||
+      target.filter !== filter || target.linkage !== linkage
+    ) return;
+    const element = document.getElementById(
+      target.view === "ecomm" ? "kiki-catalog-results" : "kiki-channel-results",
+    );
+    if (!element) return;
+    pendingGapJump.current = null;
+    element.scrollIntoView({ block: "start", behavior: "auto" });
+    element.focus({ preventScroll: true });
+  }, [view, filter, linkage, invalid, !!data]);
+  function backToGapSummary() {
+    document.getElementById("kiki-channel-summary")?.scrollIntoView({
+      block: "start", behavior: "auto",
+    });
   }
   function close() {
     update({ product: "", tab: "" });
@@ -651,13 +693,8 @@ export function IntegrationCatalog() {
         filter={filter}
         view={view}
         linkage={linkage}
-        onForward={(channel) => update({
-          filter: `${channel}_comparison_no_match`,
-          view: "", linkage: "", page: "", product: "", tab: "",
-        })}
-        onReverse={(channel) => update({
-          view: channel, filter: "", linkage: "no_match", q: "", page: "", product: "", tab: "",
-        })}
+        onForward={(channel) => navigateGap(channel, "forward")}
+        onReverse={(channel) => navigateGap(channel, "reverse")}
       />
       {session && <GtinExportPanel csrf={session.csrf_token} onImported={() => { setGtinRevision(n => n + 1); retry(n => n + 1); }} />}
       <section
@@ -976,7 +1013,28 @@ export function IntegrationCatalog() {
           </section>
         </details>
       </section>
-      <section className="d-catalog" aria-label="Catálogo Ecomm-App">
+      <section
+        id="kiki-catalog-results"
+        tabIndex={-1}
+        className="d-catalog k-gap-result-target"
+        aria-label="Catálogo Ecomm-App"
+      >
+        {(filter === "ml_comparison_no_match" || filter === "tn_comparison_no_match") && (
+          <div className="k-gap-list-banner" role="status">
+            <strong>
+              Lista: Ecomm-App sin coincidencia en {
+                filter.startsWith("ml_") ? "Mercado Libre" : "Tiendanube"
+              }
+            </strong>
+            <span>
+              {loading ? "Consultando…" : data ? `${data.matches.toLocaleString("es-AR")} variantes` : "No disponible"}
+              {" · "}Comparación con capturas históricas, no publicaciones actuales.
+            </span>
+            <button type="button" onClick={backToGapSummary}>
+              Volver a indicadores
+            </button>
+          </div>
+        )}
         <div className="i-catalog-heading">
           <div>
             <h2>Mi catálogo</h2>
@@ -1134,6 +1192,7 @@ export function IntegrationCatalog() {
             linkage={linkage}
             onChange={update}
             onOpen={(id) => update({ product: id, tab: "Canales" })}
+            onBack={backToGapSummary}
           />
         )}
         {data && !external && (

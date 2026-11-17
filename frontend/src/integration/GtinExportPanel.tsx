@@ -7,6 +7,7 @@ type Summary = {
   current?: boolean;
   variants?: number;
   api_variants?: number;
+  api_barcodes_present?: number;
   valid_unique?: number;
   valid_repeated?: number;
   pack_review?: number;
@@ -86,13 +87,14 @@ export function GtinExportPanel({
         <p>{summary?.current
           ? <><b>{usable.toLocaleString("es-AR")} códigos con GTIN válido</b> de {summary.variants?.toLocaleString("es-AR")} variantes · {missingOrInvalid.toLocaleString("es-AR")} sin GTIN válido.</>
           : summary?.available
-            ? "La captura API cambió desde que se incorporó el Excel; hay que recotejarlo."
-            : "La API no entrega GTIN; podés incorporarlos desde la exportación oficial."}
+            ? <>La captura API actual informa <b>{(summary.api_barcodes_present ?? 0).toLocaleString("es-AR")} barcode</b> de {summary.api_variants?.toLocaleString("es-AR")} variantes. El Excel anterior está desactualizado; no hace falta recargarlo para ver los códigos ya informados por API.</>
+            : "Comprobá primero los barcode que entrega la API. El Excel es respaldo para las variantes sin código."}
         </p>
       </div>
       <span>{summary?.current ? "Excel incorporado" : summary?.available ? "Revisar exportación" : "Sin exportación"}</span>
     </div>
     {summary?.current && <small className="k-gtin-note">Dentro de los válidos: {summary.valid_unique?.toLocaleString("es-AR")} únicos no combo · {summary.valid_repeated?.toLocaleString("es-AR")} repetidos · {summary.pack_review?.toLocaleString("es-AR")} packs para revisión. Fuente: Excel Ecomm-App · {date(summary.imported_at)}.</small>}
+    <BarcodeApiCheck csrf={csrf} />
     <details className="k-gtin-upload">
       <summary>{summary?.available ? "Ver origen / actualizar GTIN" : "Incorporar Excel de Ecomm-App"}</summary>
       {summary?.available && <p>Archivo: {summary.source_filename}. Los GTIN de exportación no son una confirmación de la API y nunca aprueban publicaciones automáticamente.</p>}
@@ -139,4 +141,121 @@ export function GtinExportEvidence({ ecommId, revision }: { ecommId: string; rev
       : <p>La captura API cambió. Los GTIN del archivo quedaron suspendidos hasta recotejar.</p>)
       : <p>El GTIN todavía no se incorporó. Cargá el Excel desde el resumen de catálogo.</p>)}
   </section>;
+}
+
+
+type LiveSkuMatch = {
+  variant_id: number | string | null;
+  variant_sku: string;
+  barcode_field_present: boolean;
+  barcode: string | number | null;
+  gtin_field_present: boolean;
+  gtin: string | number | null;
+};
+type LiveSkuReport = {
+  mode: "READ_ONLY_SKU_LOOKUP";
+  requested_skus: string[];
+  sku_diagnosis: {
+    shape_recognized: boolean;
+    requested: {
+      sku: string;
+      status: "UNKNOWN_SHAPE" | "MULTIPLE_EXACT" | "EXACT_SINGLE" | "NO_EXACT";
+      matches: LiveSkuMatch[];
+    }[];
+  };
+};
+
+function BarcodeApiCheck({ csrf }: { csrf: string }) {
+  const [sku, setSku] = useState("6317");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<{
+    sku: string;
+    identity: string;
+    message: string;
+    detail: string;
+  }>();
+  const sampleBarcode = "7793396000039";
+
+  async function verify() {
+    const requested = sku.trim();
+    if (!requested || requested.length > 128 || busy) return;
+    setResult(undefined);
+    setError("");
+    setBusy(true);
+    try {
+      const response = await request("/api/ecomm-app/lookup", {
+        method: "POST",
+        headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+        body: JSON.stringify({ skus: [requested] }),
+      });
+      const report = await response.json() as LiveSkuReport;
+      const found = report.sku_diagnosis?.requested?.[0];
+      if (
+        report.mode !== "READ_ONLY_SKU_LOOKUP" ||
+        report.requested_skus?.length !== 1 ||
+        report.requested_skus[0] !== requested ||
+        found?.sku !== requested ||
+        !Array.isArray(found.matches)
+      ) throw new Error("La API respondió con un formato no comprobable.");
+      if (found.status !== "EXACT_SINGLE" || found.matches.length !== 1) {
+        setResult({
+          sku: requested, identity: "Sin variante única confirmada",
+          message: found.status === "NO_EXACT"
+            ? "La API no encontró el SKU exacto."
+            : found.status === "MULTIPLE_EXACT"
+              ? "Hay más de una variante con ese SKU. Debemos revisar los Ecomm ID antes de elegir un barcode."
+              : "La forma de la respuesta todavía requiere revisión.",
+          detail: "No se incorporó ni modificó información de la captura.",
+        });
+        return;
+      }
+      const exact = found.matches[0];
+      const code = exact.barcode === null || exact.barcode === undefined
+        ? "" : String(exact.barcode).trim();
+      const expected = requested === "6317" ? sampleBarcode : null;
+      setResult({
+        sku: requested,
+        identity: `Ecomm ID ${exact.variant_id ?? "no informado"}`,
+        message: !exact.barcode_field_present
+          ? "Ecomm-App todavía no devuelve la clave variants[].barcode para este SKU."
+          : !code
+            ? "Ecomm-App devuelve barcode: null o vacío para este SKU."
+            : expected && code === expected
+              ? `Comprobación correcta: la API devuelve barcode ${code}, igual al código esperado.`
+              : expected
+                ? `Atención: la API devuelve barcode ${code}, distinto del esperado ${expected}.`
+                : `La API devuelve barcode ${code} para esta variante.`,
+        detail: `Consulta directa a Ecomm-App, sin Excel ni caché de catálogo. Campo gtin: ${exact.gtin_field_present ? String(exact.gtin ?? "null") : "ausente"}. No se guardó ni actualizó ninguna ficha.`,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo consultar Ecomm-App.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <details className="k-gtin-upload" aria-label="Comprobación directa de barcode">
+    <summary>Comprobar barcode ahora en la API (solo lectura)</summary>
+    <p>Consulta una variante exacta en Ecomm-App con el token existente. No actualiza el catálogo, stock ni publicaciones.</p>
+    <label>
+      SKU de Ecomm-App
+      <input
+        aria-label="SKU para comprobar barcode en la API"
+        value={sku}
+        maxLength={128}
+        disabled={busy}
+        onChange={event => { setSku(event.target.value); setError(""); setResult(undefined); }}
+      />
+    </label>
+    <button type="button" disabled={busy || !sku.trim() || !canWrite()} onClick={() => void verify()}>
+      {busy ? "Consultando API…" : "Comprobar barcode en vivo"}
+    </button>
+    {result && <div role="status" className="k-gtin-success">
+      <strong>{result.sku} · {result.identity}</strong>
+      <p>{result.message}</p>
+      <small>{result.detail}</small>
+    </div>}
+    {error && <p role="alert" className="k-gtin-error">{error}</p>}
+  </details>;
 }

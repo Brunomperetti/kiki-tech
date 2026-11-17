@@ -224,6 +224,21 @@ def _requested_sku_diagnosis(data: object, requested: list[str]) -> dict:
                     "variant_is_combo": variant.get("is_combo") if isinstance(variant.get("is_combo"), bool) else None,
                     "total_stock": variant.get("total_stock"),
                     "variant_description": variant.get("variant_description"),
+                    # Preserve presence separately from value. A missing key,
+                    # explicit null and a populated barcode are different API
+                    # outcomes; no Excel or KIKI fallback in this live check.
+                    "barcode_field_present": "barcode" in variant,
+                    "barcode": variant.get("barcode") if isinstance(
+                        variant.get("barcode"), (str, int)
+                    ) and not isinstance(variant.get("barcode"), bool) else None,
+                    "gtin_field_present": "gtin" in variant,
+                    "gtin": variant.get("gtin") if isinstance(
+                        variant.get("gtin"), (str, int)
+                    ) and not isinstance(variant.get("gtin"), bool) else None,
+                    "ean_field_present": "ean" in variant,
+                    "ean": variant.get("ean") if isinstance(
+                        variant.get("ean"), (str, int)
+                    ) and not isinstance(variant.get("ean"), bool) else None,
                 })
             else:
                 sibling_variants += 1

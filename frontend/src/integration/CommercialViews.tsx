@@ -153,6 +153,7 @@ export function ChannelListings({
   linkage,
   onChange,
   onOpen,
+  onBack,
   local,
 }: {
   channel: "ml" | "tn";
@@ -162,6 +163,7 @@ export function ChannelListings({
   linkage: string;
   onChange: (v: Record<string, string>) => void;
   onOpen: (id: string) => void;
+  onBack?: () => void;
   local?: Listings;
 }) {
   const [data, setData] = useState<Listings>(),
@@ -185,9 +187,26 @@ export function ChannelListings({
   }, [channel, q, page, limit, linkage, local]);
   return (
     <section
-      className="k-listings"
+      id="kiki-channel-results"
+      tabIndex={-1}
+      className="k-listings k-gap-result-target"
       aria-label={`Registros ${channel === "ml" ? "Mercado Libre" : "Tiendanube"}`}
     >
+      {linkage === "no_match" && (
+        <div className="k-gap-list-banner" role="status">
+          <strong>
+            Lista: {channel === "ml" ? "Mercado Libre" : "Tiendanube"} sin
+            candidato en Ecomm-App
+          </strong>
+          <span>
+            {data ? `${data.matches.toLocaleString("es-AR")} registros` : "Consultando…"}
+            {" · "}Comparación histórica, no estado actual del canal.
+          </span>
+          {onBack && (
+            <button type="button" onClick={onBack}>Volver a indicadores</button>
+          )}
+        </div>
+      )}
       <h3>{commercialViews[channel]}</h3>
       <p>
         Registros propios del canal, incluidos los que no tienen Ecomm ID
