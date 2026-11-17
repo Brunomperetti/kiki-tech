@@ -202,6 +202,12 @@ class Research:
             ("manufacturer", "Fabricante"),
         ]:
             expected, actual = reference.get(key), body["identity"].get(key)
+            # A manufacturer's product page can identify the exact unit
+            # without printing its barcode. Do not turn an API/Excel EAN
+            # into a manufacturer-approved claim or require it on every page.
+            # An explicit *different* EAN remains an identity blocker.
+            if key == "ean" and not actual:
+                continue
             if expected and (
                 not actual
                 or str(expected).strip().casefold() != str(actual).strip().casefold()
