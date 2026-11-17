@@ -7,6 +7,7 @@ type Summary = {
   current?: boolean;
   variants?: number;
   api_variants?: number;
+  api_barcodes_present?: number;
   valid_unique?: number;
   valid_repeated?: number;
   pack_review?: number;
@@ -86,8 +87,8 @@ export function GtinExportPanel({
         <p>{summary?.current
           ? <><b>{usable.toLocaleString("es-AR")} códigos con GTIN válido</b> de {summary.variants?.toLocaleString("es-AR")} variantes · {missingOrInvalid.toLocaleString("es-AR")} sin GTIN válido.</>
           : summary?.available
-            ? "La captura API cambió desde que se incorporó el Excel; hay que recotejarlo."
-            : "La API no entrega GTIN; podés incorporarlos desde la exportación oficial."}
+            ? <>La captura API actual informa <b>{(summary.api_barcodes_present ?? 0).toLocaleString("es-AR")} barcode</b> de {summary.api_variants?.toLocaleString("es-AR")} variantes. El Excel anterior está desactualizado; no hace falta recargarlo para ver los códigos ya informados por API.</>
+            : "Comprobá primero los barcode que entrega la API. El Excel es respaldo para las variantes sin código."}
         </p>
       </div>
       <span>{summary?.current ? "Excel incorporado" : summary?.available ? "Revisar exportación" : "Sin exportación"}</span>
