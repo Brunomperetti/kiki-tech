@@ -65,9 +65,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install 'psycopg[binary]==3.2.3'
+      - run: python -m pip install 'psycopg[binary]==3.2.3' 'sqlalchemy==2.0.36'
       - name: Check migration safety on an ephemeral database
         working-directory: backend
         env:
           KIKI_CI_SYNTHETIC_ONLY: "1"
         run: python -m integration_sandbox.ci_migration_smoke
+      - name: Test opt-in startup migration against disposable PG18
+        working-directory: backend
+        env:
+          KIKI_CI_SYNTHETIC_ONLY: "1"
+        run: python -m integration_sandbox.ci_one_time_bootstrap_smoke
