@@ -89,6 +89,13 @@ def install_fake_source(db):
         claim = evidence(field, value, location)
         body["claims"].append(claim)
         body["sections"][location] = claim["quote"]
+    # The media permission is entirely fictional but explicit and bound to
+    # this image URL; a public product page alone is NOT a licence.
+    media_grant = (
+        "Licencia: El titular autoriza el uso comercial de "
+        "https://fabricante-prueba.invalid/imagen.png en catálogo KIKI."
+    )
+    body["sections"]["texto/linea/6"] = media_grant
     # Keep the fictional original bytes consistent with its own quoted lines.
     # This still is NOT a manufacturer file or an actual source approval.
     raw = "\n".join(body["sections"].values()).encode("utf-8")
@@ -134,6 +141,17 @@ def install_fake_source(db):
             IDENT, current.version, fact["id"], fact["version"], "APPROVED",
             "Cita documental de prueba verificada en archivo original ficticio.",
         )
+    # Permission requires its own human-reviewed decision, separate from
+    # source authenticity and each approved commercial fact.
+    from app.services.documental.media_rights import review_media_rights
+    item = research.dossier(IDENT)
+    review_media_rights(
+        research, IDENT, item.version, doc.id, doc.version,
+        "https://fabricante-prueba.invalid/imagen.png", "IMAGE", URL,
+        "APPROVED", "OWNER_AUTHORIZATION",
+        "texto/linea/6", media_grant,
+        "Licencia sintética contrastada explícitamente por el operador de prueba.",
+    )
     return doc, user
 
 
@@ -180,6 +198,7 @@ def test_guard_blocks_manual_verified_checkbox_without_archived_source(
     "pending_source", "unverified_source_checkbox", "wrong_presentation",
     "wrong_short_title", "wrong_sku", "fake_document",
     "unapproved_attribute", "wrong_category", "wrong_subcategory",
+    "unapproved_media", "revoked_media_rights",
 ])
 def test_guard_fails_closed_on_absent_or_invalid_source(
     tmp_path, monkeypatch, mutation
@@ -217,6 +236,23 @@ def test_guard_fails_closed_on_absent_or_invalid_source(
             fields["attributes"].append({
                 "name": "Sin gluten", "value": "Sí",
             })
+        elif mutation == "unapproved_media":
+            fields["media"].append({
+                "kind": "IMAGE",
+                "url": "https://fabricante-prueba.invalid/imagen-2.png",
+                "alt": "Sin licencia específica",
+                "source_url": URL,
+            })
+        elif mutation == "revoked_media_rights":
+            from app.services.documental.media_rights import review_media_rights
+            current = Research(db, user).dossier(IDENT)
+            review_media_rights(
+                Research(db, user), IDENT, current.version, doc.id, doc.version,
+                "https://fabricante-prueba.invalid/imagen.png", "IMAGE",
+                URL, "REVOKED", "OWNER_AUTHORIZATION",
+                "texto/linea/6", doc.body["sections"]["texto/linea/6"],
+                "Revoco la licencia ficticia previamente aprobada para esta imagen.",
+            )
         elif mutation == "wrong_sku":
             stage = db.scalar(select(CatalogSnapshot).where(
                 CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
@@ -265,7 +301,8 @@ def test_original_with_approved_identity_allows_guarded_channel_ready(
         report = require_primary_evidence(db, user, IDENT, fields)
         assert report["commercial_coverage"]["taxonomy_supported"] is True
         assert report["commercial_coverage"]["attributes_supported"] == 1
-        assert report["commercial_coverage"]["media_rights_verified"] is False
+        assert report["commercial_coverage"]["media_rights_verified"] is True
+        assert report["commercial_coverage"]["media_resources_reviewed"] == 1
         current = Research(db, user).dossier(IDENT)
         assert len([fact for fact in current.facts if fact["state"] == "APPROVED"]) == 5
         assert db.get(Document, "local-" + "a" * 32).body["original"]["size"] > 0
