@@ -13,6 +13,7 @@ from app.services.documental.proposals import Proposals
 from app.services.documental.source_links import suggest_reviewed_sources
 from app.services.documental.local_documents import LocalDocuments, parse_local, reader_available
 from app.services.documental.source_fetch import fetch_html
+from app.services.documental.sitemap_discovery import preview_candidates
 from app.services.documental.contracts import (
     Extract,
     Review as ProposalReview,
