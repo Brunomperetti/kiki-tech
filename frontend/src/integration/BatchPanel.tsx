@@ -1,4 +1,4 @@
-import { environmentText } from "./runtime";
+import { environmentText, capabilities } from "./runtime";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { ProductDrawer } from "../prototype/CatalogView";
