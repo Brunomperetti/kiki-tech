@@ -18,6 +18,12 @@ GRANT_TERMS = re.compile(
     r"licencia\s+(?:de\s+)?uso|permiso\s+(?:de\s+)?uso)\b",
     flags=re.IGNORECASE,
 )
+NO_GRANT = re.compile(
+    r"\b(?:no\s+(?:se\s+)?autoriza|no\s+(?:se\s+)?permite|"
+    r"prohibid[oa]|sin\s+licencia|no\s+cuenta\s+con\s+autorización)\b",
+    flags=re.IGNORECASE,
+)
+COMMERCIAL_SCOPE = re.compile(r"\bcomercial(?:es)?\b", flags=re.IGNORECASE)
 
 
 def original_grant_is_current(doc, media_url, location, quote):
@@ -46,6 +52,8 @@ def original_grant_is_current(doc, media_url, location, quote):
         or len(quote) < 30
         or media_url not in quote
         or not GRANT_TERMS.search(quote)
+        or not COMMERCIAL_SCOPE.search(quote)
+        or NO_GRANT.search(quote)
         or quote not in str((body.get("sections") or {}).get(location, ""))
     ):
         return False
