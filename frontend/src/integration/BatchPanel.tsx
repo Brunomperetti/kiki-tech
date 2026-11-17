@@ -25,8 +25,8 @@ const labels: Record<string, string> = {
  * sends the visible Ecomm item title to the search engine in a new tab.
  */
 function officialSourceSearchUrl(name: string, presentation?: string): string {
-  const title = name.replace(/[\\u0000-\\u001f\\u007f]/g, " ").trim().slice(0, 140);
-  const variant = (presentation || "").replace(/[\\u0000-\\u001f\\u007f]/g, " ").trim().slice(0, 70);
+  const title = name.replace(/[\x00-\x1f\x7f]/g, " ").trim().slice(0, 140);
+  const variant = (presentation || "").replace(/[\x00-\x1f\x7f]/g, " ").trim().slice(0, 70);
   const query = [title, variant, "fabricante sitio oficial producto"].filter(Boolean).join(" ");
   const url = new URL("https://www.google.com/search");
   url.searchParams.set("q", query);
@@ -599,7 +599,7 @@ export function BatchPanel({
                           </button>
                           {!item.result.proposal_id && (
                             <>
-                              <a
+                              {item.result.preview?.name && <a
                                 href={officialSourceSearchUrl(
                                   item.result.preview?.name || "",
                                   item.result.preview?.presentation,
@@ -609,7 +609,7 @@ export function BatchPanel({
                                 title="Abre una búsqueda externa. Los resultados son candidatos, no fuentes verificadas."
                               >
                                 Buscar posible fabricante ↗
-                              </a>
+                              </a>}
                               <button
                                 type="button"
                                 disabled={locked}
