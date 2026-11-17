@@ -71,18 +71,23 @@ export function DocumentImport({
       )) throw new Error("La página guardada necesita archivo .html, URL HTTPS y fecha de consulta.");
       let encoded = "";
       if (kind === "FILE") {
+        const savedOriginalHtml = webSnapshot && !!file?.name.toLowerCase().endsWith(".html");
+        const largeOriginalLimit = 4 * 1024 * 1024;
+        const hileretOriginal = (isHileret(id) || production) &&
+          file?.size === hileretOriginalSize;
         if (
           !file ||
           !file.size ||
-          (file.size > 524288 &&
-            !(
-              (isHileret(id) || production) &&
-              file.size === hileretOriginalSize
-            ))
+          (savedOriginalHtml && file.size > largeOriginalLimit) ||
+          (file.size > 524288 && !savedOriginalHtml && !hileretOriginal)
         )
-          throw new Error("Elegí un archivo no vacío de hasta 512 KiB.");
+          throw new Error(
+            savedOriginalHtml
+              ? "El HTML original debe tener como máximo 4 MiB. No se importó."
+              : "El documento debe tener como máximo 512 KiB (salvo excepción Hileret).",
+          );
         const bytes = new Uint8Array(await file.arrayBuffer());
-        if (file.size > 524288) {
+        if (file.size > 524288 && !savedOriginalHtml) {
           const hash = Array.from(
             new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
           )
@@ -222,7 +227,9 @@ export function DocumentImport({
         <p>
           Procesamiento local aislado. No se envían archivos a terceros. PDF con
           texto (máximo 10 páginas), TXT UTF-8, HTML pasivo o captura HTML
-          guardada de una página web, y JSON estructurado; hasta 512 KiB.
+          guardada de una página web, y JSON estructurado. Máximo 512 KiB
+          para documentos comunes; HTML original guardado desde navegador:
+          hasta 4 MiB, con procesamiento aislado y límites de complejidad.
           No navega Internet, no ejecuta scripts ni verifica la autenticidad.
         </p>
         {(isHileret(id) || production) && (
