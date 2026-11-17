@@ -2,147 +2,129 @@ import { useEffect, useState } from "react";
 import { request } from "./catalog-adapter";
 import { canWrite, production } from "./runtime";
 
-type Summary = {
-  available: boolean;
-  current?: boolean;
-  variants?: number;
-  api_variants?: number;
-  api_barcodes_present?: number;
-  valid_unique?: number;
-  valid_repeated?: number;
-  pack_review?: number;
-  invalid?: number;
-  missing?: number;
-  source_filename?: string;
-  imported_at?: string;
-  note?: string;
+type ApiSummary = {
+  source: "ECOMM_APP_API_STAGE";
+  mode: "API_CAPTURE_READ_ONLY";
+  total_variants: number;
+  barcode_present: number;
+  without_api_code: number;
+  unique_non_pack_valid: number;
+  repeated: number;
+  invalid: number;
+  pack_review: number;
+  conflicts: number;
+  source_captured_at: string | null;
+  external_writes_enabled: false;
 };
-type Evidence = {
-  available: boolean;
-  current?: boolean;
-  gtin?: string | null;
-  status?: string;
-  is_combo?: boolean;
-  imported_at?: string;
-  note?: string;
-};
-const date = (s?: string) => s ? new Date(s).toLocaleString("es-AR") : "—";
 
-export function GtinExportPanel({
-  csrf,
-  onImported,
-}: {
-  csrf: string;
-  onImported?: () => void;
-}) {
-  const [summary, setSummary] = useState<Summary>();
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
+type ApiEvidence = {
+  source: "ECOMM_APP_API_STAGE";
+  mode: "API_CAPTURE_READ_ONLY";
+  ecomm_id: string;
+  sku: string;
+  name: string;
+  barcode: string | null;
+  gtin: string | null;
+  state: string;
+  captured_at: string | null;
+  manufacturer_verified: false;
+  external_writes_enabled: false;
+};
+
+const date = (s: string | null | undefined) =>
+  s ? new Date(s).toLocaleString("es-AR") : "No disponible";
+
+export function GtinExportPanel({ csrf }: { csrf: string; onImported?: () => void }) {
+  const [summary, setSummary] = useState<ApiSummary>();
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   useEffect(() => {
     if (!production) return;
     const controller = new AbortController();
-    request("/api/ecomm-app/workspace/gtin-export/summary", { signal: controller.signal })
-      .then(r => r.json()).then(setSummary)
+    request("/api/ecomm-app/workspace/api-barcode/summary", { signal: controller.signal })
+      .then(r => r.json()).then((data: ApiSummary) => {
+        if (data.source !== "ECOMM_APP_API_STAGE" ||
+            data.mode !== "API_CAPTURE_READ_ONLY" ||
+            data.external_writes_enabled !== false ||
+            !Number.isSafeInteger(data.total_variants) ||
+            !Number.isSafeInteger(data.barcode_present)) {
+          throw new Error("El resumen no proviene de la captura API.");
+        }
+        setSummary(data);
+      })
       .catch(e => { if (!controller.signal.aborted) setError(String(e?.message || e)); });
     return () => controller.abort();
   }, []);
   if (!production) return null;
-
-  async function importFile() {
-    if (!file || !canWrite() || busy) return;
-    if (!window.confirm(
-      "¿Incorporar solamente Ecomm ID, SKU y GTIN del Excel como evidencia interna de KIKI? " +
-      "No cambiará stock, precios, fichas editoriales ni publicaciones externas."
-    )) return;
-    setError("");
-    setMessage("");
-    setBusy(true);
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      const next = await request("/api/ecomm-app/workspace/gtin-export", {
-        method: "POST",
-        headers: { "X-CSRF-Token": csrf },
-        body,
-      }).then(r => r.json()) as Summary;
-      setSummary(next);
-      setMessage("Excel incorporado y cotejado por Ecomm ID + SKU. GTIN disponibles para consulta interna.");
-      setFile(null);
-      onImported?.();
-    } catch (e) {
-      setError(String((e as Error)?.message || e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const usable = (summary?.valid_unique ?? 0) + (summary?.valid_repeated ?? 0) + (summary?.pack_review ?? 0);
-  const missingOrInvalid = (summary?.invalid ?? 0) + (summary?.missing ?? 0);
-  return <section className="k-gtin-import k-gtin-compact" aria-label="Estado de GTIN de Ecomm-App">
+  return <section className="k-gtin-import k-gtin-compact" aria-label="Barcode de Ecomm-App por API">
     <div className="k-gtin-head">
       <div>
-        <strong>GTIN del inventario Ecomm-App</strong>
-        <p>{summary?.current
-          ? <><b>{usable.toLocaleString("es-AR")} códigos con GTIN válido</b> de {summary.variants?.toLocaleString("es-AR")} variantes · {missingOrInvalid.toLocaleString("es-AR")} sin GTIN válido.</>
-          : summary?.available
-            ? <>La captura API actual informa <b>{(summary.api_barcodes_present ?? 0).toLocaleString("es-AR")} barcode</b> de {summary.api_variants?.toLocaleString("es-AR")} variantes. El Excel anterior está desactualizado; no hace falta recargarlo para ver los códigos ya informados por API.</>
-            : "Comprobá primero los barcode que entrega la API. El Excel es respaldo para las variantes sin código."}
-        </p>
+        <strong>Códigos de barras de Ecomm-App · API</strong>
+        {summary
+          ? <p><b>{summary.barcode_present.toLocaleString("es-AR")} códigos barcode</b> informados de {summary.total_variants.toLocaleString("es-AR")} variantes de la captura API. {summary.without_api_code.toLocaleString("es-AR")} sin código API en ninguno de los dos campos.</p>
+          : <p>Consultando solamente la captura API. No se utilizan Excel ni CSV de Ecomm-App.</p>
+        }
       </div>
-      <span>{summary?.current ? "Excel incorporado" : summary?.available ? "Revisar exportación" : "Sin exportación"}</span>
+      <span>Origen: API</span>
     </div>
-    {summary?.current && <small className="k-gtin-note">Dentro de los válidos: {summary.valid_unique?.toLocaleString("es-AR")} únicos no combo · {summary.valid_repeated?.toLocaleString("es-AR")} repetidos · {summary.pack_review?.toLocaleString("es-AR")} packs para revisión. Fuente: Excel Ecomm-App · {date(summary.imported_at)}.</small>}
+    {summary && <small className="k-gtin-note">
+      Captura: {date(summary.source_captured_at)} · {summary.unique_non_pack_valid} códigos únicos válidos en variantes no pack · {summary.repeated} repetidos · {summary.invalid} inválidos · {summary.pack_review} packs · {summary.conflicts} conflictos. Un código presente no certifica fabricante ni presentación.
+    </small>}
     <BarcodeApiCheck csrf={csrf} />
-    <details className="k-gtin-upload">
-      <summary>{summary?.available ? "Ver origen / actualizar GTIN" : "Incorporar Excel de Ecomm-App"}</summary>
-      {summary?.available && <p>Archivo: {summary.source_filename}. Los GTIN de exportación no son una confirmación de la API y nunca aprueban publicaciones automáticamente.</p>}
-      <p>Descargá Ecomm-App con «Código de barra» marcado. KIKI valida Ecomm ID y SKU contra la captura API completa antes de guardar.</p>
-      <input aria-label="Excel GTIN de Ecomm-App" type="file" accept=".xlsx" disabled={busy || !canWrite()}
-        onChange={event => { setFile(event.currentTarget.files?.[0] ?? null); setError(""); }} />
-      <button type="button" onClick={() => void importFile()} disabled={busy || !file || !canWrite()}>
-        {busy ? "Validando Excel…" : "Validar e incorporar GTIN"}
-      </button>
-      {!canWrite() && <p>Para incorporar el Excel, la edición interna debe estar habilitada.</p>}
-    </details>
     {error && <p role="alert" className="k-gtin-error">{error}</p>}
-    {message && <p role="status" className="k-gtin-success">{message}</p>}
   </section>;
 }
 
-const states: Record<string, string> = {
-  VALID_UNIQUE: "Código válido y único en la exportación (pendiente de cotejar con fabricante)",
-  VALID_REPEATED: "Código repetido en distintas variantes: requiere revisión",
-  PACK_REVIEW: "Pack o combo: verificar que tenga GTIN propio",
-  INVALID: "El código no pasa la validación GTIN",
-  MISSING: "Código no informado",
+const stateText: Record<string, string> = {
+  API_BARCODE_GTIN_CONFLICT: "Barcode y GTIN difieren: verificar identidad.",
+  API_CODE_MISSING: "La API no informó código para esta variante.",
+  API_CODE_INVALID: "El código API no supera la validación GTIN.",
+  API_CODE_REPEATED: "Código compartido por varias variantes; revisar presentación.",
+  API_PACK_REVIEW: "Pack o combo: confirmar que tenga código propio.",
+  API_UNIQUE_CODE: "Código con formato válido y único en captura API; falta verificación de fabricante.",
 };
-export function GtinExportEvidence({ ecommId, revision }: { ecommId: string; revision?: number }) {
-  const [value, setValue] = useState<Evidence>();
+
+export function GtinExportEvidence({
+  ecommId,
+  revision,
+}: {
+  ecommId: string;
+  revision?: number;
+}) {
+  const [value, setValue] = useState<ApiEvidence>();
   const [error, setError] = useState("");
   useEffect(() => {
     if (!production || !/^[1-9]\d*$/.test(ecommId)) return;
     const controller = new AbortController();
     setValue(undefined);
-    request("/api/ecomm-app/workspace/gtin-export/" + encodeURIComponent(ecommId), { signal: controller.signal })
-      .then(r => r.json()).then(setValue)
+    setError("");
+    request("/api/ecomm-app/workspace/api-barcode/" + encodeURIComponent(ecommId), {
+      signal: controller.signal,
+    })
+      .then(r => r.json())
+      .then((result: ApiEvidence) => {
+        if (result.source !== "ECOMM_APP_API_STAGE" ||
+            result.mode !== "API_CAPTURE_READ_ONLY" ||
+            result.ecomm_id !== ecommId ||
+            result.external_writes_enabled !== false ||
+            result.manufacturer_verified !== false) {
+          throw new Error("La evidencia no corresponde al Ecomm ID de la API.");
+        }
+        if (!controller.signal.aborted) setValue(result);
+      })
       .catch(e => { if (!controller.signal.aborted) setError(String(e?.message || e)); });
     return () => controller.abort();
   }, [ecommId, revision]);
   if (!production || (!value && !error)) return null;
-  return <section className="k-gtin-evidence" aria-label="GTIN de la exportación">
-    <strong>GTIN del inventario exportado de Ecomm-App</strong>
+  return <section className="k-gtin-evidence" aria-label="Barcode original de API Ecomm-App">
+    <strong>Barcode original informado por API Ecomm-App</strong>
     {error && <p role="alert">{error}</p>}
-    {value && (value.available ? (value.current ?
-      <><div className="k-gtin-code">{value.gtin || "Sin código"}</div>
-        <p>{states[value.status || ""] || "Revisar evidencia"}</p>
-        <small>Fuente: Excel de inventario Ecomm-App, incorporado {date(value.imported_at)}. No es un GTIN certificado por la API.</small></>
-      : <p>La captura API cambió. Los GTIN del archivo quedaron suspendidos hasta recotejar.</p>)
-      : <p>El GTIN todavía no se incorporó. Cargá el Excel desde el resumen de catálogo.</p>)}
+    {value && <>
+      <div className="k-gtin-code">{value.barcode || value.gtin || "Sin código en la API"}</div>
+      <p>{stateText[value.state] || "Revisar código de la variante."}</p>
+      <small>SKU {value.sku || "no informado"} · Captura {date(value.captured_at)}. Sin Excel, sin certificación de fabricante y sin publicación automática.</small>
+    </>}
   </section>;
 }
-
 
 type LiveSkuMatch = {
   variant_id: number | string | null;
