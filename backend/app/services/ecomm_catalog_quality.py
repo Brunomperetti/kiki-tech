@@ -31,7 +31,7 @@ LABELS = {
 }
 
 
-def identity_index(pages, export_gtin_by_id=None):
+def identity_index(pages):
     rows = [
         v
         for p in pages
@@ -43,14 +43,8 @@ def identity_index(pages, export_gtin_by_id=None):
     def sku(v):
         return str(v.get("sku") or "").strip()
 
-    export_gtin_by_id = export_gtin_by_id or {}
-
     def gtin(v):
-        # API is primary, an ID+SKU-validated spreadsheet is only a supplement.
-        return str(
-            v.get("gtin") or v.get("barcode")
-            or export_gtin_by_id.get(str(v.get("id")), "")
-        ).strip()
+        return str(v.get("gtin") or v.get("barcode") or "").strip()
 
     codes = Counter(gtin(v) for v in rows)
     owners = Counter(sku(v).casefold() for v in rows)
@@ -80,17 +74,14 @@ def identity_index(pages, export_gtin_by_id=None):
             families.update(
                 s for s in members if compare_family_skus(pivot, s)["related"]
             )
-    return codes, owners, families, export_gtin_by_id
+    return codes, owners, families
 
 
 def flags(source, edit, index):
-    codes, owners, families, export_gtin_by_id = index
+    codes, owners, families = index
     started = edit is not None
     fields = (edit.fields or {}) if started else {}
-    code = str(
-        source.get("gtin_raw") or source.get("barcode")
-        or export_gtin_by_id.get(str(source.get("ecomm_id")), "")
-    ).strip()
+    code = str(source.get("gtin_raw") or source.get("barcode") or "").strip()
     title = str(source.get("product_name") or "").strip()
     variant_description = str(source.get("variant_description") or "").strip()
     sku = str(source.get("sku") or "").strip()
