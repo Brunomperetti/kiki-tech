@@ -119,3 +119,32 @@ def test_fails_closed_on_ambiguous_same_product_variants():
     assert discovery._product_match(row, second)
     different_pack = "https://geonat.com.ar/productos/espirulina-500-120-comp-geonat/"
     assert discovery._product_match(row, different_pack) is None
+
+
+def test_brand_only_is_not_enough_to_suggest_other_product():
+    row = {
+        "product_name": "Geonat Espirulina 500 X 60 Comp.",
+        "variant_description": "60 comprimidos",
+        "sku": "ABC123",
+        "is_combo": False,
+    }
+    # Same brand and quantity, wrong product. Must not be a candidate.
+    wrong = "https://geonat.com.ar/productos/valeriana-500-60-comp-geonat/"
+    assert discovery._product_match(row, wrong) is None
+    # Correct product name and identical numbers remains a possible URL,
+    # but never acquires verified provenance or approval.
+    correct = "https://geonat.com.ar/productos/espirulina-500-60-comp-geonat/"
+    match = discovery._product_match(row, correct)
+    assert match and match["verified"] is False
+
+
+def test_single_distinctive_word_and_size_is_only_a_candidate():
+    row = {
+        "product_name": "Valeriana X 50 GRS",
+        "variant_description": "50 g",
+        "sku": "1099",
+        "is_combo": False,
+    }
+    link = "https://geonat.com.ar/productos/valeriana-50g-geonat/"
+    candidate = discovery._product_match(row, link)
+    assert candidate and candidate["review_required"] is True
