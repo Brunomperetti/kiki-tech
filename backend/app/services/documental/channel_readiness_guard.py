@@ -18,12 +18,20 @@ from .storage import digest
 
 REQUIRED = frozenset({"product_name", "presentation"})
 TAXONOMY_FIELDS = ("category", "subcategory")
+# Only canonical, deterministic copy derived from individually approved facts
+# may be marked channel-ready in the single-source pilot. Drafts can still be
+# edited freely and a separate editorial approval path can be added later.
+COPY_FIELDS = (
+    "brand", "manufacturer", "title", "short_title", "short_description",
+    "description", "details", "presentation", "category", "subcategory",
+    "seo_title", "seo_description", "seo_keywords",
+)
 
 
 def _commercial_coverage(research, item, fields, approved):
     """Exact approved fields and explicit asset permissions, never inferred."""
     from .media_rights import media_grant_current
-    from .proposals import TEXT
+    from .proposals import Proposals, TEXT
 
     missing = []
     for key in TAXONOMY_FIELDS:
@@ -48,6 +56,24 @@ def _commercial_coverage(research, item, fields, approved):
     if not fields.get("attributes"):
         missing.append("attributes")
 
+    # Text and SEO require the same evidence as technical attributes. A
+    # commercially plausible paragraph or a checkbox does not verify a claim.
+    # Use the very generator behind the reviewed-evidence proposal; this
+    # excludes arbitrary health benefits, SEO synonyms and promotional copy.
+    facts = [
+        {"id": f"reviewed-{key}", "field": key, "value": values[0], "unit": None}
+        for key, values in approved.items()
+        if len(values) == 1
+    ]
+    canonical, _missing = Proposals.generate_fields(facts)
+    copy_errors = []
+    for key in COPY_FIELDS:
+        generated = canonical.get(key)
+        expected = generated["value"] if generated else ""
+        if fields.get(key, "") != expected:
+            copy_errors.append(key)
+            missing.append("commercial_copy[" + key + "]")
+
     media = fields.get("media") or []
     media_approved = 0
     if not media:
@@ -64,6 +90,9 @@ def _commercial_coverage(research, item, fields, approved):
             code.startswith("attributes[") for code in missing
         ),
         "taxonomy_supported": all(key not in missing for key in TAXONOMY_FIELDS),
+        "commercial_copy_supported": not copy_errors,
+        "commercial_copy_fields_checked": len(COPY_FIELDS),
+        "commercial_copy_mismatches": copy_errors,
         "media_rights_verified": bool(media) and media_approved == len(media),
         "media_rights_status": (
             "AUTORIZACIONES_DOCUMENTADAS_Y_VIGENTES"
