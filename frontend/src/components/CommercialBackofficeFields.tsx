@@ -26,6 +26,7 @@ type Props={
   categories:{name:string;count:number;subcategories:{name:string;count:number}[]}[];
   allowExternalResources?:boolean;
   memoryOnly?:boolean;
+  onSuggestSources?:()=>void;
 };
 
 const fieldNames:Record<string,string>={
@@ -37,7 +38,7 @@ const fieldNames:Record<string,string>={
   seo_title:'Título SEO',seo_description:'Metadescripción SEO',
   seo_keywords:'Palabras clave',
 };
-export function CommercialBackofficeFields({fields,onChange,readiness,categories,allowExternalResources=true,memoryOnly=false}:Props){
+export function CommercialBackofficeFields({fields,onChange,readiness,categories,allowExternalResources=true,memoryOnly=false,onSuggestSources}:Props){
   const editAttribute=(idx:number,key:keyof KikiAttribute,value:string)=>{
     onChange('attributes',fields.attributes.map((a,i)=>i===idx?{...a,[key]:value}:a));
   };
@@ -186,6 +187,13 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
     <section className="kiki-commercial-section" id="kiki-fuentes">
       <div className="kiki-commercial-section-head"><span>06</span><div><h3>Fuentes verificadas y control editorial</h3>
         <p>Registrá fabricante, ficha oficial o etiqueta. Confirmá explícitamente qué verificaste y que corresponde a esta variante. Un EAN solo no alcanza.</p></div></div>
+      {onSuggestSources&&<div className="kiki-commercial-source-suggestions">
+        <button type="button" className="kiki-commercial-add" onClick={onSuggestSources}>
+          Recuperar fuentes revisadas desde Evidencias
+        </button>
+        <p className="kiki-commercial-hint">Prepara vínculos a documentos originales ya revisados. No verifica automáticamente
+        la titularidad ni autoriza fotografías: confirmá la fuente antes de marcarla como verificada y guardar.</p>
+      </div>}
       <div className="kiki-commercial-list">
         {fields.sources.map((src,i)=><div className="kiki-commercial-array kiki-commercial-media" key={'source'+i}>
           <label>Tipo de evidencia
