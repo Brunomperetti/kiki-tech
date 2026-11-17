@@ -14,6 +14,7 @@ from app.services.v2_schema import statements
 
 log = logging.getLogger(__name__)
 
+TARGET_DATABASE = "kiki_tech_db"  # CI may monkeypatch only on a disposable PG18.
 REQUIRED_CORE = ("catalog_snapshots", "ecomm_api_product_edits")
 SCHEMA_TABLES = (
     "kiki_evidence_control",
@@ -31,7 +32,7 @@ def apply_additive_schema(engine, *, expected_database):
     The caller is responsible for opt-in, restoring a backup if necessary,
     and confirming the target DB. No credentials or SQL user input logged.
     """
-    if not expected_database or expected_database != "kiki_tech_db":
+    if not expected_database or expected_database != TARGET_DATABASE:
         raise ValueError("Esquema KIKI: nombre de base objetivo no autorizado.")
     with engine.begin() as connection:
         database = connection.execute(text("SELECT current_database()")).scalar_one()
