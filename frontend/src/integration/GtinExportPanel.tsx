@@ -119,7 +119,8 @@ export function GtinExportEvidence({
     <strong>Barcode original informado por API Ecomm-App</strong>
     {error && <p role="alert">{error}</p>}
     {value && <>
-      <div className="k-gtin-code">{value.barcode || value.gtin || "Sin código en la API"}</div>
+      <div className="k-gtin-code">{value.barcode || "Barcode no informado por API"}</div>
+      {value.gtin && <small>Campo GTIN informado por API: {value.gtin}</small>}
       <p>{stateText[value.state] || "Revisar código de la variante."}</p>
       <small>SKU {value.sku || "no informado"} · Captura {date(value.captured_at)}. Sin Excel, sin certificación de fabricante y sin publicación automática.</small>
     </>}
