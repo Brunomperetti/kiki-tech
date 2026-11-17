@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 import base64
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.security import require_session, require_csrf
