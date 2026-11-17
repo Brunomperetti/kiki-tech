@@ -129,7 +129,7 @@ class HTTPSFetcher:
                 headers={
                     "Host": hostname,
                     "User-Agent": USER_AGENT,
-                    "Accept": "text/html,text/plain" if path == "/robots.txt" else "text/html",
+                    "Accept": "text/html,text/plain" if path == "/robots.txt" else "application/xml,text/xml" if path.lower().endswith(".xml") else "text/html",
                     "Accept-Encoding": "identity",
                     "Connection": "close",
                 },

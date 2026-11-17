@@ -1,4 +1,4 @@
-import { environmentText } from "./runtime";
+import { environmentText, capabilities } from "./runtime";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { ProductDrawer } from "../prototype/CatalogView";
@@ -86,6 +86,24 @@ type Batch = {
   internal_only: true;
   external_writes_enabled: false;
 };
+type SitemapPreview = {
+  mode: "READ_ONLY_MANUFACTURER_SITEMAP_PREVIEW";
+  receipt: { sitemap_url: string; urls_inspected: number; robots_checked: true };
+  items: {
+    ecomm_id: string;
+    name: string;
+    state: "BLOCKED" | "CANDIDATES" | "NOT_FOUND";
+    reasons: string[];
+    ambiguous: boolean;
+    candidate_count: number;
+    candidates: {
+      url: string;
+      matched_tokens: string[];
+      verified: false;
+      review_required: true;
+    }[];
+  }[];
+};
 async function api(path: string, csrf: string, body?: unknown): Promise<Batch> {
   const response = await request(
     root + path,
@@ -140,6 +158,8 @@ export function BatchPanel({
   const [jobsPage, setJobsPage] = useState(1),
     [jobsTotal, setJobsTotal] = useState(0);
   const [operation, setOperation] = useState("GENERATE_PROPOSALS");
+  const [sitemapUrl, setSitemapUrl] = useState("");
+  const [sitemapResult, setSitemapResult] = useState<SitemapPreview>();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const mounted = useRef(true);
@@ -198,6 +218,35 @@ export function BatchPanel({
       });
       setBatch(next);
       await list();
+    });
+  }
+  async function discoverManufacturer() {
+    if (!sitemapUrl.startsWith("https://") || ids.size < 1 || ids.size > 20) {
+      setError("Seleccioná entre 1 y 20 variantes e ingresá el sitemap HTTPS oficial del fabricante.");
+      return;
+    }
+    await act(async () => {
+      const response = await request("/api/ecomm-app/workspace/sources/sitemap-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+        body: JSON.stringify({ sitemap_url: sitemapUrl.trim(), ecomm_ids: [...ids] }),
+      });
+      const data = (await response.json()) as SitemapPreview & { detail?: string };
+      if (!response.ok) throw new Error(data.detail || "No se pudo comprobar el índice oficial.");
+      if (
+        data.mode !== "READ_ONLY_MANUFACTURER_SITEMAP_PREVIEW" ||
+        !Array.isArray(data.items) ||
+        data.items.some((item) =>
+          !ids.has(item.ecomm_id) ||
+          !Array.isArray(item.candidates) ||
+          item.candidates.some((candidate) =>
+            candidate.verified !== false ||
+            candidate.review_required !== true ||
+            !candidate.url.startsWith("https://")
+          )
+        )
+      ) throw new Error("La búsqueda devolvió datos incompatibles; no se usaron.");
+      setSitemapResult(data);
     });
   }
   async function run() {
@@ -341,6 +390,75 @@ export function BatchPanel({
                 «Procesar siguiente grupo» prepara hasta 5 variantes sin IA paga y
                 sin ejecutar trabajo en segundo plano. Se requiere una revisión
                 humana independiente antes de guardar cada ficha.</p>
+              {capabilities?.document_sitemap_discovery === true && (
+                <section className="b-detail" aria-label="Descubrimiento de fabricante">
+                  <h3>Buscar fuentes oficiales por fabricante</h3>
+                  <p>
+                    Seleccioná hasta 20 variantes de un mismo fabricante e ingresá
+                    una vez la URL exacta de su sitemap de productos. KIKI coteja
+                    las páginas publicadas sin descargar fichas ni aprobar datos.
+                  </p>
+                  <label>
+                    Sitemap XML oficial del fabricante
+                    <input
+                      type="url"
+                      aria-label="Sitemap XML oficial del fabricante"
+                      placeholder="https://fabricante.com/product-sitemap.xml"
+                      value={sitemapUrl}
+                      onChange={(event) => {
+                        setSitemapUrl(event.target.value);
+                        setSitemapResult(undefined);
+                      }}
+                      disabled={locked}
+                    />
+                  </label>
+                  <div className="b-actions">
+                    <button
+                      type="button"
+                      disabled={locked || !ids.size || ids.size > 20 || !sitemapUrl.startsWith("https://")}
+                      onClick={() => void discoverManufacturer()}
+                    >
+                      Buscar fuentes para {ids.size} variantes
+                    </button>
+                  </div>
+                  {sitemapResult && (
+                    <div role="region" aria-label="Posibles fuentes oficiales">
+                      <p>
+                        {sitemapResult.receipt.urls_inspected} URLs de producto
+                        examinadas. Todas las coincidencias requieren revisión.
+                      </p>
+                      {sitemapResult.items.map((item) => (
+                        <article key={item.ecomm_id}>
+                          <strong>{item.name || item.ecomm_id}</strong>
+                          <p>
+                            {item.candidate_count} posibles páginas ·
+                            {item.ambiguous ? " coincidencia no inequívoca" : " revisar identidad"}
+                          </p>
+                          {item.reasons.map((reason) => <p key={reason}>{reason}</p>)}
+                          {item.candidates.map((candidate) => (
+                            <p key={candidate.url}>
+                              <a href={candidate.url} target="_blank" rel="noopener noreferrer">
+                                Examinar posible fuente del fabricante
+                              </a>
+                              {" · "}Coincidencias: {candidate.matched_tokens.join(", ")}
+                            </p>
+                          ))}
+                          <button
+                            type="button"
+                            disabled={locked}
+                            onClick={() => {
+                              setExpanded(false);
+                              onOpen(item.ecomm_id, undefined, "Evidencias");
+                            }}
+                          >
+                            Revisar evidencia de esta variante
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
               <div className="b-actions">
                 <label>
                   Operación
