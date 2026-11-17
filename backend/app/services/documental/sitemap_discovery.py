@@ -34,7 +34,8 @@ PRODUCT_PREFIXES = ("/producto/", "/productos/", "/product/", "/products/")
 STOPWORDS = frozenset({
     "para", "con", "sin", "los", "las", "del", "por", "uno", "una",
     "producto", "suplemento", "natural", "comp", "comprimidos", "caps",
-    "capsulas", "cápsulas", "unidad", "unidades", "gr", "x",
+    "capsulas", "cápsulas", "unidad", "unidades", "gr", "grs",
+    "gramo", "gramos", "mg", "ml", "kg", "tabletas", "x",
 })
 
 
