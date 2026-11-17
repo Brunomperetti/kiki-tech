@@ -1,6 +1,8 @@
+import base64
 from datetime import datetime, timezone
 from typing import Literal
 from document_reader.hileret_brochure import ENCODED_SIZE
+from document_reader.parser import MAX_SAVED_HTML_BYTES
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -68,10 +70,28 @@ class Incorporate(BaseModel):
 
     @field_validator("content_base64")
     @classmethod
-    def bounded_original(cls, value):
-        # Normal contract preserves 422 for generic oversize; sandbox subtype
-        # keeps its established route-level 409 contract, with the same hash check.
-        if cls is Incorporate and len(value) > 699_052:
+    def bounded_original(cls, value, info):
+        # Only explicitly opt-in original HTML snapshots may be larger. Base64
+        # lengths can be identical across a byte boundary due to padding, so
+        # an encoded-size check alone MUST NOT decide exact decoded-byte size.
+        is_saved_html = (
+            info.data.get("kind") == "FILE"
+            and info.data.get("web_snapshot") is True
+            and str(info.data.get("filename", "")).lower().endswith(".html")
+            and info.data.get("content_type") == "text/html"
+        )
+        if is_saved_html:
+            if len(value) > ((MAX_SAVED_HTML_BYTES + 2) // 3) * 4:
+                raise ValueError("HTML guardado superior a 4 MiB.")
+            try:
+                raw = base64.b64decode(value, validate=True)
+            except (ValueError, TypeError):
+                raise ValueError("Contenido base64 inválido.") from None
+            if len(raw) > MAX_SAVED_HTML_BYTES:
+                raise ValueError("HTML guardado superior a 4 MiB.")
+        elif cls is Incorporate and len(value) >= 699_052:
+            # Boundary encoded length also fits 524289 bytes (one byte over).
+            # The pinned Hileret SHA-256 is still mandatory for larger PDFs.
             from document_reader.hileret_brochure import validate_encoding
             validate_encoding(value)
         return value

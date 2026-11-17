@@ -30,7 +30,14 @@ def parse_local(body, *, max_request=MAX_REQUEST):
     ).encode()
     if len(body.content_base64) > 699_052:
         from document_reader.hileret_brochure import validate_encoding, MAX_REQUEST as PINNED_MAX
-        validate_encoding(body.content_base64)
+        if body.web_snapshot and body.kind == "FILE" and body.filename.lower().endswith(".html"):
+            from document_reader.parser import MAX_SAVED_HTML_BYTES
+            if len(body.content_base64) > ((MAX_SAVED_HTML_BYTES + 2) // 3) * 4:
+                raise ValueError("HTML guardado superior a 4 MiB.")
+            # The isolated parser validates exact base64 encoding, MIME,
+            # original byte size, complexity and non-executing HTML.
+        else:
+            validate_encoding(body.content_base64)
         max_request = PINNED_MAX
     if len(request) > max_request:
         raise ValueError("Archivo superior al límite de lectura.")
