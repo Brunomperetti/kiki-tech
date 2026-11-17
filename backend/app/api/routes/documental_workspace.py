@@ -325,3 +325,38 @@ def generation_context(
     )
 
     return execute(db, lambda: context(db, session, ecomm_id))
+
+
+class SitemapCandidatesRequest(BaseModel):
+    """Explicit operator request, no provider writes and no unattended crawl."""
+
+    model_config = ConfigDict(extra="forbid")
+    sitemap_url: str = Field(min_length=15, max_length=1000)
+    ecomm_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+@router.post("/sources/sitemap-preview")
+def preview_manufacturer_sitemap(
+    body: SitemapCandidatesRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Look up up to 20 variants in one authorized manufacturer XML index.
+
+    Candidates are not evidence or product identity confirmations. This
+    endpoint never imports documents, calls AI or changes provider data.
+    """
+    config = get_settings()
+    if (
+        not config.kiki_document_sitemap_discovery_enabled
+        or not config.kiki_document_source_fetch_hosts.strip()
+    ):
+        raise HTTPException(403, "Descubrimiento de fabricante deshabilitado.")
+    try:
+        return preview_candidates(
+            db, body.ecomm_ids, body.sitemap_url,
+            config.kiki_document_source_fetch_hosts,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
