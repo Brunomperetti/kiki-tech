@@ -343,15 +343,13 @@ def build_channel_coverage(
     include_reverse=False,
 ):
     """Map all API variant IDs to independently classified channel evidence."""
-    from .ecomm_gtin_export_service import SOURCE as GTIN_EXPORT_SOURCE
-
     if snapshots is None:
         captures = {
             capture.source: capture
             for capture in db.scalars(
                 select(CatalogSnapshot).where(
                     CatalogSnapshot.source.in_(
-                        ["MERCADOLIBRE_API", "TIENDANUBE", GTIN_EXPORT_SOURCE]
+                        ["MERCADOLIBRE_API", "TIENDANUBE"]
                     )
                 )
             )
@@ -360,7 +358,6 @@ def build_channel_coverage(
         captures = snapshots
     ml_snap = captures.get("MERCADOLIBRE_API")
     tn_snap = captures.get("TIENDANUBE")
-    gtin_export_snap = captures.get(GTIN_EXPORT_SOURCE)
     ml_rows = ml_snap.payload if ml_snap and isinstance(ml_snap.payload, list) else []
     tn_rows = tn_snap.payload if tn_snap and isinstance(tn_snap.payload, list) else []
     ml_available = ml_snap is not None and isinstance(ml_snap.payload, list)
@@ -428,12 +425,6 @@ def build_channel_coverage(
         )
         for channel, valid in [("ml", ml_valid), ("tn", tn_valid)]
     }
-    from .ecomm_gtin_export_service import (
-        safe_gtin_candidates_for_pages, export_quality_for_pages,
-    )
-
-    export_codes = safe_gtin_candidates_for_pages(db, pages, export_record=gtin_export_snap)
-    export_quality = export_quality_for_pages(pages, gtin_export_snap)
     records = {}
     totals = {"ml": Counter(), "tn": Counter(), "combined": Counter()}
     for page in pages:
@@ -462,12 +453,11 @@ def build_channel_coverage(
                 identity = source_identity(
                     parent, var, page.get("captured_at"), edits.get(ident)
                 )
-                supplemental_gtin = export_codes.get(ident, "")
                 ml_matches, ml_signals, ml_positions = _find_candidates(
-                    identity, ml_valid, ml_index, export_gtin=supplemental_gtin
+                    identity, ml_valid, ml_index
                 )
                 tn_matches, tn_signals, tn_positions = _find_candidates(
-                    identity, tn_valid, tn_index, export_gtin=supplemental_gtin
+                    identity, tn_valid, tn_index
                 )
                 for channel, matches, signals, positions, valid in [
                     ("ml", ml_matches, ml_signals, ml_positions, ml_valid),
@@ -658,7 +648,6 @@ def build_channel_coverage(
 
     return {
         "items_by_id": records,
-        "export_gtin_quality": export_quality,
         **({"candidate_ids_by_position": reverse} if include_reverse else {}),
         "api_validation_enabled": api_validation,
         "summary": {
