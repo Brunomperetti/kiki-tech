@@ -80,8 +80,8 @@ def fetch_sitemap(url, configured_hosts, *, resolver=None, transport=None):
         result.status != 200 or not _same_ip(result, ip)
         or not result.body or len(result.body) > MAX_SITEMAP_BYTES
         or result.encoding.lower() != "identity"
-        or not result.content_type.lower().split(";", 1)[0].strip()
-            in {"application/xml", "text/xml", "application/rss+xml"}
+        or result.content_type.lower().split(";", 1)[0].strip()
+            not in {"application/xml", "text/xml", "application/rss+xml"}
         or "noarchive" in result.robots_tag.lower()
     ):
         raise ValueError("El fabricante no entregó un sitemap XML aceptable.")
