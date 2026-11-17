@@ -44,7 +44,10 @@ def complete_fields():
         "subcategory": "Subcategoría de prueba",
         "seo_title": "Mix Ensaladas y Sopas · 250 g",
         "seo_description": "Mix Ensaladas y Sopas · 250 g.",
-        "seo_keywords": "Mix Ensaladas y Sopas, 250 g",
+        "seo_keywords": (
+            "Natural Seed, Mix Ensaladas y Sopas, 250 g, "
+            "Categoría de prueba, Subcategoría de prueba"
+        ),
         "attributes": [{
             "name": "Características verificables",
             "value": "3 frutos secos y 3 semillas al oreganato",
@@ -81,11 +84,13 @@ def install_fake_source(db):
     body = deepcopy(synthetic_document())
     # Category and subcategory are explicitly quoted and independently
     # reviewed in this synthetic source; commercial editor typing alone fails.
-    for field, value in (
-        ("category", "Categoría de prueba"),
-        ("subcategory", "Subcategoría de prueba"),
+    for field, value, line in (
+        ("category", "Categoría de prueba", "4"),
+        ("subcategory", "Subcategoría de prueba", "5"),
+        ("brand", "Natural Seed", "7"),
+        ("manufacturer", "Natural Seed", "8"),
     ):
-        location = "texto/linea/" + ("4" if field == "category" else "5")
+        location = "texto/linea/" + line
         claim = evidence(field, value, location)
         body["claims"].append(claim)
         body["sections"][location] = claim["quote"]
@@ -199,6 +204,10 @@ def test_guard_blocks_manual_verified_checkbox_without_archived_source(
     "wrong_short_title", "wrong_sku", "fake_document",
     "unapproved_attribute", "wrong_category", "wrong_subcategory",
     "unapproved_media", "revoked_media_rights",
+    "invented_long_description", "invented_short_description",
+    "invented_details", "invented_seo_title",
+    "invented_seo_description", "invented_seo_keywords",
+    "invented_brand", "invented_manufacturer",
 ])
 def test_guard_fails_closed_on_absent_or_invalid_source(
     tmp_path, monkeypatch, mutation
@@ -236,6 +245,18 @@ def test_guard_fails_closed_on_absent_or_invalid_source(
             fields["attributes"].append({
                 "name": "Sin gluten", "value": "Sí",
             })
+        elif mutation.startswith("invented_"):
+            key = {
+                "invented_long_description": "description",
+                "invented_short_description": "short_description",
+                "invented_details": "details",
+                "invented_seo_title": "seo_title",
+                "invented_seo_description": "seo_description",
+                "invented_seo_keywords": "seo_keywords",
+                "invented_brand": "brand",
+                "invented_manufacturer": "manufacturer",
+            }[mutation]
+            fields[key] += " · Beneficios no aprobados"
         elif mutation == "unapproved_media":
             fields["media"].append({
                 "kind": "IMAGE",
@@ -301,10 +322,13 @@ def test_original_with_approved_identity_allows_guarded_channel_ready(
         report = require_primary_evidence(db, user, IDENT, fields)
         assert report["commercial_coverage"]["taxonomy_supported"] is True
         assert report["commercial_coverage"]["attributes_supported"] == 1
+        assert report["commercial_coverage"]["commercial_copy_supported"] is True
+        assert report["commercial_coverage"]["commercial_copy_fields_checked"] == 13
+        assert report["commercial_coverage"]["commercial_copy_mismatches"] == []
         assert report["commercial_coverage"]["media_rights_verified"] is True
         assert report["commercial_coverage"]["media_resources_reviewed"] == 1
         current = Research(db, user).dossier(IDENT)
-        assert len([fact for fact in current.facts if fact["state"] == "APPROVED"]) == 5
+        assert len([fact for fact in current.facts if fact["state"] == "APPROVED"]) == 7
         assert db.get(Document, "local-" + "a" * 32).body["original"]["size"] > 0
         assert db.scalar(select(CatalogSnapshot).where(
             CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
