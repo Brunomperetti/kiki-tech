@@ -103,6 +103,7 @@ def _stage_variants(db, *, lock=False):
                     "sku": _as_text(variant.get("sku")),
                     "combo": bool(variant.get("is_combo") is True or parent.get("is_combo") is True),
                     "api_gtin": _as_text(variant.get("gtin") or variant.get("barcode")),
+                    "api_barcode": _as_text(variant.get("barcode")),
                 }
     return variants
 
@@ -201,6 +202,9 @@ class EcommExportGtin:
             "sha256": snap["sha256"],
             "variants": snap["variants"],
             "api_variants": len(stage),
+            "api_barcodes_present": sum(
+                bool(row["api_barcode"]) for row in stage.values()
+            ),
             "valid_unique": counts.get("VALID_UNIQUE", 0),
             "valid_repeated": counts.get("VALID_REPEATED", 0),
             "pack_review": counts.get("PACK_REVIEW", 0),
