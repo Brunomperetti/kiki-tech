@@ -574,6 +574,7 @@ export function PersistentWorkspace({
                     <ResearchPanel
                       id={variant.id}
                       csrf={csrf}
+                      media={fields.media}
                       onBusy={setResearchBusy}
                       workspaceVersion={record.version}
                       autoStart={researchStart}
