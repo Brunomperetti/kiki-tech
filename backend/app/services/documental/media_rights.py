@@ -11,7 +11,6 @@ import binascii
 import hashlib
 import re
 
-from .research import Research
 from .storage import digest
 
 GRANT_TERMS = re.compile(
