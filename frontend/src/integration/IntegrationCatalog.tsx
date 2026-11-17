@@ -1380,10 +1380,10 @@ export function IntegrationCatalog() {
                       new Set([...current, ...data.items.map((i) => i.id)]),
                   )
                 }
-                onOpen={(id, proposal) =>
+                onOpen={(id, proposal, tab) =>
                   update({
                     product: id,
-                    tab: proposal ? "IA" : "Ficha",
+                    tab: proposal ? "IA" : (tab ?? "Ficha"),
                     proposal: proposal ? String(proposal) : "",
                   })
                 }
