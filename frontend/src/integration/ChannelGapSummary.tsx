@@ -58,7 +58,7 @@ export function ChannelGapSummary({
     },
   ];
   return (
-    <section className="k-business-gaps" aria-label="Diferencias principales entre catálogos">
+    <section id="kiki-channel-summary" className="k-business-gaps" aria-label="Diferencias principales entre catálogos">
       <div className="k-business-gaps-title">
         <div>
           <h2>Productos para revisar por canal</h2>
