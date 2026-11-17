@@ -5,6 +5,7 @@ import { ProductDrawer } from "../prototype/CatalogView";
 import { request, captureDate, validVariantId } from "./catalog-adapter";
 import "./batches.css";
 const root = "/api/ecomm-app/editorial-batches";
+const PILOT_BATCH_LIMIT = 100; // existing Render configuration rejects larger selections.
 const labels: Record<string, string> = {
   PREVIEW: "Previsualización",
   PENDING: "Pendiente",
@@ -168,6 +169,12 @@ export function BatchPanel({
     return next;
   }
   async function preview(filtered: boolean) {
+    const selectedCount = filtered ? matches : ids.size;
+    if (selectedCount < 1 || selectedCount > PILOT_BATCH_LIMIT) {
+      setError("Seleccioná entre 1 y 100 variantes. Refiná el filtro antes de preparar el lote.");
+      setExpanded(true);
+      return;
+    }
     setExpanded(true);
     await act(async () => {
       const next = await api("/preview", csrf, {
@@ -182,7 +189,9 @@ export function BatchPanel({
     });
   }
   async function run() {
-    if (!batch) return;
+    if (!batch || !window.confirm(
+      "¿Confirmás preparar únicamente propuestas internas de las variantes previsualizadas? Cada ficha seguirá requiriendo aprobación humana y no habrá publicaciones externas.",
+    )) return;
     await act(async () => {
       await api(`/${batch.id}/start`, csrf, {
         confirm: true,
@@ -195,7 +204,7 @@ export function BatchPanel({
     });
   }
   async function processManualStep() {
-    if (!batch || batch.autonomous || !["PENDING", "RUNNING"].includes(batch.state))
+    if (!batch || batch.autonomous || batch.state !== "PENDING")
       return;
     await act(async () => {
       // Explicit single bounded backend step. Never starts a browser-side
@@ -311,6 +320,10 @@ export function BatchPanel({
                 Las propuestas se revisan y guardan individualmente. No se
                 aprueban fichas ni se publica automáticamente.
               </p>
+              <p>Este piloto admite hasta 100 variantes por selección. Cada clic en
+                «Procesar siguiente grupo» prepara hasta 5 variantes sin IA paga y
+                sin ejecutar trabajo en segundo plano. Se requiere una revisión
+                humana independiente antes de guardar cada ficha.</p>
               <div className="b-actions">
                 <label>
                   Operación
@@ -329,13 +342,13 @@ export function BatchPanel({
                   </select>
                 </label>
                 <button
-                  disabled={locked || !ids.size}
+                  disabled={locked || !ids.size || ids.size > PILOT_BATCH_LIMIT}
                   onClick={() => preview(false)}
                 >
                   Previsualizar selección
                 </button>
                 <button
-                  disabled={locked || !matches}
+                  disabled={locked || !matches || matches > PILOT_BATCH_LIMIT}
                   onClick={() => preview(true)}
                 >
                   Previsualizar {matches} resultados filtrados
@@ -420,7 +433,7 @@ export function BatchPanel({
                       </button>
                     )}
                     {!batch.autonomous &&
-                      ["PENDING", "RUNNING"].includes(batch.state) && (
+                      batch.state === "PENDING" && (
                         <button
                           className="d-primary"
                           disabled={locked || batch.cancel_requested}
