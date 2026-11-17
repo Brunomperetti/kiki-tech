@@ -267,3 +267,43 @@ def test_absent_combo_flag_stays_unknown_not_false():
     assert row["is_combo"] is None
     assert row["variants"][0]["is_combo"] is None
     assert row["variants"][0]["id"] == 20
+
+
+def test_live_barcode_probe_keeps_exact_variant_field_presence_and_null_distinct():
+    """Read-only SKU lookup must expose the actual vendor field, never Excel."""
+    from app.integrations.ecomm_app.public_api import _requested_sku_diagnosis
+
+    data = {"items": [{"code": "PIZARRO", "variants": [
+        {"id": 9913710, "sku": "6317", "barcode": "7793396000039",
+         "gtin": None, "total_stock": 4},
+        {"id": 9913711, "sku": "6318", "barcode": None},
+        {"id": 9913712, "sku": "6319"},
+    ]}]}
+    response = _requested_sku_diagnosis(data, ["6317", "6318", "6319"])
+    found, null_code, absent = [
+        item["matches"][0] for item in response["requested"]
+    ]
+    assert found["variant_id"] == 9913710
+    assert found["barcode_field_present"] is True
+    assert found["barcode"] == "7793396000039"
+    assert found["gtin_field_present"] is True
+    assert found["gtin"] is None
+    assert null_code["barcode_field_present"] is True
+    assert null_code["barcode"] is None
+    assert absent["barcode_field_present"] is False
+    assert absent["barcode"] is None
+    assert all(item["status"] == "EXACT_SINGLE" for item in response["requested"])
+
+
+def test_live_barcode_probe_never_uses_sibling_barcode_or_invents_code():
+    from app.integrations.ecomm_app.public_api import _requested_sku_diagnosis
+
+    data = {"items": [{"variants": [
+        {"id": 1, "sku": "A", "barcode": None},
+        {"id": 2, "sku": "B", "barcode": "7793396000039"},
+    ]}]}
+    response = _requested_sku_diagnosis(data, ["A"])
+    match = response["requested"][0]["matches"][0]
+    assert match["variant_sku"] == "A"
+    assert match["barcode"] is None
+    assert response["sibling_variant_count"] == 1
