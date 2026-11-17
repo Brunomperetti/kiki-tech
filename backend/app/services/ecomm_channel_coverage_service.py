@@ -111,7 +111,7 @@ def _candidate_index(channel, rows):
     return valid, indices
 
 
-def _find_candidates(identity, valid, indices, *, export_gtin=""):
+def _find_candidates(identity, valid, indices):
     sku = _sku(identity.get("sku"))
     code = (
         _valid_ean(identity.get("gtin"))
@@ -127,10 +127,6 @@ def _find_candidates(identity, valid, indices, *, export_gtin=""):
         reasons[position].add("SKU_EXACT")
     for position in indices["gtin"].get(code, ()):
         reasons[position].add("VALID_GTIN_EXACT")
-    # The manual Ecomm export is supplementary and NEVER confirms identity.
-    if export_gtin and not code and not identity.get("identity_blockers"):
-        for position in indices["gtin"].get(export_gtin, ()):
-            reasons[position].add("EXPORT_GTIN_CANDIDATE_REVIEW")
     strong = bool(reasons)
     for name in names:
         positions = indices["title"].get(name, set())
