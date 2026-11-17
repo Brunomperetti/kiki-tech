@@ -239,3 +239,46 @@ def test_source_presentation_remains_canonical_and_cannot_be_rewritten_by_editor
     assert case.identity_digest != original
     assert not service.equivalence_current(case, doc)
     assert service.identity_blockers(case, doc)
+
+
+@pytest.mark.parametrize("manufacturer_ean", [None, LOOKUP])
+def test_ecomm_api_ean_may_be_absent_from_manufacturer_page_without_blocking_alias(
+    manufacturer_ean,
+):
+    """Real pilot: API has barcode, original HTML provides name+250g only.
+
+    The absence of an EAN on the manufacturer page is not a contradiction,
+    but must never be interpreted as verifying the Ecomm barcode.
+    """
+    service, case, doc = setup_case(ean=manufacturer_ean)
+    case.identity["ean"] = LOOKUP
+    case.identity_digest = identity_digest(case.identity)
+    issues = service.identity_issues(case.identity, doc.body)
+    assert not any(issue.startswith("EAN incompatible") for issue in issues)
+    assert any(issue.startswith("Nombre incompatible") for issue in issues)
+    assert any(issue.startswith("Presentación incompatible") for issue in issues)
+    approve(service, case, doc)
+    assert service.identity_blockers(case, doc) == []
+    assert case.facts == []  # No manufacturer GTIN fact was approved.
+    assert case.identity["ean"] == LOOKUP  # Ecomm source remains unchanged.
+
+
+def test_manufacturer_declares_conflicting_ean_while_api_ean_is_present():
+    service, case, doc = setup_case(ean="8410771100656")
+    case.identity["ean"] = LOOKUP
+    case.identity_digest = identity_digest(case.identity)
+    issues = service.identity_issues(case.identity, doc.body)
+    assert any(issue.startswith("EAN incompatible") for issue in issues)
+    with pytest.raises(ValueError, match="discrepancias de EAN"):
+        approve(service, case, doc)
+    assert case.history == []
+
+
+def test_ean_absent_does_not_remove_other_identity_safety_checks():
+    service, case, doc = setup_case(ean=None)
+    case.identity["ean"] = LOOKUP
+    case.identity_digest = identity_digest(case.identity)
+    doc.body["identity"]["is_combo"] = True
+    with pytest.raises(ValueError, match="discrepancias de EAN"):
+        approve(service, case, doc)
+    assert any("Tipo de venta" in s for s in service.identity_blockers(case, doc))
