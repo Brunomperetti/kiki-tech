@@ -87,6 +87,7 @@ export function PersistentWorkspace({
   const [loadRevision, reload] = useState(0);
   const [channelBusy, setChannelBusy] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
+  const [sourceLinkBusy, setSourceLinkBusy] = useState(false);
   const [researchStart, setResearchStart] = useState(0);
   const [proposalBusy, setProposalBusy] = useState(false),
     [proposalDirty, setProposalDirty] = useState(false);
@@ -104,9 +105,9 @@ export function PersistentWorkspace({
     return () => onDirty(false);
   }, [dirty, proposalDirty, onDirty]);
   useEffect(() => {
-    onBusy(saving || researchBusy || proposalBusy || channelBusy);
+    onBusy(saving || researchBusy || proposalBusy || channelBusy || sourceLinkBusy);
     return () => onBusy(false);
-  }, [saving, researchBusy, proposalBusy, channelBusy, onBusy]);
+  }, [saving, researchBusy, proposalBusy, channelBusy, sourceLinkBusy, onBusy]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -141,6 +142,76 @@ export function PersistentWorkspace({
     setIdentityBlocked(!compatibleWithRow(value, variant));
     onRecord(value);
   }
+  async function reuseReviewedDocumentSources() {
+    if (!record || !fields || saving || sourceLinkBusy || identityBlocked) return;
+    setSourceLinkBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await request(
+        `/api/ecomm-app/workspace/${encodeURIComponent(variant.id)}/sources/suggestions`,
+      );
+      const payload = (await response.json()) as {
+        ecomm_id: string;
+        internal_only: boolean;
+        external_writes_enabled: boolean;
+        automatically_verified: boolean;
+        suggestions: Array<{
+          requires_operator_confirmation: boolean;
+          source: { kind: string; name: string; url: string; note: string; verified: boolean };
+        }>;
+      };
+      if (
+        payload.ecomm_id !== variant.id ||
+        payload.internal_only !== true ||
+        payload.external_writes_enabled !== false ||
+        payload.automatically_verified !== false ||
+        !Array.isArray(payload.suggestions) ||
+        payload.suggestions.length > 10
+      ) throw new Error("El servidor devolvió fuentes sin garantías de revisión.");
+      const candidates = payload.suggestions.map((item) => {
+        const src = item.source;
+        if (
+          item.requires_operator_confirmation !== true ||
+          !src || src.verified !== false || src.kind !== "OTRO" ||
+          typeof src.name !== "string" || !src.name.trim() ||
+          typeof src.url !== "string" || !src.url.startsWith("https://") ||
+          typeof src.note !== "string" || !src.note.trim()
+        ) throw new Error("Una fuente no cumple la revisión documental mínima.");
+        return {
+          kind: "OTRO" as const,
+          name: src.name,
+          url: src.url,
+          note: src.note,
+          verified: false,
+        };
+      });
+      let prepared = 0;
+      setFields((previous) => {
+        if (!previous) return previous;
+        const urls = new Set(previous.sources.map((x) => x.url.trim().replace(/\/$/, "").toLowerCase()));
+        const next = [...previous.sources];
+        for (const item of candidates) {
+          const key = item.url.trim().replace(/\/$/, "").toLowerCase();
+          if (urls.has(key) || next.length >= 20) continue;
+          next.push(item);
+          urls.add(key);
+          prepared++;
+        }
+        return prepared ? { ...previous, sources: next } : previous;
+      });
+      setMessage(
+        candidates.length
+          ? "Fuentes documentales recuperadas cuando faltan vínculos. Revisá los datos, elegí el tipo, confirmá la verificación y guardá como borrador. Si ya existe el enlace, no se duplica."
+          : "No hay documentos con procedencia, identidad y hechos aprobados vigentes para vincular.",
+      );
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSourceLinkBusy(false);
+    }
+  }
+
   async function monthlyReview() {
     if (
       !record ||
@@ -536,6 +607,7 @@ export function PersistentWorkspace({
                     readiness={assessCommercialReadiness(fields)}
                     categories={[]}
                     allowExternalResources={false}
+                    onSuggestSources={availableFeature("documents") ? reuseReviewedDocumentSources : undefined}
                   />
                   <label className="i-editor-state">
                     Estado editorial
