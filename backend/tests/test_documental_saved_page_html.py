@@ -155,3 +155,64 @@ def test_ambiguous_product_descriptions_block_automatic_composition_extraction()
     assert not [f for f in result["claims"] if f["field"] == "characteristics"]
     assert any("declaración descriptiva" in e for e in result["parser_blockers"])
     assert not any(f["field"] == "ingredients" for f in result["claims"])
+
+
+
+def test_geonat_style_page_extracts_package_count_without_health_claims():
+    """The exact original remains the only authority; text is never approved."""
+    html = """<!doctype html><html lang="es"><body><main>
+        <h1>ESPIRULINA 500 (60 COMP) - GEONAT</h1>
+        <p>🌊 ESPIRULINA 500 – GEONAT . Excelente fuente nutritiva.</p>
+        <p>✨ Beneficios principales ✅ Vitamina B, Omega 6 y salud.</p>
+        <p>📋 Información del producto Suplemento dietario | 60 comprimidos
+           | Espirulina 500 mg | Apto vegano</p>
+        <p>💊 Modo de uso 2 comprimidos diarios.</p>
+        <p>⚠️ Consultar a un médico antes de consumir.</p>
+    </main></body></html>"""
+    result = parsed(html)
+    assert result["identity"]["name"] == "ESPIRULINA 500 (60 COMP) - GEONAT"
+    assert result["identity"]["presentation"] == "60 comprimidos"
+    assert result["identity"]["ean"] is None
+    presentation = next(
+        item for item in result["claims"] if item["field"] == "presentation"
+    )
+    assert presentation["value"] == "60 comprimidos"
+    assert presentation["location"].startswith("web/p/")
+    assert presentation["quote"] in result["sections"][presentation["location"]]
+    assert "60 comprimidos" in presentation["quote"]
+    # The parser NEVER upgrades public marketing copy into a verified fact.
+    fields = {item["field"] for item in result["claims"]}
+    assert fields == {"product_name", "presentation"}
+    assert not fields & {
+        "nutrition.energy", "ingredients", "commercial_claim",
+        "certification", "allergens", "characteristics",
+    }
+
+
+@pytest.mark.parametrize("title,info", [
+    ("ESPIRULINA 500 (60 COMP)", "Información del producto 30 comprimidos"),
+    ("ESPIRULINA 500 (60 COMP)", "Información del producto 60 comprimidos y 30 comprimidos"),
+    ("ESPIRULINA 500 (60 COMP)", "Beneficios 60 comprimidos"),
+    ("ESPIRULINA 500 (60 COMP)", "Información del producto 60 cápsulas"),
+    ("ESPIRULINA 500 (60 COMP)", "Información del producto 500 mg"),
+])
+def test_manufacturer_pack_is_not_inferred_without_exact_corroborration(title, info):
+    html = f"<html><main><h1>{title}</h1><p>{info}</p></main></html>"
+    result = parsed(html)
+    assert result["identity"]["presentation"] is None
+    assert not [x for x in result["claims"] if x["field"] == "presentation"]
+
+
+def test_hidden_or_unrelated_product_info_cannot_become_pack_claim():
+    html = """<html><main>
+        <h1>GEONAT ESPIRULINA 500 (60 COMP)</h1>
+        <p aria-hidden="true">Información del producto 60 comprimidos</p>
+        <p>Modo de uso: 60 comprimidos</p>
+    </main></html>"""
+    assert parsed(html)["identity"]["presentation"] is None
+    hidden_sibling = """<html><main>
+        <h1>GEONAT ESPIRULINA 500 (60 COMP)</h1>
+        <p>Información del producto 60 comprimidos</p>
+        <p>Información del producto 30 comprimidos de otro producto</p>
+    </main></html>"""
+    assert parsed(hidden_sibling)["identity"]["presentation"] is None
