@@ -20,8 +20,9 @@ REQUIRED = frozenset({"product_name", "presentation"})
 TAXONOMY_FIELDS = ("category", "subcategory")
 
 
-def _commercial_coverage(fields, approved):
-    """Exact, reviewed facts only; names/units must match the canonical editor."""
+def _commercial_coverage(research, item, fields, approved):
+    """Exact approved fields and explicit asset permissions, never inferred."""
+    from .media_rights import media_grant_current
     from .proposals import TEXT
 
     missing = []
@@ -47,6 +48,15 @@ def _commercial_coverage(fields, approved):
     if not fields.get("attributes"):
         missing.append("attributes")
 
+    media = fields.get("media") or []
+    media_approved = 0
+    if not media:
+        missing.append("media")
+    for index, resource in enumerate(media, 1):
+        if media_grant_current(research, item, resource):
+            media_approved += 1
+        else:
+            missing.append(f"media_rights[{index}]")
     return {
         "verified": not missing,
         "missing": missing,
@@ -54,10 +64,14 @@ def _commercial_coverage(fields, approved):
             code.startswith("attributes[") for code in missing
         ),
         "taxonomy_supported": all(key not in missing for key in TAXONOMY_FIELDS),
-        # A URL in the editor is not a copyright licence. The next acceptance
-        # gate needs a separately reviewed proof of usage rights for each file.
-        "media_rights_verified": False,
-        "media_rights_status": "PENDIENTE_ACREDITAR_DERECHOS",
+        "media_rights_verified": bool(media) and media_approved == len(media),
+        "media_rights_status": (
+            "AUTORIZACIONES_DOCUMENTADAS_Y_VIGENTES"
+            if media and media_approved == len(media)
+            else "PENDIENTE_ACREDITAR_DERECHOS"
+        ),
+        "media_resources_reviewed": media_approved,
+        "media_resources_total": len(media),
     }
 
 
@@ -151,14 +165,14 @@ def require_primary_evidence(db, session, ecomm_id, fields):
                 or fields.get("title") != name + " · " + fields["presentation"]
             ):
                 continue
-            coverage = _commercial_coverage(fields, approved)
+            coverage = _commercial_coverage(research, dossier, fields, approved)
             if not coverage["verified"]:
                 raise ValueError(
-                    "Faltan hechos documentales aprobados para la taxonomía "
-                    "o atributos de esta ficha: " + ", ".join(coverage["missing"])
+                    "Faltan datos respaldados o permisos multimedia vigentes "
+                    "para esta ficha: " + ", ".join(coverage["missing"])
                 )
-            # The current gate proves identity, taxonomy and listed attributes
-            # only. A photo URL never constitutes permission to reproduce it.
+            # A media URL alone never constitutes permission. Every asset
+            # requires an original grant with exact quoted URL and human review.
             return {
                 "ready": True,
                 "commercial_coverage": coverage,
