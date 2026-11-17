@@ -3,14 +3,14 @@
 This does not discover manufacturer URLs, fetch a web page, call AI or approve
 data. Classification is exhaustive: every variant belongs to one safe/manual
 bucket, while the eligible cohort only contains stable unique ID+SKU records
-with a valid export-GTIN research *hint*, not a manufacturer's verified EAN.
+with a unique valid API barcode *hint*, not a manufacturer's verified EAN.
 """
 from collections import Counter
 from datetime import datetime, timezone
 
 from .ecomm_api_product_workspace_service import EcommApiProductWorkspace
 from .ecomm_api_work_queue_service import build_queue
-from .ecomm_gtin_export_service import safe_gtin_candidates_for_pages
+from .ecomm_api_barcode_service import api_candidates_for_pages
 
 BUCKETS = (
     "identity_review", "pack_review", "name_missing",
@@ -40,9 +40,8 @@ def build_research_batch_plan(db, *, limit=10, offset=0):
         raise ValueError("Paginación de investigación inválida.")
 
     pages = EcommApiProductWorkspace(db)._source_pages()
-    candidates = safe_gtin_candidates_for_pages(db, pages)
-    # One complete queue projection, not the first page or a filtered partial
-    # capture; all 2,784 variants remain classified.
+    candidates = api_candidates_for_pages(pages)
+    # One complete queue projection: all variants in the current API capture.
     work = build_queue(db, export_rows=True)
     rows = work["items"]
     counters = Counter()
@@ -55,7 +54,7 @@ def build_research_batch_plan(db, *, limit=10, offset=0):
             gtin = candidates.get(ecomm_id)
             if not gtin:
                 # Detect stale/improper export rather than inventing an EAN.
-                raise ValueError("GTIN de investigación no conciliado con captura completa.")
+                raise ValueError("Código de investigación no conciliado con captura API completa.")
             eligible.append({
                 "ecomm_id": ecomm_id,
                 "sku": row["sku"],
@@ -95,7 +94,7 @@ def build_research_batch_plan(db, *, limit=10, offset=0):
         "can_auto_fetch": False,
         "manufacturer_urls_discovered": 0,
         "policy": (
-            "Planificación únicamente. Los códigos del Excel son pistas de búsqueda, "
+            "Planificación únicamente. Los códigos de la API son pistas de búsqueda, "
             "no EAN certificados. Cada fabricante, presentación, fuente, claim y "
             "material gráfico requieren evidencia original y revisión humana."
         ),
