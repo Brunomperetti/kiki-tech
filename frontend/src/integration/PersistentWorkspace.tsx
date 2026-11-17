@@ -338,6 +338,16 @@ export function PersistentWorkspace({
         )}
         {record && fields && (
           <>
+            {record.documentary_gate?.enabled && record.status === "READY_FOR_CHANNELS" && (
+              <div className="i-message" role={record.documentary_gate.ready ? "status" : "alert"}>
+                {record.documentary_gate.ready
+                  ? "Control documental del piloto aprobado: identidad respaldada por el original archivado. La ficha sigue siendo interna, no se publicó en canales."
+                  : "La ficha conservó un estado anterior, pero su fuente documental ya no cumple los requisitos. No debe enviarse a canales ni confirmarse una nueva revisión hasta corregir la evidencia."}
+                {!record.documentary_gate.ready && record.documentary_gate.reason && (
+                  <p>{record.documentary_gate.reason}</p>
+                )}
+              </div>
+            )}
             {identityBlocked && (
               <div className="i-message" role="alert">
                 La identidad de Ecomm-App es incompatible con esta ficha o
@@ -564,6 +574,7 @@ export function PersistentWorkspace({
                     <ResearchPanel
                       id={variant.id}
                       csrf={csrf}
+                      media={fields.media}
                       onBusy={setResearchBusy}
                       workspaceVersion={record.version}
                       autoStart={researchStart}

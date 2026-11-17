@@ -1,5 +1,7 @@
 """Authenticated documental workspace. No provider clients or startup DDL."""
 
+from datetime import datetime, timezone
+import base64
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.core.config import get_settings
@@ -7,7 +9,8 @@ from app.core.security import require_session, require_csrf
 from app.database.session import get_db
 from app.services.documental.research import Research
 from app.services.documental.proposals import Proposals
-from app.services.documental.local_documents import LocalDocuments, parse_local
+from app.services.documental.local_documents import LocalDocuments, parse_local, reader_available
+from app.services.documental.source_fetch import fetch_html
 from app.services.documental.contracts import (
     Extract,
     Review as ProposalReview,
@@ -16,6 +19,8 @@ from app.services.documental.contracts import (
     Provenance,
 )
 from app.services.documental.contracts import FactReview
+from app.services.documental.contracts import DocumentIdentityReview, ManufacturerFetch, MediaRightsReview
+from app.services.documental.media_rights import review_media_rights
 
 
 def enabled():
@@ -87,6 +92,121 @@ def review_fact(
             body.reason,
         ),
     )
+
+
+@router.post("/{ecomm_id}/documents/{document_id}/identity-review")
+def review_identity(
+    ecomm_id: str,
+    document_id: str,
+    body: DocumentIdentityReview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """A reviewed source may have a different commercial name, never a different SKU."""
+    return execute(
+        db,
+        lambda: Research(db, session).review_document_identity(
+            ecomm_id, body.expected_version, document_id,
+            body.document_version, body.decision, body.reason,
+        ),
+    )
+
+
+@router.post("/{ecomm_id}/documents/{document_id}/media-rights")
+def review_asset_permissions(
+    ecomm_id: str,
+    document_id: str,
+    body: MediaRightsReview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Review an explicit original written grant for a specific asset URL."""
+    return execute(
+        db,
+        lambda: review_media_rights(
+            Research(db, session),
+            ecomm_id, body.expected_version, document_id, body.document_version,
+            body.media_url, body.media_kind, body.source_url, body.decision,
+            body.licence_basis, body.location, body.quote, body.reason,
+        ),
+    )
+
+
+@router.post("/{ecomm_id}/documents/fetch-manufacturer")
+def fetch_manufacturer(
+    ecomm_id: str,
+    body: ManufacturerFetch,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """One allowlisted public HTML source, no bulk or provider writes."""
+    config = get_settings()
+    if (
+        not config.kiki_document_source_fetch_enabled
+        or not config.kiki_document_source_fetch_hosts.strip()
+        or ecomm_id != config.kiki_document_source_fetch_pilot_id
+    ):
+        raise HTTPException(
+            403, "Consulta automática deshabilitada o fuera de la variante piloto."
+        )
+
+    def operation():
+        try:
+            # Fail before making an external request if the isolated reader,
+            # source identity or optimistic version is unavailable.
+            if (
+                not config.kiki_document_parser_kernel_required
+                or not reader_available()
+            ):
+                raise ValueError(
+                    "Lector documental aislado obligatorio antes de consultar al fabricante."
+                )
+            research = Research(db, session)
+            item = research.dossier(ecomm_id)
+            research.expect(item, body.expected_version)
+            today = datetime.now(timezone.utc).date()
+            for event in item.history or []:
+                if (
+                    event.get("action") == "DOCUMENT_INCORPORATED"
+                    and (event.get("detail") or {}).get("source_fetched")
+                ):
+                    try:
+                        date = datetime.fromisoformat(event["at"]).date()
+                    except (KeyError, TypeError, ValueError):
+                        raise ValueError("Historial de consultas inválido; contacto externo bloqueado.") from None
+                    if date == today:
+                        raise ValueError(
+                            "El piloto admite una consulta automática diaria por variante."
+                        )
+            original, receipt = fetch_html(
+                body.reference_url, config.kiki_document_source_fetch_hosts
+            )
+            imported = Incorporate(
+                kind="FILE",
+                web_snapshot=True,
+                expected_version=body.expected_version,
+                filename="fabricante-" + receipt["sha256"][:16] + ".html",
+                content_type="text/html",
+                content_base64=base64.b64encode(original).decode("ascii"),
+                provenance_note=body.provenance_note,
+                reference_url=body.reference_url,
+                declared_official=False,
+                declared_consulted_at=datetime.now(timezone.utc),
+                authorized_local_processing=True,
+            )
+            parsed = parse_local(imported)
+            db.expire_all()  # Re-read versions before the mutation after slow I/O.
+            return LocalDocuments(db, session).incorporate(
+                ecomm_id, imported, parsed, source_retrieval=receipt
+            )
+
+        except Exception:
+            # A denied robots.txt or failed parse must not commit even an
+            # empty research dossier. execute() may commit safe invalidations.
+            db.rollback()
+            raise
+
+    return execute(db, operation)
 
 
 @router.post("/{ecomm_id}/documents/import")

@@ -89,19 +89,22 @@ export type ResearchDocument = {
   hash: string;
   versions: number[];
   issues: string[];
+  identity_reconciliation?: { decision: string; current: boolean; reviewer?: string | null };
   body: {
     title: string;
     kind: string;
     synthetic: boolean;
     origin_kind?: "FILE" | "URL";
     retrieval?: {
-      simulated: true;
-      network_enabled: false;
+      simulated: boolean;
+      network_enabled: boolean;
       requested_url: string;
       final_url: string;
       acquired_at: string;
       sha256: string;
-      hops: unknown[];
+      hops?: unknown[];
+      robots_checked?: boolean;
+      tls_hostname_verified?: boolean;
     };
     associated_ecomm_id?: string;
     parse_status?: string;
@@ -116,6 +119,7 @@ export type ResearchDocument = {
       declared_manufacturer?: string | null;
       declared_consulted_at?: string | null;
       declared_official: boolean;
+      capture_mode?: "USER_SAVED_WEB_HTML" | "ALLOWLISTED_HTTPS_FETCH" | "LOCAL_REFERENCE_OR_FILE";
       note: string;
       reference_url: string;
       registered_at: string;

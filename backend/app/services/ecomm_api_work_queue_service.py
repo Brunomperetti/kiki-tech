@@ -19,6 +19,7 @@ from .ecomm_api_product_workspace_service import (
     review_schedule,
 )
 from .ecomm_channel_coverage_service import build_channel_coverage
+from .ecomm_gtin_export_service import safe_gtin_candidates_for_pages
 from .ecomm_catalog_quality import (
     LABELS as QUALITY_FILTERS,
     identity_index,
@@ -28,6 +29,7 @@ from .ecomm_catalog_quality import (
 FILTERS = {
     "all",
     "ai_eligible",
+    "research_gtin_unique",
     "identity",
     "draft",
     "ready",
@@ -360,6 +362,9 @@ def build_queue(
         api_validation=get_settings().kiki_channel_workspace_enabled,
         edits=edits,
     )
+    # Excel GTIN remains a lookup hint, never a verified manufacturer claim.
+    # One full ID+SKU validation for this request; no supplier calls or writes.
+    research_gtin_candidates = safe_gtin_candidates_for_pages(db, pages)
     sku_owners = Counter(
         _value(v.get("sku")).casefold()
         for p in pages
@@ -393,6 +398,15 @@ def build_queue(
                     channel_matrix["items_by_id"].get(ecomm_id),
                     source["identity_blockers"],
                 )
+                if (
+                    ecomm_id in research_gtin_candidates
+                    and not item["identity_issue"]
+                    and not item["is_combo"]
+                    and item["source_name_present"]
+                    and bool(_value(source.get("variant_description")))
+                ):
+                    # A candidate to research, not an approved GTIN or fiche.
+                    item["flags"].append("research_gtin_unique")
                 extra_flags = editorial.get(ecomm_id, [])
                 item["flags"].extend(
                     quality_flags(source, edits.get(ecomm_id), quality)

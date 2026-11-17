@@ -149,6 +149,139 @@ class PassiveHTML(HTMLParser):
         self.current.append(value)
 
 
+
+class PageSnapshotHTML(HTMLParser):
+    """Non-rendering extraction of a saved, source-preserved manufacturer page.
+
+    A unique H1, an unambiguous size and a narrowly matched *literal*
+    composition fragment are unapproved candidates. Product-specific
+    WooCommerce descriptive sections are the only source for free text.
+    No CSS/JS, resource fetch, inferred ingredients or nutritional claims.
+    """
+
+    OMIT = frozenset({
+        "head", "script", "style", "noscript", "template", "svg", "iframe",
+        "object", "embed", "form", "nav", "footer", "canvas",
+    })
+    VOID = frozenset({
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
+    })
+    BLOCK = frozenset({"p", "li", "h1", "h2", "h3", "th", "td"})
+    WEIGHT = re.compile(r"\d{1,5}(?:[.,]\d{1,3})?\s*(?:g|gr|kg|ml|l)\b", re.I)
+    PRODUCT_AREAS = {
+        "woocommerce-tabs", "woocommerce-product-details__short-description",
+        "tab-description",
+    }
+    # Narrow pilot pattern: only an exact manufacturer sentence fragment,
+    # never extended marketing prose or inferred specific ingredients.
+    MIX_CLAIM = re.compile(
+        r"\bcontiene\s+(\d{1,2}\s+frutos\s+secos\s*\+\s*"
+        r"\d{1,2}\s+semillas\s+al\s+oreganato)\b", re.I,
+    )
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tags, self.omit = [], 0
+        self.blocks, self.cells, self.headings = [], [], []
+        self.captures = []
+        self.tr_cells = []
+        self.product_depth = 0
+        self.events = 0
+        self.total_text = 0
+
+    def handle_starttag(self, tag, attrs):
+        self.events += 1
+        if self.events > 15000 or len(self.tags) > 100:
+            raise ValueError("HTML de página demasiado complejo.")
+        attrs = dict(attrs)
+        classes = set((attrs.get("class") or "").lower().split())
+        hidden = (
+            tag in self.OMIT or "hidden" in attrs
+            or (attrs.get("aria-hidden") or "").casefold() == "true"
+            or bool(classes & {"hidden", "sr-only", "visually-hidden", "d-none", "screen-reader-text"})
+            or bool(re.search(r"(?:display\s*:\s*none|visibility\s*:\s*hidden)",
+                              attrs.get("style") or "", re.I))
+        )
+        if tag in self.VOID:
+            return
+        ignored = self.omit > 0 or hidden
+        in_product = bool(
+            self.product_depth or
+            (classes & self.PRODUCT_AREAS) or
+            (attrs.get("id") or "").lower() in self.PRODUCT_AREAS
+        ) and not ignored
+        self.tags.append((tag, ignored, in_product))
+        if ignored:
+            self.omit += 1
+            return
+        if in_product:
+            self.product_depth += 1
+        if tag == "tr":
+            self.tr_cells = []
+        if tag in self.BLOCK:
+            self.captures.append({
+                "tag": tag, "text": [], "line": self.getpos()[0],
+                "product_description": in_product,
+            })
+
+    def handle_endtag(self, tag):
+        if not self.tags:
+            return
+        # A closing tag for unrelated markup must not end a hidden subtree.
+        top, ignored, in_product = self.tags[-1]
+        if top != tag:
+            return
+        self.tags.pop()
+        if ignored:
+            self.omit -= 1
+            return
+        if in_product:
+            self.product_depth -= 1
+        if tag in self.BLOCK and self.captures and self.captures[-1]["tag"] == tag:
+            active = self.captures.pop()
+            value = " ".join(" ".join(active["text"]).split())
+            if value:
+                if tag == "h1":
+                    self.headings.append((active["line"], value))
+                elif tag in {"th", "td"} and "tr" in (x[0] for x in self.tags):
+                    self.tr_cells.append(value)
+                elif tag not in {"th", "td"}:
+                    self.blocks.append((
+                        tag, active["line"], value, active["product_description"]
+                    ))
+        if tag == "tr" and len(self.tr_cells) >= 2:
+            self.cells.append(tuple(self.tr_cells[:3]))
+            self.tr_cells = []
+
+    def handle_data(self, data):
+        if self.omit or not self.captures:
+            return
+        self.total_text += len(data)
+        if self.total_text > MAX_TEXT:
+            raise ValueError("Texto visible de página superior al límite.")
+        for active in self.captures:
+            active["text"].append(data)
+
+    def sections(self):
+        result = {}
+        if len(self.headings) == 1:
+            line, title = self.headings[0]
+            if len(title) <= 180:
+                result[f"web/h1/linea/{line}"] = "Nombre: " + title
+        for i, row in enumerate(self.cells, 1):
+            label, value = row[0].strip(), row[1].strip()
+            if normalized(label) in {"peso", "presentacion", "contenido neto"}:
+                if len(value) <= 40 and self.WEIGHT.fullmatch(value):
+                    result[f"web/tabla/fila/{i}"] = "Presentación: " + value
+        for i, (tag, line, value, product_description) in enumerate(self.blocks, 1):
+            if len(value) <= 2000:
+                prefix = "web/product" if product_description and tag == "p" else "web"
+                result[f"{prefix}/{tag}/linea/{line}/bloque/{i}"] = value
+        return result
+
+
+
 def pdf_sections(raw):
     from .hileret_brochure import matches, STREAM_LIMIT, TOTAL_STREAM_LIMIT
 
@@ -259,7 +392,7 @@ def pdf_sections(raw):
     return sections
 
 
-def parse(name, mime, encoded):
+def parse(name, mime, encoded, *, web_snapshot=False):
     extension = safe_filename(name)
     if mime != MIMES[extension]:
         raise ValueError("El MIME no corresponde a la extensión permitida.")
@@ -279,16 +412,24 @@ def parse(name, mime, encoded):
         except UnicodeError:
             raise ValueError("El documento debe usar UTF-8.") from None
         if (
-            len(text) > MAX_TEXT
+            len(text) > (MAX_BYTES if web_snapshot and extension == ".html" else MAX_TEXT)
             or any(ord(c) < 32 and c not in "\n\r\t" for c in text)
             or re.search("[\u202a-\u202e\u2066-\u2069]", text)
         ):
             raise ValueError("Texto excesivo o con controles inseguros.")
+        if web_snapshot and extension != ".html":
+            raise ValueError("Las capturas web solo admiten archivo HTML.")
         if extension == ".html":
-            html = PassiveHTML()
-            html.feed(text)
-            html.flush()
-            sections = dict(html.fragments)
+            if web_snapshot:
+                page = PageSnapshotHTML()
+                page.feed(text)
+                page.close()
+                sections = page.sections()
+            else:
+                html = PassiveHTML()
+                html.feed(text)
+                html.flush()
+                sections = dict(html.fragments)
         elif extension == ".json":
             data = json.loads(text)
             if not isinstance(data, dict) or len(data) > 40:
@@ -344,6 +485,25 @@ def parse(name, mime, encoded):
             if ":" in line
         ]
     )
+    page_ambiguous = False
+    if web_snapshot and extension == ".html":
+        # Pages often publish composition in a description paragraph instead
+        # of a labelled field. Keep only exact, brief, product-scoped fragments.
+        # Never lift generic nutrition, health claims or nearby product cards.
+        extracts = []
+        for location, quote in sections.items():
+            if not location.startswith("web/product/p/"):
+                continue
+            matches = list(PageSnapshotHTML.MIX_CLAIM.finditer(quote))
+            for match in matches:
+                extracts.append((match.group(1), location, quote))
+        # Two differing composition claims are ambiguous, not a licence to
+        # pick whichever one looks best.
+        if len(extracts) == 1:
+            value, location, quote = extracts[0]
+            entries.append(("características", value, None, location, quote))
+        elif len(extracts) > 1:
+            page_ambiguous = True
     if json_values is None:
         # A bounded single row of a passive HTML/PDF nutritional table, never pair unrelated lines.
         for loc, line in sections.items():
@@ -357,6 +517,11 @@ def parse(name, mime, encoded):
             if row and ALIASES.get(normalized(row[1]), "").startswith("nutrition."):
                 entries.append((row[1], row[2], None, loc, line))
     values, warnings, ambiguous = {}, [], set()
+    if page_ambiguous:
+        warnings.append(
+            "Más de una declaración descriptiva de composición: "
+            "requiere revisión del original; no se extrajo característica."
+        )
     for label, literal, unit, location, quote in entries:
         field = ALIASES.get(normalized(label))
         if not field or not literal.strip():

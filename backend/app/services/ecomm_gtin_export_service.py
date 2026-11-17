@@ -252,8 +252,14 @@ def safe_gtin_candidates_for_pages(db, pages, *, export_record=_UNFETCHED):
     if not isinstance(payload, dict) or payload.get("version") != SCHEMA_VERSION:
         return {}
     rows = payload.get("rows")
-    if not isinstance(rows, list):
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
         return {}
+    # Defend even against a malformed persisted export whose VALID_UNIQUE
+    # status is stale or incorrect. The same GTIN must not identify two rows.
+    code_counts = Counter(
+        row.get("gtin") for row in rows
+        if isinstance(row.get("gtin"), str) and row.get("gtin")
+    )
     live = {}
     for page in pages:
         for parent in page.get("items") or []:
@@ -289,6 +295,7 @@ def safe_gtin_candidates_for_pages(db, pages, *, export_record=_UNFETCHED):
             and isinstance(code, str)
             and _gtin_check_digit_valid(code)
             and code
+            and code_counts[code] == 1
         ):
             result[eid] = code
     return result

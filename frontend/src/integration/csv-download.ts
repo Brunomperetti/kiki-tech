@@ -16,7 +16,7 @@ export function downloadReviewCsv(blob: Blob, filename: string) {
     !/^text\/csv(?:;|$)/i.test(blob.type) ||
     !blob.size ||
     blob.size > 10 * 1024 * 1024 ||
-    !/^kiki-(ml|tn)-(all|no_match|pending)\.csv$/.test(filename)
+    !(/^(?:kiki-(ml|tn)-(all|no_match|pending)|kiki-investigacion-gtin-unico)\.csv$/.test(filename))
   )
     throw new Error("CSV o nombre de descarga fuera del contrato permitido.");
   const url = URL.createObjectURL(blob);

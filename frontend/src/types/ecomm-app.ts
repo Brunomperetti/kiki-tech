@@ -674,6 +674,10 @@ export interface EcommApiProductEdit {
   version:number;
   fields:EcommEditableFields;
   readiness:KikiReadiness;
+  documentary_gate?: {
+    enabled:true; ready:boolean; reason:string|null;
+    document_id:string|null; original_sha256:string|null;
+  };
   review_schedule:{last_review_at:string|null;next_review_at:string|null;review_due:boolean};
   history:{
     at:string; version:number; previous_status:string; new_status:string;

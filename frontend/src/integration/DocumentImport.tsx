@@ -46,6 +46,7 @@ export function DocumentImport({
   const [originalInfo, setOriginalInfo] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [consultedDate, setConsultedDate] = useState("");
+  const [webSnapshot, setWebSnapshot] = useState(false);
   const local = document?.body.synthetic === false;
   async function perform(action: () => Promise<void>) {
     onBusy(true);
@@ -64,6 +65,10 @@ export function DocumentImport({
         throw new Error(
           "Autorizá expresamente el procesamiento local de este archivo o referencia.",
         );
+      if (kind === "FILE" && webSnapshot && (
+        !file?.name.toLowerCase().endsWith(".html") ||
+        !url.startsWith("https://") || !consultedDate
+      )) throw new Error("La página guardada necesita archivo .html, URL HTTPS y fecha de consulta.");
       let encoded = "";
       if (kind === "FILE") {
         if (
@@ -100,6 +105,7 @@ export function DocumentImport({
         `${basePath(id)}/import`,
         {
           kind,
+          web_snapshot: kind === "FILE" && webSnapshot,
           expected_version: data.version,
           filename: kind === "FILE" ? file!.name : "",
           content_type:
@@ -140,6 +146,31 @@ export function DocumentImport({
           "Documento incorporado en PostgreSQL de pruebas. La procedencia y cada dato requieren revisión independiente.",
           "Documento incorporado en KIKI PostgreSQL. La procedencia y cada dato requieren revisión independiente.",
         ),
+      );
+    });
+  }
+  async function fetchManufacturerSource() {
+    if (!authorized || !url.startsWith("https://") || note.trim().length < 10)
+      return onError("La consulta requiere URL HTTPS, motivo y autorización.");
+    if (!window.confirm(
+      "¿Consultar UNA página pública del fabricante? KIKI validará el dominio, robots.txt y TLS, archivará el HTML, y dejará TODOS los datos pendientes de revisión. No publica ni modifica canales."
+    )) return;
+    await perform(async () => {
+      const value = await changeResearch(
+        id,
+        `${basePath(id)}/fetch-manufacturer`,
+        {
+          expected_version: data.version,
+          reference_url: url,
+          provenance_note: note,
+          authorized_local_processing: true,
+        },
+        csrf,
+      );
+      setAuthorized(false);
+      onResult(
+        value,
+        "HTML original obtenido por HTTPS y archivado en KIKI. Revisá identidad, procedencia y cada hecho antes de generar una ficha."
       );
     });
   }
@@ -190,8 +221,9 @@ export function DocumentImport({
         </label>
         <p>
           Procesamiento local aislado. No se envían archivos a terceros. PDF con
-          texto (máximo 10 páginas), TXT UTF-8, HTML pasivo sin atributos o JSON
-          estructurado; hasta 512 KiB. Sin OCR ni búsquedas web.
+          texto (máximo 10 páginas), TXT UTF-8, HTML pasivo o captura HTML
+          guardada de una página web, y JSON estructurado; hasta 512 KiB.
+          No navega Internet, no ejecuta scripts ni verifica la autenticidad.
         </p>
         {(isHileret(id) || production) && (
           <p>
@@ -222,6 +254,26 @@ export function DocumentImport({
             Carga de archivos bloqueada: falta el lector documental aislado.
             Podés registrar una referencia URL sin descargar; no acredita hechos
             ni procedencia oficial.
+          </p>
+        )}
+        {kind === "FILE" && (
+          <label className="r-check">
+            <input
+              type="checkbox"
+              disabled={busy}
+              checked={webSnapshot}
+              onChange={(e) => setWebSnapshot(e.target.checked)}
+            />
+            El archivo es una página web HTML original que guardé desde el navegador
+            (no es transcripción). Se conserva su SHA-256; la URL y su
+            autenticidad requieren revisión humana.
+          </label>
+        )}
+        {kind === "FILE" && webSnapshot && (
+          <p role="note">
+            Para una página guardada son obligatorios la URL HTTPS y la fecha de
+            consulta. El lector aislado ignora scripts y recursos externos.
+            Extrae candidatos, nunca hechos aprobados.
           </p>
         )}
         {kind === "FILE" && (
@@ -287,12 +339,31 @@ export function DocumentImport({
             busy ||
             !authorized ||
             note.trim().length < 10 ||
-            (kind === "FILE" ? !file : !url)
+            (kind === "FILE" ? (!file || (webSnapshot && (!url.startsWith("https://") || !consultedDate))) : !url)
           }
           onClick={incorporate}
         >
           Incorporar documentación
         </button>
+        {capabilities?.document_fetch === true && (
+          <div className="r-document" role="group" aria-label="Consulta puntual de fabricante">
+            <h4>Obtener una página del fabricante (piloto)</h4>
+            <p>
+              Solo para la variante piloto y dominios habilitados. KIKI comprueba
+              robots.txt y TLS, no sigue redirecciones y conserva el HTML
+              original. No busca masivamente, no certifica EAN, no aprueba
+              hechos ni publica. Si la web bloquea el acceso, usá la carga manual.
+            </p>
+            <button
+              type="button"
+              disabled={busy || !authorized || note.trim().length < 10
+                || !url.startsWith("https://")}
+              onClick={() => void fetchManufacturerSource()}
+            >
+              Consultar y archivar página autorizada
+            </button>
+          </div>
+        )}
       </details>
       {local && document && (
         <section
@@ -354,6 +425,22 @@ export function DocumentImport({
                 document.body.source!.review_state}
             </strong>
           </p>
+          {document.body.source?.capture_mode === "USER_SAVED_WEB_HTML" && (
+            <p role="note">
+              Captura HTML guardada por un operador. El sistema no comprobó la
+              descarga ni autenticó el dominio. Se conserva el archivo original;
+              revisar citas, identidad y procedencia antes de aprobar.
+            </p>
+          )}
+          {document.body.source?.capture_mode === "ALLOWLISTED_HTTPS_FETCH" && (
+            <p role="note">
+              Página obtenida por KIKI mediante HTTPS y dominio autorizado.
+              Se comprobó el permiso de robots.txt y la identidad TLS,
+              y se archivó el original con SHA-256. Esto NO confirma que
+              corresponda al SKU: la identidad, procedencia y hechos todavía
+              requieren revisión humana.
+            </p>
+          )}
           <p>{document.body.source!.note}</p>
           <p>
             Fabricante declarado:{" "}

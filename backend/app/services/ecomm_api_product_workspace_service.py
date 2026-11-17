@@ -267,18 +267,78 @@ class EcommApiProductWorkspace:
             "external_writes_enabled": False,
         }
 
-    def get(self, ecomm_id: str) -> dict:
+    def get(self, ecomm_id: str, *, session=None) -> dict:
         source = self._source(ecomm_id)
         edit = self.db.scalar(
             select(EcommApiProductEdit).where(EcommApiProductEdit.ecomm_id == ecomm_id)
         )
-        return self._serialize(edit, source)
+        result = self._serialize(edit, source)
+        from app.core.config import get_settings
 
-    def save(self, ecomm_id: str, fields: dict, status: str, expected_version: int) -> dict:
+        config = get_settings()
+        if not (
+            config.kiki_document_channel_guard_enabled
+            and ecomm_id == config.kiki_document_channel_guard_pilot_id
+        ):
+            return result
+        # Read-time status must reflect a later document revocation. We never
+        # silently mutate READY_FOR_CHANNELS in the database; expose its
+        # *effective* readiness and block renewal until evidence is restored.
+        reason = None
+        proof = None
+        if edit and edit.status == "READY_FOR_CHANNELS":
+            try:
+                if not config.kiki_document_workspace_enabled:
+                    raise ValueError("El expediente documental está deshabilitado.")
+                from .documental.channel_readiness_guard import require_primary_evidence
+
+                proof = require_primary_evidence(
+                    self.db, session, ecomm_id, result["fields"]
+                )
+            except (ValueError, RuntimeError) as exc:
+                reason = str(exc)
+        else:
+            reason = "La revisión documental se comprueba al preparar la ficha para canales."
+        result["documentary_gate"] = {
+            "enabled": True,
+            "ready": proof is not None,
+            "reason": reason,
+            "document_id": proof["document_id"] if proof else None,
+            "original_sha256": proof["document_sha256"] if proof else None,
+        }
+        if edit and edit.status == "READY_FOR_CHANNELS" and proof is None:
+            ready = result["readiness"]
+            ready["missing"].append("documentary_primary_source")
+            ready["ready"] = False
+            ready["total"] += 1
+            ready["percent"] = round(
+                100 * ready["completed"] / ready["total"]
+            )
+        return result
+
+    def save(
+        self, ecomm_id: str, fields: dict, status: str, expected_version: int,
+        *, session=None,
+    ) -> dict:
         if expected_version < 0:
             raise ValueError("Número de versión inválido.")
         normalized = _canonical_fields(fields)
         _validate(normalized, status)
+        # Keep the legacy editor and all channel integrations unchanged until
+        # explicit pilot activation; all direct calls fail closed when guarded.
+        if status == "READY_FOR_CHANNELS":
+            from app.core.config import get_settings
+
+            config = get_settings()
+            if (
+                config.kiki_document_channel_guard_enabled
+                and ecomm_id == config.kiki_document_channel_guard_pilot_id
+            ):
+                if not config.kiki_document_workspace_enabled:
+                    raise ValueError("El expediente documental debe estar habilitado.")
+                from .documental.channel_readiness_guard import require_primary_evidence
+
+                require_primary_evidence(self.db, session, ecomm_id, normalized)
         source = self._source(ecomm_id)
         if source.get("identity_blockers"):
             raise ValueError("Identidad contradictoria: barcode y gtin discrepan. Guardado bloqueado.")
@@ -340,7 +400,9 @@ class EcommApiProductWorkspace:
         return self._serialize(edit, source)
 
 
-    def confirm_monthly_review(self, ecomm_id: str, expected_version: int) -> dict:
+    def confirm_monthly_review(
+        self, ecomm_id: str, expected_version: int, *, session=None
+    ) -> dict:
         """Record explicit source re-verification, without changing any product data."""
         source = self._source(ecomm_id)
         edit = self.db.scalar(
@@ -356,6 +418,18 @@ class EcommApiProductWorkspace:
             raise ValueError("La ficha necesita estar completa y lista para canales.")
         if edit.source_sku != source["sku"]:
             raise ValueError("El SKU cambió. Verificá la identidad de la variante.")
+        from app.core.config import get_settings
+
+        config = get_settings()
+        if (
+            config.kiki_document_channel_guard_enabled
+            and ecomm_id == config.kiki_document_channel_guard_pilot_id
+        ):
+            if not config.kiki_document_workspace_enabled:
+                raise ValueError("El expediente documental debe estar habilitado.")
+            from .documental.channel_readiness_guard import require_primary_evidence
+
+            require_primary_evidence(self.db, session, ecomm_id, edit.fields)
         now = _now()
         event = {
             "at": now.isoformat(), "version": edit.version + 1,

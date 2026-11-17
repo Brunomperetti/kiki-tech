@@ -25,6 +25,28 @@ def health(path):
 
 
 def main():
+    # Explicitly authorized deployment gate, on the existing service and DB.
+    # This runs before the API starts, never in the HTTP request path.
+    # If migration fails, do NOT abort/replace the existing core API: the
+    # documentary capabilities correctly remain unavailable until validated.
+    if os.environ.get("KIKI_DOCUMENT_BOOTSTRAP_ON_STARTUP", "false").lower() == "true":
+        try:
+            from app.database.session import engine
+            from app.services.documental.one_time_bootstrap import apply_additive_schema
+            result = apply_additive_schema(
+                engine, expected_database="kiki_tech_db"
+            )
+            print(
+                "KIKI document schema verified; tables=" +
+                str(result["tables"]) + "; no Ecomm/channel writes.",
+                flush=True,
+            )
+        except Exception:
+            print(
+                "KIKI document schema bootstrap rejected: no partial DDL "
+                "committed; existing API preserved. Check protected logs.",
+                flush=True,
+            )
     boundary = os.getuid() == 0
     if boundary:
         try:

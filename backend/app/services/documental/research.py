@@ -35,11 +35,16 @@ def fact_digest(fact):
 
 
 def identity_digest(reference):
-    # Provenance display and copying the exact canonical presentation to the editor
-    # do not change the variant. Genuine contradictory editorial values still do.
-    values = {k: v for k, v in reference.items() if k != "provenance"}
-    if values.get("editorial_presentation") == values.get("presentation"):
-        values["editorial_presentation"] = None
+    # Commercial presentation is an editorial overlay, not the canonical Ecomm
+    # identity. Saving a *reviewed* manufacturer's size must not invalidate
+    # approved facts merely because the text differs from the original API.
+    # Every document is still checked against the editorial presentation in
+    # identity_issues(), which blocks unrelated sizes and revokes evidence.
+    # SKU, EAN, source presentation, combo type and lookup GTIN stay signed.
+    values = {
+        key: value for key, value in reference.items()
+        if key not in {"provenance", "presentation_lookup_hint", "editorial_presentation"}
+    }
     return digest(values)
 
 
@@ -103,26 +108,63 @@ class Research:
             raise ValueError("Identidad bloqueada: barcode y gtin discrepan.")
         edit = self.edit_record(ident)
         fields = edit.fields if edit else {}
+        # The API barcode and a lookup-only Excel hint MUST remain separate.
+        # Manufacturer documents may not print the EAN even when name, brand
+        # and presentation match. A lookup hint must not become an approved
+        # fact or an obligatory barcode claim in every source document.
+        lookup_gtin = None
+        lookup_provenance = "Sin código externo apto para búsqueda"
+        if not source["gtin"]:
+            # Only *unique, non-combo* barcodes with exact Ecomm ID+SKU and a
+            # complete, unchanged API capture can be considered. This merely
+            # supplies a reference for source matching. It is NOT a verified
+            # manufacturer assertion and never approves documentary facts.
+            from app.services.ecomm_gtin_export_service import (
+                safe_gtin_candidates_for_pages,
+            )
+
+            # A Research instance is scoped to one guarded request/transaction.
+            # Build the validated export index once when several references are
+            # checked together; never reuse it across HTTP requests.
+            export_candidates = getattr(self, "_export_gtin_candidates", None)
+            if export_candidates is None:
+                export_candidates = safe_gtin_candidates_for_pages(
+                    self.db, self.workspace_type(self.db)._source_pages()
+                )
+                self._export_gtin_candidates = export_candidates
+            candidate = export_candidates.get(ident)
+            if candidate:
+                lookup_gtin = candidate
+                lookup_provenance = (
+                    "Excel de inventario Ecomm-App: ID y SKU exactos, GTIN único "
+                    "y válido, variante no combo. Solo pista de búsqueda, "
+                    "no GTIN certificado por API ni por fabricante."
+                )
+        from .presentation_hint import candidate as size_candidate
+
         return {
             "ecomm_id": ident,
             "name": source["product_name"],
             "sku": source["sku"],
             "presentation": source["variant_description"],
+            "presentation_lookup_hint": size_candidate(source),
             "is_combo": source["is_combo"],
             "parent_is_combo": source.get("parent_is_combo"),
             "ean": source["gtin"],
+            "lookup_gtin": lookup_gtin,
             "barcode": source.get("barcode"),
             "gtin_raw": source.get("gtin_raw"),
             "brand": source.get("brand"),
             "manufacturer": source.get("manufacturer"),
             "editorial_presentation": fields.get("presentation") or None,
             "provenance": {
-                k: "Captura API; no equivale a verificación del fabricante"
-                for k in ("name", "presentation", "ean")
-            }
-            | {
-                k: "Campo KIKI de contraste; no aprobado por defecto"
-                for k in ("brand", "manufacturer")
+                "name": "Captura API; no equivale a verificación del fabricante",
+                "presentation": "Captura API; no equivale a verificación del fabricante",
+                "presentation_lookup_hint": "Medida encontrada en el texto original de Ecomm; solo pista para contrastar con etiqueta y fabricante, nunca presentación certificada.",
+                "ean": "Captura API; no equivale a verificación del fabricante",
+                "lookup_gtin": lookup_provenance,
+                "brand": "Campo KIKI de contraste; no aprobado por defecto",
+                "manufacturer": "Campo KIKI de contraste; no aprobado por defecto",
             },
         }
 
@@ -167,6 +209,16 @@ class Research:
                 issues.append(
                     f"{label} incompatible o ausente: referencia «{expected}» / documento «{actual or 'sin datos'}»."
                 )
+        # A validated Excel GTIN is a lookup hint. Do not demand that every
+        # manufacturer's document print it, but reject an explicit conflicting
+        # EAN on a document before any fact can be approved.
+        hint = reference.get("lookup_gtin")
+        claimed = body["identity"].get("ean")
+        if hint and claimed and str(hint).strip() != str(claimed).strip():
+            issues.append(
+                "EAN declarado en documento incompatible con la pista GTIN "
+                "del Excel Ecomm-App; revisar variante y presentación."
+            )
         if (
             reference.get("editorial_presentation")
             and reference["editorial_presentation"] != reference["presentation"]
@@ -179,11 +231,147 @@ class Research:
                 issues.append(
                     "Documento asociado a otro Ecomm ID; no se reutiliza por SKU/EAN."
                 )
-            if body["identity"].get("is_combo") is None or (
-                body["identity"]["is_combo"] != reference["is_combo"]
+            document_sale_type = body["identity"].get("is_combo")
+            # Manufacturers commonly identify an individual retail product by
+            # its *exact name and presentation* without an explicit "unidad"
+            # field. Absence must not block all ordinary, non-combo evidence.
+            # Pack/kit identities remain strict: no inherited unit EAN, no
+            # assumption about contents or the actual pack presentation.
+            if document_sale_type is not None and (
+                document_sale_type != reference["is_combo"]
             ):
-                issues.append("Tipo de venta (unidad/pack) ausente o incompatible.")
+                issues.append("Tipo de venta (unidad/pack) incompatible.")
+            elif reference["is_combo"] is True and document_sale_type is not True:
+                issues.append(
+                    "Pack/kit sin tipo de venta explícito en el documento; "
+                    "no se puede acreditar la presentación del pack."
+                )
         return issues
+
+    @staticmethod
+    def _equivalence_record(item, doc):
+        """Latest explicit decision for this exact document, never shared by EAN/SKU."""
+        for event in reversed(item.history or []):
+            if event.get("action") != "DOCUMENT_IDENTITY_REVIEW":
+                continue
+            detail = event.get("detail") or {}
+            if detail.get("document_id") == doc.id:
+                return detail
+        return None
+
+    def equivalence_current(self, item, doc):
+        record = self._equivalence_record(item, doc)
+        return bool(
+            record
+            and record.get("decision") == "APPROVED"
+            and record.get("ecomm_id") == item.ecomm_id
+            and record.get("identity_digest") == item.identity_digest
+            and record.get("document_version") == doc.version
+            and record.get("document_hash") == doc.digest
+            and record.get("source_name") == item.identity.get("name")
+            and record.get("source_presentation") == item.identity.get("presentation")
+            and record.get("document_name") == doc.body.get("identity", {}).get("name")
+            and record.get("document_presentation") == doc.body.get("identity", {}).get("presentation")
+            and item.identity.get("is_combo") is False
+            and doc.body.get("associated_ecomm_id") == item.ecomm_id
+            and doc.body.get("source", {}).get("review_state") == "REVIEWED"
+            and doc.body.get("parse_status") == "TEXT_EXTRACTED"
+        )
+
+    def identity_blockers(self, item, doc):
+        issues = self.identity_issues(item.identity, doc.body)
+        if not self.equivalence_current(item, doc):
+            return issues
+        # Human decision waives only the stated nomenclature and package-size
+        # differences; not EAN, SKU, brand, manufacturer or sale type.
+        issues = [
+            issue for issue in issues
+            if not issue.startswith(("Nombre incompatible", "Presentación incompatible"))
+        ]
+        editorial = item.identity.get("editorial_presentation")
+        if editorial == doc.body["identity"]["presentation"]:
+            issues = [issue for issue in issues if not issue.startswith("La presentación editorial")]
+        return issues
+
+    def review_document_identity(
+        self, ident, expected_version, document_id, document_version, decision, reason
+    ):
+        if decision not in {"APPROVED", "REVOKED"}:
+            raise ValueError("Decisión de identidad no permitida.")
+        if len(reason.strip()) < 20:
+            raise ValueError("Indicá cómo contrastaste el producto con la fuente (20 caracteres).")
+        item = self.dossier(ident)
+        self.expect(item, expected_version)
+        doc = self._document(document_id)
+        self.validate_document(ident, doc)
+        if not doc or doc.version != document_version:
+            raise ValueError("Documento inexistente o cambió de versión.")
+        if doc.body.get("associated_ecomm_id") != ident:
+            raise ValueError("La equivalencia solo puede vincular el documento de esta variante.")
+        if decision == "APPROVED":
+            if (
+                item.identity.get("is_combo") is not False
+                or doc.body.get("source", {}).get("review_state") != "REVIEWED"
+                or doc.body.get("parse_status") != "TEXT_EXTRACTED"
+            ):
+                raise ValueError("Requiere unidad individual y procedencia documental revisada.")
+            identity = doc.body.get("identity", {})
+            if not all(str(identity.get(k) or "").strip() for k in ("name", "presentation")):
+                raise ValueError("La fuente debe identificar explícitamente nombre y presentación.")
+            # A typed name/size alone cannot certify a relationship. Both
+            # identity values must be backed by verbatim, locatable fragments
+            # from the saved original document.
+            identity_evidence = doc.body.get("identity_evidence") or {}
+            sections = doc.body.get("sections") or {}
+            for key in ("name", "presentation"):
+                record = identity_evidence.get(key) or {}
+                location = record.get("location")
+                quote = record.get("quote")
+                value = str(identity[key]).strip()
+                if (
+                    record.get("value") != identity[key]
+                    or not isinstance(location, str)
+                    or not isinstance(quote, str)
+                    or not isinstance(sections.get(location), str)
+                    or quote not in sections[location]
+                    or value.casefold() not in quote.casefold()
+                ):
+                    raise ValueError(
+                        "Nombre y presentación requieren citas literales ubicables "
+                        "en el documento original."
+                    )
+            original = self.identity_issues(item.identity, doc.body)
+            if not any(x.startswith(("Nombre incompatible", "Presentación incompatible")) for x in original):
+                raise ValueError("Sin diferencias de identidad nominal que requieran conciliación.")
+            disallowed = [
+                x for x in original if not x.startswith((
+                    "Nombre incompatible", "Presentación incompatible",
+                    "La presentación editorial",
+                ))
+            ]
+            if disallowed or self.additional_blockers(item, doc) or doc.body.get("parser_blockers"):
+                raise ValueError("Existen discrepancias de EAN, tipo de venta u otros bloqueos.")
+        else:
+            current = self._equivalence_record(item, doc)
+            if not current or current.get("decision") != "APPROVED":
+                raise ValueError("No hay una conciliación aprobada vigente para revocar.")
+        record = {
+            "ecomm_id": ident,
+            "document_id": doc.id,
+            "document_version": doc.version,
+            "document_hash": doc.digest,
+            "identity_digest": item.identity_digest,
+            "source_name": item.identity.get("name"),
+            "source_presentation": item.identity.get("presentation"),
+            "document_name": doc.body.get("identity", {}).get("name"),
+            "document_presentation": doc.body.get("identity", {}).get("presentation"),
+            "decision": decision,
+            "reason": reason.strip(),
+            "reviewer": self.actor,
+        }
+        self.commit_change(item, deepcopy(item.facts), "DOCUMENT_IDENTITY_REVIEW", record)
+        self.refresh(item)
+        return self.serialize(item)
 
     def dossier(self, ident):
         item = self.db.get(self.Dossier, ident)
@@ -283,7 +471,7 @@ class Research:
 
     def blockers(self, item, fact, *, include_conflicts=True):
         doc = self._document(fact["document_id"])
-        issues = self.identity_issues(item.identity, doc.body)
+        issues = self.identity_blockers(item, doc)
         issues.extend(self.additional_blockers(item, doc))
         if fact["ecomm_id"] != item.ecomm_id:
             issues.append("El hecho no pertenece a esta variante Ecomm-App.")
@@ -342,7 +530,14 @@ class Research:
                 issues.append(
                     "Falta una unidad explícita y respaldada por el documento."
                 )
-        if fact["presentation"] != item.identity["presentation"]:
+        doc_presentation = doc.body.get("identity", {}).get("presentation")
+        record = self._equivalence_record(item, doc)
+        matched_alias = bool(
+            record and record.get("decision") == "APPROVED"
+            and not self.identity_blockers(item, doc)
+            and fact["presentation"] == doc_presentation
+        )
+        if fact["presentation"] != item.identity["presentation"] and not matched_alias:
             issues.append("La presentación del hecho no corresponde a la variante.")
         if fact["field"] == "certification_evidence" and not re.search(
             r"\d", fact["value"]
@@ -471,7 +666,16 @@ class Research:
                     "version": doc.version,
                     "hash": doc.digest,
                     "body": public_body(doc.body),
-                    "issues": self.identity_issues(item.identity, doc.body),
+                    "issues": self.identity_blockers(item, doc),
+                    "identity_reconciliation": {
+                        "decision": (
+                            self._equivalence_record(item, doc) or {}
+                        ).get("decision", "NONE"),
+                        "current": self.equivalence_current(item, doc),
+                        "reviewer": (
+                            self._equivalence_record(item, doc) or {}
+                        ).get("reviewer"),
+                    },
                     "versions": [v["version"] for v in self.fixtures.get(doc.id, [])],
                     "history": [
                         {**h, "body": public_body(h["body"])} for h in doc.history

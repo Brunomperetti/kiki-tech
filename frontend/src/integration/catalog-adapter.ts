@@ -383,6 +383,7 @@ export const queueFilters = {
   evidence_revoked: "Con evidencia revocada",
   documents_changed: "Con documentación modificada",
   all: "Todo el catálogo",
+  research_gtin_unique: "Investigar fabricante · GTIN único de Excel (sin certificar)",
   identity: "Identidad por revisar",
   untouched: "Sin trabajar",
   draft: "En preparación",
