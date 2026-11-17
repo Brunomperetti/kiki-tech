@@ -20,6 +20,18 @@ const labels: Record<string, string> = {
   ERROR: "Fallido",
   CANCELLED: "Cancelado",
 };
+/** Explicit operator-assisted search; never claims manufacturer identity.
+ * Do not crawl, fetch, import or publish automatically. The user's click
+ * sends the visible Ecomm item title to the search engine in a new tab.
+ */
+function officialSourceSearchUrl(name: string, presentation?: string): string {
+  const title = name.replace(/[\\u0000-\\u001f\\u007f]/g, " ").trim().slice(0, 140);
+  const variant = (presentation || "").replace(/[\\u0000-\\u001f\\u007f]/g, " ").trim().slice(0, 70);
+  const query = [title, variant, "fabricante sitio oficial producto"].filter(Boolean).join(" ");
+  const url = new URL("https://www.google.com/search");
+  url.searchParams.set("q", query);
+  return url.toString();
+}
 type Item = {
   ecomm_id: string;
   state: string;
@@ -117,7 +129,7 @@ export function BatchPanel({
   disabled: boolean;
   onClear: () => void;
   onPage: () => void;
-  onOpen: (id: string, proposal?: number) => void;
+  onOpen: (id: string, proposal?: number, tab?: "Ficha" | "Evidencias") => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null),
@@ -320,6 +332,11 @@ export function BatchPanel({
                 Las propuestas se revisan y guardan individualmente. No se
                 aprueban fichas ni se publica automáticamente.
               </p>
+              <p>Para tareas sin documentación, «Buscar posible fabricante»
+                abre una consulta externa con el nombre de esa variante; sus
+                resultados no están verificados. «Investigar y revisar fuente»
+                abre Evidencias para registrar y comprobar la identidad y
+                procedencia antes de generar contenido.</p>
               <p>Este piloto admite hasta 100 variantes por selección. Cada clic en
                 «Procesar siguiente grupo» prepara hasta 5 variantes sin IA paga y
                 sin ejecutar trabajo en segundo plano. Se requiere una revisión
@@ -568,17 +585,44 @@ export function BatchPanel({
                             </small>
                           )}
                         </div>
-                        <button
-                          disabled={locked}
-                          onClick={() => {
-                            setExpanded(false);
-                            onOpen(item.ecomm_id, item.result.proposal_id);
-                          }}
-                        >
-                          {item.result.proposal_id
-                            ? `Revisar propuesta #${item.result.proposal_id}`
-                            : "Revisar producto"}
-                        </button>
+                        <div className="b-actions">
+                          <button
+                            disabled={locked}
+                            onClick={() => {
+                              setExpanded(false);
+                              onOpen(item.ecomm_id, item.result.proposal_id);
+                            }}
+                          >
+                            {item.result.proposal_id
+                              ? `Revisar propuesta #${item.result.proposal_id}`
+                              : "Revisar producto"}
+                          </button>
+                          {!item.result.proposal_id && (
+                            <>
+                              <a
+                                href={officialSourceSearchUrl(
+                                  item.result.preview?.name || "",
+                                  item.result.preview?.presentation,
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Abre una búsqueda externa. Los resultados son candidatos, no fuentes verificadas."
+                              >
+                                Buscar posible fabricante ↗
+                              </a>
+                              <button
+                                type="button"
+                                disabled={locked}
+                                onClick={() => {
+                                  setExpanded(false);
+                                  onOpen(item.ecomm_id, undefined, "Evidencias");
+                                }}
+                              >
+                                Investigar y revisar fuente
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </article>
                     ))}
                   </div>
