@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Literal
 from document_reader.hileret_brochure import ENCODED_SIZE
+from document_reader.parser import MAX_SAVED_HTML_BYTES
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -68,12 +69,22 @@ class Incorporate(BaseModel):
 
     @field_validator("content_base64")
     @classmethod
-    def bounded_original(cls, value):
-        # Normal contract preserves 422 for generic oversize; sandbox subtype
-        # keeps its established route-level 409 contract, with the same hash check.
+    def bounded_original(cls, value, info):
+        # Only explicitly opt-in, original HTML snapshots may be larger.
+        # All normal files still use the 512 KiB / pinned-Hileret validation.
         if cls is Incorporate and len(value) > 699_052:
-            from document_reader.hileret_brochure import validate_encoding
-            validate_encoding(value)
+            is_saved_html = (
+                info.data.get("kind") == "FILE"
+                and info.data.get("web_snapshot") is True
+                and str(info.data.get("filename", "")).lower().endswith(".html")
+                and info.data.get("content_type") == "text/html"
+            )
+            if is_saved_html:
+                if len(value) > ((MAX_SAVED_HTML_BYTES + 2) // 3) * 4:
+                    raise ValueError("HTML guardado superior a 4 MiB.")
+            else:
+                from document_reader.hileret_brochure import validate_encoding
+                validate_encoding(value)
         return value
 
     @field_validator("declared_consulted_at")
