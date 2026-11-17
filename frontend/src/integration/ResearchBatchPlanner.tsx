@@ -30,7 +30,7 @@ const labels: Record<string, string> = {
   pack_review: "Packs y combos",
   name_missing: "Falta nombre de origen",
   presentation_missing: "Falta presentación",
-  gtin_lookup_unavailable: "GTIN sin pista única confiable",
+  gtin_lookup_unavailable: "Sin código único válido en API",
   research_candidate: "Candidatos para investigar",
 };
 
@@ -109,7 +109,7 @@ export function ResearchBatchPlanner({
                 <strong>{item.name}</strong> · SKU {item.sku} · Ecomm{" "}
                 {item.ecomm_id} · {item.presentation_original}.
                 <small>
-                  {" "}GTIN Excel para búsqueda: {item.gtin_lookup_hint}.
+                  {" "}Código API para búsqueda: {item.gtin_lookup_hint}.
                   Pendiente encontrar y validar fabricante.
                 </small>{" "}
                 <button
@@ -134,7 +134,7 @@ export function ResearchBatchPlanner({
             </button>
           )}
           <p>
-            Ningún EAN se certificó por el Excel. La búsqueda de fabricante y
+            El código API no certifica fabricante. La búsqueda de fabricante y
             los textos comerciales necesitan original, citas y revisión.
           </p>
         </section>
