@@ -8,6 +8,8 @@ import unicodedata
 from decimal import Decimal
 
 MAX_BYTES = 524_288
+# Opt-in saved HTML originals can contain inert scripts/styles; other types stay at 512 KiB.
+MAX_SAVED_HTML_BYTES = 4 * 1024 * 1024
 MAX_TEXT = 65_536
 MIMES = {
     ".pdf": "application/pdf",
@@ -398,9 +400,22 @@ def parse(name, mime, encoded, *, web_snapshot=False):
         raise ValueError("El MIME no corresponde a la extensión permitida.")
     from .hileret_brochure import validate_encoding, matches
 
-    raw = validate_encoding(encoded)
+    if web_snapshot and extension == ".html":
+        import base64
+        # Limit encoded size before allocating untrusted bytes.
+        max_encoded = ((MAX_SAVED_HTML_BYTES + 2) // 3) * 4
+        if len(encoded) > max_encoded:
+            raise ValueError("HTML guardado superior a 4 MiB.")
+        try:
+            raw = base64.b64decode(encoded, validate=True)
+        except (TypeError, ValueError):
+            raise ValueError("Contenido base64 inválido.") from None
+        if len(raw) > MAX_SAVED_HTML_BYTES:
+            raise ValueError("HTML guardado superior a 4 MiB.")
+    else:
+        raw = validate_encoding(encoded)
     if not raw:
-        raise ValueError("Archivo vacío o superior a 512 KiB.")
+        raise ValueError("Archivo vacío o superior al límite de lectura.")
     json_values = None
     if extension == ".pdf":
         sections = pdf_sections(raw)
@@ -412,7 +427,7 @@ def parse(name, mime, encoded, *, web_snapshot=False):
         except UnicodeError:
             raise ValueError("El documento debe usar UTF-8.") from None
         if (
-            len(text) > (MAX_BYTES if web_snapshot and extension == ".html" else MAX_TEXT)
+            len(text) > (MAX_SAVED_HTML_BYTES if web_snapshot and extension == ".html" else MAX_TEXT)
             or any(ord(c) < 32 and c not in "\n\r\t" for c in text)
             or re.search("[\u202a-\u202e\u2066-\u2069]", text)
         ):
