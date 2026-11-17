@@ -149,8 +149,8 @@ def _tokens(value):
         "ascii", "ignore"
     ).decode().lower()
     return [
-        token for token in re.findall(r"[a-z0-9]+", ascii_text)
-        if len(token) > 2 and token not in STOPWORDS
+        token for token in re.findall(r"[a-z]+|[0-9]+", ascii_text)
+        if (len(token) > 2 or token.isdigit()) and token not in STOPWORDS
     ]
 
 
