@@ -3,7 +3,9 @@
 Every file and grant in this suite is fabricated. These tests verify program
 controls, not authorship or legal validity of an actual manufacturer's licence.
 """
+import base64
 from copy import deepcopy
+from hashlib import sha256
 
 import pytest
 from sqlalchemy.orm import Session
@@ -13,7 +15,7 @@ from app.services.documental.media_rights import (
     review_media_rights,
 )
 from app.services.documental.research import Research
-from app.services.documental.storage import Document
+from app.services.documental.storage import Document, digest
 from test_documental_channel_readiness_guard import (
     URL, complete_fields, install_fake_source, prepare, setting,
 )
@@ -148,3 +150,50 @@ def test_explicit_revocation_and_stale_version_cannot_be_bypassed(
                 "texto/linea/6", quote,
                 "Se revoca expresamente el permiso ficticio ya revocado.",
             )
+
+
+
+@pytest.mark.parametrize("grant_text,accepted", [
+    (
+        "El titular NO autoriza el uso comercial de "
+        "https://fabricante-prueba.invalid/imagen.png en KIKI.",
+        False,
+    ),
+    (
+        "La licencia solo permite el uso privado de "
+        "https://fabricante-prueba.invalid/imagen.png.",
+        False,
+    ),
+    (
+        "El uso comercial de https://fabricante-prueba.invalid/imagen.png "
+        "está prohibido por el titular de derechos.",
+        False,
+    ),
+    (
+        "Licencia de uso comercial de "
+        "https://fabricante-prueba.invalid/imagen.png "
+        "otorgada expresamente por el titular a KIKI.",
+        True,
+    ),
+])
+def test_quote_must_explicitly_authorize_commercial_use_without_denial(
+    tmp_path, monkeypatch, grant_text, accepted,
+):
+    engine = case(tmp_path, monkeypatch)
+    with Session(engine) as db:
+        doc, _user = install_fake_source(db)
+        body = deepcopy(doc.body)
+        body["sections"]["texto/linea/6"] = grant_text
+        raw = "\n".join(body["sections"].values()).encode("utf-8")
+        checksum = sha256(raw).hexdigest()
+        body["original_base64"] = base64.b64encode(raw).decode("ascii")
+        body["original"]["size"] = len(raw)
+        body["original"]["sha256"] = checksum
+        body["provenance"] = "local://sha256/" + checksum
+        doc.body = body
+        doc.digest = digest(body)
+        db.flush()
+        assert original_grant_is_current(
+            doc, "https://fabricante-prueba.invalid/imagen.png",
+            "texto/linea/6", grant_text,
+        ) is accepted
