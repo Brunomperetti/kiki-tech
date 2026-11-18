@@ -14,7 +14,6 @@ from sqlalchemy import select
 
 from app.services.documental.contracts import Incorporate
 from app.services.documental.local_documents import LocalDocuments, parse_local
-from app.services.documental.research import Research
 from app.services.documental.storage import Dossier
 from app.services.editorial_batches.context import AtomicSession, sources
 from .sitemap_discovery import preview_candidates
