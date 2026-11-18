@@ -137,12 +137,10 @@ class Proposals:
                 [name["value"], presentation["value"]],
             )
 
-            # Manufacturer taxonomy labels can differ from KIKI/channel
-            # hierarchy even when their source facts are approved. Do not
-            # spread those labels into SEO before a reviewed mapping exists.
-            # Safe base keywords use approved identity only, without AI,
-            # health claims, inferred terms or third-party identifiers.
-            candidates = ("brand", "product_name", "presentation")
+            # Indexing keywords may only use independently approved identity
+            # and taxonomy labels. No AI, inferred search terms, nutrition,
+            # health claims or third-party barcode assumptions.
+            candidates = ("brand", "product_name", "presentation", "category", "subcategory")
             chosen, seen = [], set()
             for candidate_key in candidates:
                 fact = by_field.get(candidate_key)
