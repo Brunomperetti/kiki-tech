@@ -111,7 +111,7 @@ def test_conflicting_ingredient_rows_block_approval_instead_of_choosing_one():
     """)
     assert "ingredients" not in {x["field"] for x in result["claims"]}
     assert any(
-        "ingredientes" in text for text in result["parser_blockers"]
+        "ingredients" in text for text in result["parser_blockers"]
     )
     # Conflicting source is NOT silently treated as verified.
     assert result["identity"]["name"] == "Producto de ensayo 250 g"
