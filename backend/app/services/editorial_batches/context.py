@@ -265,6 +265,23 @@ class Context:
             "fingerprint": digest(expected),
             "sufficient_evidence": bool(approved),
             "approved_fact_count": len(approved),
+            # These are only current approved documentary facts; never the
+            # unreviewed taxonomy strings from the raw Ecomm-App catalogue.
+            "approved_taxonomy": [
+                {"field": fact["field"], "value": fact["value"],
+                 "evidence_id": fact["id"]}
+                for fact in approved
+                if fact["field"] in {"category", "subcategory"}
+            ],
+            "existing_taxonomy": {
+                "category": edit["fields"].get("category") or "",
+                "subcategory": edit["fields"].get("subcategory") or "",
+                "status": edit["status"],
+            },
+            "existing_seo_fields": [
+                field for field in ("seo_title", "seo_description", "seo_keywords")
+                if edit["fields"].get(field)
+            ],
             "supported_proposal_fields": sorted(generated),
             "no_documentation": not any(
                 d.body.get("sections") and d.body.get("associated_ecomm_id") == ident
