@@ -196,3 +196,60 @@ def test_commercial_summary_exposes_taxonomy_and_zero_writes():
     assert result["automatic_publications"] == 0
     assert result["external_writes_enabled"] is False
     assert result["facts_approved"] == 0
+
+
+def test_unmapped_source_hierarchy_is_not_a_supported_editorial_field():
+    reviewed = {("semillas", "mix de semillas"): {
+        "category": "Semillas", "subcategory": "Mix de semillas",
+        "referenced_fiches": 1,
+    }}
+    item = inspected(
+        taxonomy=category_facts("Suplementos", "Vitaminas"),
+        supported_proposal_fields=[
+            "category", "subcategory", "seo_title", "seo_keywords",
+        ],
+    )
+    report = summarize_inspections([("101", item)], reviewed)
+    result = report["items"][0]
+    assert result["next_task"] == "REVIEW_TAXONOMY"
+    assert result["fields_supported"] == ["seo_title", "seo_keywords"]
+    assert "category" in result["fields_needing_support"]
+    assert "subcategory" in result["fields_needing_support"]
+    assert result["taxonomy_alignment"]["mapping_saved"] is False
+
+
+def test_exact_taxonomy_can_be_considered_but_never_applied():
+    reviewed = {("semillas", "mix de semillas"): {
+        "category": "Semillas", "subcategory": "Mix de semillas",
+        "referenced_fiches": 1,
+    }}
+    item = inspected(
+        taxonomy=category_facts(),
+        supported_proposal_fields=["category", "subcategory", "seo_title"],
+    )
+    report = summarize_inspections([("101", item)], reviewed)
+    result = report["items"][0]
+    assert result["next_task"] == "GENERATE"
+    assert "category" in result["fields_supported"]
+    assert "subcategory" in result["fields_supported"]
+    assert result["taxonomy_alignment"]["exact_internal_reference"] is not None
+    assert result["taxonomy_alignment"]["mapping_saved"] is False
+
+
+def test_unmapped_manufacturer_categories_never_enter_keyword_copy():
+    from app.services.documental.proposals import Proposals
+
+    facts = [
+        {"id": "name", "field": "product_name", "value": "Mix de prueba", "unit": None},
+        {"id": "size", "field": "presentation", "value": "250 g", "unit": None},
+        {"id": "cat", "field": "category", "value": "Categoría externa", "unit": None},
+        {"id": "sub", "field": "subcategory", "value": "Subcategoría externa", "unit": None},
+    ]
+    fields, _ = Proposals.generate_fields(facts)
+    assert fields["seo_keywords"]["value"] == "Mix de prueba, 250 g"
+    assert fields["seo_keywords"]["evidence_ids"] == ["name", "size"]
+    assert "Categoría externa" not in fields["seo_keywords"]["value"]
+    assert "Subcategoría externa" not in fields["seo_keywords"]["value"]
+    # Source claims remain reviewable as *proposals*, but do not overwrite KIKI.
+    assert fields["category"]["value"] == "Categoría externa"
+    assert fields["subcategory"]["value"] == "Subcategoría externa"
