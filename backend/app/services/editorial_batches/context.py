@@ -264,6 +264,8 @@ class Context:
             "expected": expected,
             "fingerprint": digest(expected),
             "sufficient_evidence": bool(approved),
+            "approved_fact_count": len(approved),
+            "supported_proposal_fields": sorted(generated),
             "no_documentation": not any(
                 d.body.get("sections") and d.body.get("associated_ecomm_id") == ident
                 for d in self.documents.values()
