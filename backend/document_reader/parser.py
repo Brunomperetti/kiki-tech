@@ -502,6 +502,17 @@ def parse(name, mime, encoded, *, web_snapshot=False):
     )
     page_ambiguous = False
     if web_snapshot and extension == ".html":
+        # Some authentic manufacturer pages publish presentation only in an
+        # information paragraph, rather than WooCommerce attributes. Extract
+        # a candidate ONLY when a unique visible H1 independently agrees on
+        # count and form (e.g. 60 COMP == 60 comprimidos). Never extract
+        # health benefits, dosage instructions, nutrition or medical claims.
+        from .product_package import page_presentation
+
+        package = page_presentation(sections)
+        if package:
+            presentation, location, quote = package
+            entries.append(("presentación", presentation, None, location, quote))
         # Pages often publish composition in a description paragraph instead
         # of a labelled field. Keep only exact, brief, product-scoped fragments.
         # Never lift generic nutrition, health claims or nearby product cards.

@@ -23,8 +23,8 @@ def setup_case(*, ean=None, sale=None, state="REVIEWED", combo=False):
         "name": RAW,
         "presentation": RAW,
         "is_combo": combo,
-        "lookup_gtin": LOOKUP,
-        "ean": None,
+        "lookup_gtin": None,
+        "ean": LOOKUP,
         "editorial_presentation": None,
     }
     dossier = SimpleNamespace(
@@ -178,8 +178,8 @@ def test_review_metadata_cannot_approve_commercial_claim_or_gtin():
     assert case.history[-1]["action"] == "DOCUMENT_IDENTITY_REVIEW"
     # No facts or fields are introduced by the identity decision.
     assert case.facts == []
-    assert case.identity["ean"] is None
-    assert case.identity["lookup_gtin"] == LOOKUP
+    assert case.identity["ean"] == LOOKUP  # Fuente Ecomm-App API
+    assert case.identity["lookup_gtin"] is None  # Sin respaldo de Excel
     assert not any("CERTIFIC" in str(event) for event in case.history)
 
 
