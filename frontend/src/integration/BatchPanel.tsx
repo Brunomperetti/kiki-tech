@@ -88,7 +88,7 @@ type Batch = {
 };
 type SitemapPreview = {
   mode: "READ_ONLY_MANUFACTURER_SITEMAP_PREVIEW";
-  receipt: { sitemap_url: string; urls_inspected: number; robots_checked: true };
+  receipt: { sitemap_url: string; sitemap_sha256: string; urls_inspected: number; robots_checked: true };
   items: {
     ecomm_id: string;
     name: string;
@@ -160,6 +160,7 @@ export function BatchPanel({
   const [operation, setOperation] = useState("GENERATE_PROPOSALS");
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [sitemapResult, setSitemapResult] = useState<SitemapPreview>();
+  const [capturedManufacturerIds, setCapturedManufacturerIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const mounted = useRef(true);
@@ -246,7 +247,64 @@ export function BatchPanel({
           )
         )
       ) throw new Error("La búsqueda devolvió datos incompatibles; no se usaron.");
+      if (!/^[a-f0-9]{64}$/.test(data.receipt?.sitemap_sha256 || "")) {
+        throw new Error("El fabricante no devolvió un comprobante verificable del índice.");
+      }
       setSitemapResult(data);
+      setCapturedManufacturerIds([]);
+    });
+  }
+  async function captureManufacturer() {
+    if (!sitemapResult || capabilities?.document_batch_source_import !== true) return;
+    const chosen = sitemapResult.items.filter((item) =>
+      ids.has(item.ecomm_id) &&
+      !capturedManufacturerIds.includes(item.ecomm_id) &&
+      item.state === "CANDIDATES" &&
+      item.ambiguous === false &&
+      item.candidate_count === 1 &&
+      item.candidates.length === 1
+    ).slice(0, 2);
+    if (!chosen.length) return;
+    if (!window.confirm(
+      `¿Incorporar ${chosen.length} documentos originales de fabricante? KIKI guardará HTML y procedencia como PENDIENTES; ningún dato quedará aprobado ni se publicará nada.`
+    )) return;
+    await act(async () => {
+      const response = await request("/api/ecomm-app/workspace/sources/batch-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+        body: JSON.stringify({
+          sitemap_url: sitemapResult.receipt.sitemap_url,
+          sitemap_sha256: sitemapResult.receipt.sitemap_sha256,
+          items: chosen.map((item) => ({
+            ecomm_id: item.ecomm_id,
+            url: item.candidates[0].url,
+          })),
+          authorized_local_processing: true,
+          confirm: true,
+        }),
+      });
+      const data = await response.json() as {
+        mode?: string;
+        detail?: string;
+        documents?: {ecomm_id: string; document_id: string; review_state: string; facts_approved: number}[];
+        external_catalogue_writes?: number;
+        facts_approved?: number;
+      };
+      if (!response.ok) throw new Error(data.detail || "No se incorporaron las fuentes.");
+      if (data.mode !== "EXPLICIT_BATCH_SOURCE_INTAKE" ||
+          data.external_catalogue_writes !== 0 ||
+          data.facts_approved !== 0 ||
+          !Array.isArray(data.documents) ||
+          data.documents.length !== chosen.length ||
+          data.documents.some((doc) =>
+            !chosen.some(item => item.ecomm_id === doc.ecomm_id) ||
+            !doc.document_id?.startsWith("local-") ||
+            doc.review_state !== "PENDING" ||
+            doc.facts_approved !== 0
+          )) throw new Error("El resultado no prueba la incorporación segura; revisá antes de reintentar.");
+      setCapturedManufacturerIds((old) => [
+        ...new Set([...old, ...data.documents!.map((doc) => doc.ecomm_id)])
+      ]);
     });
   }
   async function run() {
@@ -408,6 +466,7 @@ export function BatchPanel({
                       onChange={(event) => {
                         setSitemapUrl(event.target.value);
                         setSitemapResult(undefined);
+                        setCapturedManufacturerIds([]);
                       }}
                       disabled={locked}
                     />
@@ -421,6 +480,28 @@ export function BatchPanel({
                       Buscar fuentes para {ids.size} variantes
                     </button>
                   </div>
+                  {sitemapResult && capabilities?.document_batch_source_import === true && (
+                    <div className="b-actions">
+                      <p>
+                        La incorporación por lotes conserva hasta 2 HTML originales por paso.
+                        Las fuentes quedan pendientes de comprobar. No se aprueban hechos.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={locked || !sitemapResult.items.some((item) =>
+                          ids.has(item.ecomm_id) &&
+                          !capturedManufacturerIds.includes(item.ecomm_id) &&
+                          item.state === "CANDIDATES" &&
+                          item.ambiguous === false &&
+                          item.candidate_count === 1 &&
+                          item.candidates.length === 1
+                        )}
+                        onClick={() => void captureManufacturer()}
+                      >
+                        Incorporar siguientes 2 fuentes candidatas
+                      </button>
+                    </div>
+                  )}
                   {sitemapResult && (
                     <div role="region" aria-label="Posibles fuentes oficiales">
                       <p>
@@ -431,6 +512,7 @@ export function BatchPanel({
                         <article key={item.ecomm_id}>
                           <strong>{item.name || item.ecomm_id}</strong>
                           <p>
+                            {capturedManufacturerIds.includes(item.ecomm_id) ? "Original incorporado; evidencia pendiente de revisión · " : ""}
                             {item.candidate_count} posibles páginas ·
                             {item.ambiguous ? " coincidencia no inequívoca" : " revisar identidad"}
                           </p>

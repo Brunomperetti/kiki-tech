@@ -158,8 +158,12 @@ class HTTPSFetcher:
             connection.close()
 
 
-def fetch_html(url, configured_hosts, *, resolver=None, transport=None):
+def fetch_html(url, configured_hosts, *, resolver=None, transport=None, max_bytes=MAX_SOURCE_BYTES):
     """Fetch only after exact domain, public DNS, robots and TLS checks."""
+    # The 4-MiB limit is only for explicitly authorized original HTML
+    # documents, and the caller still uses a separate opt-in feature flag.
+    if type(max_bytes) is not int or not 1 <= max_bytes <= 4 * 1024 * 1024:
+        raise ValueError("Límite de captura HTML no permitido.")
     host, path = target(url, allowed_hosts(configured_hosts))
     resolver = resolver if resolver is not None else DNSResolver()
     transport = transport if transport is not None else HTTPSFetcher()
@@ -201,7 +205,7 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None):
         raise ValueError("robots.txt requiere texto UTF-8 válido.") from None
 
     try:
-        result = transport.get(host, ip, path, MAX_SOURCE_BYTES)
+        result = transport.get(host, ip, path, max_bytes)
     except (OSError, http.client.HTTPException):
         raise ValueError(
             "Consulta HTTPS al fabricante no disponible; no se archivó contenido."
@@ -215,7 +219,7 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None):
         ipaddress.ip_address(result.remote_ip) != ipaddress.ip_address(ip)
         or result.encoding.lower() != "identity"
         or not result.content_type.lower().startswith("text/html")
-        or not result.body or len(result.body) > MAX_SOURCE_BYTES
+        or not result.body or len(result.body) > max_bytes
         or "noarchive" in result.robots_tag.lower()
         or b"noarchive" in result.body.lower()
     ):
