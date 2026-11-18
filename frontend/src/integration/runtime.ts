@@ -11,6 +11,7 @@ export type Capabilities = {
   document_upload: boolean;
   document_fetch: boolean;
   document_sitemap_discovery?: boolean;
+  document_batch_source_import?: boolean;
   channels: boolean;
   batches: boolean;
   executor: boolean;
