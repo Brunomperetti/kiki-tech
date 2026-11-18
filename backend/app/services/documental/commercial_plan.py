@@ -9,6 +9,7 @@ from collections import Counter
 from app.core.config import get_settings
 from app.integrations.ecomm_app.api_catalog_browser import valid_variant_id
 from app.services.editorial_batches.context import Context, sources
+from .taxonomy_alignment import align_taxonomy, reviewed_internal_pairs, seo_field_audit
 
 
 MAX_ITEMS = 20
@@ -38,12 +39,15 @@ def task_for(inspection):
     return "REVIEW_EDITORIAL"
 
 
-def summarize_inspections(rows):
+def summarize_inspections(rows, vocabulary=None):
+    vocabulary = vocabulary if vocabulary is not None else {}
     result = []
     for ident, inspected in rows:
         task = task_for(inspected)
         supported = list(inspected.get("supported_proposal_fields") or [])
         missing = list(inspected.get("fields_without_support") or [])
+        taxonomy = align_taxonomy(inspected, vocabulary)
+        seo_fields = seo_field_audit(inspected)
         result.append({
             "ecomm_id": ident,
             "name": inspected.get("name") or "",
@@ -53,16 +57,22 @@ def summarize_inspections(rows):
             "approved_facts": inspected.get("approved_fact_count", 0),
             "fields_supported": supported,
             "fields_needing_support": missing,
+            "taxonomy_alignment": taxonomy,
+            "seo_fields": seo_fields,
             "reasons": list(dict.fromkeys(inspected.get("reasons") or []))[:8],
             "review_due": bool((inspected.get("review_schedule") or {}).get("review_due")),
             "human_review_required": True,
             "commercial_fiche_saved": False,
         })
     tally = Counter(row["next_task"] for row in result)
+    taxonomy_counts = Counter(row["taxonomy_alignment"]["state"] for row in result)
     return {
         "mode": "READ_ONLY_COMMERCIAL_EVIDENCE_PLAN",
         "total": len(result),
         "counts": {key: tally[key] for key in TASK_LABELS},
+        "taxonomy_counts": dict(sorted(taxonomy_counts.items())),
+        "reviewed_internal_pairs": len(vocabulary),
+        "taxonomy_reference": "KIKI_EDITORIAL_READY_FOR_CHANNELS_ONLY",
         "items": result,
         "external_writes_enabled": False,
         "provider_calls": 0,
@@ -72,12 +82,17 @@ def summarize_inspections(rows):
         "policy": (
             "Planificación sin cambios. Solo los hechos aprobados y vigentes "
             "permiten proponer campos. Identidad, categorías, contenido, "
-            "medios y publicación conservan revisión humana."
+            "medios y publicación conservan revisión humana. La taxonomía de "
+            "fabricante solo se compara con categorías internas ya marcadas "
+            "listas para canales, sin asignarlas automáticamente."
         ),
     }
 
 
-def commercial_plan(db, session, ids, *, source_loader=sources, context_type=Context):
+def commercial_plan(
+    db, session, ids, *, source_loader=sources, context_type=Context,
+    taxonomy_loader=reviewed_internal_pairs,
+):
     if (
         not 1 <= len(ids) <= MAX_ITEMS or len(set(ids)) != len(ids)
         or not all(isinstance(i, str) and valid_variant_id(i) for i in ids)
@@ -92,6 +107,7 @@ def commercial_plan(db, session, ids, *, source_loader=sources, context_type=Con
     )
     try:
         reports = [(ident, context.inspect(db, session, ident)) for ident in ids]
-        return summarize_inspections(reports)
+        vocabulary = taxonomy_loader(db)
+        return summarize_inspections(reports, vocabulary)
     finally:
         context.release()
