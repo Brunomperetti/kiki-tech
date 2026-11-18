@@ -134,6 +134,17 @@ def test_two_sources_are_archived_atomically_as_pending_evidence(tmp_path, monke
         assert result["external_catalogue_writes"] == 0
         assert result["openai_requests"] == 0
 
+    # A repeated click cannot download the same URL twice for this variant.
+    with Session(engine) as db:
+        with pytest.raises(ValueError, match="Ya existe documentación"):
+            capture_selected(
+                db, SimpleNamespace(id=1),
+                sitemap_url=SITEMAP, sitemap_sha256=HASH,
+                items=[items[0]], configured_hosts=HOST,
+                previewer=lambda *_args: pytest.fail("Repeated sitemap GET"),
+                downloader=lambda *_args, **_kwargs: pytest.fail("Repeated HTML GET"),
+            )
+
     with Session(engine) as db:
         for entry in result["documents"]:
             doc = db.get(Document, entry["document_id"])
