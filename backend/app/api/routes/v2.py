@@ -15,6 +15,7 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
     from app.database.models import Base
     from app.services.documental.storage import ResearchBase, Control
     from app.services.editorial_batches.storage import EditorialBase
+    from app.services.documental.source_intake_storage import SourceIntakeBase
 
     config = get_settings()
     inspector = inspect(db.get_bind())
