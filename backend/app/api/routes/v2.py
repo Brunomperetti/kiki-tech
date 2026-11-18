@@ -69,6 +69,13 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
             and config.kiki_document_batch_source_import_enabled
             and config.kiki_document_source_fetch_hosts.strip()
         ),
+        "document_resumable_intake": bool(
+            reader and not intake_missing and config.kiki_document_resumable_intake_enabled
+            and config.kiki_document_parser_kernel_required
+            and config.kiki_document_batch_source_import_enabled
+            and config.kiki_document_sitemap_discovery_enabled
+            and config.kiki_document_source_fetch_hosts.strip()
+        ),
         # Only a single registered pilot ID on exactly allowlisted hosts.
         # The API validates all settings again before making a GET.
         "document_fetch": bool(
