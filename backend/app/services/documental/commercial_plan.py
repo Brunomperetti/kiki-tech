@@ -62,7 +62,10 @@ def summarize_inspections(rows, vocabulary=None):
             held = [key for key in supported if key in {"category", "subcategory"}]
             supported = [key for key in supported if key not in held]
             missing = list(dict.fromkeys([*missing, *held]))
-        seo_fields = seo_field_audit(inspected)
+        seo_fields = seo_field_audit(inspected, taxonomy)
+        if seo_fields["seo_keywords"] == "REVIEW_TAXONOMY":
+            supported = [field for field in supported if field != "seo_keywords"]
+            missing = list(dict.fromkeys([*missing, "seo_keywords"]))
         result.append({
             "ecomm_id": ident,
             "name": inspected.get("name") or "",
