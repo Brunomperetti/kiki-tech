@@ -1,0 +1,316 @@
+"""Operator-controlled, durable and resumable manufacturer intake queue.
+
+A single item is claimed per manual step. Network calls happen outside the
+row lock, while item ownership and an expiry are persisted in PostgreSQL.
+The existing guarded documentary importer rechecks the source sitemap,
+the current Ecomm identity, the exact URL and document CAS. Never publishes.
+"""
+from __future__ import annotations
+
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
+from sqlalchemy import select
+
+from app.services.documental.storage import Document
+from app.services.editorial_batches.context import sources
+from .manufacturer_batch_intake import _identity, capture_selected, preflight
+from .sitemap_discovery import preview_candidates
+from .source_fetch import allowed_hosts, target
+from .source_intake_storage import SourceIntakeJob
+
+MAX_ITEMS = 20
+MAX_STEPS_PER_REQUEST = 1
+CLAIM_TTL = timedelta(minutes=10)
+DONE = frozenset({"IMPORTED", "ALREADY_PRESENT", "CANCELLED"})
+VALID = frozenset({"PENDING", "RUNNING", "BLOCKED", *DONE})
+
+
+def now():
+    return datetime.now(timezone.utc)
+
+
+def _present(db, ident, url):
+    return db.scalar(
+        select(Document.id)
+        .where(Document.body["associated_ecomm_id"].as_string() == ident)
+        .where(Document.body["source"]["reference_url"].as_string() == url)
+        .limit(1)
+    )
+
+
+def _summary(job):
+    counts = {state: 0 for state in sorted(VALID)}
+    for item in job.items:
+        counts[item["state"]] += 1
+    if all(item["state"] in DONE for item in job.items):
+        progress = "COMPLETED"
+    elif counts["BLOCKED"]:
+        progress = "NEEDS_REVIEW"
+    elif counts["RUNNING"]:
+        progress = "RUNNING"
+    else:
+        progress = "PENDING"
+    return {
+        "mode": "MANUAL_RESUMABLE_SOURCE_INTAKE",
+        "id": job.id,
+        "revision": job.revision,
+        "state": "CANCELLED" if job.state == "CANCELLED" else progress,
+        "created_at": job.created_at.isoformat(),
+        "updated_at": job.updated_at.isoformat(),
+        "total": len(job.items),
+        "counts": counts,
+        "items": [{
+            key: row.get(key)
+            for key in ("ecomm_id", "url", "state", "attempts",
+                        "document_id", "error", "next_action")
+        } for row in job.items],
+        "sitemap_url": job.sitemap_url,
+        "sitemap_sha256": job.sitemap_sha256,
+        "external_writes_enabled": False,
+        "ai_requests": 0,
+        "claims_approved": 0,
+        "manual_steps_only": True,
+    }
+
+
+class SourceIntakeQueue:
+    def __init__(self, db, session, configured_hosts):
+        self.db = db
+        self.actor = f"sesión {session.id}"
+        self.session = session
+        self.hosts = allowed_hosts(configured_hosts)
+
+    def _get(self, ident, *, locked=False):
+        statement = select(SourceIntakeJob).where(SourceIntakeJob.id == ident)
+        if locked:
+            statement = statement.with_for_update()
+        job = self.db.scalar(statement.execution_options(populate_existing=True))
+        if not job:
+            raise ValueError("Lote de fabricantes inexistente.")
+        return job
+
+    def detail(self, ident):
+        return _summary(self._get(ident))
+
+    def listing(self):
+        jobs = self.db.scalars(
+            select(SourceIntakeJob)
+            .order_by(SourceIntakeJob.created_at.desc())
+            .limit(20)
+        ).all()
+        return {
+            "mode": "MANUAL_RESUMABLE_SOURCE_INTAKE",
+            "items": [_summary(job) for job in jobs],
+            "external_writes_enabled": False,
+        }
+
+    def create(self, request_key, sitemap_url, sitemap_sha256, selected,
+               *, previewer=preview_candidates):
+        if len(selected) < 1 or len(selected) > MAX_ITEMS:
+            raise ValueError("Seleccioná entre 1 y 20 coincidencias.")
+        if len({row["ecomm_id"] for row in selected}) != len(selected):
+            raise ValueError("Ecomm ID repetido en un lote.")
+        old = self.db.scalar(
+            select(SourceIntakeJob).where(SourceIntakeJob.request_key == request_key)
+        )
+        if old:
+            if (
+                old.sitemap_url != sitemap_url or
+                old.sitemap_sha256 != sitemap_sha256 or
+                [(x["ecomm_id"], x["url"]) for x in old.items] !=
+                [(x["ecomm_id"], x["url"]) for x in selected]
+            ):
+                raise ValueError("La clave de solicitud ya fue utilizada para otro lote.")
+            return _summary(old)
+
+        host, _ = target(sitemap_url, self.hosts)
+        for item in selected:
+            if target(item["url"], self.hosts)[0] != host:
+                raise ValueError("Las fuentes deben pertenecer al mismo fabricante.")
+        captured = sources(self.db)
+        snapshots = []
+        for item in selected:
+            row = captured.get(item["ecomm_id"])
+            if not row or not row.get("sku") or row.get("is_combo") is not False:
+                raise ValueError("Producto, SKU o tipo de venta no apto para este lote.")
+            snapshots.append(_identity(row))
+            if _present(self.db, item["ecomm_id"], item["url"]):
+                raise ValueError("La fuente ya está incorporada para una variante.")
+
+        preview = previewer(
+            self.db, [x["ecomm_id"] for x in selected], sitemap_url,
+            ",".join(sorted(self.hosts))
+        )
+        preflight(preview, selected, sitemap_sha256)
+        items = [{
+            "ecomm_id": item["ecomm_id"],
+            "url": item["url"],
+            "state": "PENDING",
+            "attempts": 0,
+            "expected_identity": list(identity),
+            "document_id": None,
+            "error": None,
+            "next_action": "INCORPORATE",
+            "claim_token": None,
+            "claim_until": None,
+        } for item, identity in zip(selected, snapshots)]
+        instant = now()
+        job = SourceIntakeJob(
+            id=str(uuid4()),
+            request_key=request_key,
+            created_at=instant,
+            updated_at=instant,
+            creator=self.actor,
+            revision=1,
+            state="PENDING",
+            sitemap_url=sitemap_url,
+            sitemap_sha256=sitemap_sha256,
+            source_host=host,
+            items=items,
+            history=[{"action": "CREATED", "at": instant.isoformat(),
+                      "by": self.actor, "items": len(items)}],
+        )
+        self.db.add(job)
+        self.db.commit()
+        return _summary(job)
+
+    def _update(self, job, items, action):
+        instant = now()
+        job.items = items
+        job.revision += 1
+        job.updated_at = instant
+        job.history = (list(job.history or []) + [
+            {"action": action, "at": instant.isoformat(), "by": self.actor}
+        ])[-100:]
+        self.db.commit()
+        return _summary(job)
+
+    def _recover(self, items, *, instant):
+        # Recovery is explicit and requires the original lease to have expired.
+        # A persisted document is evidence that an interrupted step committed.
+        changed = False
+        for row in items:
+            if row["state"] != "RUNNING":
+                continue
+            deadline = datetime.fromisoformat(row["claim_until"])
+            if instant < deadline:
+                continue
+            doc = _present(self.db, row["ecomm_id"], row["url"])
+            row["state"] = "IMPORTED" if doc else "BLOCKED"
+            row["document_id"] = doc
+            row["error"] = None if doc else "Paso interrumpido; revisar antes de reintentar."
+            row["next_action"] = "REVIEW_EVIDENCE" if doc else "RETRY"
+            row["claim_token"] = row["claim_until"] = None
+            changed = True
+        return changed
+
+    def step(self, ident, revision, *, importer=capture_selected):
+        job = self._get(ident, locked=True)
+        if job.revision != revision:
+            raise ValueError("El lote cambió: actualizá su estado antes de continuar.")
+        if job.state == "CANCELLED":
+            raise ValueError("El lote fue cancelado.")
+        rows = deepcopy(job.items)
+        had_recovery = self._recover(rows, instant=now())
+        if any(x["state"] == "RUNNING" for x in rows):
+            if had_recovery:
+                return self._update(job, rows, "RECOVERED")
+            raise ValueError("Ya existe un paso de captura ejecutándose.")
+        selected = next((r for r in rows if r["state"] == "PENDING"), None)
+        if not selected:
+            if had_recovery:
+                return self._update(job, rows, "RECOVERED")
+            return _summary(job)
+        snapshot = sources(self.db)
+        current = snapshot.get(selected["ecomm_id"])
+        if not current or tuple(selected["expected_identity"]) != _identity(current):
+            selected["state"] = "BLOCKED"
+            selected["error"] = "Cambió la identidad en Ecomm-App; revisar coincidencia."
+            selected["next_action"] = "REVIEW_IDENTITY"
+            return self._update(job, rows, "IDENTITY_CHANGED")
+        token = str(uuid4())
+        selected["state"] = "RUNNING"
+        selected["claim_token"] = token
+        selected["claim_until"] = (now() + CLAIM_TTL).isoformat()
+        selected["attempts"] += 1
+        selected["next_action"] = "WAIT"
+        self._update(job, rows, "CLAIMED")
+
+        try:
+            result = importer(
+                self.db, self.session,
+                sitemap_url=job.sitemap_url,
+                sitemap_sha256=job.sitemap_sha256,
+                items=[{"ecomm_id": selected["ecomm_id"], "url": selected["url"]}],
+                configured_hosts=",".join(sorted(self.hosts)),
+            )
+            docs = result.get("documents") or []
+            if (
+                len(docs) != 1 or
+                docs[0]["ecomm_id"] != selected["ecomm_id"] or
+                docs[0].get("review_state") != "PENDING" or
+                result.get("facts_approved") != 0
+            ):
+                raise ValueError("La incorporación no confirmó una fuente pendiente.")
+            document_id = docs[0]["document_id"]
+        except Exception as error:
+            self.db.rollback()
+            # The exporter may have committed before the response was lost.
+            existing = _present(self.db, selected["ecomm_id"], selected["url"])
+            self._finish(ident, selected["ecomm_id"], token, existing,
+                         str(error)[:350] if not existing else None)
+            return self.detail(ident)
+        self._finish(ident, selected["ecomm_id"], token, document_id, None)
+        return self.detail(ident)
+
+    def _finish(self, ident, ecomm_id, token, document_id, error):
+        job = self._get(ident, locked=True)
+        rows = deepcopy(job.items)
+        match = next((x for x in rows if x["ecomm_id"] == ecomm_id), None)
+        if not match or match["state"] != "RUNNING" or match["claim_token"] != token:
+            raise ValueError("El paso ya no es dueño del lote; no se guardó resultado.")
+        match["state"] = "IMPORTED" if document_id else "BLOCKED"
+        match["document_id"] = document_id
+        match["error"] = error
+        match["next_action"] = "REVIEW_EVIDENCE" if document_id else "RETRY"
+        match["claim_token"] = match["claim_until"] = None
+        self._update(job, rows, "DOCUMENT_IMPORTED" if document_id else "BLOCKED")
+
+    def retry(self, ident, revision, ecomm_id):
+        job = self._get(ident, locked=True)
+        if job.revision != revision or job.state == "CANCELLED":
+            raise ValueError("El lote cambió o fue cancelado.")
+        rows = deepcopy(job.items)
+        match = next((x for x in rows if x["ecomm_id"] == ecomm_id), None)
+        if not match or match["state"] != "BLOCKED" or match["attempts"] >= 3:
+            raise ValueError("Esta variante no admite reintento automático.")
+        snapshot = sources(self.db)
+        current = snapshot.get(ecomm_id)
+        if not current or tuple(match["expected_identity"]) != _identity(current):
+            raise ValueError("Identidad Ecomm cambió; iniciá una investigación nueva.")
+        doc = _present(self.db, ecomm_id, match["url"])
+        if doc:
+            match["state"] = "ALREADY_PRESENT"
+            match["document_id"] = doc
+            match["next_action"] = "REVIEW_EVIDENCE"
+        else:
+            match["state"] = "PENDING"
+            match["next_action"] = "INCORPORATE"
+        match["error"] = None
+        return self._update(job, rows, "RETRY_REQUESTED")
+
+    def cancel(self, ident, revision):
+        job = self._get(ident, locked=True)
+        if job.revision != revision:
+            raise ValueError("El lote cambió.")
+        rows = deepcopy(job.items)
+        if any(row["state"] == "RUNNING" for row in rows):
+            raise ValueError("Hay un paso en curso; cancelá al terminarlo.")
+        for row in rows:
+            if row["state"] == "PENDING":
+                row["state"] = "CANCELLED"
+                row["next_action"] = None
+        job.state = "CANCELLED"
+        return self._update(job, rows, "CANCELLED")
