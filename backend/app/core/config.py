@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     kiki_document_sitemap_discovery_enabled: bool = False
     # Explicit two-source steps; archives PENDING originals only, never approves facts.
     kiki_document_batch_source_import_enabled: bool = False
+    # Manual, resumable source-intake coordination; requires explicit migration.
+    kiki_document_resumable_intake_enabled: bool = False
     # Separate guarded activation: source checkbox alone cannot make a pilot
     # fiche READY_FOR_CHANNELS without documentary source and approved facts.
     kiki_document_channel_guard_enabled: bool = False

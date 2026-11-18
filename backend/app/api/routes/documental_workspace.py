@@ -16,6 +16,10 @@ from app.services.documental.local_documents import LocalDocuments, parse_local,
 from app.services.documental.source_fetch import fetch_html
 from app.services.documental.sitemap_discovery import preview_candidates
 from app.services.documental.manufacturer_batch_intake import capture_selected
+from app.services.documental.source_intake_queue import SourceIntakeQueue
+from app.services.documental.source_intake_storage import SourceIntakeJob
+from sqlalchemy import inspect
+from uuid import UUID
 from app.services.documental.contracts import (
     Extract,
     Review as ProposalReview,
@@ -417,3 +421,137 @@ def import_manufacturer_batch(
     except Exception:
         db.rollback()
         raise
+
+
+def _resumable_intake_ready(db):
+    """No implicit migration or network if the operator flag or schema is absent."""
+    settings = get_settings()
+    if not (
+        settings.kiki_document_resumable_intake_enabled
+        and settings.kiki_document_batch_source_import_enabled
+        and settings.kiki_document_sitemap_discovery_enabled
+        and settings.kiki_document_parser_kernel_required
+        and settings.kiki_document_source_fetch_hosts.strip()
+        and reader_available()
+    ):
+        raise HTTPException(403, "Investigación reanudable deshabilitada.")
+    if not inspect(db.get_bind()).has_table(SourceIntakeJob.__tablename__):
+        raise HTTPException(503, "Falta aplicar la migración de cola documental.")
+    return settings
+
+
+class SourceIntakeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request_key: UUID
+    sitemap_url: str = Field(min_length=16, max_length=1000)
+    sitemap_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    items: list[ManufacturerBatchItem] = Field(min_length=1, max_length=20)
+    authorized_local_processing: Literal[True]
+    confirm: Literal[True]
+
+
+class IntakeRevision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1)
+    confirm: Literal[True]
+
+
+class IntakeRetry(IntakeRevision):
+    ecomm_id: str = Field(pattern=r"^[1-9][0-9]{0,19}$")
+
+
+@router.get("/sources/intake-jobs")
+def source_intake_jobs(
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
+):
+    settings = _resumable_intake_ready(db)
+    return SourceIntakeQueue(db, session, settings.kiki_document_source_fetch_hosts).listing()
+
+
+@router.get("/sources/intake-jobs/{job_id}")
+def source_intake_detail(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
+):
+    settings = _resumable_intake_ready(db)
+    try:
+        return SourceIntakeQueue(
+            db, session, settings.kiki_document_source_fetch_hosts,
+        ).detail(str(job_id))
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
+@router.post("/sources/intake-jobs")
+def source_intake_create(
+    body: SourceIntakeRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    settings = _resumable_intake_ready(db)
+    try:
+        return SourceIntakeQueue(
+            db, session, settings.kiki_document_source_fetch_hosts,
+        ).create(
+            str(body.request_key), body.sitemap_url, body.sitemap_sha256,
+            [row.model_dump() for row in body.items],
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post("/sources/intake-jobs/{job_id}/step")
+def source_intake_step(
+    job_id: UUID,
+    body: IntakeRevision,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    settings = _resumable_intake_ready(db)
+    try:
+        return SourceIntakeQueue(
+            db, session, settings.kiki_document_source_fetch_hosts,
+        ).step(str(job_id), body.expected_revision)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/sources/intake-jobs/{job_id}/retry")
+def source_intake_retry(
+    job_id: UUID,
+    body: IntakeRetry,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    settings = _resumable_intake_ready(db)
+    try:
+        return SourceIntakeQueue(
+            db, session, settings.kiki_document_source_fetch_hosts,
+        ).retry(str(job_id), body.expected_revision, body.ecomm_id)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/sources/intake-jobs/{job_id}/cancel")
+def source_intake_cancel(
+    job_id: UUID,
+    body: IntakeRevision,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    settings = _resumable_intake_ready(db)
+    try:
+        return SourceIntakeQueue(
+            db, session, settings.kiki_document_source_fetch_hosts,
+        ).cancel(str(job_id), body.expected_revision)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None

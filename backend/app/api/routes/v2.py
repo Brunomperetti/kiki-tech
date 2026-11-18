@@ -15,6 +15,7 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
     from app.database.models import Base
     from app.services.documental.storage import ResearchBase, Control
     from app.services.editorial_batches.storage import EditorialBase
+    from app.services.documental.source_intake_storage import SourceIntakeBase
 
     config = get_settings()
     inspector = inspect(db.get_bind())
@@ -32,6 +33,7 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
 
     documents_missing = missing(ResearchBase.metadata)
     batches_missing = missing(EditorialBase.metadata)
+    intake_missing = missing(SourceIntakeBase.metadata)
     core_missing = missing(Base.metadata)
     if not documents_missing:
         if db.scalar(select(Control.id).where(Control.id == 1)) is None:
@@ -65,6 +67,13 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
             reader and config.kiki_document_parser_kernel_required
             and config.kiki_document_sitemap_discovery_enabled
             and config.kiki_document_batch_source_import_enabled
+            and config.kiki_document_source_fetch_hosts.strip()
+        ),
+        "document_resumable_intake": bool(
+            reader and not intake_missing and config.kiki_document_resumable_intake_enabled
+            and config.kiki_document_parser_kernel_required
+            and config.kiki_document_batch_source_import_enabled
+            and config.kiki_document_sitemap_discovery_enabled
             and config.kiki_document_source_fetch_hosts.strip()
         ),
         # Only a single registered pilot ID on exactly allowlisted hosts.
