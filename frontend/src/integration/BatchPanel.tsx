@@ -1,5 +1,6 @@
 import { environmentText, capabilities } from "./runtime";
 import { ManufacturerIntakeQueue } from "./ManufacturerIntakeQueue";
+import { CommercialPreparationPlan } from "./CommercialPreparationPlan";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { ProductDrawer } from "../prototype/CatalogView";
@@ -449,6 +450,17 @@ export function BatchPanel({
                 «Procesar siguiente grupo» prepara hasta 5 variantes sin IA paga y
                 sin ejecutar trabajo en segundo plano. Se requiere una revisión
                 humana independiente antes de guardar cada ficha.</p>
+              {capabilities?.documents === true && (
+                <CommercialPreparationPlan
+                  ids={ids}
+                  csrf={csrf}
+                  disabled={locked}
+                  onOpen={(id, tab) => {
+                    setExpanded(false);
+                    onOpen(id, undefined, tab);
+                  }}
+                />
+              )}
               {capabilities?.document_resumable_intake === true && (
                 <ManufacturerIntakeQueue
                   csrf={csrf}
