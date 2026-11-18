@@ -173,7 +173,20 @@ class PageSnapshotHTML(HTMLParser):
     WEIGHT = re.compile(r"\d{1,5}(?:[.,]\d{1,3})?\s*(?:g|gr|kg|ml|l)\b", re.I)
     PRODUCT_AREAS = {
         "woocommerce-tabs", "woocommerce-product-details__short-description",
-        "tab-description",
+        "tab-description", "woocommerce-product-attributes",
+    }
+    # Only clearly labelled, visible rows in the product's own WooCommerce
+    # attribute table become candidates; all require later identity/provenance
+    # review. Do not infer claims, certification, EAN, price or media rights.
+    ATTRIBUTE_LABELS = {
+        "marca": "Marca",
+        "fabricante": "Fabricante",
+        "ingredientes": "Ingredientes",
+        "alergenos": "Alérgenos",
+        "conservacion": "Conservación",
+        "categoria": "Categoría",
+        "subcategoria": "Subcategoría",
+        "formulacion": "Formulación",
     }
     # Narrow pilot pattern: only an exact manufacturer sentence fragment,
     # never extended marketing prose or inferred specific ingredients.
@@ -213,7 +226,11 @@ class PageSnapshotHTML(HTMLParser):
             (classes & self.PRODUCT_AREAS) or
             (attrs.get("id") or "").lower() in self.PRODUCT_AREAS
         ) and not ignored
-        self.tags.append((tag, ignored, in_product))
+        is_attribute_table = (
+            tag == "table" and in_product
+            and "woocommerce-product-attributes" in classes
+        )
+        self.tags.append((tag, ignored, in_product, is_attribute_table))
         if ignored:
             self.omit += 1
             return
@@ -231,7 +248,7 @@ class PageSnapshotHTML(HTMLParser):
         if not self.tags:
             return
         # A closing tag for unrelated markup must not end a hidden subtree.
-        top, ignored, in_product = self.tags[-1]
+        top, ignored, in_product, _ = self.tags[-1]
         if top != tag:
             return
         self.tags.pop()
@@ -252,8 +269,15 @@ class PageSnapshotHTML(HTMLParser):
                     self.blocks.append((
                         tag, active["line"], value, active["product_description"]
                     ))
-        if tag == "tr" and len(self.tr_cells) >= 2:
-            self.cells.append(tuple(self.tr_cells[:3]))
+        if tag == "tr":
+            # A random table (recommendations, upsell, freight or footer)
+            # is never product evidence even when it has familiar labels.
+            if (
+                len(self.tr_cells) == 2
+                and any(node[3] for node in self.tags)
+                and len(self.cells) < 100
+            ):
+                self.cells.append(tuple(self.tr_cells))
             self.tr_cells = []
 
     def handle_data(self, data):
@@ -271,11 +295,24 @@ class PageSnapshotHTML(HTMLParser):
             line, title = self.headings[0]
             if len(title) <= 180:
                 result[f"web/h1/linea/{line}"] = "Nombre: " + title
-        for i, row in enumerate(self.cells, 1):
-            label, value = row[0].strip(), row[1].strip()
-            if normalized(label) in {"peso", "presentacion", "contenido neto"}:
-                if len(value) <= 40 and self.WEIGHT.fullmatch(value):
-                    result[f"web/tabla/fila/{i}"] = "Presentación: " + value
+        # Source-specific table data is considered only with a single visible
+        # product H1. The table provides *candidate* facts, never approval.
+        if len(self.headings) == 1:
+            for i, row in enumerate(self.cells, 1):
+                label, value = row[0].strip(), row[1].strip()
+                clean_label = normalized(label).rstrip(":")
+                if clean_label in {"peso", "presentacion", "contenido neto"}:
+                    if len(value) <= 40 and self.WEIGHT.fullmatch(value):
+                        result[f"web/tabla/fila/{i}"] = "Presentación: " + value
+                elif clean_label in self.ATTRIBUTE_LABELS:
+                    if (
+                        1 <= len(value) <= 450
+                        and not re.search(r"[\\x00-\\x1f\\x7f]", value)
+                        and not re.search(r"https?://|@", value, re.I)
+                    ):
+                        result[f"web/tabla/fila/{i}"] = (
+                            self.ATTRIBUTE_LABELS[clean_label] + ": " + value
+                        )
         for i, (tag, line, value, product_description) in enumerate(self.blocks, 1):
             if len(value) <= 2000:
                 prefix = "web/product" if product_description and tag == "p" else "web"
@@ -497,7 +534,10 @@ def parse(name, mime, encoded, *, web_snapshot=False):
         else [
             (line.split(":", 1)[0], line.split(":", 1)[1].strip(), None, loc, line)
             for loc, line in sections.items()
-            if ":" in line
+            if ":" in line and (
+                not (web_snapshot and extension == ".html")
+                or loc.startswith(("web/h1/", "web/tabla/", "web/product/p/"))
+            )
         ]
     )
     page_ambiguous = False
