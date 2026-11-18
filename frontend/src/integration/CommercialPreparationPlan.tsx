@@ -30,6 +30,7 @@ const seoText: Record<string, string> = {
   ALREADY_SAVED: "Guardado en ficha",
   REVALIDATE: "Requiere revalidación",
   NEEDS_EVIDENCE: "Sin respaldo suficiente",
+  REVIEW_TAXONOMY: "Revisar categorías antes de utilizar estas palabras clave",
 };
 const seoLabels: Record<string, string> = {
   seo_title: "Título SEO",
