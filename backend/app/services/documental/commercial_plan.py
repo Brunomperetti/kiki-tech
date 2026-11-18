@@ -19,12 +19,13 @@ TASK_LABELS = {
     "FIND_SOURCE": "Obtener documentación de fabricante o etiqueta",
     "REVALIDATE": "Revalidar evidencia o revisión vencida",
     "APPROVE_FACTS": "Revisar procedencia y aprobar hechos respaldados",
+    "REVIEW_TAXONOMY": "Revisar la equivalencia de categorías y subcategorías",
     "GENERATE": "Preparar propuesta interna con hechos aprobados",
     "REVIEW_EDITORIAL": "Revisar campos comerciales, SEO, categorías y medios",
 }
 
 
-def task_for(inspection):
+def task_for(inspection, taxonomy=None):
     """Priority order is deliberately strict; no approval by omission."""
     if inspection["conflicts"]:
         return "REVIEW_IDENTITY"
@@ -34,6 +35,11 @@ def task_for(inspection):
         return "REVALIDATE"
     if not inspection["sufficient_evidence"]:
         return "APPROVE_FACTS"
+    if taxonomy and taxonomy["state"] in {
+        "CONFLICTING_APPROVED_FACTS", "SAVED_SOURCE_MISMATCH",
+        "INCOMPLETE_SAVED", "NO_REVIEWED_PAIRS", "NEEDS_MAPPING",
+    }:
+        return "REVIEW_TAXONOMY"
     if inspection["eligible"]:
         return "GENERATE"
     return "REVIEW_EDITORIAL"
@@ -43,10 +49,19 @@ def summarize_inspections(rows, vocabulary=None):
     vocabulary = vocabulary if vocabulary is not None else {}
     result = []
     for ident, inspected in rows:
-        task = task_for(inspected)
+        taxonomy = align_taxonomy(inspected, vocabulary)
+        task = task_for(inspected, taxonomy)
         supported = list(inspected.get("supported_proposal_fields") or [])
         missing = list(inspected.get("fields_without_support") or [])
-        taxonomy = align_taxonomy(inspected, vocabulary)
+        if inspected.get("conflicts") or inspected.get("stale"):
+            # No cached proposal may look actionable while evidence is invalid.
+            supported = []
+        elif taxonomy["state"] != "EXACT_REVIEWED_PAIR":
+            # An approved manufacturer label is not automatically a KIKI
+            # category. Keep it out of supported editorial fields until mapped.
+            held = [key for key in supported if key in {"category", "subcategory"}]
+            supported = [key for key in supported if key not in held]
+            missing = list(dict.fromkeys([*missing, *held]))
         seo_fields = seo_field_audit(inspected)
         result.append({
             "ecomm_id": ident,
