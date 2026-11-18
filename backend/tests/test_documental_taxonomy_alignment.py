@@ -212,7 +212,9 @@ def test_unmapped_source_hierarchy_is_not_a_supported_editorial_field():
     report = summarize_inspections([("101", item)], reviewed)
     result = report["items"][0]
     assert result["next_task"] == "REVIEW_TAXONOMY"
-    assert result["fields_supported"] == ["seo_title", "seo_keywords"]
+    assert result["fields_supported"] == ["seo_title"]
+    assert result["seo_fields"]["seo_keywords"] == "REVIEW_TAXONOMY"
+    assert "seo_keywords" in result["fields_needing_support"]
     assert "category" in result["fields_needing_support"]
     assert "subcategory" in result["fields_needing_support"]
     assert result["taxonomy_alignment"]["mapping_saved"] is False
@@ -236,7 +238,7 @@ def test_exact_taxonomy_can_be_considered_but_never_applied():
     assert result["taxonomy_alignment"]["mapping_saved"] is False
 
 
-def test_unmapped_manufacturer_categories_never_enter_keyword_copy():
+def test_unmapped_manufacturer_categories_are_flagged_before_seo_use():
     from app.services.documental.proposals import Proposals
 
     facts = [
@@ -246,10 +248,18 @@ def test_unmapped_manufacturer_categories_never_enter_keyword_copy():
         {"id": "sub", "field": "subcategory", "value": "Subcategoría externa", "unit": None},
     ]
     fields, _ = Proposals.generate_fields(facts)
-    assert fields["seo_keywords"]["value"] == "Mix de prueba, 250 g"
-    assert fields["seo_keywords"]["evidence_ids"] == ["name", "size"]
-    assert "Categoría externa" not in fields["seo_keywords"]["value"]
-    assert "Subcategoría externa" not in fields["seo_keywords"]["value"]
+    # Keep the existing draft/channel-review contract unchanged; category
+    # terms may exist in an unapproved proposal, but the *read-only plan*
+    # must mark them as unsuitable until a reviewed mapping is supplied.
+    assert "Categoría externa" in fields["seo_keywords"]["value"]
+    pending = inspected(
+        taxonomy=category_facts("Categoría externa", "Subcategoría externa"),
+        supported_proposal_fields=["seo_keywords"],
+    )
+    audit = summarize_inspections([("101", pending)], {})["items"][0]
+    assert audit["seo_fields"]["seo_keywords"] == "REVIEW_TAXONOMY"
+    assert "seo_keywords" not in audit["fields_supported"]
+    assert audit["taxonomy_alignment"]["mapping_saved"] is False
     # Source claims remain reviewable as *proposals*, but do not overwrite KIKI.
     assert fields["category"]["value"] == "Categoría externa"
     assert fields["subcategory"]["value"] == "Subcategoría externa"
