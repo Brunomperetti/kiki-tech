@@ -42,12 +42,20 @@ Para `seo_title`, `seo_description` y `seo_keywords`:
 - `EVIDENCE_BACKED`: el generador determinista puede proponerlo usando
   hechos vigentes y aprobados; la propuesta todavía requiere aceptación.
 - `NEEDS_EVIDENCE`: sin respaldo suficiente.
+- `REVIEW_TAXONOMY`: las palabras clave contienen categorías del fabricante
+  cuya equivalencia interna todavía necesita revisión. No presentarlas como
+  listas para usar por lote.
 - `REVALIDATE`: conflicto de identidad o revisión vencida; no recomendar
   nuevos textos hasta resolver el bloqueo.
 
 Ninguna palabra clave o afirmación de salud puede inferirse por similitud
 con productos de terceros. Una categoría de fabricante aprobada no se
-transforma automáticamente en taxonomía de canal.
+transforma automáticamente en taxonomía de canal. El generador documental
+anterior sigue pudiendo incluir nombres de categoría aprobados por fuente
+en **borradores sujetos a revisión**, porque cambiar su formato rompería
+el control de coherencia de fichas ya revisadas para canales. El nuevo
+plan de Operaciones retira esos campos de su lista de propuestas listas
+para usar si falta equivalencia aprobada; tampoco guarda o publica nada.
 
 ## Seguridad
 
