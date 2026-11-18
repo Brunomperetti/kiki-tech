@@ -8,6 +8,7 @@ const taskText: Record<string, string> = {
   FIND_SOURCE: "Buscar documentación del producto",
   REVALIDATE: "Revalidar evidencia o revisión vencida",
   APPROVE_FACTS: "Revisar y aprobar hechos de la fuente",
+  REVIEW_TAXONOMY: "Revisar equivalencia entre categorías de fabricante y KIKI",
   GENERATE: "Preparar propuesta comercial documentada",
   REVIEW_EDITORIAL: "Completar revisión editorial y multimedia",
 };
