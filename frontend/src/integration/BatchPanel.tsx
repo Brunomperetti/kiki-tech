@@ -1,4 +1,5 @@
 import { environmentText, capabilities } from "./runtime";
+import { ManufacturerIntakeQueue } from "./ManufacturerIntakeQueue";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { ProductDrawer } from "../prototype/CatalogView";
@@ -448,6 +449,18 @@ export function BatchPanel({
                 «Procesar siguiente grupo» prepara hasta 5 variantes sin IA paga y
                 sin ejecutar trabajo en segundo plano. Se requiere una revisión
                 humana independiente antes de guardar cada ficha.</p>
+              {capabilities?.document_resumable_intake === true && (
+                <ManufacturerIntakeQueue
+                  csrf={csrf}
+                  selected={ids}
+                  sitemap={sitemapResult}
+                  disabled={locked}
+                  onOpen={(id) => {
+                    setExpanded(false);
+                    onOpen(id, undefined, "Evidencias");
+                  }}
+                />
+              )}
               {capabilities?.document_sitemap_discovery === true && (
                 <section className="b-detail" aria-label="Descubrimiento de fabricante">
                   <h3>Buscar fuentes oficiales por fabricante</h3>
@@ -480,7 +493,8 @@ export function BatchPanel({
                       Buscar fuentes para {ids.size} variantes
                     </button>
                   </div>
-                  {sitemapResult && capabilities?.document_batch_source_import === true && (
+                  {sitemapResult && capabilities?.document_batch_source_import === true &&
+                    capabilities?.document_resumable_intake !== true && (
                     <div className="b-actions">
                       <p>
                         La incorporación por lotes conserva hasta 2 HTML originales por paso.
