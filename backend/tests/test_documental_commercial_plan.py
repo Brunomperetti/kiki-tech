@@ -148,7 +148,7 @@ def test_success_is_read_only_and_releases_context():
     result = commercial_plan(
         object(), SimpleNamespace(id=1), ["101"],
         source_loader=lambda db: {"101": {"sku": "SKU-A"}},
-        context_type=SyntheticContext,
+        context_type=SyntheticContext, taxonomy_loader=lambda _db: {},
     )
     assert result["counts"]["GENERATE"] == 1
     assert calls == ["constructed", "inspected", "released"]
@@ -170,6 +170,6 @@ def test_context_released_even_when_one_variant_inspection_fails():
         commercial_plan(
             object(), SimpleNamespace(id=1), ["101"],
             source_loader=lambda db: {"101": {"sku": "SKU-A"}},
-            context_type=FailingContext,
+            context_type=FailingContext, taxonomy_loader=lambda _db: {},
         )
     assert calls == ["released"]
