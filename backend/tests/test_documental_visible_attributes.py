@@ -135,3 +135,19 @@ def test_suspicious_unlabelled_text_is_not_promoted_to_facts():
     """, table=False)
     assert result["claims"][0]["field"] == "product_name"
     assert len(result["claims"]) == 1
+
+
+def test_related_sibling_woocommerce_table_outside_description_is_not_evidence():
+    html = """<html><body><main>
+        <h1>Producto principal</h1>
+        <section class="related products">
+        <table class="woocommerce-product-attributes">
+        <tr><th>Ingredientes</th><td>Ingredientes del producto relacionado</td></tr>
+        </table></section>
+    </main></body></html>"""
+    result = parse(
+        "otro-fabricante.html", "text/html",
+        base64.b64encode(html.encode()).decode(), web_snapshot=True,
+    )
+    assert result["identity"]["name"] == "Producto principal"
+    assert not any(x["field"] == "ingredients" for x in result["claims"])
