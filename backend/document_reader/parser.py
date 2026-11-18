@@ -307,7 +307,7 @@ class PageSnapshotHTML(HTMLParser):
                 elif clean_label in self.ATTRIBUTE_LABELS:
                     if (
                         1 <= len(value) <= 450
-                        and not re.search(r"[\\x00-\\x1f\\x7f]", value)
+                        and not any(ord(char) < 32 or ord(char) == 127 for char in value)
                         and not re.search(r"https?://|@", value, re.I)
                     ):
                         result[f"web/tabla/fila/{i}"] = (
