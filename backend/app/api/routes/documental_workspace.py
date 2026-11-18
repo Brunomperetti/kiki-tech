@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import base64
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.security import require_session, require_csrf
@@ -14,6 +15,7 @@ from app.services.documental.source_links import suggest_reviewed_sources
 from app.services.documental.local_documents import LocalDocuments, parse_local, reader_available
 from app.services.documental.source_fetch import fetch_html
 from app.services.documental.sitemap_discovery import preview_candidates
+from app.services.documental.manufacturer_batch_intake import capture_selected
 from app.services.documental.contracts import (
     Extract,
     Review as ProposalReview,
@@ -360,3 +362,58 @@ def preview_manufacturer_sitemap(
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from None
+
+
+class ManufacturerBatchItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ecomm_id: str = Field(pattern=r"^[1-9][0-9]{0,19}$")
+    url: str = Field(min_length=16, max_length=1000)
+
+
+class ManufacturerBatchRequest(BaseModel):
+    """Operator confirmed 1-2 exact URLs from a previously reviewed sitemap."""
+
+    model_config = ConfigDict(extra="forbid")
+    sitemap_url: str = Field(min_length=16, max_length=1000)
+    sitemap_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    items: list[ManufacturerBatchItem] = Field(min_length=1, max_length=2)
+    authorized_local_processing: Literal[True]
+    confirm: Literal[True]
+
+
+@router.post("/sources/batch-import")
+def import_manufacturer_batch(
+    body: ManufacturerBatchRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Opt-in explicit same-host acquisition; archives only PENDING originals.
+
+    Does not validate official source, approve medical/commercial facts, call
+    OpenAI or write to Ecomm-App / Mercado Libre / Tiendanube.
+    """
+    config = get_settings()
+    if not (
+        config.kiki_document_parser_kernel_required
+        and config.kiki_document_batch_source_import_enabled
+        and config.kiki_document_sitemap_discovery_enabled
+        and config.kiki_document_source_fetch_hosts.strip()
+        and reader_available()
+    ):
+        raise HTTPException(403, "Captura por lotes deshabilitada o lector aislado no disponible.")
+    try:
+        return capture_selected(
+            db, session,
+            sitemap_url=body.sitemap_url,
+            sitemap_sha256=body.sitemap_sha256,
+            items=[item.model_dump() for item in body.items],
+            configured_hosts=config.kiki_document_source_fetch_hosts,
+        )
+    except ValueError as exc:
+        # A preview collision, HTML parsing failure or CAS conflict must
+        # not commit even an empty research dossier or partially stored files.
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
