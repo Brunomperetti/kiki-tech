@@ -33,6 +33,7 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
 
     documents_missing = missing(ResearchBase.metadata)
     batches_missing = missing(EditorialBase.metadata)
+    intake_missing = missing(SourceIntakeBase.metadata)
     core_missing = missing(Base.metadata)
     if not documents_missing:
         if db.scalar(select(Control.id).where(Control.id == 1)) is None:
