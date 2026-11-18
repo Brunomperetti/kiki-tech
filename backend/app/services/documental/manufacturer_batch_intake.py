@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.services.documental.contracts import Incorporate
 from app.services.documental.local_documents import LocalDocuments, parse_local
-from app.services.documental.storage import Dossier
+from app.services.documental.storage import Dossier, Document
 from app.services.editorial_batches.context import AtomicSession, sources
 from .sitemap_discovery import preview_candidates
 from .source_fetch import fetch_html
@@ -91,7 +91,21 @@ def capture_selected(
         selected[ident] = _identity(row)
 
     expected_versions = {}
-    for ident in ids:
+    for item in items:
+        ident = item["ecomm_id"]
+        # Skip expensive external GETs for URLs already archived for this
+        # exact variant. Keep the post-lock check below for concurrent writes.
+        archived = db.scalar(
+            select(Document.id)
+            .where(Document.body["associated_ecomm_id"].as_string() == ident)
+            .where(Document.body["source"]["reference_url"].as_string() == item["url"])
+            .limit(1)
+        )
+        if archived:
+            raise ValueError(
+                "Ya existe documentación para esta URL y variante. "
+                "Revisá la evidencia existente en vez de duplicarla."
+            )
         version = db.scalar(select(Dossier.version).where(Dossier.ecomm_id == ident))
         expected_versions[ident] = version if version is not None else 0
 
