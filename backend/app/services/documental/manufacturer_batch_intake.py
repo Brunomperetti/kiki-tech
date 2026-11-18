@@ -131,6 +131,7 @@ def capture_selected(
             "sitemap_url": sitemap_url,
             "sitemap_sha256": sitemap_sha256,
             "selection_mode": "EXPLICIT_BATCH_MAX_2",
+            "mode": "ALLOWLISTED_EXPLICIT_BATCH",
         }))
 
     # Re-read source snapshot under a shared lock, then use the already
