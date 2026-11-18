@@ -190,34 +190,42 @@ class Proposals:
                 ],
                 keys,
             )
-            # Descriptive copy uses only whole source-backed clauses, no marketing inference.
-            if name and presentation:
-                lead = name["value"] + " · " + presentation["value"] + "."
+        # Even if a manufacturer does not document optional technical claims,
+        # the product identity and presentation can support an honest,
+        # minimal commercial description. Never fabricate attributes, health
+        # benefits, ingredients, a category or an image to fill the rest.
+        if name and presentation:
+            lead = name["value"] + " · " + presentation["value"] + "."
+            add(
+                "description",
+                "\n".join([lead, *rows]),
+                ["product_name", "presentation", *keys],
+                [lead, *rows],
+            )
+            short = [
+                lead,
+                *[
+                    row
+                    for row, k in zip(rows, keys)
+                    if k in {"ingredients", "allergens"}
+                ],
+            ]
+            for key in ("short_description", "seo_description"):
                 add(
-                    "description",
-                    "\n".join([lead, *rows]),
-                    ["product_name", "presentation", *keys],
-                    [lead, *rows],
-                )
-                short = [
-                    lead,
-                    *[
-                        row
-                        for row, k in zip(rows, keys)
-                        if k in {"ingredients", "allergens"}
+                    key,
+                    "\n".join(short),
+                    [
+                        "product_name",
+                        "presentation",
+                        *[k for k in keys if k in {"ingredients", "allergens"}],
                     ],
-                ]
-                for key in ("short_description", "seo_description"):
-                    add(
-                        key,
-                        "\n".join(short),
-                        [
-                            "product_name",
-                            "presentation",
-                            *[k for k in keys if k in {"ingredients", "allergens"}],
-                        ],
-                        short,
-                    )
+                    short,
+                )
+            if not rows:
+                missing.append(
+                    "Descripción comercial básica: faltan características documentadas "
+                    "para enriquecer el texto sin inventar información."
+                )
         missing.extend(
             [
                 "Multimedia y fuentes manuales: se conservan exactamente; no se inventan recursos ni derechos.",
