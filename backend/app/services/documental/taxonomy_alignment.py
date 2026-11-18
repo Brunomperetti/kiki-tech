@@ -155,14 +155,22 @@ def align_taxonomy(inspection, vocabulary):
     }
 
 
-def seo_field_audit(inspection):
+def seo_field_audit(inspection, taxonomy=None):
     supported = set(inspection.get("supported_proposal_fields") or [])
     saved = set(inspection.get("existing_seo_fields") or [])
     blocked = inspection.get("conflicts") or inspection.get("stale")
+    # Existing commercial/SEO drafts keep their contract, but a new preview
+    # cannot claim that manufacturer taxonomy terms are ready to propagate.
+    pending_taxonomy = bool(inspection.get("approved_taxonomy")) and (
+        taxonomy is None or taxonomy["state"] not in {
+            "EXACT_REVIEWED_PAIR", "ALREADY_SAVED",
+        }
+    )
     return {
         field: (
             "REVALIDATE" if blocked
             else "ALREADY_SAVED" if field in saved
+            else "REVIEW_TAXONOMY" if field == "seo_keywords" and pending_taxonomy
             else "EVIDENCE_BACKED" if field in supported
             else "NEEDS_EVIDENCE"
         )
