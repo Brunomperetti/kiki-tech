@@ -173,7 +173,7 @@ class PageSnapshotHTML(HTMLParser):
     WEIGHT = re.compile(r"\d{1,5}(?:[.,]\d{1,3})?\s*(?:g|gr|kg|ml|l)\b", re.I)
     PRODUCT_AREAS = {
         "woocommerce-tabs", "woocommerce-product-details__short-description",
-        "tab-description", "woocommerce-product-attributes",
+        "tab-description",
     }
     # Only clearly labelled, visible rows in the product's own WooCommerce
     # attribute table become candidates; all require later identity/provenance
@@ -227,7 +227,7 @@ class PageSnapshotHTML(HTMLParser):
             (attrs.get("id") or "").lower() in self.PRODUCT_AREAS
         ) and not ignored
         is_attribute_table = (
-            tag == "table" and in_product
+            tag == "table" and self.product_depth > 0
             and "woocommerce-product-attributes" in classes
         )
         self.tags.append((tag, ignored, in_product, is_attribute_table))
