@@ -11,6 +11,7 @@ from app.core.security import require_session, require_csrf
 from app.database.session import get_db
 from app.services.documental.research import Research
 from app.services.documental.proposals import Proposals
+from app.services.documental.commercial_plan import commercial_plan
 from app.services.documental.source_links import suggest_reviewed_sources
 from app.services.documental.local_documents import LocalDocuments, parse_local, reader_available
 from app.services.documental.source_fetch import fetch_html
@@ -555,3 +556,32 @@ def source_intake_cancel(
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from None
+
+
+class CommercialPlanRequest(BaseModel):
+    """Read-only preview; no draft, media, category or provider mutations."""
+
+    model_config = ConfigDict(extra="forbid")
+    ecomm_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+@router.post("/commercial-plan/preview")
+def preview_commercial_plan(
+    body: CommercialPlanRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Determine per-variant next actions from current, approved evidence.
+
+    No new document, AI draft, field approval or channel publication is saved.
+    """
+    try:
+        result = commercial_plan(db, session, body.ecomm_ids)
+        db.rollback()  # release document lock without persisting any inspection
+        return result
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
