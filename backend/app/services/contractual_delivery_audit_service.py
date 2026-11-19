@@ -70,12 +70,20 @@ def _document_index(db):
             Document.id, Document.version, Document.digest,
             Document.body["associated_ecomm_id"].as_string(),
             Document.body["source"]["review_state"].as_string(),
+            Document.body["origin_kind"].as_string(),
+            Document.body["parse_status"].as_string(),
+            Document.body["original"]["sha256"].as_string(),
+            Document.body["synthetic"].as_boolean(),
         )
     )
-    for doc_id, version, sha, ident, state in rows:
+    for doc_id, version, sha, ident, state, origin, parse_status, original_sha, synthetic in rows:
         if not ident:
             continue
-        current[doc_id] = (version, sha, ident, state)
+        current[doc_id] = (version, sha, ident, state, bool(
+            origin == "FILE" and parse_status == "TEXT_EXTRACTED"
+            and isinstance(original_sha, str) and len(original_sha) == 64
+            and synthetic is False
+        ))
         docs[ident].append(doc_id)
     return docs, current
 
@@ -87,7 +95,7 @@ def _approved_index(db, current):
             if not isinstance(fact, dict) or fact.get("state") != "APPROVED":
                 continue
             doc = current.get(fact.get("document_id"))
-            if doc is None or doc[2] != ident or doc[3] != "REVIEWED":
+            if doc is None or doc[2] != ident or doc[3] != "REVIEWED" or not doc[4]:
                 continue
             if (
                 doc[0] != fact.get("document_version")
@@ -104,14 +112,16 @@ def _gap_report(row, edit, document_ids, documents, approved):
     image = any(m.get("kind") == "IMAGE" for m in media)
     video = any(m.get("kind") == "VIDEO" for m in media)
     primary = any(
-        (fields.get("sources") or []) and
         s.get("kind") in ("FABRICANTE", "ETIQUETA") and s.get("verified") is True
         for s in fields["sources"]
     )
     editorial_complete = bool(
         edit and edit.status == "READY_FOR_CHANNELS" and _readiness(fields)["ready"]
     )
-    reviewed_sources = sum(documents[d][3] == "REVIEWED" for d in document_ids)
+    reviewed_sources = sum(
+        documents[d][3] == "REVIEWED" and documents[d][4]
+        for d in document_ids
+    )
     due = review_schedule(edit)["review_due"] if edit else False
     gap = set()
     if row["identity_issue"] or (edit is not None and edit.source_sku != row["sku"]):
