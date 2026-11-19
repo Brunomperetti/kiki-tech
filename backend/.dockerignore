@@ -3,6 +3,7 @@
 !requirements.txt
 !requirements-reader.txt
 !start.py
+!api_launcher.py
 !reader_launcher.py
 !app/
 !app/**
