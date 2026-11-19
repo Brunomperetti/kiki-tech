@@ -17,6 +17,7 @@ from ...services.ecomm_api_work_queue_service import build_queue
 from ...services.ecomm_api_barcode_service import api_summary, api_evidence
 from ...services.research_manifest_service import build_research_manifest
 from ...services.research_batch_plan_service import build_research_batch_plan
+from ...services.contractual_delivery_audit_service import build_delivery_audit, export_delivery_csv
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -154,6 +155,43 @@ def work_queue(
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
 
+
+
+@router.get("/audit/contractual")
+def commercial_delivery_audit(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Read-only whole catalogue contract audit, no source fetching or AI."""
+    try:
+        summary, _ = build_delivery_audit(db)
+        return summary
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/audit/contractual.csv")
+def commercial_delivery_csv(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Export all variant exceptions with safe Excel cells; no database writes."""
+    try:
+        summary, rows = build_delivery_audit(db)
+        body = export_delivery_csv(rows)
+        return Response(
+            body,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": 'attachment; filename="kiki-auditoria-comercial-mensual.csv"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Kiki-Audit-Variants": str(summary["total"]),
+                "X-Kiki-Audit-Snapshot": summary["source"],
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get("/research/plan")
