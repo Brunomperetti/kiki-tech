@@ -81,3 +81,14 @@ jobs:
         env:
           KIKI_CI_SYNTHETIC_ONLY: "1"
         run: python -m integration_sandbox.ci_source_intake_smoke
+
+  production-supervisor-no-cap-kill:
+    runs-on: ubuntu-latest
+    # Test the actual Render Dockerfile with no external network at runtime,
+    # no CAP_KILL, no secrets and only a disposable SQLite database.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build actual production image
+        run: docker build --tag kiki-supervisor-shutdown:ci --file backend/Dockerfile backend
+      - name: Start and stop isolated API+reader without CAP_KILL
+        run: python integration/ci_supervisor_docker_smoke.py
