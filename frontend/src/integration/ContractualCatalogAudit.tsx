@@ -11,6 +11,15 @@ type Audit = {
   approved_claims_in_current_originals: number;
   gap_counts: Record<string, number>;
   editorial_status: Record<string, number>;
+  monthly_review: {
+    ready_current: number;
+    ready_overdue: number;
+    ready_changed: number;
+    ready_without_signoff: number;
+    not_ready: number;
+    due: number;
+    review_actions_performed_by_audit: 0;
+  };
   external_writes_enabled: false;
   network_requests: 0;
   ai_requests: 0;
@@ -53,6 +62,14 @@ export function ContractualCatalogAudit() {
           !Number.isSafeInteger(value.total) || value.total < 0 ||
           !Number.isSafeInteger(value.internal_fiches_complete) ||
           !value.editorial_status || !value.gap_counts ||
+          !value.monthly_review ||
+          !Object.values(value.monthly_review).every(n => Number.isSafeInteger(n) && n >= 0) ||
+          value.monthly_review.review_actions_performed_by_audit !== 0 ||
+          value.monthly_review.ready_current + value.monthly_review.ready_overdue +
+          value.monthly_review.ready_changed + value.monthly_review.ready_without_signoff +
+          value.monthly_review.not_ready !== value.total ||
+          value.monthly_review.ready_overdue + value.monthly_review.ready_changed +
+          value.monthly_review.ready_without_signoff !== value.monthly_review.due ||
           Object.values(value.editorial_status).reduce((sum, n) => sum + n, 0) !== value.total ||
           !Object.keys(gapLabels).every(key => Number.isSafeInteger(value.gap_counts[key]))) {
         throw new Error("El informe no acredita todo el catálogo; resultado descartado.");
@@ -102,6 +119,14 @@ export function ContractualCatalogAudit() {
         <strong>{report.internal_fiches_complete}</strong> fichas completas
         internamente · <strong>{report.approved_claims_in_current_originals}</strong>{" "}
         hechos aprobados asociados a originales vigentes.
+      </p>
+      <p>
+        <strong>Revisión mensual:</strong> {report.monthly_review.ready_current} fichas vigentes,{" "}
+        {report.monthly_review.due} pendientes de nueva revisión
+        ({report.monthly_review.ready_overdue} vencidas por fecha,{" "}
+        {report.monthly_review.ready_changed} modificadas después de revisar,{" "}
+        {report.monthly_review.ready_without_signoff} sin constancia).
+        Hay {report.monthly_review.not_ready} variantes aún sin ficha lista.
       </p>
       <p>
         Informe generado {new Date(report.generated_at).toLocaleString("es-AR")}.
