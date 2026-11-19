@@ -1,13 +1,15 @@
-"""Root-only reader launch boundary; no backend imports or secrets.
+"""Root-only reader boundary with cooperative supervisor shutdown.
 
-The supervisor may lack CAP_KILL. The isolated reader therefore requests a
-kernel SIGTERM if its supervisor exits. Arm it AFTER setuid: Linux resets this
-setting whenever process credentials change.
+The reader receives no database credentials, network permission or backend
+modules. It requests Linux SIGTERM on parent death *after* UID change, and
+also listens for EOF on a private inherited pipe to finish gracefully
+before PID 1 exits, even when CAP_KILL is absent.
 """
 import ctypes
 import os
 import signal
 import sys
+from threading import Thread
 
 
 PR_SET_PDEATHSIG = 1
@@ -27,6 +29,25 @@ def arm_parent_death_signal():
         raise SystemExit("El supervisor terminó antes de iniciar el lector.")
 
 
+def start_shutdown_watch():
+    try:
+        fd = int(os.environ.pop("KIKI_SHUTDOWN_READ_FD"))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SystemExit("Canal de apagado del lector no identificado.") from exc
+    if fd < 3:
+        raise SystemExit("Canal de apagado del lector inválido.")
+
+    def watch():
+        try:
+            while os.read(fd, 1):
+                pass
+        finally:
+            os.close(fd)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    Thread(target=watch, name="kiki-reader-shutdown", daemon=True).start()
+
+
 def main():
     if os.getuid() != 0:
         raise SystemExit("El lector requiere la frontera chroot; no hay fallback inseguro.")
@@ -36,6 +57,7 @@ def main():
     os.setgid(10000)
     os.setuid(10001)
     arm_parent_death_signal()
+    start_shutdown_watch()
 
     sys.path = [
         "/usr/local/lib/python3.12/site-packages",
@@ -43,9 +65,11 @@ def main():
         "/usr/local/lib/python3.12/lib-dynload",
     ]
     from document_reader import worker
-
     worker.SOCKET = "/run/parser.sock"
-    worker.serve(kernel_guard=True)
+    try:
+        worker.serve(kernel_guard=True)
+    finally:
+        print("KIKI_READER_SHUTDOWN_COMPLETE", flush=True)
 
 
 if __name__ == "__main__":
