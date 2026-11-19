@@ -95,7 +95,7 @@ def test_reviewed_real_original_with_matching_hash_counts_only_approved_facts(tm
         assert summary["approved_claims_in_current_originals"] == 1
         # If a source changes or loses review, an old approval cannot pass.
         original = db.get(Document, doc_id)
-        original.version = 2
+        original.version = 3  # Neither fact-1 (v1) nor fact-mismatched (v2).
         db.commit()
         result, _ = build_delivery_audit(db)
         assert result["approved_claims_in_current_originals"] == 0
