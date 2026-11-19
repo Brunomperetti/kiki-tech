@@ -63,6 +63,7 @@ def fake_importer(db, session, *, ecomm_id, expected_version, reference_url,
 def test_stage_without_provider_requests_and_resume_on_new_session(tmp_path):
     engine = setup(tmp_path)
     with Session(engine) as db:
+        baseline_documents = {doc.id for doc in db.scalars(select(Document))}
         q = SourceIntakeQueue(db, SimpleNamespace(id=1), HOST)
         ticket = q.create_explicit(str(uuid4()), entries())
         assert ticket["selection_mode"] == "EXACT_OPERATOR_URL"
@@ -71,7 +72,7 @@ def test_stage_without_provider_requests_and_resume_on_new_session(tmp_path):
         assert ticket["claims_approved"] == 0
         assert ticket["external_writes_enabled"] is False
         assert ticket["manual_steps_only"] is True
-        assert not db.scalars(select(Document)).all()
+        assert {doc.id for doc in db.scalars(select(Document))} == baseline_documents
         first = q.step(ticket["id"], ticket["revision"],
                        explicit_importer=fake_importer,
                        importer=lambda *_a, **_k: pytest.fail("No sitemap"))
@@ -86,7 +87,7 @@ def test_stage_without_provider_requests_and_resume_on_new_session(tmp_path):
                        importer=lambda *_a, **_k: pytest.fail("No sitemap"))
         assert final["state"] == "COMPLETED"
         assert final["counts"]["IMPORTED"] == 2
-        assert len(db.scalars(select(Document)).all()) == 2
+        assert len(db.scalars(select(Document)).all()) == len(baseline_documents) + 2
         assert db.scalars(select(EcommApiProductEdit)).all() == []
         assert db.scalars(select(Dossier)).all() == []
 
@@ -126,10 +127,11 @@ def test_manifest_is_rejected_before_network_or_db_write(tmp_path, change):
             db, SimpleNamespace(id=1),
             HOST + ",otro-fabricante.invalid",
         )
+        baseline_documents = {doc.id for doc in db.scalars(select(Document))}
         with pytest.raises(ValueError):
             q.create_explicit(str(uuid4()), rows)
         assert db.scalars(select(SourceIntakeJob)).all() == []
-        assert db.scalars(select(Document)).all() == []
+        assert {doc.id for doc in db.scalars(select(Document))} == baseline_documents
 
 
 def test_changed_identity_blocks_before_exact_url_fetch(tmp_path):
