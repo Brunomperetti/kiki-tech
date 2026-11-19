@@ -20,7 +20,7 @@ from app.services.documental.storage import Document, Dossier
 from app.services.research_manifest_service import _cell
 
 GAPS = (
-    "IDENTITY_CONFLICT", "NO_UNIQUE_API_BARCODE",
+    "IDENTITY_CONFLICT", "BARCODE_RESEARCH_NOT_ELIGIBLE",
     "NO_MANUFACTURER_DOCUMENT", "SOURCE_NOT_REVIEWED",
     "NO_CURRENT_APPROVED_FACTS", "INCOMPLETE_COMMERCIAL_FICHE",
     "TAXONOMY_MISSING", "SEO_MISSING", "IMAGE_MISSING",
@@ -29,7 +29,7 @@ GAPS = (
 )
 LABELS = {
     "IDENTITY_CONFLICT": "Verificar identidad SKU/variante",
-    "NO_UNIQUE_API_BARCODE": "Investigar sin código de barras único validado en la API",
+    "BARCODE_RESEARCH_NOT_ELIGIBLE": "Revisar elegibilidad para investigar con código API",
     "NO_MANUFACTURER_DOCUMENT": "Conseguir original del fabricante o etiqueta",
     "SOURCE_NOT_REVIEWED": "Revisar identidad y procedencia del documento",
     "NO_CURRENT_APPROVED_FACTS": "Aprobar hechos con originales vigentes",
@@ -48,7 +48,7 @@ ORDER = (
     "NO_CURRENT_APPROVED_FACTS", "MONTHLY_REVIEW_DUE",
     "INCOMPLETE_COMMERCIAL_FICHE", "TAXONOMY_MISSING",
     "SEO_MISSING", "IMAGE_MISSING", "MEDIA_RIGHTS_NOT_VERIFIED",
-    "VIDEO_NOT_DOCUMENTED", "NO_UNIQUE_API_BARCODE",
+    "VIDEO_NOT_DOCUMENTED", "BARCODE_RESEARCH_NOT_ELIGIBLE",
     "READY_WITHOUT_VERIFIED_DOCUMENTAL_GATE",
 )
 CSV_HEADER = (
@@ -127,7 +127,7 @@ def _gap_report(row, edit, document_ids, documents, approved):
     if row["identity_issue"] or (edit is not None and edit.source_sku != row["sku"]):
         gap.add("IDENTITY_CONFLICT")
     if "research_gtin_unique" not in row["flags"]:
-        gap.add("NO_UNIQUE_API_BARCODE")
+        gap.add("BARCODE_RESEARCH_NOT_ELIGIBLE")
     if not document_ids:
         gap.add("NO_MANUFACTURER_DOCUMENT")
     elif reviewed_sources == 0:
@@ -249,5 +249,5 @@ def export_delivery_csv(rows):
             r["next_step"], " | ".join(r["gaps"]),
             "SI", "SI",
         )
-        csv_writer.writerow([_cell(v) for v in values])
+        csv_writer.writerow([_cell(str(v) if isinstance(v, int) else v) for v in values])
     return "\ufeff" + out.getvalue()
