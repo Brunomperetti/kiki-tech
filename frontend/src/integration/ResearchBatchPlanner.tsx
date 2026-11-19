@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { request } from "./catalog-adapter";
+import { ContractualCatalogAudit } from "./ContractualCatalogAudit";
 
 type Candidate = {
   ecomm_id: string;
@@ -80,6 +81,7 @@ export function ResearchBatchPlanner({
         ambigua, packs y GTIN no conciliables. No consulta fabricantes, no
         consume IA ni guarda fichas.
       </p>
+      <ContractualCatalogAudit />
       <button type="button" disabled={busy} onClick={() => void load(0)}>
         {busy ? "Preparando lote…" : "Ver próximo lote de 10 productos"}
       </button>
