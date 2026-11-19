@@ -164,6 +164,8 @@ def test_export_escapes_spreadsheet_formula_in_untrusted_api_name():
         "approved_facts_with_current_original": 0,
         "internal_fiche_complete": False, "image_present": False,
         "video_present": False, "monthly_review_due": False,
+        "last_review_at": None, "next_review_at": None,
+        "review_reason": "NOT_READY",
         "next_step": "NO_MANUFACTURER_DOCUMENT",
         "gaps": ["NO_MANUFACTURER_DOCUMENT"],
     }
