@@ -18,7 +18,7 @@ type Audit = {
 };
 const gapLabels: Record<string, string> = {
   IDENTITY_CONFLICT: "Identidad para revisar",
-  NO_UNIQUE_API_BARCODE: "Sin barcode único verificable de la API",
+  BARCODE_RESEARCH_NOT_ELIGIBLE: "Aún no apto para investigación por código API",
   NO_MANUFACTURER_DOCUMENT: "Sin documento original",
   SOURCE_NOT_REVIEWED: "Fuentes pendientes de revisión",
   NO_CURRENT_APPROVED_FACTS: "Sin hechos aprobados con original vigente",
