@@ -89,6 +89,8 @@ def main():
         logs = docker("logs", NAME).stdout + docker("logs", NAME).stderr
         assert "PermissionError" not in logs
         assert "Operation not permitted" not in logs
+        assert "Application shutdown complete" in logs, "Uvicorn lifecycle did not finish"
+        assert "KIKI_READER_SHUTDOWN_COMPLETE" in logs, "Reader was terminated abruptly"
         print("PASS: actual production image starts and stops without CAP_KILL")
     except Exception:
         details = docker("logs", "--tail", "35", NAME, check=False)
