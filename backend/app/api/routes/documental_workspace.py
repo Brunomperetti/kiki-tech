@@ -15,6 +15,7 @@ from app.services.documental.commercial_plan import commercial_plan
 from app.services.documental.source_links import suggest_reviewed_sources
 from app.services.documental.local_documents import LocalDocuments, parse_local, reader_available
 from app.services.documental.source_fetch import fetch_html
+from app.services.documental.explicit_url_intake import import_explicit_url
 from app.services.documental.sitemap_discovery import preview_candidates
 from app.services.documental.manufacturer_batch_intake import capture_selected
 from app.services.documental.source_intake_queue import SourceIntakeQueue
@@ -228,6 +229,46 @@ def fetch_manufacturer(
             raise
 
     return execute(db, operation)
+
+
+
+@router.post("/{ecomm_id}/documents/fetch-reviewed-url")
+def fetch_exact_reviewed_manufacturer_url(
+    ecomm_id: str,
+    body: ManufacturerFetch,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """One manually chosen URL: HTTPS, robots, no redirects, PENDING original.
+
+    Does NOT require an XML sitemap, but cannot bypass manufacturer policy,
+    identity checks, dossier optimistic lock or source approval.
+    """
+    config = get_settings()
+    if (
+        not config.kiki_document_explicit_url_intake_enabled
+        or not config.kiki_document_parser_kernel_required
+        or not config.kiki_document_source_fetch_hosts.strip()
+        or not reader_available()
+    ):
+        raise HTTPException(
+            403, "Captura por URL exacta deshabilitada o lector no disponible."
+        )
+    try:
+        return import_explicit_url(
+            db, session,
+            ecomm_id=ecomm_id,
+            expected_version=body.expected_version,
+            reference_url=body.reference_url,
+            provenance_note=body.provenance_note,
+            configured_hosts=config.kiki_document_source_fetch_hosts,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/{ecomm_id}/documents/import")

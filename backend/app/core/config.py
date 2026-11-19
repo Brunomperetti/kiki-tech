@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     kiki_document_workspace_enabled: bool = False
     # Explicit pilot allowlist. No network access until every value is set.
     kiki_document_source_fetch_enabled: bool = False
+    # Explicit manual URL pilot, sitemap optional; still requires domain allowlist,
+    # isolated reader, robots and independent human evidence approval.
+    kiki_document_explicit_url_intake_enabled: bool = False
     kiki_document_source_fetch_hosts: str = ""
     kiki_document_source_fetch_pilot_id: str = ""
     # Independent, explicit opt-in: one read-only manufacturer sitemap per request.
