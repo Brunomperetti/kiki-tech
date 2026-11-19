@@ -56,7 +56,8 @@ CSV_HEADER = (
     "barcode_api_solo_busqueda", "captura_api", "estado_editorial",
     "documentos", "fuentes_revisadas", "hechos_aprobados_con_original_vigente",
     "ficha_interna_completa", "imagen_en_ficha", "video_en_ficha",
-    "revision_mensual_vencida", "siguiente_accion", "pendientes",
+    "revision_mensual_vencida", "ultima_revision_documentada",
+    "proxima_revision", "estado_revision", "siguiente_accion", "pendientes",
     "fuente_solo_por_api", "validacion_fabricante_requerida",
 )
 
@@ -122,7 +123,8 @@ def _gap_report(row, edit, document_ids, documents, approved):
         documents[d][3] == "REVIEWED" and documents[d][4]
         for d in document_ids
     )
-    due = review_schedule(edit)["review_due"] if edit else False
+    schedule = review_schedule(edit)
+    due = schedule["review_due"]
     gap = set()
     if row["identity_issue"] or (edit is not None and edit.source_sku != row["sku"]):
         gap.add("IDENTITY_CONFLICT")
@@ -170,6 +172,9 @@ def _gap_report(row, edit, document_ids, documents, approved):
         "image_present": image,
         "video_present": video,
         "monthly_review_due": due,
+        "last_review_at": schedule["last_review_at"],
+        "next_review_at": schedule["next_review_at"],
+        "review_reason": schedule["review_reason"],
         "next_step": ordered[0] if ordered else "REVIEW_FOR_DELIVERY",
         "gaps": ordered,
         # Deliberate: a structural audit is NOT sufficient to certify claims,
@@ -185,6 +190,7 @@ def summarize_rows(rows):
     for row in rows:
         totals[row["editorial_status"]] += 1
         detail.update(row["gaps"])
+    monthly = Counter(row["review_reason"] for row in rows)
     return {
         "mode": "READ_ONLY_CONTRACTUAL_CATALOG_AUDIT",
         "source": "ECOMM_APP_API_STAGE",
@@ -193,6 +199,17 @@ def summarize_rows(rows):
         "editorial_status": dict(sorted(totals.items())),
         "gap_counts": {key: detail[key] for key in GAPS},
         "next_actions": dict(Counter(row["next_step"] for row in rows)),
+        "monthly_review": {
+            "ready_current": monthly["CURRENT"],
+            "ready_overdue": monthly["OVERDUE"],
+            "ready_changed": monthly["CONTENT_CHANGED"],
+            "ready_without_signoff": monthly["NO_SIGNOFF"],
+            "not_ready": monthly["NOT_READY"],
+            "due": sum(
+                row["monthly_review_due"] for row in rows
+            ),
+            "review_actions_performed_by_audit": 0,
+        },
         "internal_fiches_complete": sum(row["internal_fiche_complete"] for row in rows),
         "approved_claims_in_current_originals": sum(
             row["approved_facts_with_current_original"] for row in rows
@@ -246,6 +263,7 @@ def export_delivery_csv(rows):
             "SI" if r["image_present"] else "NO",
             "SI" if r["video_present"] else "NO",
             "SI" if r["monthly_review_due"] else "NO",
+            r["last_review_at"], r["next_review_at"], r["review_reason"],
             r["next_step"], " | ".join(r["gaps"]),
             "SI", "SI",
         )

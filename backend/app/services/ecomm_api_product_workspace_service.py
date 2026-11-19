@@ -182,26 +182,61 @@ def _validate(fields: dict, status: str):
 
 
 def review_schedule(edit: EcommApiProductEdit | None) -> dict:
-    """A signed-off catalog record must be revisited at least every 30 days."""
+    """Track a 30-day review cycle from real sign-offs, not arbitrary edits.
+
+    Entering READY_FOR_CHANNELS is the initial operator sign-off.
+    Only REVIEW_CONFIRMED resets the clock afterwards. Any changed
+    commercial field while already READY makes a new verification due
+    immediately; merely saving must not silently postpone the deadline.
+    """
+    empty = {
+        "last_review_at": None, "next_review_at": None,
+        "review_due": False, "review_reason": "NOT_READY",
+        "changed_since_review": False,
+    }
     if not edit or edit.status != "READY_FOR_CHANNELS":
-        return {"last_review_at": None, "next_review_at": None, "review_due": False}
-    reviewed = []
+        return empty
+
+    last = None
+    content_changed_at = None
+
     for event in edit.history or []:
-        if event.get("new_status") == "READY_FOR_CHANNELS":
-            try:
-                reviewed.append(datetime.fromisoformat(event["at"]))
-            except (ValueError, TypeError, KeyError):
-                continue
-    if not reviewed:
-        return {"last_review_at": None, "next_review_at": None, "review_due": True}
-    last = max(reviewed)
-    if last.tzinfo is None:
-        last = last.replace(tzinfo=timezone.utc)
+        if not isinstance(event, dict) or event.get("new_status") != "READY_FOR_CHANNELS":
+            continue
+        try:
+            timestamp = datetime.fromisoformat(event["at"])
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            timestamp = timestamp.astimezone(timezone.utc)
+        except (TypeError, ValueError, KeyError, OverflowError):
+            continue
+        if event.get("action") == "REVIEW_CONFIRMED" or (
+            event.get("previous_status") != "READY_FOR_CHANNELS"
+        ):
+            # Later approval cancels any pending invalidation. Existing
+            # transition events are preserved for historical compatibility.
+            if last is None or timestamp >= last:
+                last = timestamp
+                content_changed_at = None
+        elif event.get("changes"):
+            if content_changed_at is None or timestamp >= content_changed_at:
+                content_changed_at = timestamp
+
+    if last is None:
+        return {**empty, "review_due": True, "review_reason": "NO_SIGNOFF"}
     due_at = last + timedelta(days=30)
+    changed = bool(content_changed_at and content_changed_at >= last)
+    is_overdue = _now() >= due_at
     return {
         "last_review_at": last.isoformat(),
         "next_review_at": due_at.isoformat(),
-        "review_due": _now() >= due_at,
+        "review_due": changed or is_overdue,
+        "review_reason": (
+            "CONTENT_CHANGED" if changed
+            else "OVERDUE" if is_overdue
+            else "CURRENT"
+        ),
+        "changed_since_review": changed,
     }
 
 
