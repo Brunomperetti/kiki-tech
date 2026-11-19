@@ -177,7 +177,6 @@ def test_failed_fetch_blocks_only_one_item_and_retry_preserves_other(tmp_path):
 def test_empty_db_has_no_implicit_migration_and_flag_is_required(tmp_path, monkeypatch):
     from fastapi import HTTPException
     import app.api.routes.documental_workspace as routes
-    import app.services.documental.source_intake_queue as queue_module
 
     engine = prepare_two(tmp_path)
     settings = SimpleNamespace(
