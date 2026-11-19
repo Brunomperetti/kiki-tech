@@ -164,3 +164,17 @@ else:
             break
         time.sleep(0.02)
     assert signalled.read_text() == "SIGTERM"
+
+
+def test_docker_build_context_contains_supervisor_and_child_launchers():
+    """Regression: the real Render Docker build context uses a deny-all rule."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    rules = (root / ".dockerignore").read_text().splitlines()
+    assert rules[0] == "**"  # Fail closed: every runtime file needs explicit allowlist.
+    for name in ("start.py", "api_launcher.py", "reader_launcher.py"):
+        assert f"!{name}" in rules
+        assert (root / name).is_file()
+    dockerfile = (root / "Dockerfile").read_text()
+    assert "COPY --chmod=755 . ." in dockerfile
