@@ -1,43 +1,49 @@
-# KIKI Tech 2.0 — corrección del apagado del supervisor (19/11/2026)
+# KIKI Tech 2.0 — apagado seguro de API + lector en Render
 
-## Incidencia real en Render
-
-El 19/11, a las 13:32:34 UTC, el servicio `kiki-tech-api` registró
+## Incidencia observada
+El 19/11/2026, 13:32:34 UTC, `kiki-tech-api` produjo
 `PermissionError: [Errno 1] Operation not permitted` en
-`/app/start.py`, al intentar `terminate()` sobre un proceso de otro UID.
-El servicio conserva dos dominios: API UID 10000 y lector aislado UID
-10001 bajo chroot/seccomp. En producción no se debe exigir `CAP_KILL`.
+`/app/start.py` al intentar `terminate()` sobre otro UID.
+El supervisor es **PID 1**, la API usa UID 10000 y el lector
+UID 10001 bajo chroot/seccomp. No se debe habilitar `CAP_KILL`.
 
-## Reparación de código (pendiente de despliegue)
+## Solución segura (PR #195)
+1. El supervisor crea un **pipe anónimo heredado por cada hijo** y
+   conserva el extremo de escritura. El hijo recibe solamente el FD
+   de lectura y el PID esperado del supervisor.
+2. Al recibir SIGTERM, el supervisor cierra **ambos** escritores y
+   **permanece como PID 1** mientras cada hijo finaliza.
+3. Los hilos de vigilancia de API y lector detectan EOF y se envían
+   SIGTERM **a sí mismos** (permitido entre el mismo UID).
+4. La API ejecuta Uvicorn en el mismo proceso del vigilante, de modo
+   que se cumple su `lifespan` normal y `stop_executor()` puede
+   cerrar tareas. El lector puede liberar su socket Unix ordenadamente.
+5. Como protección de caída *imprevista* del padre, ambos siguen
+   armando `PR_SET_PDEATHSIG=SIGTERM` **después** de `setuid` y
+   rechazan supervisores incorrectos.
+6. Si un hijo no sale en el plazo de cierre, se registra una alerta;
+   nunca se agregan permisos privilegiados ni se escriben datos externos.
 
-- Los launchers registran `PR_SET_PDEATHSIG=SIGTERM` **después** del
-  cambio de UID: el kernel avisa al hijo cuando muere el supervisor. El
-  proceso exige el PID padre esperado y falla cerrado si el supervisor
-  desapareció o el kernel no permite registrar el mecanismo.
-- El supervisor mantiene un cierre normal por señales cuando tiene
-  permiso. Si no puede señalar a otro UID, no lanza traceback ni se
-  queda esperando sobre ese proceso: salir hace que el kernel entregue
-  SIGTERM al hijo protegido. No rebaja la separación de usuarios, no
-  ejecuta lector dentro de API y no pide capacidades privilegiadas.
-- Si el lector no supera su chequeo inicial y tampoco puede detenerse,
-  el supervisor aborta el arranque, en lugar de exponer un lector fuera
-  de control. La salida del supervisor activa el mismo resguardo.
-- El launcher API continúa usando Uvicorn y la configuración previa.
-  El lector conserva chroot, seccomp y entorno restringido.
+Esta distinción es esencial: **PDEATHSIG por sí solo no basta cuando
+muere PID 1 del namespace**; Linux puede terminar bruscamente los
+procesos restantes. Por eso el protocolo cooperativo por pipe ocurre
+antes del fin del supervisor.
 
-## Verificaciones necesarias antes de aprobar merge/despliegue
+## Pruebas y criterios de aceptación
+- CI backend y frontend, suite PostgreSQL 18 aislada.
+- Build del Dockerfile productivo real con `backend/.dockerignore`
+  que contiene ambos launchers.
+- Arranque sin `CAP_KILL`, `--network none`, sin credenciales ni
+  conexión a proveedor, API `/health=200` y lector seccomp válido.
+- Al hacer `docker stop`, exigir **ambos** marcadores: Uvicorn
+  `Application shutdown complete` y lector
+  `KIKI_READER_SHUTDOWN_COMPLETE`. No aceptar un exit 0 sin esas
+  evidencias (error detectado en revisión de Codex).
+- Verificar modo sin lector, aislamiento, sesiones, versión, rollback
+  y ausencia de tareas de captura antes de cualquier despliegue.
 
-1. CI backend, frontend y PostgreSQL 18 en verde.
-2. Revisar diff y confirmar que Docker utiliza `python /app/start.py`.
-3. Ensayar imagen productiva **sin CAP_KILL** en contenedor aislado:
-   arranque, `/health`, socket del lector, SIGTERM del supervisor y
-   ausencia de hijos supervivientes o `PermissionError`.
-4. Repetir con `KIKI_DOCUMENT_PARSER_ENABLED=false` para asegurar
-   continuidad de API; no consultar proveedores, IA ni clientes.
-5. Antes de desplegar, respaldo auténtico restaurado en un entorno
-   separado; verificaciones de compatibilidad, rollback de artefacto y
-   servicios con auto-deploy apagado.
-6. Fusionar y desplegar solo con permisos explícitos y separados.
-
-**Esto no autoriza una migración PostgreSQL, un deploy ni cambios a
-Render, Ecomm-App, Tiendanube, Mercado Libre o variables de entorno.**
+## Limitación
+Las pruebas de imagen Docker no prueban por sí mismas la configuración
+exacta de toda la plataforma Render ni una aplicación autenticada.
+**No autoriza fusión, despliegue, flags, migración, proveedores ni
+publicación de productos.**
