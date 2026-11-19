@@ -6,6 +6,9 @@ import importlib
 import os
 import signal
 import subprocess
+import sys
+import time
+from pathlib import Path
 
 import pytest
 
@@ -114,3 +117,52 @@ def test_child_fails_closed_if_kernel_denies_parent_watch(
     monkeypatch.setenv("KIKI_SUPERVISOR_PID", "9001")
     with pytest.raises(OSError, match="protección"):
         launcher.arm_parent_death_signal()
+
+
+def test_linux_kernel_sends_sigterm_when_supervisor_exits(tmp_path):
+    """Real, network-free Linux process tree, not just an emulated prctl call."""
+    if sys.platform != "linux":
+        pytest.skip("PR_SET_PDEATHSIG is Linux-specific")
+
+    armed = tmp_path / "armed"
+    signalled = tmp_path / "signalled"
+    child_code = """
+import signal,sys,time
+from pathlib import Path
+from api_launcher import arm_parent_death_signal
+
+def stop(signum, frame):
+    Path(sys.argv[2]).write_text('SIGTERM')
+    raise SystemExit(0)
+
+signal.signal(signal.SIGTERM, stop)
+arm_parent_death_signal()
+Path(sys.argv[1]).write_text('ready')
+while True:
+    time.sleep(0.1)
+"""
+    supervisor_code = """
+import os,subprocess,sys,time
+from pathlib import Path
+
+env = os.environ.copy()
+env['KIKI_SUPERVISOR_PID'] = str(os.getpid())
+subprocess.Popen([sys.executable, '-c', sys.argv[3], sys.argv[1], sys.argv[2]],
+                 env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                 stderr=subprocess.DEVNULL, close_fds=True)
+for _ in range(150):
+    if Path(sys.argv[1]).exists():
+        break
+    time.sleep(0.02)
+else:
+    raise SystemExit('Child never armed PDEATHSIG')
+"""
+    subprocess.run(
+        [sys.executable, "-c", supervisor_code, str(armed), str(signalled), child_code],
+        check=True, timeout=8,
+    )
+    for _ in range(150):
+        if signalled.exists():
+            break
+        time.sleep(0.02)
+    assert signalled.read_text() == "SIGTERM"
