@@ -470,8 +470,11 @@ def _resumable_intake_ready(db):
     settings = get_settings()
     if not (
         settings.kiki_document_resumable_intake_enabled
-        and settings.kiki_document_batch_source_import_enabled
-        and settings.kiki_document_sitemap_discovery_enabled
+        and (
+            (settings.kiki_document_batch_source_import_enabled
+             and settings.kiki_document_sitemap_discovery_enabled)
+            or settings.kiki_document_explicit_url_intake_enabled
+        )
         and settings.kiki_document_parser_kernel_required
         and settings.kiki_document_source_fetch_hosts.strip()
         and reader_available()
@@ -489,6 +492,22 @@ class SourceIntakeRequest(BaseModel):
     sitemap_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     items: list[ManufacturerBatchItem] = Field(min_length=1, max_length=20)
     authorized_local_processing: Literal[True]
+    confirm: Literal[True]
+
+
+class ExactURLManifestItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ecomm_id: str = Field(pattern=r"^[1-9][0-9]{0,19}$")
+    url: str = Field(min_length=16, max_length=1000)
+    provenance_note: str = Field(min_length=10, max_length=600)
+
+
+class ExactURLManifestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request_key: UUID
+    items: list[ExactURLManifestItem] = Field(min_length=1, max_length=20)
+    authorized_local_processing: Literal[True]
+    identity_reviewed_by_operator: Literal[True]
     confirm: Literal[True]
 
 
@@ -533,12 +552,41 @@ def source_intake_create(
     session=Depends(require_csrf),
 ):
     settings = _resumable_intake_ready(db)
+    if not (
+        settings.kiki_document_batch_source_import_enabled
+        and settings.kiki_document_sitemap_discovery_enabled
+    ):
+        raise HTTPException(403, "Importación por sitemap desactivada.")
     try:
         return SourceIntakeQueue(
             db, session, settings.kiki_document_source_fetch_hosts,
         ).create(
             str(body.request_key), body.sitemap_url, body.sitemap_sha256,
             [row.model_dump() for row in body.items],
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post("/sources/intake-jobs/exact-urls")
+def source_intake_create_exact_urls(
+    body: ExactURLManifestRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Stage a manual manifest without contacting a manufacturer."""
+    settings = _resumable_intake_ready(db)
+    if not settings.kiki_document_explicit_url_intake_enabled:
+        raise HTTPException(403, "Investigación por URL exacta desactivada.")
+    try:
+        return SourceIntakeQueue(
+            db, session, settings.kiki_document_source_fetch_hosts,
+        ).create_explicit(
+            str(body.request_key), [row.model_dump() for row in body.items],
         )
     except ValueError as exc:
         db.rollback()
@@ -557,9 +605,19 @@ def source_intake_step(
 ):
     settings = _resumable_intake_ready(db)
     try:
-        return SourceIntakeQueue(
+        queue = SourceIntakeQueue(
             db, session, settings.kiki_document_source_fetch_hosts,
-        ).step(str(job_id), body.expected_revision)
+        )
+        current = queue.detail(str(job_id))
+        if current["selection_mode"] == "EXACT_OPERATOR_URL":
+            if not settings.kiki_document_explicit_url_intake_enabled:
+                raise HTTPException(403, "Captura por URL exacta desactivada.")
+        elif not (
+            settings.kiki_document_batch_source_import_enabled
+            and settings.kiki_document_sitemap_discovery_enabled
+        ):
+            raise HTTPException(403, "Captura por sitemap desactivada.")
+        return queue.step(str(job_id), body.expected_revision)
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from None
