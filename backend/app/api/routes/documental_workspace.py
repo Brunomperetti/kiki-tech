@@ -12,6 +12,7 @@ from app.database.session import get_db
 from app.services.documental.research import Research
 from app.services.documental.proposals import Proposals
 from app.services.documental.commercial_plan import commercial_plan
+from app.services.documental.reextract_reviewed_batch import extract_reviewed_selection
 from app.services.documental.source_links import suggest_reviewed_sources
 from app.services.documental.local_documents import LocalDocuments, parse_local, reader_available
 from app.services.documental.source_fetch import fetch_html
@@ -56,6 +57,31 @@ def execute(db, operation):
         # The shared service can persist automatic evidence invalidations before CAS fails.
         db.commit()
         raise HTTPException(409, str(exc)) from None
+
+
+class ReviewExistingDocumentsRequest(BaseModel):
+    """Manual operation. Does not approve any individual facts or publish."""
+
+    model_config = ConfigDict(extra="forbid")
+    ecomm_ids: list[str] = Field(min_length=1, max_length=20)
+    confirm: Literal[True]
+
+
+@router.post("/sources/reextract-reviewed")
+def reextract_reviewed_originals(
+    body: ReviewExistingDocumentsRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Extract pending claims only from one reviewed original per API variant."""
+    try:
+        return extract_reviewed_selection(db, session, body.ecomm_ids)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("/{ecomm_id}/evidence")
