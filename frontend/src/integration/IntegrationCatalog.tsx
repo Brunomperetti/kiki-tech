@@ -1338,7 +1338,7 @@ export function IntegrationCatalog() {
                         >
                           {state?.candidatesTotal
                             ? "Revisar candidatos"
-                            : "Ver evidencia del canal"}
+                            : "Ver última captura"}
                         </button>
                         <small>
                           {state?.note ??
