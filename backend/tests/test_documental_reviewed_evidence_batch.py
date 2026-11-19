@@ -10,7 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database.models import EcommApiProductEdit, KikiAiEditorialDraft
-from app.services.documental.local_documents import LocalDocuments, parse_local
+from app.services.documental.local_documents import LocalDocuments
+from document_reader.parser import parse
 from app.services.documental.contracts import Provenance
 from app.services.documental.reextract_reviewed_batch import (
     extract_reviewed_selection,
@@ -18,6 +19,11 @@ from app.services.documental.reextract_reviewed_batch import (
 from app.services.documental.storage import Dossier
 from test_documental_complete_draft_flow import IDENT, prepare
 from test_documental_saved_page_import import upload_payload
+
+
+def source_parse(payload):
+    return parse(payload.filename, payload.content_type, payload.content_base64,
+                 web_snapshot=payload.web_snapshot)
 
 
 def setup(tmp_path, monkeypatch):
@@ -32,7 +38,7 @@ def setup(tmp_path, monkeypatch):
 def attach_reviewed_real_original(db, user):
     service = LocalDocuments(db, user)
     body = upload_payload()
-    parsed = parse_local(body)
+    parsed = source_parse(body)
     uploaded = service.incorporate(IDENT, body, parsed)
     doc_id = uploaded["incorporated_document_id"]
     doc = service.research._document(doc_id)
@@ -66,7 +72,7 @@ def test_unreviewed_or_name_mismatched_source_blocks_before_alias(tmp_path, monk
     with Session(engine) as db:
         svc = LocalDocuments(db, user)
         body = upload_payload()
-        imported = svc.incorporate(IDENT, body, parse_local(body))
+        imported = svc.incorporate(IDENT, body, source_parse(body))
         status = extract_reviewed_selection(db, user, [IDENT])
         assert status["items"][0]["state"] == "BLOCKED"
         assert "original real revisado" in status["items"][0]["reasons"][0]
@@ -88,7 +94,7 @@ def test_alias_review_then_bulk_extraction_only_creates_pending_facts(tmp_path, 
     with Session(engine) as db:
         service, reviewed, document_id = attach_reviewed_real_original(db, user)
         latest = service.research._document(document_id)
-        identity = service.research.review_document_identity(
+        service.research.review_document_identity(
             IDENT, reviewed["version"], document_id, latest.version,
             "APPROVED", "Cotejé identidad y presentación del HTML ficticio contra el SKU.",
         )
@@ -108,7 +114,7 @@ def test_alias_review_then_bulk_extraction_only_creates_pending_facts(tmp_path, 
         assert all(f["state"] == "PENDING" for f in current.facts)
         previous_versions = [(f["id"], f["version"]) for f in current.facts]
         again = extract_reviewed_selection(db, user, [IDENT])
-        assert again["counts"]["NO_CHANGES"] == 0 or again["counts"]["NO_CHANGES"] == 1
+        assert again["items"][0]["facts_pending"] == 3
         assert [(f["id"], f["version"]) for f in db.get(Dossier, IDENT).facts] == previous_versions
 
 
