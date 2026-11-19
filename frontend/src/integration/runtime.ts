@@ -14,6 +14,7 @@ export type Capabilities = {
   document_sitemap_discovery?: boolean;
   document_batch_source_import?: boolean;
   document_resumable_intake?: boolean;
+  document_exact_url_manifest?: boolean;
   channels: boolean;
   batches: boolean;
   executor: boolean;

@@ -9,13 +9,17 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
+import json
 from uuid import uuid4
 
 from sqlalchemy import select
 
-from app.services.documental.storage import Document
+from app.services.documental.storage import Document, Dossier
+from app.integrations.ecomm_app.api_catalog_browser import valid_variant_id
 from app.services.editorial_batches.context import sources
 from .manufacturer_batch_intake import _identity, capture_selected, preflight
+from .explicit_url_intake import import_explicit_url
 from .sitemap_discovery import preview_candidates
 from .source_fetch import allowed_hosts, target
 from .source_intake_storage import SourceIntakeJob
@@ -68,6 +72,12 @@ def _summary(job):
         } for row in job.items],
         "sitemap_url": job.sitemap_url,
         "sitemap_sha256": job.sitemap_sha256,
+        "selection_mode": (
+            "EXACT_OPERATOR_URL"
+            if job.items and job.items[0].get("source_mode") == "EXACT_OPERATOR_URL"
+            else "REVIEWED_SITEMAP"
+        ),
+        "source_host": job.source_host,
         "external_writes_enabled": False,
         "ai_requests": 0,
         "claims_approved": 0,
@@ -176,6 +186,104 @@ class SourceIntakeQueue:
         self.db.commit()
         return _summary(job)
 
+    def create_explicit(self, request_key, selected):
+        """Persist up to twenty human-reviewed exact URLs, without network.
+
+        This is a staging manifest, never an approval of manufacturer
+        identity or content. Requires the same 20-item queue table.
+        """
+        if not 1 <= len(selected) <= MAX_ITEMS:
+            raise ValueError("Seleccioná entre 1 y 20 URLs exactas.")
+        if (
+            len({row.get("ecomm_id") for row in selected}) != len(selected)
+            or not all(
+                isinstance(row.get("ecomm_id"), str)
+                and valid_variant_id(row["ecomm_id"])
+                and isinstance(row.get("url"), str)
+                and isinstance(row.get("provenance_note"), str)
+                and 10 <= len(row["provenance_note"].strip()) <= 600
+                for row in selected
+            )
+        ):
+            raise ValueError("Ecomm ID, URL o motivo repetido/inválido.")
+        source_host = None
+        manifest = []
+        for row in selected:
+            host, _ = target(row["url"], self.hosts)
+            if source_host is None:
+                source_host = host
+            if host != source_host:
+                raise ValueError(
+                    "Prepará un lote por dominio de fabricante; no mezcles sitios."
+                )
+            manifest.append({
+                "ecomm_id": row["ecomm_id"],
+                "url": row["url"],
+                "provenance_note": row["provenance_note"].strip(),
+            })
+        digest = sha256(
+            json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode()
+        ).hexdigest()
+        existing = self.db.scalar(
+            select(SourceIntakeJob).where(SourceIntakeJob.request_key == request_key)
+        )
+        if existing:
+            if (
+                existing.sitemap_url != ""
+                or existing.sitemap_sha256 != digest
+                or existing.source_host != source_host
+                or [
+                    (x["ecomm_id"], x["url"], x.get("provenance_note"))
+                    for x in existing.items
+                ] != [
+                    (x["ecomm_id"], x["url"], x["provenance_note"])
+                    for x in manifest
+                ]
+            ):
+                raise ValueError("La clave de solicitud pertenece a otro lote.")
+            return _summary(existing)
+
+        snapshot = sources(self.db)
+        items = []
+        for row in manifest:
+            variant = snapshot.get(row["ecomm_id"])
+            if (
+                not variant or not variant.get("sku")
+                or variant.get("is_combo") is not False
+            ):
+                raise ValueError(
+                    "La variante Ecomm, su SKU o el tipo de venta no son aptos."
+                )
+            if _present(self.db, row["ecomm_id"], row["url"]):
+                raise ValueError("La URL ya está incorporada para esa variante.")
+            items.append({
+                **row,
+                "source_mode": "EXACT_OPERATOR_URL",
+                "expected_identity": list(_identity(variant)),
+                "state": "PENDING",
+                "attempts": 0,
+                "document_id": None,
+                "error": None,
+                "next_action": "INCORPORATE",
+                "claim_token": None,
+                "claim_until": None,
+            })
+        instant = now()
+        job = SourceIntakeJob(
+            id=str(uuid4()), request_key=request_key, created_at=instant,
+            updated_at=instant, creator=self.actor, revision=1,
+            state="PENDING", sitemap_url="", sitemap_sha256=digest,
+            source_host=source_host, items=items,
+            history=[{
+                "action": "CREATED_EXACT_URL_MANIFEST",
+                "at": instant.isoformat(), "by": self.actor,
+                "items": len(items),
+            }],
+        )
+        self.db.add(job)
+        self.db.commit()
+        return _summary(job)
+
     def _update(self, job, items, action):
         instant = now()
         job.items = items
@@ -206,7 +314,10 @@ class SourceIntakeQueue:
             changed = True
         return changed
 
-    def step(self, ident, revision, *, importer=capture_selected):
+    def step(
+        self, ident, revision, *, importer=capture_selected,
+        explicit_importer=import_explicit_url,
+    ):
         job = self._get(ident, locked=True)
         if job.revision != revision:
             raise ValueError("El lote cambió: actualizá su estado antes de continuar.")
@@ -239,22 +350,54 @@ class SourceIntakeQueue:
         self._update(job, rows, "CLAIMED")
 
         try:
-            result = importer(
-                self.db, self.session,
-                sitemap_url=job.sitemap_url,
-                sitemap_sha256=job.sitemap_sha256,
-                items=[{"ecomm_id": selected["ecomm_id"], "url": selected["url"]}],
-                configured_hosts=",".join(sorted(self.hosts)),
-            )
-            docs = result.get("documents") or []
-            if (
-                len(docs) != 1 or
-                docs[0]["ecomm_id"] != selected["ecomm_id"] or
-                docs[0].get("review_state") != "PENDING" or
-                result.get("facts_approved") != 0
-            ):
-                raise ValueError("La incorporación no confirmó una fuente pendiente.")
-            document_id = docs[0]["document_id"]
+            if selected.get("source_mode") == "EXACT_OPERATOR_URL":
+                expected = self.db.scalar(
+                    select(Dossier.version).where(
+                        Dossier.ecomm_id == selected["ecomm_id"]
+                    )
+                )
+                result = explicit_importer(
+                    self.db, self.session,
+                    ecomm_id=selected["ecomm_id"],
+                    expected_version=expected if expected is not None else 0,
+                    reference_url=selected["url"],
+                    provenance_note=selected["provenance_note"],
+                    configured_hosts=",".join(sorted(self.hosts)),
+                )
+                document_id = result["incorporated_document_id"]
+                document = self.db.get(Document, document_id)
+                if (
+                    not document
+                    or document.body.get("associated_ecomm_id")
+                    != selected["ecomm_id"]
+                    or document.body.get("source", {}).get("review_state")
+                    != "PENDING"
+                    or document.body.get("source", {}).get("reference_url")
+                    != selected["url"]
+                ):
+                    raise ValueError(
+                        "No se confirmó un original pendiente para esta variante."
+                    )
+            else:
+                result = importer(
+                    self.db, self.session,
+                    sitemap_url=job.sitemap_url,
+                    sitemap_sha256=job.sitemap_sha256,
+                    items=[{"ecomm_id": selected["ecomm_id"],
+                            "url": selected["url"]}],
+                    configured_hosts=",".join(sorted(self.hosts)),
+                )
+                docs = result.get("documents") or []
+                if (
+                    len(docs) != 1 or
+                    docs[0]["ecomm_id"] != selected["ecomm_id"]
+                    or docs[0].get("review_state") != "PENDING"
+                    or result.get("facts_approved") != 0
+                ):
+                    raise ValueError(
+                        "La incorporación no confirmó una fuente pendiente."
+                    )
+                document_id = docs[0]["document_id"]
         except Exception as error:
             self.db.rollback()
             # The exporter may have committed before the response was lost.

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { request } from "./catalog-adapter";
+import { capabilities } from "./runtime";
 
 const endpoint = "/api/ecomm-app/workspace/sources/intake-jobs";
 type Candidate = {
@@ -32,6 +33,8 @@ type Job = {
   counts: Record<string, number>;
   items: JobItem[];
   sitemap_url: string;
+  selection_mode: "EXACT_OPERATOR_URL" | "REVIEWED_SITEMAP";
+  source_host: string;
   external_writes_enabled: false;
   manual_steps_only: true;
   ai_requests: 0;
@@ -43,6 +46,7 @@ function verified(value: unknown): Job {
   if (!row || row.mode !== "MANUAL_RESUMABLE_SOURCE_INTAKE" ||
       row.external_writes_enabled !== false || row.manual_steps_only !== true ||
       row.ai_requests !== 0 || row.claims_approved !== 0 ||
+      !["EXACT_OPERATOR_URL", "REVIEWED_SITEMAP"].includes(row.selection_mode) ||
       !/^[a-f0-9-]{36}$/.test(row.id) ||
       !Number.isSafeInteger(row.revision) || !Array.isArray(row.items) ||
       row.items.some(item => !/^[1-9][0-9]*$/.test(item.ecomm_id) ||
@@ -65,6 +69,7 @@ export function ManufacturerIntakeQueue({
   const [current, setCurrent] = useState<Job>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [exactUrls, setExactUrls] = useState("");
   const rootName = "Fuentes de fabricantes · cola reanudable";
 
   async function refresh() {
@@ -135,6 +140,56 @@ export function ManufacturerIntakeQueue({
     });
   }
 
+  function createExactManifest() {
+    const entries = exactUrls.trim().split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if (!entries.length || entries.length > 20) {
+      setError("Ingresá entre 1 y 20 líneas de un mismo fabricante.");
+      return;
+    }
+    let items: { ecomm_id: string; url: string; provenance_note: string }[];
+    try {
+      items = entries.map((line, i) => {
+        const columns = line.split(";");
+        if (columns.length !== 3) throw new Error(
+          `Línea ${i + 1}: utilizá Ecomm ID;URL HTTPS;motivo documentado.`
+        );
+        const [ecomm_id, url, provenance_note] = columns.map(x => x.trim());
+        if (!/^[1-9][0-9]{0,19}$/.test(ecomm_id) ||
+            !selected.has(ecomm_id) ||
+            !/^https:\/\/[^/]+\/[^?#]+$/.test(url) ||
+            provenance_note.length < 10 || provenance_note.length > 600) {
+          throw new Error(
+            `Línea ${i + 1}: seleccioná esa variante y completá URL HTTPS exacta y procedencia.`
+          );
+        }
+        return { ecomm_id, url, provenance_note };
+      });
+      if (new Set(items.map(x => x.ecomm_id)).size !== items.length) {
+        throw new Error("No se admite el mismo Ecomm ID dos veces.");
+      }
+      const hosts = new Set(items.map(x => new URL(x.url).hostname.toLowerCase()));
+      if (hosts.size !== 1) {
+        throw new Error("Separá Natufarma y Biosa: cada lote admite un solo dominio.");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Manifiesto inválido.");
+      return;
+    }
+    if (!window.confirm(
+      `¿Crear el lote de ${items.length} URLs? Confirmás que revisaste cada identidad y presentación en Ecomm-App y el fabricante. No se hace ninguna descarga ahora. Cada incorporación queda PENDIENTE de validar.`
+    )) return;
+    void run(async () => {
+      await mutation("/exact-urls", {
+        request_key: crypto.randomUUID(),
+        items,
+        authorized_local_processing: true,
+        identity_reviewed_by_operator: true,
+        confirm: true,
+      });
+      setExactUrls("");
+    });
+  }
+
   function process() {
     if (!current || !window.confirm(
       "¿Capturar una sola página del fabricante en este paso? Guardará su HTML como evidencia pendiente, sin publicar ni aprobar información."
@@ -171,6 +226,31 @@ export function ManufacturerIntakeQueue({
   return <section className="b-detail" aria-label={rootName}>
     <h3>{rootName}</h3>
     <p>Conserva el avance en KIKI aunque cierres el navegador. Procesa una variante por clic; los documentos quedan pendientes de revisar.</p>
+    {capabilities?.document_exact_url_manifest === true && <details>
+      <summary>Preparar lote por URLs exactas (sin sitemap)</summary>
+      <p>
+        Seleccioná primero hasta 20 variantes en el catálogo. Pegá una línea
+        por producto: <code>Ecomm ID;URL HTTPS exacta;procedencia comprobada</code>.
+        Solo un dominio por lote. KIKI verifica identidad y restricciones técnicas
+        antes de cada descarga. La URL y el EAN no acreditan por sí solos al fabricante.
+      </p>
+      <textarea rows={5} value={exactUrls}
+        onChange={e => setExactUrls(e.target.value)}
+        disabled={busy || disabled}
+        placeholder={"6754660;https://fabricante.example/producto/abc;Página específica revisada con nombre y presentación"}
+        aria-label="Lista de URLs exactas de un fabricante"
+      />
+      <div className="b-actions">
+        <button type="button" disabled={busy || disabled || !exactUrls.trim()}
+          onClick={createExactManifest}>
+          Guardar manifiesto de investigación
+        </button>
+      </div>
+      <p>
+        Guardar el manifiesto no descarga páginas. Procesá cada fuente con
+        el botón de avance; los hechos y las fichas requieren aprobación humana.
+      </p>
+    </details>}
     <div className="b-actions">
       <button type="button" disabled={busy || disabled || !candidates.length} onClick={create}>
         Preparar lote con {candidates.length} fuentes
@@ -185,7 +265,7 @@ export function ManufacturerIntakeQueue({
         setCurrent(jobs.find(job => job.id === event.target.value));
       }}>
         {jobs.map(job => <option key={job.id} value={job.id}>
-          {job.id.slice(0, 8)} · {job.state} · {job.total} fuentes
+          {job.id.slice(0, 8)} · {job.state} · {job.total} fuentes · {job.selection_mode === "EXACT_OPERATOR_URL" ? "URLs revisadas" : "Sitemap"}
         </option>)}
       </select>
     </label>}
