@@ -179,6 +179,33 @@ export function DocumentImport({
       );
     });
   }
+  async function fetchExactReviewedURL() {
+    if (!authorized || !url.startsWith("https://") || note.trim().length < 10) {
+      onError("Indicá la URL HTTPS exacta, cómo identificaste la fuente y autorizá su consulta.");
+      return;
+    }
+    if (!window.confirm(
+      "¿Incorporar esta única URL de fabricante? KIKI comprobará dominio autorizado, robots.txt, HTTPS y redirecciones; archivará el HTML como PENDIENTE. Debés revisar identidad y cada hecho. No utiliza IA ni publica productos."
+    )) return;
+    await perform(async () => {
+      const value = await changeResearch(
+        id, `${basePath(id)}/fetch-reviewed-url`,
+        {
+          expected_version: data.version,
+          reference_url: url.trim(),
+          provenance_note: note.trim(),
+          authorized_local_processing: true,
+        },
+        csrf,
+      );
+      setAuthorized(false);
+      onResult(
+        value,
+        "HTML original incorporado como evidencia PENDIENTE. Revisá procedencia, identidad y cada dato antes de generar la ficha."
+      );
+    });
+  }
+
   async function review(decision: string) {
     if (
       !document ||
@@ -352,6 +379,27 @@ export function DocumentImport({
         >
           Incorporar documentación
         </button>
+        {capabilities?.document_explicit_url_intake === true && (
+          <div className="r-document" role="group" aria-label="Incorporar URL exacta de fabricante">
+            <h4>Incorporar una URL exacta sin sitemap</h4>
+            <p>
+              Para fabricantes sin índice XML disponible: ingresá la página específica
+              de esta variante y confirmá su consulta. Se comprueban HTTPS,
+              robots.txt y dominio permitido. Se guarda como fuente pendiente,
+              nunca como ficha aprobada. Máximo una nueva descarga automática
+              por variante al día. Si está bloqueada, podés cargar el HTML
+              original guardado manualmente.
+            </p>
+            <button
+              type="button"
+              disabled={busy || !authorized || note.trim().length < 10
+                || !url.startsWith("https://")}
+              onClick={() => void fetchExactReviewedURL()}
+            >
+              Consultar y archivar esta URL
+            </button>
+          </div>
+        )}
         {capabilities?.document_fetch === true && (
           <div className="r-document" role="group" aria-label="Consulta puntual de fabricante">
             <h4>Obtener una página del fabricante (piloto)</h4>
