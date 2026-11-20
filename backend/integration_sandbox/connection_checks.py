@@ -129,6 +129,12 @@ class Connections(unittest.TestCase):
         self.assertFalse(self.status()["ecomm"]["github_schedule_verified"])
 
     def test_mutations_require_csrf_and_old_routes_are_not_bypassed(self):
+        # The main catalog shortcut polls local job metadata only; it must
+        # not open any new provider or sensitive POST through the sandbox.
+        self.assertTrue(route_allowed("GET", "/api/ecomm-app/stage/auto/status"))
+        status = self.client.get("/api/ecomm-app/stage/auto/status")
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertFalse(status.json()["external_writes_enabled"])
         for method, path in CONNECTION_ACTIONS:
             self.assertEqual(self.client.request(method, path).status_code, 403, path)
             self.assertFalse(route_allowed(method, path))
