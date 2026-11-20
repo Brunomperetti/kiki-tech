@@ -235,7 +235,7 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       <strong>{readiness.ready?'Campos requeridos completos, sin certificación documental':'Datos pendientes de cargar en la ficha'}</strong>
       <p>Los hechos aprobados, la autenticidad de fuentes, las licencias multimedia y los vínculos con canales se validan por separado. Esta pantalla sólo comprueba presencia y estructura.</p>
       {readiness.missing.length>0&&<ul>{readiness.missing.map(key=><li key={key}>{fieldNames[key]||key}</li>)}</ul>}
-      {readiness.ready&&<p>El estado «Lista para canales» es interno y no implica derechos verificados ni publicación. El servidor debe aplicar sus controles documentales antes de aceptar ese estado.</p>}
+      {readiness.ready&&<p>El estado «Lista para canales» es interno y no implica derechos verificados ni publicación. La validación documental estricta depende de los controles habilitados para cada variante: confirmala por separado antes de preparar cualquier canal.</p>}
     </section>
   </div>;
 }
