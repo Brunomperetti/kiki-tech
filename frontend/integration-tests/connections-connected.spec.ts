@@ -367,3 +367,25 @@ test("botón directo respeta el trabajo programado en curso sin emitir otro POST
     .toBeDisabled();
   expect(manualPosts).toBe(0);
 });
+
+test("botón directo no expone un POST si Conexiones informa acciones bloqueadas", async ({ page }) => {
+  const status = await original(page);
+  status.actions_enabled = false;
+  await page.route("**/api/connections/status", route =>
+    route.fulfill({
+      json: status,
+      headers: { "X-Kiki-Environment": "local-synthetic" },
+    }),
+  );
+  let calls = 0;
+  await page.route("**/api/ecomm-app/stage/manual/start", route => {
+    calls += 1;
+    return route.abort();
+  });
+  await page.reload();
+  const control = page.getByRole("region", { name: "Actualización de Ecomm-App" });
+  await expect(control.getByRole("button", { name: "Actualizar desde Ecomm-App" }))
+    .toBeDisabled();
+  await expect(control).toContainText("Actualización manual no habilitada");
+  expect(calls).toBe(0);
+});
