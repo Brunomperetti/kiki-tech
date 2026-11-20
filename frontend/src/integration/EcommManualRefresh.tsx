@@ -58,11 +58,13 @@ function newerCapture(a: string | null, b?: string | null): boolean {
 
 export function EcommManualRefresh({
   csrf,
+  actionsAllowed,
   displayedCaptureAt,
   editing,
   onReload,
 }: {
   csrf: string;
+  actionsAllowed: boolean;
   displayedCaptureAt?: string | null;
   editing: boolean;
   onReload: () => void;
@@ -72,7 +74,7 @@ export function EcommManualRefresh({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const startingRef = useRef(false);
-  const permitted = canWrite() && (!production || capabilities?.connections === true);
+  const permitted = actionsAllowed && canWrite() && (!production || capabilities?.connections === true);
 
   useEffect(() => {
     let active = true;
