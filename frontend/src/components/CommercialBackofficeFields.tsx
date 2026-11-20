@@ -15,7 +15,7 @@ export function assessCommercialReadiness(fields:EcommEditableFields):KikiReadin
   return {
     missing,ready:missing.length===0,completed:total-missing.length,
     total,percent:Math.round(100*(total-missing.length)/total),
-    policy:'Completitud documental interna; las fuentes deben comprobarse y nada se publica.',
+    policy:'Completitud de campos (presencia y formato). No verifica hechos, permisos ni canales.',
   };
 }
 
@@ -56,9 +56,14 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
       <div><strong>Ficha comercial central de KIKI</strong>
         <p>{memoryOnly ? "En esta demostración los campos se conservan sólo en memoria y se identifican con la variante sintética." : "Todos los campos se guardan en KIKI y quedan asociados al ID de variante de Ecomm-App."}
           No se envían a ningún canal hasta que exista un proceso de publicación autorizado.</p></div>
-      <div className="kiki-commercial-score"><strong>{readiness.percent}%</strong><span>Completitud documental</span></div>
-      <div className="kiki-commercial-meter" aria-label={readiness.percent+'% de la ficha completa'}>
+      <div className="kiki-commercial-score"><strong>{readiness.percent}%</strong><span>Campos cargados · sin certificar</span></div>
+      <div className="kiki-commercial-meter" aria-label={readiness.percent+'% de los campos requeridos cargados'}>
         <span style={{width:readiness.percent+'%'}}/>
+      </div>
+      <div className="kiki-commercial-quality-levels" aria-label="Tres controles independientes de calidad">
+        <p><strong>1. Campos:</strong> {readiness.percent}% cargados. Este porcentaje mide presencia y estructura, no autenticidad.</p>
+        <p><strong>2. Evidencias:</strong> revisar originales, identidad, hechos y permisos por separado en «Evidencias». Una URL o casilla de verificación no certifica datos ni derechos multimedia.</p>
+        <p><strong>3. Canales:</strong> la aptitud exige revisión específica y capturas vigentes; ni el 100% ni «Lista para canales» publican o certifican vínculos externos.</p>
       </div>
     </div>
 
@@ -227,10 +232,10 @@ export function CommercialBackofficeFields({fields,onChange,readiness,categories
           onChange={e=>onChange('note',e.target.value)}/></label>
     </section>
     <section className="kiki-commercial-checklist" aria-live="polite">
-      <strong>{readiness.ready?'Ficha documentalmente completa para preparar canales':'Datos pendientes para completar la ficha'}</strong>
-      <p>La calidad y autenticidad de fuentes deben ser comprobadas por el operador; este control valida presencia y estructura, no verdad externa.</p>
+      <strong>{readiness.ready?'Campos requeridos completos, sin certificación documental':'Datos pendientes de cargar en la ficha'}</strong>
+      <p>Los hechos aprobados, la autenticidad de fuentes, las licencias multimedia y los vínculos con canales se validan por separado. Esta pantalla sólo comprueba presencia y estructura.</p>
       {readiness.missing.length>0&&<ul>{readiness.missing.map(key=><li key={key}>{fieldNames[key]||key}</li>)}</ul>}
-      {readiness.ready&&<p>Guardar como «Lista para canales» fija esta versión interna. Nada se publica automáticamente.</p>}
+      {readiness.ready&&<p>El estado «Lista para canales» es interno y no implica derechos verificados ni publicación. El servidor debe aplicar sus controles documentales antes de aceptar ese estado.</p>}
     </section>
   </div>;
 }
