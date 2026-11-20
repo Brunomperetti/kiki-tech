@@ -8,6 +8,7 @@ import {
 } from "./runtime";
 import { SettingsDialog } from "../prototype/SettingsDialog";
 import { ConnectionCenter } from "./ConnectionCenter";
+import { EcommManualRefresh } from "./EcommManualRefresh";
 import { useConnections } from "./connections";
 import { recommendedAction } from "./product-actions";
 import { SavedHistory } from "./SavedHistory";
@@ -687,6 +688,14 @@ export function IntegrationCatalog() {
           · {captureDate(data?.lastAt ?? null)}
         </span>
       </div>
+      {session && (
+        <EcommManualRefresh
+          csrf={session.csrf_token}
+          displayedCaptureAt={data?.lastAt}
+          editing={dirty || editorBusy || loading}
+          onReload={() => retry(value => value + 1)}
+        />
+      )}
       <ChannelGapSummary
         comparison={data?.channelOverview?.comparison}
         filter={filter}
