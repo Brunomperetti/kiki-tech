@@ -1,3 +1,33 @@
+.i-ecomm-refresh {
+  display: grid;
+  gap: 8px;
+  padding: 12px 15px;
+  margin: 0 0 18px;
+  border: 1px solid #d6e1d9;
+  border-radius: 10px;
+  background: #f7faf7;
+  color: #345646;
+  font-size: 12px;
+}
+.i-ecomm-refresh-main,
+.i-ecomm-refresh-ready {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.i-ecomm-refresh-main small,
+.i-ecomm-refresh-ready small {
+  color: #556d5e;
+}
+.i-ecomm-refresh p { margin: 0; line-height: 1.5; }
+.i-ecomm-refresh p[role="alert"] { color: #a24330; }
+.i-ecomm-refresh-ready { border-top: 1px solid #d6e1d9; padding-top: 8px; }
+.i-ecomm-refresh button:disabled { opacity: 0.65; cursor: not-allowed; }
+@media (max-width: 700px) {
+  .i-ecomm-refresh-main > button { width: 100%; }
+}
+
 .i-metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
