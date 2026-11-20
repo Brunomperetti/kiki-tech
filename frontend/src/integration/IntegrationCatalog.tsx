@@ -112,9 +112,8 @@ export function IntegrationCatalog() {
       configureRuntime();
     };
   }, [!!session]);
-  const [connectionsOpened, setConnectionsOpened] = useState(false);
   const connections = useConnections(
-    !!session && runtimeReady && connectionsOpened,
+    !!session && runtimeReady,
     session?.csrf_token,
     preferences,
   );
@@ -614,7 +613,6 @@ export function IntegrationCatalog() {
         selected ? update({ tab: "Historial" }) : setHistoryOpen(true)
       }
       onSettings={() => {
-        setConnectionsOpened(true);
         setPreferences(true);
       }}
       connectionStatus={
@@ -691,6 +689,7 @@ export function IntegrationCatalog() {
       {session && (
         <EcommManualRefresh
           csrf={session.csrf_token}
+          actionsAllowed={connections.data?.actions_enabled === true && connections.data.ecomm.api_configured}
           displayedCaptureAt={data?.lastAt}
           editing={dirty || editorBusy || loading}
           onReload={() => retry(value => value + 1)}
