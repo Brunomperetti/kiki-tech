@@ -689,7 +689,9 @@ export function IntegrationCatalog() {
       {session && (
         <EcommManualRefresh
           csrf={session.csrf_token}
-          actionsAllowed={connections.data?.actions_enabled === true && connections.data.ecomm.api_configured}
+          actionsAllowed={production
+            ? capabilities?.ecomm_manual_refresh === true
+            : connections.data?.actions_enabled === true && connections.data.ecomm.api_configured}
           displayedCaptureAt={data?.lastAt}
           editing={dirty || editorBusy || loading}
           onReload={() => retry(value => value + 1)}
