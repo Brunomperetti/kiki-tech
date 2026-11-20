@@ -167,8 +167,8 @@ export function useConnections(
     const c = new AbortController();
     controller.current = c;
     let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      if (!visibleRef.current && !runningRef.current) return;
+    async function poll(initial = false) {
+      if (!initial && !visibleRef.current && !runningRef.current) return;
       let running = false;
       try {
         running = !!(await load())?.ecomm.refresh_in_progress;
@@ -182,7 +182,9 @@ export function useConnections(
       if (!c.signal.aborted && (visibleRef.current || runningRef.current))
         timer = setTimeout(poll, running ? 1500 : 15000);
     }
-    void poll();
+    // A direct catalog action needs validated connection permissions before a POST.
+    // Make one safe initial status read even with the settings dialog closed.
+    void poll(true);
     wake.current = () => {
       clearTimeout(timer);
       timer = setTimeout(poll, 500);

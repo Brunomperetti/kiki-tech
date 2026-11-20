@@ -8,6 +8,7 @@ import {
 } from "./runtime";
 import { SettingsDialog } from "../prototype/SettingsDialog";
 import { ConnectionCenter } from "./ConnectionCenter";
+import { EcommManualRefresh } from "./EcommManualRefresh";
 import { useConnections } from "./connections";
 import { recommendedAction } from "./product-actions";
 import { SavedHistory } from "./SavedHistory";
@@ -111,9 +112,8 @@ export function IntegrationCatalog() {
       configureRuntime();
     };
   }, [!!session]);
-  const [connectionsOpened, setConnectionsOpened] = useState(false);
   const connections = useConnections(
-    !!session && runtimeReady && connectionsOpened,
+    !!session && runtimeReady,
     session?.csrf_token,
     preferences,
   );
@@ -613,7 +613,6 @@ export function IntegrationCatalog() {
         selected ? update({ tab: "Historial" }) : setHistoryOpen(true)
       }
       onSettings={() => {
-        setConnectionsOpened(true);
         setPreferences(true);
       }}
       connectionStatus={
@@ -687,6 +686,15 @@ export function IntegrationCatalog() {
           · {captureDate(data?.lastAt ?? null)}
         </span>
       </div>
+      {session && (
+        <EcommManualRefresh
+          csrf={session.csrf_token}
+          actionsAllowed={connections.data?.actions_enabled === true && connections.data.ecomm.api_configured}
+          displayedCaptureAt={data?.lastAt}
+          editing={dirty || editorBusy || loading}
+          onReload={() => retry(value => value + 1)}
+        />
+      )}
       <ChannelGapSummary
         comparison={data?.channelOverview?.comparison}
         filter={filter}
