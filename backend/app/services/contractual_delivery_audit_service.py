@@ -57,7 +57,7 @@ ORDER = (
 QUALITY_STAGES = (
     "REVIEW_IDENTITY", "FIND_ORIGINAL", "REVIEW_ORIGINAL",
     "REVIEW_FACTS", "COMPLETE_FIELDS", "REVIEW_TAXONOMY",
-    "REVIEW_SEO", "ADD_IMAGE", "VERIFY_MEDIA_RIGHTS",
+    "REVIEW_SEO", "ADD_IMAGE", "REVIEW_MEDIA_AND_CHANNEL",
 )
 
 CSV_HEADER = (
@@ -179,12 +179,12 @@ def _gap_report(row, edit, document_ids, documents, approved):
         quality_stage = "REVIEW_ORIGINAL"
     elif "NO_CURRENT_APPROVED_FACTS" in gap:
         quality_stage = "REVIEW_FACTS"
-    elif not fields_complete:
-        quality_stage = "COMPLETE_FIELDS"
     elif "TAXONOMY_MISSING" in gap:
         quality_stage = "REVIEW_TAXONOMY"
     elif "SEO_MISSING" in gap:
         quality_stage = "REVIEW_SEO"
+    elif not fields_complete:
+        quality_stage = "COMPLETE_FIELDS"
     elif "IMAGE_MISSING" in gap:
         quality_stage = "ADD_IMAGE"
     else:
@@ -192,7 +192,7 @@ def _gap_report(row, edit, document_ids, documents, approved):
         # its fields, source checkbox or image URL exist. Permission grants,
         # independently matched identity and channel freshness need a
         # separate authenticated gate; this catalog audit cannot attest them.
-        quality_stage = "VERIFY_MEDIA_RIGHTS"
+        quality_stage = "REVIEW_MEDIA_AND_CHANNEL"
     return {
         "ecomm_id": row["ecomm_id"],
         "sku": row["sku"],
