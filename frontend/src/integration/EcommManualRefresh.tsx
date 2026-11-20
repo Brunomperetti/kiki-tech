@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { canWrite } from "./runtime";
+import { canWrite, production, capabilities } from "./runtime";
 import { captureDate, request } from "./catalog-adapter";
 
 type RefreshJob = {
@@ -72,6 +72,7 @@ export function EcommManualRefresh({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const startingRef = useRef(false);
+  const permitted = canWrite() && (!production || capabilities?.connections === true);
 
   useEffect(() => {
     let active = true;
@@ -107,7 +108,7 @@ export function EcommManualRefresh({
   }, [csrf]);
 
   async function start() {
-    if (startingRef.current || !state || state.refresh_in_progress || !canWrite())
+    if (startingRef.current || !state || state.refresh_in_progress || !permitted)
       return;
     if (!window.confirm(
       "¿Actualizar ahora el catálogo desde Ecomm-App? Se consultará la API real y se renovará la copia interna únicamente al finalizar. Las fichas editadas se conservarán; si hay otra actualización en curso, no se iniciará una segunda."
@@ -156,7 +157,7 @@ export function EcommManualRefresh({
         <button
           type="button"
           className="d-primary"
-          disabled={!state || !canWrite() || starting || running}
+          disabled={!state || !permitted || starting || running}
           onClick={() => void start()}
         >
           {starting ? "Solicitando actualización…" :
@@ -164,6 +165,12 @@ export function EcommManualRefresh({
         </button>
         <small>Automática: 08:25 y 16:25 (Argentina) · Manual cuando necesites</small>
       </div>
+      {!permitted && (
+        <p role="status">
+          Actualización manual no habilitada para esta interfaz.
+          Se respetan los permisos de Conexiones y edición de KIKI.
+        </p>
+      )}
       {running && state?.refresh_job && (
         <p role="status">
           {state.refresh_job.origin === "SCHEDULED"
