@@ -258,3 +258,32 @@ def test_identity_conflict_takes_priority_over_approved_facts_or_fields():
     result = _gap_report(row, None, [], {}, 0)
     assert result["quality_stage"] == "REVIEW_IDENTITY"
     assert result["delivery_certified"] is False
+
+
+def test_csv_groups_by_next_action_before_sku_and_never_changes_data():
+    common = {
+        "name": "Producto", "presentation": "250 g",
+        "api_barcode": "7791234567890", "captured_at": "2026-11-20",
+        "editorial_status": "DRAFT", "documents": 0,
+        "reviewed_source_documents": 0,
+        "approved_facts_with_current_original": 0,
+        "internal_fiche_complete": False, "fields_complete": False,
+        "fields_percent": 0, "image_present": False,
+        "video_present": False, "monthly_review_due": False,
+        "last_review_at": None, "next_review_at": None,
+        "review_reason": "NOT_READY", "next_step": "NO_MANUFACTURER_DOCUMENT",
+        "gaps": ["NO_MANUFACTURER_DOCUMENT"],
+    }
+    needs_source = {
+        **common, "ecomm_id": "101", "sku": "AAA",
+        "quality_stage": "FIND_ORIGINAL",
+    }
+    identity_exception = {
+        **common, "ecomm_id": "102", "sku": "ZZZ",
+        "quality_stage": "REVIEW_IDENTITY",
+    }
+    result = export_delivery_csv([needs_source, identity_exception])
+    assert result.splitlines()[1].startswith("102,ZZZ")
+    assert result.splitlines()[2].startswith("101,AAA")
+    assert needs_source["quality_stage"] == "FIND_ORIGINAL"
+    assert identity_exception["quality_stage"] == "REVIEW_IDENTITY"
