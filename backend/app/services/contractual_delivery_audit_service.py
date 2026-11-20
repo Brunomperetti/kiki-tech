@@ -101,6 +101,7 @@ def _document_index(db):
 
 def _approved_index(db, current):
     counts = Counter()
+    approved_fields = defaultdict(set)
     for ident, facts in db.execute(select(Dossier.ecomm_id, Dossier.facts)):
         for fact in facts or []:
             if not isinstance(fact, dict) or fact.get("state") != "APPROVED":
@@ -114,10 +115,12 @@ def _approved_index(db, current):
             ):
                 continue
             counts[ident] += 1
-    return counts
+            if fact.get("reviewer") and fact.get("verification_digest"):
+                approved_fields[ident].add(fact.get("field"))
+    return counts, approved_fields
 
 
-def _gap_report(row, edit, document_ids, documents, approved):
+def _gap_report(row, edit, document_ids, documents, approved, approved_fields=None):
     fields = {**blank_fields(), **dict(edit.fields or {})} if edit else blank_fields()
     media = fields.get("media") or []
     image = any(m.get("kind") == "IMAGE" for m in media)
@@ -150,6 +153,11 @@ def _gap_report(row, edit, document_ids, documents, approved):
         gap.add("SOURCE_NOT_REVIEWED")
     if approved == 0:
         gap.add("NO_CURRENT_APPROVED_FACTS")
+    # A single approved characteristic cannot stand in for the reviewed
+    # product name and presentation required to trust a commercial variant.
+    identity_fact_keys = set(approved_fields or ()).intersection(
+        {"product_name", "presentation"}
+    )
     if not fields_complete:
         gap.add("INCOMPLETE_COMMERCIAL_FICHE")
     if not fields["category"] or not fields["subcategory"]:
@@ -177,7 +185,7 @@ def _gap_report(row, edit, document_ids, documents, approved):
         quality_stage = "FIND_ORIGINAL"
     elif "SOURCE_NOT_REVIEWED" in gap:
         quality_stage = "REVIEW_ORIGINAL"
-    elif "NO_CURRENT_APPROVED_FACTS" in gap:
+    elif "NO_CURRENT_APPROVED_FACTS" in gap or len(identity_fact_keys) != 2:
         quality_stage = "REVIEW_FACTS"
     elif "TAXONOMY_MISSING" in gap:
         quality_stage = "REVIEW_TAXONOMY"
@@ -204,6 +212,7 @@ def _gap_report(row, edit, document_ids, documents, approved):
         "documents": len(document_ids),
         "reviewed_source_documents": reviewed_sources,
         "approved_facts_with_current_original": approved,
+        "approved_identity_fact_count": len(identity_fact_keys),
         "internal_fiche_complete": editorial_complete,
         "fields_complete": fields_complete,
         "fields_percent": structure["percent"] if edit else 0,
@@ -286,11 +295,11 @@ def build_delivery_audit(db):
         for edit in db.scalars(select(EcommApiProductEdit))
     }
     docs, current = _document_index(db)
-    facts = _approved_index(db, current)
+    facts, fact_fields = _approved_index(db, current)
     report = [
         _gap_report(row, edit_map.get(row["ecomm_id"]),
                     docs.get(row["ecomm_id"], []), current,
-                    facts[row["ecomm_id"]])
+                    facts[row["ecomm_id"]], fact_fields[row["ecomm_id"]])
         for row in rows
     ]
     return summarize_rows(report), report
