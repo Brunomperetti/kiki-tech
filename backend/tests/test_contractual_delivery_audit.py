@@ -282,9 +282,28 @@ def test_csv_groups_by_next_action_before_sku_and_never_changes_data():
         **common, "ecomm_id": "102", "sku": "ZZZ",
         "quality_stage": "REVIEW_IDENTITY",
     }
-    result = export_delivery_csv([needs_source, identity_exception])
-    assert result.splitlines()[1].startswith("102,ZZZ")
-    assert result.splitlines()[2].startswith("101,AAA")
+    taxonomy = {
+        **common, "ecomm_id": "103", "sku": "ZZY",
+        "quality_stage": "REVIEW_TAXONOMY",
+    }
+    seo = {
+        **common, "ecomm_id": "104", "sku": "BBB",
+        "quality_stage": "REVIEW_SEO",
+    }
+    editorial = {
+        **common, "ecomm_id": "105", "sku": "AAB",
+        "quality_stage": "COMPLETE_FIELDS",
+    }
+    # Deliberately choose SKU order that differs from workflow order.
+    result = export_delivery_csv([
+        editorial, needs_source, seo, identity_exception, taxonomy,
+    ])
+    lines = result.lstrip("\ufeff").splitlines()
+    assert lines[1].startswith("102,ZZZ")
+    assert lines[2].startswith("101,AAA")
+    assert lines[3].startswith("103,ZZY")
+    assert lines[4].startswith("104,BBB")
+    assert lines[5].startswith("105,AAB")
     assert needs_source["quality_stage"] == "FIND_ORIGINAL"
     assert identity_exception["quality_stage"] == "REVIEW_IDENTITY"
 
