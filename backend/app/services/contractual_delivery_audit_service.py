@@ -51,6 +51,15 @@ ORDER = (
     "VIDEO_NOT_DOCUMENTED", "BARCODE_RESEARCH_NOT_ELIGIBLE",
     "READY_WITHOUT_VERIFIED_DOCUMENTAL_GATE",
 )
+# Each variant belongs to exactly one actionable stage; this is NOT a claim
+# that its product data or media usage rights are independently certified.
+# Order reflects the next blocking step, never an automated approval.
+QUALITY_STAGES = (
+    "REVIEW_IDENTITY", "FIND_ORIGINAL", "REVIEW_ORIGINAL",
+    "REVIEW_FACTS", "REVIEW_TAXONOMY", "REVIEW_SEO",
+    "COMPLETE_FIELDS", "ADD_IMAGE", "REVIEW_MEDIA_AND_CHANNEL",
+)
+
 CSV_HEADER = (
     "ecomm_id", "sku", "nombre_api", "presentacion_api",
     "barcode_api_solo_busqueda", "captura_api", "estado_editorial",
@@ -59,6 +68,7 @@ CSV_HEADER = (
     "revision_mensual_vencida", "ultima_revision_documentada",
     "proxima_revision", "estado_revision", "siguiente_accion", "pendientes",
     "fuente_solo_por_api", "validacion_fabricante_requerida",
+    "campos_completos_sin_certificar", "porcentaje_campos", "etapa_siguiente",
 )
 
 
@@ -91,6 +101,7 @@ def _document_index(db):
 
 def _approved_index(db, current):
     counts = Counter()
+    approved_fields = defaultdict(set)
     for ident, facts in db.execute(select(Dossier.ecomm_id, Dossier.facts)):
         for fact in facts or []:
             if not isinstance(fact, dict) or fact.get("state") != "APPROVED":
@@ -104,10 +115,12 @@ def _approved_index(db, current):
             ):
                 continue
             counts[ident] += 1
-    return counts
+            if fact.get("reviewer") and fact.get("verification_digest"):
+                approved_fields[ident].add(fact.get("field"))
+    return counts, approved_fields
 
 
-def _gap_report(row, edit, document_ids, documents, approved):
+def _gap_report(row, edit, document_ids, documents, approved, approved_fields=None):
     fields = {**blank_fields(), **dict(edit.fields or {})} if edit else blank_fields()
     media = fields.get("media") or []
     image = any(m.get("kind") == "IMAGE" for m in media)
@@ -116,8 +129,12 @@ def _gap_report(row, edit, document_ids, documents, approved):
         s.get("kind") in ("FABRICANTE", "ETIQUETA") and s.get("verified") is True
         for s in fields["sources"]
     )
+    structure = _readiness(fields)
+    fields_complete = bool(edit and structure["ready"])
+    # Preserve the historical count of drafts already marked READY, but
+    # report field completeness independently of workflow state.
     editorial_complete = bool(
-        edit and edit.status == "READY_FOR_CHANNELS" and _readiness(fields)["ready"]
+        fields_complete and edit.status == "READY_FOR_CHANNELS"
     )
     reviewed_sources = sum(
         documents[d][3] == "REVIEWED" and documents[d][4]
@@ -136,7 +153,12 @@ def _gap_report(row, edit, document_ids, documents, approved):
         gap.add("SOURCE_NOT_REVIEWED")
     if approved == 0:
         gap.add("NO_CURRENT_APPROVED_FACTS")
-    if not editorial_complete:
+    # A single approved characteristic cannot stand in for the reviewed
+    # product name and presentation required to trust a commercial variant.
+    identity_fact_keys = set(approved_fields or ()).intersection(
+        {"product_name", "presentation"}
+    )
+    if not fields_complete:
         gap.add("INCOMPLETE_COMMERCIAL_FICHE")
     if not fields["category"] or not fields["subcategory"]:
         gap.add("TAXONOMY_MISSING")
@@ -157,6 +179,30 @@ def _gap_report(row, edit, document_ids, documents, approved):
     if editorial_complete and (not primary or reviewed_sources == 0 or approved == 0):
         gap.add("READY_WITHOUT_VERIFIED_DOCUMENTAL_GATE")
     ordered = [key for key in ORDER if key in gap]
+    if "IDENTITY_CONFLICT" in gap:
+        quality_stage = "REVIEW_IDENTITY"
+    elif "NO_MANUFACTURER_DOCUMENT" in gap:
+        quality_stage = "FIND_ORIGINAL"
+    elif "SOURCE_NOT_REVIEWED" in gap:
+        quality_stage = "REVIEW_ORIGINAL"
+    elif "NO_CURRENT_APPROVED_FACTS" in gap or len(identity_fact_keys) != 2:
+        quality_stage = "REVIEW_FACTS"
+    elif "TAXONOMY_MISSING" in gap:
+        quality_stage = "REVIEW_TAXONOMY"
+    elif "SEO_MISSING" in gap:
+        quality_stage = "REVIEW_SEO"
+    elif any(code != "images" for code in structure["missing"]):
+        quality_stage = "COMPLETE_FIELDS"
+    elif "IMAGE_MISSING" in gap:
+        # Treat image-only work as its own batch even though structural
+        # completeness remains false until a real image is recorded.
+        quality_stage = "ADD_IMAGE"
+    else:
+        # We deliberately do not mark a product as verified just because
+        # its fields, source checkbox or image URL exist. Permission grants,
+        # independently matched identity and channel freshness need a
+        # separate authenticated gate; this catalog audit cannot attest them.
+        quality_stage = "REVIEW_MEDIA_AND_CHANNEL"
     return {
         "ecomm_id": row["ecomm_id"],
         "sku": row["sku"],
@@ -168,7 +214,12 @@ def _gap_report(row, edit, document_ids, documents, approved):
         "documents": len(document_ids),
         "reviewed_source_documents": reviewed_sources,
         "approved_facts_with_current_original": approved,
+        "approved_identity_fact_count": len(identity_fact_keys),
         "internal_fiche_complete": editorial_complete,
+        "fields_complete": fields_complete,
+        "fields_percent": structure["percent"] if edit else 0,
+        "quality_stage": quality_stage,
+        "channel_certified": False,
         "image_present": image,
         "video_present": video,
         "monthly_review_due": due,
@@ -191,6 +242,11 @@ def summarize_rows(rows):
         totals[row["editorial_status"]] += 1
         detail.update(row["gaps"])
     monthly = Counter(row["review_reason"] for row in rows)
+    stages = Counter(row["quality_stage"] for row in rows)
+    if sum(stages.values()) != len(rows) or any(
+        stage not in QUALITY_STAGES for stage in stages
+    ):
+        raise ValueError("Clasificación de catálogo incompleta o ambigua.")
     return {
         "mode": "READ_ONLY_CONTRACTUAL_CATALOG_AUDIT",
         "source": "ECOMM_APP_API_STAGE",
@@ -211,6 +267,10 @@ def summarize_rows(rows):
             "review_actions_performed_by_audit": 0,
         },
         "internal_fiches_complete": sum(row["internal_fiche_complete"] for row in rows),
+        "fields_complete": sum(row["fields_complete"] for row in rows),
+        "quality_stage_counts": {key: stages[key] for key in QUALITY_STAGES},
+        "classified_variants": sum(stages.values()),
+        "channel_certified_by_this_audit": 0,
         "approved_claims_in_current_originals": sum(
             row["approved_facts_with_current_original"] for row in rows
         ),
@@ -237,11 +297,11 @@ def build_delivery_audit(db):
         for edit in db.scalars(select(EcommApiProductEdit))
     }
     docs, current = _document_index(db)
-    facts = _approved_index(db, current)
+    facts, fact_fields = _approved_index(db, current)
     report = [
         _gap_report(row, edit_map.get(row["ecomm_id"]),
                     docs.get(row["ecomm_id"], []), current,
-                    facts[row["ecomm_id"]])
+                    facts[row["ecomm_id"]], fact_fields[row["ecomm_id"]])
         for row in rows
     ]
     return summarize_rows(report), report
@@ -253,7 +313,12 @@ def export_delivery_csv(rows):
     out = StringIO(newline="")
     csv_writer = csv.writer(out)
     csv_writer.writerow(CSV_HEADER)
-    for r in sorted(rows, key=lambda row: (row["next_step"], row["sku"].casefold(), row["ecomm_id"])):
+    # Keep adjacent SKUs with the same next action together for human batches.
+    priority = {stage: rank for rank, stage in enumerate(QUALITY_STAGES)}
+    for r in sorted(rows, key=lambda row: (
+        priority.get(row.get("quality_stage"), len(QUALITY_STAGES)),
+        row["sku"].casefold(), row["ecomm_id"],
+    )):
         values = (
             r["ecomm_id"], r["sku"], r["name"], r["presentation"],
             r["api_barcode"], r["captured_at"], r["editorial_status"],
@@ -266,6 +331,8 @@ def export_delivery_csv(rows):
             r["last_review_at"], r["next_review_at"], r["review_reason"],
             r["next_step"], " | ".join(r["gaps"]),
             "SI", "SI",
+            "SI" if r.get("fields_complete") else "NO",
+            r.get("fields_percent", 0), r.get("quality_stage", "REVIEW_IDENTITY"),
         )
         csv_writer.writerow([_cell(str(v) if isinstance(v, int) else v) for v in values])
     return "\ufeff" + out.getvalue()

@@ -4,6 +4,10 @@
 .kiki-commercial-score{display:grid;text-align:right;gap:2px}.kiki-commercial-score strong{font-size:25px;font-variant-numeric:tabular-nums}.kiki-commercial-score span{font-size:10px;color:#526a5d}
 .kiki-commercial-meter{height:8px;background:#d1dfd6;border-radius:20px;overflow:hidden;grid-column:1/-1}
 .kiki-commercial-meter span{display:block;height:100%;border-radius:20px;background:#2b8052;transition:width .2s}
+.kiki-commercial-quality-levels{grid-column:1/-1;display:grid;gap:7px;padding:12px;background:#fff;border:1px solid #ccdbd0;border-radius:10px}
+.kiki-commercial-overview .kiki-commercial-quality-levels p{font-size:12px;line-height:1.5;margin:0}
+.kiki-commercial-quality-levels strong{font-size:12px}
+
 .kiki-commercial-section{display:grid;gap:15px;padding:18px;border:1px solid #d8e5dc;border-radius:14px;background:#fff}
 .kiki-commercial-section-head{display:flex;align-items:flex-start;gap:12px}
 .kiki-commercial-section-head>span{display:inline-grid;place-items:center;width:33px;height:33px;border-radius:10px;color:#2b6545;background:#ecf5ee;font-weight:800;font-size:11px;flex:none}
