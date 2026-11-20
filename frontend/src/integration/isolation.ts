@@ -7,6 +7,7 @@ const allowed = new Set([
   "POST /api/auth/login",
   "POST /api/auth/logout",
   "GET /api/ecomm-app/stage/catalog",
+  "GET /api/ecomm-app/stage/auto/status",
   "GET /api/ecomm-app/workspace/queue",
   "GET /api/ecomm-app/workspace/channels/listings",
   "GET /api/ecomm-app/workspace/channels/differences.csv",
