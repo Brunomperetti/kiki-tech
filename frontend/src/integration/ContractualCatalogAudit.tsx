@@ -8,6 +8,10 @@ type Audit = {
   generated_at: string;
   total: number;
   internal_fiches_complete: number;
+  fields_complete: number;
+  classified_variants: number;
+  quality_stage_counts: Record<string, number>;
+  channel_certified_by_this_audit: 0;
   approved_claims_in_current_originals: number;
   gap_counts: Record<string, number>;
   editorial_status: Record<string, number>;
@@ -24,6 +28,17 @@ type Audit = {
   network_requests: 0;
   ai_requests: 0;
   monthly_review_confirmed: false;
+};
+const stageLabels: Record<string, string> = {
+  REVIEW_IDENTITY: "1. Resolver identidad de variante, pack o SKU",
+  FIND_ORIGINAL: "2. Conseguir documentación original",
+  REVIEW_ORIGINAL: "3. Revisar procedencia e identidad documental",
+  REVIEW_FACTS: "4. Revisar afirmaciones con cita",
+  REVIEW_TAXONOMY: "5. Validar categoría y subcategoría",
+  REVIEW_SEO: "6. Completar posicionamiento SEO",
+  COMPLETE_FIELDS: "7. Completar campos editoriales",
+  ADD_IMAGE: "8. Incorporar imagen auténtica",
+  REVIEW_MEDIA_AND_CHANNEL: "9. Comprobar permisos y aptitud comercial",
 };
 const gapLabels: Record<string, string> = {
   IDENTITY_CONFLICT: "Identidad para revisar",
@@ -61,6 +76,15 @@ export function ContractualCatalogAudit() {
           value.network_requests !== 0 || value.monthly_review_confirmed !== false ||
           !Number.isSafeInteger(value.total) || value.total < 0 ||
           !Number.isSafeInteger(value.internal_fiches_complete) ||
+          !Number.isSafeInteger(value.fields_complete) ||
+          value.fields_complete < 0 || value.fields_complete > value.total ||
+          !Number.isSafeInteger(value.classified_variants) ||
+          value.classified_variants !== value.total ||
+          value.channel_certified_by_this_audit !== 0 ||
+          !value.quality_stage_counts ||
+          Object.keys(value.quality_stage_counts).some(key => !(key in stageLabels)) ||
+          !Object.keys(stageLabels).every(key => Number.isSafeInteger(value.quality_stage_counts[key]) && value.quality_stage_counts[key] >= 0) ||
+          Object.values(value.quality_stage_counts).reduce((sum, n) => sum + n, 0) !== value.total ||
           !value.editorial_status || !value.gap_counts ||
           !value.monthly_review ||
           !Object.values(value.monthly_review).every(n => Number.isSafeInteger(n) && n >= 0) ||
@@ -115,11 +139,36 @@ export function ContractualCatalogAudit() {
     {error && <p role="alert">{error}</p>}
     {report && <div role="region" aria-label="Cobertura y excepciones">
       <p role="status">
-        <strong>{report.total}</strong> variantes evaluadas ·{" "}
-        <strong>{report.internal_fiches_complete}</strong> fichas completas
-        internamente · <strong>{report.approved_claims_in_current_originals}</strong>{" "}
+        <strong>{report.total}</strong> variantes clasificadas ·{" "}
+        <strong>{report.fields_complete}</strong> con todos los campos cargados
+        (sin certificar) ·{" "}
+        <strong>{report.internal_fiches_complete}</strong> además marcadas
+        internamente como listas para canales ·{" "}
+        <strong>{report.approved_claims_in_current_originals}</strong>{" "}
         hechos aprobados asociados a originales vigentes.
       </p>
+      <p>
+        La completitud de campos no equivale a validación documental, derechos
+        de imagen ni aptitud de publicación. Esta auditoría no certifica ninguna
+        salida a canales comerciales.
+      </p>
+      <section aria-label="Próxima acción por variante">
+        <h5>Priorización automática del catálogo por excepciones</h5>
+        <p>
+          Cada variante se asigna a una única etapa prioritaria. Las etapas
+          se calculan sobre la captura guardada, sin investigar proveedores,
+          generar IA, modificar productos ni certificar identidades.
+        </p>
+        <ul>
+          {Object.entries(stageLabels).map(([key, label]) => <li key={key}>
+            {label}: <strong>{report.quality_stage_counts[key]}</strong>
+          </li>)}
+        </ul>
+        <p>
+          Cobertura clasificada: {report.classified_variants} de {report.total}.
+          El CSV incluye la etapa por SKU para planificar lotes.
+        </p>
+      </section>
       <p>
         <strong>Revisión mensual:</strong> {report.monthly_review.ready_current} fichas vigentes,{" "}
         {report.monthly_review.due} pendientes de nueva revisión
