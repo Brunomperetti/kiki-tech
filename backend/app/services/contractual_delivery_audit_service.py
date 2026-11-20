@@ -191,9 +191,11 @@ def _gap_report(row, edit, document_ids, documents, approved, approved_fields=No
         quality_stage = "REVIEW_TAXONOMY"
     elif "SEO_MISSING" in gap:
         quality_stage = "REVIEW_SEO"
-    elif not fields_complete:
+    elif any(code != "images" for code in structure["missing"]):
         quality_stage = "COMPLETE_FIELDS"
     elif "IMAGE_MISSING" in gap:
+        # Treat image-only work as its own batch even though structural
+        # completeness remains false until a real image is recorded.
         quality_stage = "ADD_IMAGE"
     else:
         # We deliberately do not mark a product as verified just because
