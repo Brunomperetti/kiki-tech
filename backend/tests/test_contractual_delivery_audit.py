@@ -38,6 +38,12 @@ def test_catalogue_audit_is_complete_and_read_only(tmp_path):
         assert summary["total"] == len(rows) == 2
         assert len({row["ecomm_id"] for row in rows}) == 2
         assert summary["internal_fiches_complete"] == 0
+        assert summary["fields_complete"] == 0
+        assert summary["classified_variants"] == summary["total"] == 2
+        assert sum(summary["quality_stage_counts"].values()) == 2
+        assert summary["quality_stage_counts"]["FIND_ORIGINAL"] == 2
+        assert summary["channel_certified_by_this_audit"] == 0
+        assert all(row["quality_stage"] == "FIND_ORIGINAL" for row in rows)
         assert summary["gap_counts"]["NO_MANUFACTURER_DOCUMENT"] == 2
         assert summary["gap_counts"]["NO_CURRENT_APPROVED_FACTS"] == 2
         assert summary["gap_counts"]["INCOMPLETE_COMMERCIAL_FICHE"] == 2
@@ -127,6 +133,11 @@ def test_channel_ready_is_not_certified_without_documentary_gate(tmp_path):
         assert "MEDIA_RIGHTS_NOT_VERIFIED" in record["gaps"]
         assert "VIDEO_NOT_DOCUMENTED" in record["gaps"]
         assert summary["internal_fiches_complete"] == 1
+        assert summary["fields_complete"] == 1
+        assert record["fields_complete"] is True
+        assert record["fields_percent"] == 100
+        assert record["quality_stage"] == "FIND_ORIGINAL"
+        assert summary["channel_certified_by_this_audit"] == 0
 
 
 def test_monthly_review_is_reported_and_never_marked_confirmed():
@@ -174,3 +185,76 @@ def test_export_escapes_spreadsheet_formula_in_untrusted_api_name():
     assert "'+evil" in csv_text
     assert "'@SUM" in csv_text
     assert tuple(CSV_HEADER)[0:3] == ("ecomm_id", "sku", "nombre_api")
+
+
+def test_complete_draft_counts_fields_without_certifying_evidence_or_channels(tmp_path):
+    """Natural Seed's 100% editor score must not be 100% commercially ready."""
+    engine = fixture(tmp_path)
+    fields = blank_fields()
+    for key in READY_REQUIRED:
+        fields[key] = "Valor comercial no acreditado"
+    fields["attributes"] = [{"name": "Formato", "value": "250 g"}]
+    fields["media"] = [{"kind": "IMAGE", "url": "https://example.invalid/a.jpg"}]
+    fields["sources"] = [{
+        "kind": "FABRICANTE", "verified": True, "name": "Ejemplo",
+        "url": "https://example.invalid/item",
+        "note": "Declaración manual, no certificado",
+    }]
+    fields["seo_keywords"] = "mezcla, 250 g"
+    with Session(engine) as db:
+        db.add(EcommApiProductEdit(
+            ecomm_id="101", source_sku="2500", source_snapshot={},
+            fields=fields, status="DRAFT", version=5, history=[],
+        ))
+        db.commit()
+        report, rows = build_delivery_audit(db)
+        draft = next(r for r in rows if r["ecomm_id"] == "101")
+        assert draft["fields_complete"] is True
+        assert draft["fields_percent"] == 100
+        assert draft["internal_fiche_complete"] is False
+        assert draft["delivery_certified"] is False
+        assert draft["channel_certified"] is False
+        assert draft["quality_stage"] == "FIND_ORIGINAL"
+        assert "INCOMPLETE_COMMERCIAL_FICHE" not in draft["gaps"]
+        assert report["fields_complete"] == 1
+        assert report["internal_fiches_complete"] == 0
+        assert report["classified_variants"] == report["total"] == 2
+        assert report["channel_certified_by_this_audit"] == 0
+        text = export_delivery_csv(rows)
+        assert "campos_completos_sin_certificar" in text
+        assert "porcentaje_campos" in text
+        assert "etapa_siguiente" in text
+        assert "FIND_ORIGINAL" in text
+
+
+def test_exclusive_triage_stays_in_fact_review_without_approved_name_and_size():
+    source = {
+        "ecomm_id": "101", "sku": "SKU-1", "product_name": "Demo",
+        "identity_issue": False, "flags": ["research_gtin_unique"],
+        "source": {"variant_description": "250 g", "barcode": "7791234567890"},
+        "captured_at": "2026-11-19",
+    }
+    doc = {"id": (1, "digest", "101", "REVIEWED", True)}
+    # An approved characteristic alone is not a verified product identity.
+    result = _gap_report(source, None, ["id"], doc, 1, {"characteristics"})
+    assert result["quality_stage"] == "REVIEW_FACTS"
+    assert result["approved_identity_fact_count"] == 0
+    assert result["delivery_certified"] is False
+    result2 = _gap_report(
+        source, None, ["id"], doc, 3,
+        {"product_name", "presentation", "characteristics"},
+    )
+    assert result2["quality_stage"] == "REVIEW_TAXONOMY"
+    assert result2["approved_identity_fact_count"] == 2
+
+
+def test_identity_conflict_takes_priority_over_approved_facts_or_fields():
+    row = {
+        "ecomm_id": "101", "sku": "SKU-1", "product_name": "Demo",
+        "identity_issue": True, "flags": ["research_gtin_unique"],
+        "source": {"variant_description": "250 g", "barcode": "7791234567890"},
+        "captured_at": "2026-11-19",
+    }
+    result = _gap_report(row, None, [], {}, 0)
+    assert result["quality_stage"] == "REVIEW_IDENTITY"
+    assert result["delivery_certified"] is False
