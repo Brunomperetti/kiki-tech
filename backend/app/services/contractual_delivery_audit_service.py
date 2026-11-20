@@ -311,7 +311,7 @@ def export_delivery_csv(rows):
     out = StringIO(newline="")
     csv_writer = csv.writer(out)
     csv_writer.writerow(CSV_HEADER)
-    for r in sorted(rows, key=lambda row: (row["next_step"], row["sku"].casefold(), row["ecomm_id"])):
+    # Keep adjacent SKUs with the same next action together for human batches.\n    priority = {stage: rank for rank, stage in enumerate(QUALITY_STAGES)}\n    for r in sorted(rows, key=lambda row: (\n        priority.get(row.get("quality_stage"), len(QUALITY_STAGES)),\n        row["sku"].casefold(), row["ecomm_id"],\n    )):
         values = (
             r["ecomm_id"], r["sku"], r["name"], r["presentation"],
             r["api_barcode"], r["captured_at"], r["editorial_status"],
