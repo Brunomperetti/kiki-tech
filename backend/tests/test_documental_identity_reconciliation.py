@@ -282,3 +282,45 @@ def test_ean_absent_does_not_remove_other_identity_safety_checks():
     with pytest.raises(ValueError, match="discrepancias de EAN"):
         approve(service, case, doc)
     assert any("Tipo de venta" in s for s in service.identity_blockers(case, doc))
+
+def test_reviewed_document_without_brand_does_not_invent_brand_conflict():
+    """Actual KIKI pilot: verified 250 g original has no structured brand."""
+    service, case, doc = setup_case()
+    service.edit_record = lambda _: SimpleNamespace(fields={
+        "brand": "Natural Seed", "manufacturer": "",
+    })
+    doc.body["identity"]["brand"] = None
+    doc.body["identity"]["manufacturer"] = None
+
+    approve(service, case, doc)
+    assert service.identity_blockers(case, doc) == []
+    assert Research.additional_blockers(service, case, doc) == []
+    # No fact or manufacturer-brand certification was created by absence.
+    assert case.facts == []
+    assert doc.body["identity"]["brand"] is None
+
+
+def test_explicit_conflicting_brand_or_manufacturer_still_blocks_evidence():
+    """Only an actual contradiction is a brand/manufacturer blocker."""
+    service, case, doc = setup_case()
+    service.edit_record = lambda _: SimpleNamespace(fields={
+        "brand": "Natural Seed", "manufacturer": "Fabricante declarado",
+    })
+    doc.body["identity"]["brand"] = "Otra Marca"
+    doc.body["identity"]["manufacturer"] = "Otro Fabricante"
+    approve(service, case, doc)
+    blockers = Research.additional_blockers(service, case, doc)
+    assert len(blockers) == 2
+    assert any(issue.startswith("brand:") for issue in blockers)
+    assert any(issue.startswith("manufacturer:") for issue in blockers)
+
+
+def test_explicit_brand_match_is_case_and_whitespace_insensitive():
+    service, case, doc = setup_case()
+    service.edit_record = lambda _: SimpleNamespace(fields={
+        "brand": "Natural Seed", "manufacturer": "",
+    })
+    doc.body["identity"]["brand"] = " natural seed "
+    doc.body["identity"]["manufacturer"] = None
+    assert Research.additional_blockers(service, case, doc) == []
+
