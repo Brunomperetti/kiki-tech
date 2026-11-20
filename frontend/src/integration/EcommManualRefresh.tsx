@@ -51,9 +51,13 @@ function parseStatus(input: unknown): RefreshState {
 }
 
 function newerCapture(a: string | null, b?: string | null): boolean {
-  if (!a || !b) return false;
-  const newer = Date.parse(a), shown = Date.parse(b);
-  return Number.isFinite(newer) && Number.isFinite(shown) && newer > shown;
+  if (!a) return false;
+  const newer = Date.parse(a);
+  if (!Number.isFinite(newer)) return false;
+  // An absent or failed initial catalogue load is not evidence that the
+  // latest completed snapshot has already been rendered in the table.
+  if (!b || !Number.isFinite(Date.parse(b))) return true;
+  return newer > Date.parse(b);
 }
 
 export function EcommManualRefresh({
