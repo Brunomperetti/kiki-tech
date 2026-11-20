@@ -10,6 +10,20 @@ from app.database.session import get_db
 router = APIRouter(prefix="/api/ui/v2", tags=["v2-rollout"])
 
 
+def manual_ecomm_refresh_permitted(config):
+    """Allow a read-only Ecomm capture independently of other connections.
+
+    No new environment flags: the existing v2 write grant and configured
+    Ecomm read-only API credential are both required. The endpoint separately
+    enforces the authenticated operator session and CSRF token.
+    """
+    return bool(
+        config.kiki_v2_enabled
+        and config.kiki_v2_writes_enabled
+        and config.ecomm_app_api_token.strip()
+    )
+
+
 def capabilities(db, synthetic=False, *, reader_probe=False):
     from app.services.documental.local_documents import reader_available
     from app.database.models import Base
@@ -57,6 +71,7 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
         "enabled": config.kiki_v2_enabled,
         "writes": config.kiki_v2_writes_enabled,
         "connections": config.kiki_v2_connections_enabled,
+        "ecomm_manual_refresh": manual_ecomm_refresh_permitted(config),
         "documents": documents,
         "document_upload": reader,
         "document_sitemap_discovery": bool(
@@ -129,9 +144,15 @@ def guard_request(path, method, db):
         raise HTTPException(404, "KIKI Tech 2.0 deshabilitado.")
     if method != "GET" and not config.kiki_v2_writes_enabled:
         raise HTTPException(403, "KIKI Tech 2.0 está en modo de sólo lectura.")
-    if path in {"/api/ecomm-app/stage/manual/start", "/api/mercadolibre/auth-url", "/api/mercadolibre/sync", "/api/tiendanube/import-csv"}:
+    if method == "POST" and path == "/api/ecomm-app/stage/manual/start":
+        if not manual_ecomm_refresh_permitted(config):
+            raise HTTPException(403, "Actualización manual de Ecomm-App no autorizada.")
+    elif method == "POST" and path in {
+        "/api/mercadolibre/auth-url", "/api/mercadolibre/sync",
+        "/api/tiendanube/import-csv",
+    }:
         if not config.kiki_v2_connections_enabled:
-            raise HTTPException(403, "Actualizaciones y OAuth requieren habilitación explícita.")
+            raise HTTPException(403, "Actualizaciones de canales y OAuth requieren habilitación explícita.")
     if path.endswith("/suggest") and not config.kiki_v2_ai_generation_enabled:
         raise HTTPException(403, "Consumo OpenAI no autorizado para esta interfaz.")
     if "/editorial-batches" in path or any(part in path for part in ("/evidence", "/documents", "/proposals")):
