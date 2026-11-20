@@ -389,3 +389,21 @@ test("botón directo no expone un POST si Conexiones informa acciones bloqueadas
   await expect(control).toContainText("Actualización manual no habilitada");
   expect(calls).toBe(0);
 });
+
+test("se puede refrescar la tabla cuando el catálogo inicial falló pero hay captura completa", async ({
+  page,
+}) => {
+  // The refresh status remains available even when catalogue rendering failed.
+  await page.route("**/api/ecomm-app/stage/catalog**", route =>
+    route.fulfill({
+      status: 409,
+      json: { detail: "No se puede mostrar la captura inicial" },
+      headers: { "X-Kiki-Environment": "local-synthetic" },
+    }),
+  );
+  await page.reload();
+  const control = page.getByRole("region", { name: "Actualización de Ecomm-App" });
+  await expect(
+    control.getByRole("button", { name: "Refrescar tabla e indicadores" }),
+  ).toBeEnabled();
+});
