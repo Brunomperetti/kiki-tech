@@ -308,3 +308,62 @@ test("configuración ausente o respuesta incompatible no habilita operaciones ni
     }),
   ).toBeDisabled();
 });
+
+test("botón directo en Mi catálogo inicia la captura manual existente sin abrir Conexiones", async ({
+  page,
+}) => {
+  const control = page.getByRole("region", { name: "Actualización de Ecomm-App" });
+  const button = control.getByRole("button", {
+    name: "Actualizar desde Ecomm-App",
+    exact: true,
+  });
+  await expect(control).toContainText("08:25 y 16:25");
+  await expect(button).toBeEnabled();
+  page.once("dialog", (dialog) => dialog.accept());
+  await button.click();
+  await expect(control).toContainText("Actualización solicitada");
+  // One job at a time: no second click while manual/scheduled refresh is active.
+  await expect(control.getByRole("button", { name: "Ecomm-App actualizando…" }))
+    .toBeDisabled();
+  await expect(control).toContainText("Hay una nueva captura completa disponible", {
+    timeout: 45000,
+  });
+  await expect(
+    control.getByRole("button", { name: "Refrescar tabla e indicadores" }),
+  ).toBeEnabled();
+  const current = await (await page.request.get("/api/ecomm-app/stage/auto/status")).json();
+  expect(current.refresh_job.status).toBe("SUCCESS");
+  expect(current.external_writes_enabled).toBe(false);
+});
+
+test("botón directo respeta el trabajo programado en curso sin emitir otro POST", async ({
+  page,
+}) => {
+  const running = await (await page.request.get("/api/ecomm-app/stage/auto/status")).json();
+  running.refresh_in_progress = true;
+  running.refresh_job = {
+    status: "RUNNING",
+    origin: "SCHEDULED",
+    pages_saved: 12,
+    expected_pages: 49,
+    started_at: new Date().toISOString(),
+    message: "Captura programada en curso",
+  };
+  await page.route("**/api/ecomm-app/stage/auto/status", route =>
+    route.fulfill({
+      json: running,
+      headers: { "X-Kiki-Environment": "local-synthetic" },
+    }),
+  );
+  let manualPosts = 0;
+  await page.route("**/api/ecomm-app/stage/manual/start", route => {
+    manualPosts += 1;
+    return route.abort();
+  });
+  await page.reload();
+  const control = page.getByRole("region", { name: "Actualización de Ecomm-App" });
+  await expect(control).toContainText("Actualización programada en curso: 12/49 páginas.");
+  await expect(control.getByRole("button", { name: "Ecomm-App actualizando…" }))
+    .toBeDisabled();
+  expect(manualPosts).toBe(0);
+});
