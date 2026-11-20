@@ -74,11 +74,14 @@ class Research:
         edit = self.edit_record(item.ecomm_id)
         fields = edit.fields if edit else {}
         for key in ("brand", "manufacturer"):
-            if (
-                fields.get(key)
-                and fields[key].strip().casefold()
-                != str(doc.body.get("identity", {}).get(key) or "").strip().casefold()
-            ):
+            # A manufacturer product page may omit a structured brand or
+            # manufacturer field. Absence is NOT evidence of a conflicting
+            # brand; editorial attribution remains independently sourced
+            # from Ecomm-App and must not be stamped as manufacturer-approved.
+            # An explicitly different value still blocks claim approval.
+            editorial = str(fields.get(key) or "").strip()
+            documented = str(doc.body.get("identity", {}).get(key) or "").strip()
+            if editorial and documented and editorial.casefold() != documented.casefold():
                 issues.append(
                     f"{key}: el valor editorial difiere del documento; requiere revisión."
                 )
