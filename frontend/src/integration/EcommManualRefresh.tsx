@@ -78,7 +78,8 @@ export function EcommManualRefresh({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const startingRef = useRef(false);
-  const permitted = actionsAllowed && canWrite() && (!production || capabilities?.connections === true);
+  // Independent grant for the Ecomm read-only capture only; ML/TN stay closed.
+  const permitted = actionsAllowed && canWrite() && (!production || capabilities?.ecomm_manual_refresh === true);
 
   useEffect(() => {
     let active = true;
@@ -174,7 +175,8 @@ export function EcommManualRefresh({
       {!permitted && (
         <p role="status">
           Actualización manual no habilitada para esta interfaz.
-          Se respetan los permisos de Conexiones y edición de KIKI.
+          Se requiere edición de KIKI habilitada y lectura Ecomm-App configurada.
+          No se habilitan las conexiones de otros canales.
         </p>
       )}
       {running && state?.refresh_job && (

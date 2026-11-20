@@ -7,6 +7,7 @@ export type Capabilities = {
   enabled: boolean;
   writes: boolean;
   connections: boolean;
+  ecomm_manual_refresh: boolean;
   documents: boolean;
   document_upload: boolean;
   document_fetch: boolean;
@@ -43,6 +44,7 @@ export function configureRuntime(value?: unknown) {
       c.synthetic,
       c.writes,
       c.connections,
+      c.ecomm_manual_refresh,
       c.documents,
       c.document_upload,
       c.document_fetch,
