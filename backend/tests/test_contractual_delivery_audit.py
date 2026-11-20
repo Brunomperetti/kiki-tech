@@ -287,3 +287,30 @@ def test_csv_groups_by_next_action_before_sku_and_never_changes_data():
     assert result.splitlines()[2].startswith("101,AAA")
     assert needs_source["quality_stage"] == "FIND_ORIGINAL"
     assert identity_exception["quality_stage"] == "REVIEW_IDENTITY"
+
+
+def test_image_only_gap_is_separate_batch_not_generic_editorial_completion():
+    fields = blank_fields()
+    for key in READY_REQUIRED:
+        fields[key] = "Campo de ejemplo"
+    fields["attributes"] = [{"name": "Formato", "value": "250 g"}]
+    fields["sources"] = [{"kind": "FABRICANTE", "verified": True}]
+    fields["seo_keywords"] = "producto, 250 g"
+    source = {
+        "ecomm_id": "101", "sku": "2500", "product_name": "Demo",
+        "identity_issue": False, "flags": ["research_gtin_unique"],
+        "source": {"variant_description": "250 g", "barcode": "7791234567890"},
+        "captured_at": "2026-11-19",
+    }
+    edit = SimpleNamespace(
+        source_sku="2500", status="DRAFT", fields=fields, history=[],
+    )
+    doc = {"doc1": (1, "hash", "101", "REVIEWED", True)}
+    result = _gap_report(
+        source, edit, ["doc1"], doc, 2, {"product_name", "presentation"},
+    )
+    assert result["quality_stage"] == "ADD_IMAGE"
+    assert result["fields_complete"] is False
+    assert "IMAGE_MISSING" in result["gaps"]
+    assert "INCOMPLETE_COMMERCIAL_FICHE" in result["gaps"]
+    assert result["delivery_certified"] is False
