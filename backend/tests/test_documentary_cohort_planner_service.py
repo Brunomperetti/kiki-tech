@@ -74,6 +74,7 @@ def test_lots_are_bounded_20_deterministic_with_current_capture_signature():
     a = build(rows)
     b = build(list(reversed(rows)))
     assert a["capture_fingerprint"] == b["capture_fingerprint"]
+    assert a["plan_fingerprint"] == b["plan_fingerprint"]
     assert [c["count"] for c in a["cohorts"]] == [20, 20, 3]
     assert [c["id"] for c in a["cohorts"]] == ["P001", "P002", "P003"]
     assert a["grouped_variants"] == 43
@@ -108,6 +109,7 @@ def test_csv_escapes_formula_and_contains_only_safe_review_candidates():
     assert values[0]["fabricante_validado"] == "NO"
     assert values[0]["url_oficial_validada"] == "NO"
     assert values[0]["huella_captura"] == plans["capture_fingerprint"]
+    assert values[0]["huella_plan"] == plans["plan_fingerprint"]
     assert values[0]["nombre_api"] == "Natural Seed =HYPERLINK(1)"
     malicious = build([row("=CMD", "+HACK", "Natural Seed")])
     escaped = list(csv.reader(StringIO(
@@ -129,3 +131,19 @@ def test_invalid_audit_does_not_produce_partial_cohorts():
         plan_cohorts_from_audit(
             {"total": 1, "classified_variants": 0}, [one]
         )
+
+
+def test_documentary_review_changes_cohort_membership_without_changing_capture():
+    products = [
+        row(1, "1001", "Natural Seed Mix 250 g"),
+        row(2, "1002", "Natural Seed Cereales 250 g"),
+    ]
+    before = build(products)
+    after_rows = [dict(p) for p in products]
+    # A reviewed/imported original changes quality stage, not the source API.
+    after_rows[0]["quality_stage"] = "REVIEW_ORIGINAL"
+    after = build(after_rows)
+    assert after["capture_fingerprint"] == before["capture_fingerprint"]
+    assert after["plan_fingerprint"] != before["plan_fingerprint"]
+    assert after["cohorts"][0]["count"] == 1
+    assert after["cohort_count"] == before["cohort_count"]
