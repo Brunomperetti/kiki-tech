@@ -23,6 +23,8 @@ ALLOWED_ROUTES = frozenset(
         ("GET", "/api/ecomm-app/stage/catalog"),
         ("GET", "/api/ecomm-app/stage/auto/status"),
         ("GET", "/api/ecomm-app/workspace/queue"),
+        ("GET", "/api/ecomm-app/workspace/research/documentary-cohorts"),
+        ("GET", "/api/ecomm-app/workspace/research/documentary-cohorts.csv"),
         ("GET", "/api/ecomm-app/workspace/channels/listings"),
         ("GET", "/api/ecomm-app/workspace/channels/differences.csv"),
         ("GET", "/api/ecomm-app/workspace/saved"),
