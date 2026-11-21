@@ -120,6 +120,18 @@ def plan_cohorts_from_audit(summary, rows):
                     for row in part
                 ],
             })
+    # The capture identity may remain unchanged while documentary review
+    # removes or adds cohort members. Freeze the *selection* separately.
+    plan_signature = sha256(
+        json.dumps(
+            [
+                (cohort["id"], cohort["brand_phrase"],
+                 [(item["ecomm_id"], item["sku"]) for item in cohort["items"]])
+                for cohort in cohorts
+            ],
+            ensure_ascii=False, separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     grouped = sum(group["count"] for group in cohorts)
     if eligible != grouped + unattributed + ambiguous + pack_suspected:
         raise ValueError("La clasificación de cohortes perdió variantes.")
@@ -129,6 +141,7 @@ def plan_cohorts_from_audit(summary, rows):
         "mode": "READ_ONLY_DOCUMENTARY_COHORTS",
         "source": "ECOMM_APP_API_STAGE",
         "capture_fingerprint": signature,
+        "plan_fingerprint": plan_signature,
         "total_variants": len(rows),
         "eligible_to_look_up": eligible,
         "grouped_variants": grouped,
@@ -166,7 +179,7 @@ def export_documentary_cohorts_csv(plan):
     writer.writerow((
         "lote", "mencion_de_marca_no_verificada", "ecomm_id", "sku",
         "nombre_api", "presentacion_api", "gtin_api_solo_busqueda",
-        "capturado", "huella_captura", "fabricante_validado",
+        "capturado", "huella_captura", "huella_plan", "fabricante_validado",
         "url_oficial_validada", "proxima_accion",
     ))
     for cohort in plan["cohorts"]:
@@ -177,6 +190,7 @@ def export_documentary_cohorts_csv(plan):
                     item["ecomm_id"], item["sku"], item["name"],
                     item["presentation"], item["gtin_lookup_hint"],
                     item["captured_at"], plan["capture_fingerprint"],
+                    plan["plan_fingerprint"],
                     "NO", "NO", item["next_step"],
                 )
             ])
