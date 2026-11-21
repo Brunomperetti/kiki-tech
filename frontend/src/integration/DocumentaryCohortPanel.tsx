@@ -25,6 +25,7 @@ type CohortPlan = {
   mode: "READ_ONLY_DOCUMENTARY_COHORTS";
   source: "ECOMM_APP_API_STAGE";
   capture_fingerprint: string;
+  plan_fingerprint: string;
   total_variants: number;
   eligible_to_look_up: number;
   grouped_variants: number;
@@ -50,6 +51,7 @@ const validCohortPlan = (p: CohortPlan): boolean => {
     p.mode !== "READ_ONLY_DOCUMENTARY_COHORTS" ||
     p.source !== "ECOMM_APP_API_STAGE" ||
     !/^[a-f0-9]{64}$/.test(p.capture_fingerprint || "") ||
+    !/^[a-f0-9]{64}$/.test(p.plan_fingerprint || "") ||
     p.max_per_cohort !== 20 ||
     p.network_requests !== 0 || p.ai_requests !== 0 || p.db_writes !== 0 ||
     p.external_writes_enabled !== false || p.can_auto_fetch !== false ||
@@ -125,6 +127,8 @@ export function DocumentaryCohortPanel() {
       if (!response.ok) throw new Error("No se pudo exportar la selección.");
       if (response.headers.get("X-Kiki-Source-Fingerprint") !== plan.capture_fingerprint)
         throw new Error("La captura de Ecomm cambió; prepará nuevamente los lotes antes de exportar.");
+      if (response.headers.get("X-Kiki-Cohort-Plan-Fingerprint") !== plan.plan_fingerprint)
+        throw new Error("Cambió la selección de productos o sus documentos; prepará nuevamente los lotes.");
       if (response.headers.get("X-Kiki-Documentary-Cohorts") !== String(plan.cohort_count))
         throw new Error("Los lotes cambiaron; repetí la planificación.");
       downloadReviewCsv(await response.blob(), "kiki-lotes-documentales-no-verificados.csv");
@@ -165,7 +169,8 @@ export function DocumentaryCohortPanel() {
           códigos no aptos para investigación: {plan.barcode_not_eligible_for_research}.
         </p>
         <p>
-          Huella de la captura: <code>{plan.capture_fingerprint.slice(0, 12)}</code>.
+          Huella de captura: <code>{plan.capture_fingerprint.slice(0, 12)}</code> ·{" "}
+          huella de selección: <code>{plan.plan_fingerprint.slice(0, 12)}</code>.
           Si actualizás Ecomm, prepará de nuevo los lotes. Una pista de marca
           no acredita fabricante, EAN, URL ni derechos de uso.
         </p>
