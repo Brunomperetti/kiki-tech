@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { request } from "./catalog-adapter";
 import { downloadReviewCsv } from "./csv-download";
+import { DocumentaryCohortPanel } from "./DocumentaryCohortPanel";
 
 type Audit = {
   mode: "READ_ONLY_CONTRACTUAL_CATALOG_AUDIT";
@@ -187,6 +188,7 @@ export function ContractualCatalogAudit() {
           {label}: <strong>{report.gap_counts[key]}</strong>
         </li>)}
       </ul>
+      <DocumentaryCohortPanel />
     </div>}
   </section>;
 }

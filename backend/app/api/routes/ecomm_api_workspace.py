@@ -17,6 +17,7 @@ from ...services.ecomm_api_work_queue_service import build_queue
 from ...services.ecomm_api_barcode_service import api_summary, api_evidence
 from ...services.research_manifest_service import build_research_manifest
 from ...services.research_batch_plan_service import build_research_batch_plan
+from ...services.documentary_cohort_planner_service import build_documentary_cohorts, export_documentary_cohorts_csv
 from ...services.contractual_delivery_audit_service import build_delivery_audit, export_delivery_csv
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
@@ -188,6 +189,42 @@ def commercial_delivery_csv(
                 "X-Content-Type-Options": "nosniff",
                 "X-Kiki-Audit-Variants": str(summary["total"]),
                 "X-Kiki-Audit-Snapshot": summary["source"],
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/research/documentary-cohorts")
+def documentary_cohorts(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Organize manufacturer *mentions* from the current complete API capture."""
+    try:
+        return build_documentary_cohorts(db)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/research/documentary-cohorts.csv")
+def documentary_cohorts_export(
+    db: Session = Depends(get_db),
+    _session=Depends(require_session),
+):
+    """Read-only CSV; URL, verification and permission are always empty/false."""
+    try:
+        plan = build_documentary_cohorts(db)
+        return Response(
+            export_documentary_cohorts_csv(plan),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": 'attachment; filename="kiki-lotes-documentales-no-verificados.csv"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Kiki-Source-Fingerprint": plan["capture_fingerprint"],
+                "X-Kiki-Cohort-Plan-Fingerprint": plan["plan_fingerprint"],
+                "X-Kiki-Documentary-Cohorts": str(plan["cohort_count"]),
             },
         )
     except ValueError as exc:
