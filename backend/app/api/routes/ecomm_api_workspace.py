@@ -223,6 +223,7 @@ def documentary_cohorts_export(
                 "Cache-Control": "no-store",
                 "X-Content-Type-Options": "nosniff",
                 "X-Kiki-Source-Fingerprint": plan["capture_fingerprint"],
+                "X-Kiki-Cohort-Plan-Fingerprint": plan["plan_fingerprint"],
                 "X-Kiki-Documentary-Cohorts": str(plan["cohort_count"]),
             },
         )
