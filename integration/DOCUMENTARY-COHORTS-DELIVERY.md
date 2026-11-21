@@ -12,8 +12,9 @@ Este componente es parte del Plan Maestro #174, puntos 1, 2, 6 y 9. No reemplaza
    auditoría de todas las variantes, clasifica solo `FIND_ORIGINAL` y excluye
    los códigos que no están habilitados como pistas de investigación.
 4. Consultar los lotes P001, P002, etc. y **Exportar estos lotes (CSV)**.
-   CSV y vista incluyen huella SHA-256 calculada de identidades de la captura.
-   Si se actualizó Ecomm en el medio, la descarga bloquea una huella distinta.
+   CSV y vista incluyen dos huellas SHA-256: **identidad de captura** y
+   **miembros de los lotes**. Si se actualizó Ecomm o alguien incorporó un
+   documento que cambió la selección, la descarga bloquea la versión distinta.
 5. Verificar el fabricante y la presentación de los candidatos de forma
    independiente y resolver URL, robots, permisos y derecho de uso antes de
    **incorporar** un original. Los campos de fuentes/URL verificadas son
