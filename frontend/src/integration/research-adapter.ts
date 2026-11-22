@@ -89,7 +89,11 @@ export type ResearchDocument = {
   hash: string;
   versions: number[];
   issues: string[];
-  identity_reconciliation?: { decision: string; current: boolean; reviewer?: string | null };
+  identity_reconciliation?: {
+    decision: string;
+    current: boolean;
+    reviewer?: string | null;
+  };
   body: {
     title: string;
     kind: string;
@@ -119,7 +123,10 @@ export type ResearchDocument = {
       declared_manufacturer?: string | null;
       declared_consulted_at?: string | null;
       declared_official: boolean;
-      capture_mode?: "USER_SAVED_WEB_HTML" | "ALLOWLISTED_HTTPS_FETCH" | "LOCAL_REFERENCE_OR_FILE";
+      capture_mode?:
+        | "USER_SAVED_WEB_HTML"
+        | "ALLOWLISTED_HTTPS_FETCH"
+        | "LOCAL_REFERENCE_OR_FILE";
       note: string;
       reference_url: string;
       registered_at: string;
@@ -146,6 +153,21 @@ export type ResearchDocument = {
   }[];
 };
 export type Dossier = {
+  media_rights?: Array<{
+    kind: "IMAGE" | "VIDEO";
+    url: string;
+    source_url: string;
+    state: "APPROVED_CURRENT" | "REVOKED" | "STALE" | "NO_PERMISSION";
+    current: boolean;
+    ecomm_id: string;
+    document_id: string | null;
+    document_version: number | null;
+    document_hash: string | null;
+    reviewer: string | null;
+    licence_basis: string | null;
+    location: string | null;
+    quote: string | null;
+  }>;
   assisted?: AssistedRun | null;
   ecomm_id: string;
   version: number;
@@ -190,6 +212,20 @@ function adapt(value: unknown, id: string): Dossier {
     !Array.isArray(data.documents) ||
     !Array.isArray(data.history) ||
     !Array.isArray(data.missing) ||
+    (data.media_rights !== undefined &&
+      (!Array.isArray(data.media_rights) ||
+        data.media_rights.length > 30 ||
+        data.media_rights.some(
+          (entry) =>
+            entry.ecomm_id !== id ||
+            !["IMAGE", "VIDEO"].includes(entry.kind) ||
+            !["APPROVED_CURRENT", "REVOKED", "STALE", "NO_PERMISSION"].includes(
+              entry.state,
+            ) ||
+            typeof entry.url !== "string" ||
+            typeof entry.source_url !== "string" ||
+            entry.current !== (entry.state === "APPROVED_CURRENT"),
+        ))) ||
     (data.assisted &&
       (data.assisted.ecomm_id !== id ||
         data.assisted.simulated_only !== true ||

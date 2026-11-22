@@ -104,6 +104,43 @@ def media_grant_current(research, item, media):
     )
 
 
+def media_permission_report(research, item, resources):
+    """Effective rights for exact saved assets; an old approval is not current.
+
+    Uses the same check as channel preparation, without mutating a decision or
+    loading any remote resource. The editor already bounds resources to thirty.
+    """
+    if not isinstance(resources, list) or len(resources) > 30:
+        raise ValueError("La lista multimedia guardada supera el contrato del editor.")
+    result = []
+    for media in resources:
+        record = latest_media_rights(item, media.get("kind"), media.get("url"))
+        if not record:
+            state = "NO_PERMISSION"
+        elif record.get("decision") == "REVOKED":
+            state = "REVOKED"
+        elif media_grant_current(research, item, media):
+            state = "APPROVED_CURRENT"
+        else:
+            state = "STALE"
+        result.append({
+            "kind": media.get("kind"),
+            "url": media.get("url"),
+            "source_url": media.get("source_url"),
+            "state": state,
+            "current": state == "APPROVED_CURRENT",
+            "ecomm_id": item.ecomm_id,
+            "document_id": (record or {}).get("document_id"),
+            "document_version": (record or {}).get("document_version"),
+            "document_hash": (record or {}).get("document_hash"),
+            "reviewer": (record or {}).get("reviewer"),
+            "licence_basis": (record or {}).get("licence_basis"),
+            "location": (record or {}).get("location"),
+            "quote": (record or {}).get("quote"),
+        })
+    return result
+
+
 def review_media_rights(
     research, ident, expected_version, document_id, document_version,
     media_url, media_kind, source_url, decision, licence_basis,

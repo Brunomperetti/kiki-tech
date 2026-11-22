@@ -13,6 +13,23 @@ export type Decisions = Partial<
   >
 >;
 export type Proposal = {
+  completion?: {
+    schema_version: "kiki-editor-completion-v1";
+    total_fields: number;
+    states: Record<string, number>;
+    fields: Array<{
+      field: ProposalField;
+      state: string;
+      proposed: boolean;
+      saved_content_present: boolean;
+      current_evidence_supported: boolean;
+      evidence_ids: string[];
+      human_review_required: boolean;
+    }>;
+    commercial_completion_certified: false;
+    channel_ready: false;
+    policy: string;
+  };
   available: boolean;
   synthetic_only: boolean;
   isolated_only: boolean;
@@ -79,6 +96,37 @@ async function read(id: string, init?: RequestInit, suffix = "") {
       0,
       "La propuesta no acredita el contrato sintético. No se aplicó ningún dato.",
     );
+  if (data.completion) {
+    const c = data.completion;
+    if (
+      c.schema_version !== "kiki-editor-completion-v1" ||
+      c.total_fields !== fieldKeys.length ||
+      !Array.isArray(c.fields) ||
+      c.fields.length !== fieldKeys.length ||
+      new Set(c.fields.map((row) => row.field)).size !== fieldKeys.length ||
+      c.fields.some(
+        (row) =>
+          !fieldKeys.includes(row.field) ||
+          typeof row.state !== "string" ||
+          !Array.isArray(row.evidence_ids) ||
+          row.evidence_ids.some((id) => typeof id !== "string") ||
+          typeof row.current_evidence_supported !== "boolean",
+      ) ||
+      !c.states ||
+      Object.values(c.states).some((n) => !Number.isSafeInteger(n) || n < 0) ||
+      Object.values(c.states).reduce((sum, n) => sum + n, 0) !==
+        fieldKeys.length ||
+      Object.entries(c.states).some(([state, n]) =>
+        c.fields.filter((row) => row.state === state).length !== n) ||
+      c.fields.some((row) => !(row.state in c.states)) ||
+      c.commercial_completion_certified !== false ||
+      c.channel_ready !== false
+    )
+      throw new CatalogError(
+        0,
+        "Cobertura de propuesta incompatible; no se certifica la ficha.",
+      );
+  }
   return data;
 }
 export const loadProposal = (

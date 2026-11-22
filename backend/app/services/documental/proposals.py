@@ -96,9 +96,17 @@ class Proposals:
 
     @staticmethod
     def generate_fields(facts):
-        by_field = {}
+        by_field, support = {}, {}
         for fact in sorted(facts, key=lambda f: f["id"]):
+            prior = by_field.get(fact["field"])
+            if prior and (prior["value"], prior.get("unit")) != (
+                fact["value"], fact.get("unit")
+            ):
+                raise ValueError(
+                    "Hechos aprobados contradictorios: resolvé las fuentes antes de generar una propuesta."
+                )
             by_field.setdefault(fact["field"], fact)
+            support.setdefault(fact["field"], []).append(fact["id"])
         fields, missing = {}, []
 
         def add(key, value, keys, clauses=None):
@@ -109,7 +117,9 @@ class Proposals:
                 return
             fields[key] = {
                 "value": value,
-                "evidence_ids": [by_field[k]["id"] for k in keys],
+                "evidence_ids": list(dict.fromkeys(
+                    ident for key in keys for ident in support[key]
+                )),
                 "clauses": clauses or ([value] if isinstance(value, str) else []),
             }
 
@@ -243,7 +253,7 @@ class Proposals:
             or not record.history
             or record.history[0].get("event") != self.event
         ):
-            raise ValueError("La propuesta no pertenece a esta variante sintética.")
+            raise ValueError("La propuesta no pertenece a esta variante Ecomm-App.")
         return record
 
     @staticmethod
@@ -310,6 +320,13 @@ class Proposals:
                 "review_status": record.review_status,
             }
         )
+        from .completion import proposal_completion
+
+        result["completion"] = proposal_completion(
+            meta["fields"], edit["fields"], meta.get("decisions", {}),
+            authorized, current=not reasons,
+            applied=record.review_status == "APPLIED",
+        )
         self.db.commit()
         return result
 
@@ -325,6 +342,8 @@ class Proposals:
         ).first()
         if not record:
             self.db.commit()
+            from .completion import proposal_completion
+
             return {
                 "available": False,
                 "synthetic_only": all(
@@ -335,6 +354,9 @@ class Proposals:
                 "ecomm_id": ident,
                 "external_writes_enabled": False,
                 "authorized_facts": facts,
+                "completion": proposal_completion(
+                    {}, edit["fields"], {}, facts, current=True
+                ),
             }
         return self.serialize(record, edit, item, facts, fingerprint)
 
@@ -384,7 +406,7 @@ class Proposals:
                     "proposal": meta,
                     **({"batch_reference": batch_reference} if batch_reference else {}),
                     "quality_warnings": [
-                        "Redacción determinista desde hechos de documentos locales revisados; sin IA real. Las decisiones de un operador de prueba no son aprobación efectiva del cliente."
+                        "Redacción determinista desde hechos de documentos locales revisados; sin consumo OpenAI. La aprobación por campo no certifica derechos multimedia ni autoriza publicaciones."
                         if any(
                             not f["provenance"].startswith("fixture://") for f in facts
                         )
