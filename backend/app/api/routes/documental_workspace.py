@@ -30,7 +30,7 @@ from app.services.documental.contracts import (
     Incorporate,
     Provenance,
 )
-from app.services.documental.contracts import FactReview
+from app.services.documental.contracts import FactReview, BatchFactReview
 from app.services.documental.contracts import DocumentIdentityReview, ManufacturerFetch, MediaRightsReview
 from app.services.documental.media_rights import review_media_rights
 
@@ -138,6 +138,26 @@ def review_fact(
             body.expected_fact_version,
             body.decision,
             body.reason,
+        ),
+    )
+
+
+@router.post("/{ecomm_id}/evidence/facts/review-batch")
+def review_facts_batch(
+    ecomm_id: str,
+    body: BatchFactReview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Single explicit human decision for checked facts, no automatic approval."""
+    return execute(
+        db,
+        lambda: Research(db, session).review_batch(
+            ecomm_id,
+            body.expected_version,
+            body.document_id,
+            body.document_version,
+            body.facts,
         ),
     )
 
