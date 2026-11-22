@@ -65,6 +65,24 @@ async function fill(page: Page, ident = "MLA900000003", qty = "1") {
       "Contrasté nombre, marca, presentación, cantidad y códigos de esta variante sintética.",
     );
 }
+test("reconsulta visible conserva resultados de la misma variante y evita clics repetidos", async ({ page }) => {
+  await open(page);
+  const panel = page.getByLabel("Canales por variante API");
+  const mlPanel = panel.locator('[data-channel-panel="ml"]');
+  await expect(mlPanel).toBeVisible();
+  await page.route("**/api/ecomm-app/workspace/900003/channels", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.continue();
+  });
+  await panel.getByRole("button", { name: "Volver a consultar canales" }).click();
+  await expect(panel.getByRole("button", { name: "Consultando capturas…" })).toBeDisabled();
+  await expect(panel.getByRole("status")).toContainText("Se muestran los resultados anteriores");
+  await expect(mlPanel).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Volver a consultar canales" })).toBeEnabled();
+  await expect(mlPanel).toBeVisible();
+});
+
+
 test("candidato y decisión Excel no confirman; revisión API confirma sólo la captura ML y actualiza filtros", async ({
   page,
 }, info) => {

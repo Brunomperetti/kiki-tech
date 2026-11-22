@@ -68,7 +68,11 @@ def report(db, ident):
             "Captura API incompleta; no se consulta Excel como alternativa."
         )
     edits = {e.ecomm_id: e for e in db.scalars(select(EcommApiProductEdit))}
-    matrix = build_channel_coverage(db, pages, api_validation=True, edits=edits)
+    # For a single product, keep global capture/SKU validation but only
+    # calculate the requested variant's channel comparison.
+    matrix = build_channel_coverage(
+        db, pages, api_validation=True, edits=edits, target_ids={ident}
+    )
     item = matrix["items_by_id"].get(ident)
     if not item:
         raise ValueError("No existe una variante API única con este Ecomm ID.")
