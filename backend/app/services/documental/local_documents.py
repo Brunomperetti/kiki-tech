@@ -293,6 +293,28 @@ class LocalDocuments:
             )
         if len(body.reason.strip()) < 10:
             raise ValueError("Registrá un motivo concreto de revisión de procedencia.")
+        if (
+            body.decision == "REVIEWED"
+            and doc.body.get("source", {}).get("review_state") == "REVIEWED"
+        ):
+            # Reconfirming an unchanged reviewed original is an audit event, not
+            # a new document version: changing its metadata digest needlessly
+            # invalidates valid per-field approvals and identity reconciliation.
+            # Revoking/rejecting a source still takes the revision path below,
+            # which blocks facts as before.
+            self.research.commit_change(
+                case,
+                deepcopy(case.facts),
+                "PROVENANCE_RECONFIRMED",
+                {
+                    "document_id": doc_id,
+                    "document_version": doc.version,
+                    "document_hash": doc.digest,
+                    "decision": body.decision,
+                    "reason": body.reason.strip(),
+                },
+            )
+            return self.research.serialize(case)
         updated = deepcopy(doc.body)
         updated["source"].update(
             review_state=body.decision,
