@@ -513,6 +513,16 @@ def import_manufacturer_batch(
         raise
 
 
+def _resumable_intake_state_ready(db):
+    """Local queue inspection/recovery never requires a downloader or network."""
+    settings = get_settings()
+    if not settings.kiki_document_resumable_intake_enabled:
+        raise HTTPException(403, "Investigación reanudable deshabilitada.")
+    if not inspect(db.get_bind()).has_table(SourceIntakeJob.__tablename__):
+        raise HTTPException(503, "Falta aplicar la migración de cola documental.")
+    return settings
+
+
 def _resumable_intake_ready(db):
     """No implicit migration or network if the operator flag or schema is absent."""
     settings = get_settings()
@@ -574,8 +584,8 @@ def source_intake_jobs(
     db: Session = Depends(get_db),
     session=Depends(require_session),
 ):
-    settings = _resumable_intake_ready(db)
-    return SourceIntakeQueue(db, session, settings.kiki_document_source_fetch_hosts).listing()
+    _resumable_intake_state_ready(db)
+    return SourceIntakeQueue(db, session, "").listing()
 
 
 @router.get("/sources/intake-jobs/{job_id}")
@@ -584,11 +594,9 @@ def source_intake_detail(
     db: Session = Depends(get_db),
     session=Depends(require_session),
 ):
-    settings = _resumable_intake_ready(db)
+    _resumable_intake_state_ready(db)
     try:
-        return SourceIntakeQueue(
-            db, session, settings.kiki_document_source_fetch_hosts,
-        ).detail(str(job_id))
+        return SourceIntakeQueue(db, session, "").detail(str(job_id))
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from None
 
@@ -688,6 +696,29 @@ def source_intake_retry(
         raise HTTPException(409, str(exc)) from None
 
 
+@router.post("/sources/intake-jobs/{job_id}/recover")
+def source_intake_recover(
+    job_id: UUID,
+    body: IntakeRevision,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Recover only expired local leases, even if the downloader is unavailable.
+
+    This endpoint cannot fetch a page, create a document or retry a source.
+    Keep the workspace/queue opt-ins and schema gate; do not require network
+    or parser availability for restoring persisted coordination state.
+    """
+    _resumable_intake_state_ready(db)
+    try:
+        return SourceIntakeQueue(db, session, "").recover(
+            str(job_id), body.expected_revision,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+
+
 @router.post("/sources/intake-jobs/{job_id}/cancel")
 def source_intake_cancel(
     job_id: UUID,
@@ -695,11 +726,11 @@ def source_intake_cancel(
     db: Session = Depends(get_db),
     session=Depends(require_csrf),
 ):
-    settings = _resumable_intake_ready(db)
+    _resumable_intake_state_ready(db)
     try:
-        return SourceIntakeQueue(
-            db, session, settings.kiki_document_source_fetch_hosts,
-        ).cancel(str(job_id), body.expected_revision)
+        return SourceIntakeQueue(db, session, "").cancel(
+            str(job_id), body.expected_revision,
+        )
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from None

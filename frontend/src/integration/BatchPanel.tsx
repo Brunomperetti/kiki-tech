@@ -473,12 +473,14 @@ export function BatchPanel({
                   }}
                 />
               )}
-              {capabilities?.document_resumable_intake === true && (
+              {(capabilities?.document_resumable_intake === true ||
+                capabilities?.document_intake_state === true) && (
                 <ManufacturerIntakeQueue
                   csrf={csrf}
                   selected={ids}
                   sitemap={sitemapResult}
                   disabled={locked}
+                  executionEnabled={capabilities?.document_resumable_intake === true}
                   onOpen={(id) => {
                     setExpanded(false);
                     onOpen(id, undefined, "Evidencias");

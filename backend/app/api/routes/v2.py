@@ -84,6 +84,10 @@ def capabilities(db, synthetic=False, *, reader_probe=False):
             and config.kiki_document_batch_source_import_enabled
             and config.kiki_document_source_fetch_hosts.strip()
         ),
+        "document_intake_state": bool(
+            documents and not intake_missing
+            and config.kiki_document_resumable_intake_enabled
+        ),
         "document_resumable_intake": bool(
             reader and not intake_missing and config.kiki_document_resumable_intake_enabled
             and config.kiki_document_parser_kernel_required
