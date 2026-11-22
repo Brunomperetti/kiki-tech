@@ -8,6 +8,10 @@ test.skip(
 );
 
 const endpoint = "/api/ecomm-app/workspace/sources/intake-jobs";
+const contractHeaders = {
+  "Content-Type": "application/json",
+  "X-Kiki-UI-Contract": "kiki-same-origin-v2-1",
+};
 const id = "00000000-0000-4000-8000-000000000099";
 function report(recoverable: boolean) {
   return {
@@ -56,7 +60,7 @@ for (const recoverable of [true, false]) {
     await page.route("**/api/ecomm-app/workspace/sources/intake-jobs**", async route => {
       const path = new URL(route.request().url()).pathname;
       if (route.request().method() === "GET" && path === endpoint)
-        return route.fulfill({ json: { mode: job.mode, items: [job], external_writes_enabled: false } });
+        return route.fulfill({ headers: contractHeaders, json: { mode: job.mode, items: [job], external_writes_enabled: false } });
       if (route.request().method() === "POST" && path === `${endpoint}/${id}/recover`) {
         posts.push(path);
         expect(route.request().headers()["x-csrf-token"]).toBeTruthy();
@@ -68,7 +72,7 @@ for (const recoverable of [true, false]) {
             next_action: "RETRY", retry_available: true, error: "Paso interrumpido; revisar antes de reintentar.",
           }),
         };
-        return route.fulfill({ json: job });
+        return route.fulfill({ headers: contractHeaders, json: job });
       }
       throw new Error(`Operación de proveedor o reintento inesperado: ${path}`);
     });

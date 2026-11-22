@@ -3,6 +3,10 @@ import { test, expect, type Page } from "@playwright/test";
 test.skip(process.env.KIKI_PRODUCTION_COMPAT !== "isolated-only", "Transporte documental sintético sin proveedores");
 test.setTimeout(60000);
 const endpoint = "/api/ecomm-app/workspace/sources/intake-jobs";
+const contractHeaders = {
+  "Content-Type": "application/json",
+  "X-Kiki-UI-Contract": "kiki-same-origin-v2-1",
+};
 const jobId = "00000000-0000-4000-8000-000000000088";
 const states = ["PENDING", "RUNNING", "IMPORTED", "ALREADY_PRESENT", "BLOCKED", "CANCELLED"];
 type Item = { ecomm_id: string; url: string; state: string; attempts: number; document_id: string | null; error: string | null; next_action: string; recoverable: boolean; retry_available: boolean };
@@ -51,15 +55,15 @@ for (const scenario of ["complete", "blocked", "conflict", "network", "pause", "
       const path = new URL(route.request().url()).pathname;
       if (route.request().method() === "GET") {
         reads.push(path);
-        if (path === endpoint) return route.fulfill({ json: { mode: job.mode, items: [job], external_writes_enabled: false } });
-        if (path === `${endpoint}/${jobId}`) return route.fulfill({ json: job });
+        if (path === endpoint) return route.fulfill({ headers: contractHeaders, json: { mode: job.mode, items: [job], external_writes_enabled: false } });
+        if (path === `${endpoint}/${jobId}`) return route.fulfill({ headers: contractHeaders, json: job });
       }
       if (route.request().method() === "POST" && path === `${endpoint}/${jobId}/step`) {
         stepBodies.push(route.request().postDataJSON());
         expect(route.request().headers()["x-csrf-token"]).toBeTruthy();
         expect(stepBodies.at(-1)).toEqual({ expected_revision: job.revision, confirm: true });
         if (scenario === "conflict")
-          return route.fulfill({ status: 409, json: { detail: "Conflicto sintético de otra sesión" } });
+          return route.fulfill({ status: 409, headers: contractHeaders, json: { detail: "Conflicto sintético de otra sesión" } });
         if (scenario === "network") return route.abort("failed");
         if (["pause", "close"].includes(scenario) && stepBodies.length === 1) await gate;
         const selected = job.items.find(item => item.state === "PENDING");
@@ -68,7 +72,7 @@ for (const scenario of ["complete", "blocked", "conflict", "network", "pause", "
           ...item, state: scenario === "blocked" && stepBodies.length === 1 ? "BLOCKED" : "IMPORTED",
           attempts: item.attempts + 1, document_id: `local-synthetic-${item.ecomm_id}`, next_action: "REVIEW_EVIDENCE",
         }), job.revision + 2);
-        return route.fulfill({ json: job });
+        return route.fulfill({ headers: contractHeaders, json: job });
       }
       throw new Error(`No se autorizan reintentos ni otras operaciones: ${path}`);
     });
