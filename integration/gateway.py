@@ -137,6 +137,22 @@ class Handler(BaseHTTPRequestHandler):
                 max_response = MAX_HTTP_BODY
             if self.command == "GET" and path.path == "/api/ecomm-app/workspace/channels/differences.csv":
                 max_response = 10 * 1024 * 1024  # Same bounded CSV contract; all other routes unchanged.
+            if PRODUCTION_COMPAT and (
+                (self.command == "POST" and path.path in {
+                    "/api/ecomm-app/workspace/reports/monthly/download",
+                    "/api/ecomm-app/workspace/exports/commercial/preview",
+                    "/api/ecomm-app/workspace/exports/commercial/download",
+                }) or (
+                    self.command == "POST" and re.fullmatch(
+                        r"/api/ecomm-app/workspace/reports/monthly/[0-9]{6}:[a-f0-9]{10}/download", path.path,
+                    )
+                ) or (
+                    self.command == "GET" and re.fullmatch(
+                        r"/api/ecomm-app/workspace/reports/monthly/[0-9]{6}:[a-f0-9]{10}", path.path,
+                    )
+                )
+            ):
+                max_response = 10 * 1024 * 1024
             body = upstream.read(max_response + 1)
             if len(body) > max_response:
                 raise OSError("Response too large")

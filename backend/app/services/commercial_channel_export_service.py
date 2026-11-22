@@ -1,0 +1,469 @@
+"""Read-only, reviewed commercial packages; never native provider import files.
+
+One preview is bound to source identity, all 18 saved fields, documentary
+versions, rights decisions and monthly-review state. Export recomputes it;
+neither request approves, reconciles, saves, publishes nor calls a provider.
+"""
+
+import csv
+from copy import deepcopy
+from datetime import datetime, timezone
+import hmac
+import importlib
+from io import StringIO
+import json
+from types import SimpleNamespace
+
+from sqlalchemy import cast, func, select, Text
+from sqlalchemy.orm import load_only
+
+from app.database.models import EcommApiProductEdit
+from app.integrations.ecomm_app.api_catalog_browser import valid_variant_id
+from app.services.contractual_delivery_audit_service import (
+    build_delivery_audit,
+    export_delivery_csv,
+)
+from app.services.documental.channel_readiness_guard import require_primary_evidence
+from app.services.documental.research import Research, identity_digest, fact_digest
+from app.services.documental.storage import Control, Document, Dossier, digest
+from app.services.ecomm_api_product_workspace_service import (
+    blank_fields,
+    review_schedule,
+    _readiness,
+)
+from app.services.editorial_batches.context import sources
+
+MAX_ITEMS = 20
+MAX_BYTES = 10 * 1024 * 1024
+CONTEXT_BYTES = 32 * 1024 * 1024
+CONTENT_FIELDS = (
+    "brand",
+    "manufacturer",
+    "title",
+    "short_title",
+    "short_description",
+    "description",
+    "details",
+    "presentation",
+    "category",
+    "subcategory",
+    "seo_title",
+    "seo_description",
+    "seo_keywords",
+    "proposed_gtin",
+    "attributes",
+    "media",
+)
+
+
+def _cell(value):
+    text = "" if value is None else str(value)
+    if len(text) > 128 * 1024:
+        raise ValueError(
+            "Una celda supera el límite; no se exportó contenido truncado."
+        )
+    if text.lstrip(" \t\r\n\v\f\ufeff").startswith(
+        ("=", "+", "-", "@")
+    ) or text.startswith(("\t", "\r", "\n")):
+        return "'" + text
+    return text
+
+
+def _check_fingerprint(expected, actual):
+    if (
+        not isinstance(expected, str)
+        or len(expected) != 64
+        or not hmac.compare_digest(expected, actual)
+    ):
+        raise ValueError(
+            "La previsualización cambió o falta. Revisá nuevamente antes de exportar."
+        )
+
+
+class ReadOnlyResearch(Research):
+    """Reuse evidence rules while forbidding Research.dossier's write path."""
+
+    def __init__(self, db, session, catalog, edits, documents, dossiers):
+        if session is None:
+            raise ValueError("La exportación requiere una sesión autenticada.")
+        self.db, self.catalog, self.edits = db, catalog, edits
+        self._document_refs, self.dossiers = documents, dossiers
+
+    def source_record(self, ident):
+        return self.catalog[ident]
+
+    def edit_record(self, ident):
+        return self.edits.get(ident)
+
+    def documents(self, ident=None):
+        return [
+            d
+            for d in self._document_refs.values()
+            if d.body.get("associated_ecomm_id") == ident
+        ]
+
+    def _document(self, document_id):
+        return self._document_refs.get(document_id)
+
+    def dossier(self, ident):
+        item = self.dossiers.get(ident)
+        if item is None:
+            raise ValueError("Falta expediente documental para esta variante.")
+        reference = self.reference(ident)
+        if item.identity_digest != identity_digest(reference):
+            raise ValueError(
+                "La identidad documental cambió; requiere revisión humana."
+            )
+        return SimpleNamespace(
+            ecomm_id=ident,
+            version=item.version,
+            identity=deepcopy(reference),
+            identity_digest=item.identity_digest,
+            facts=deepcopy(item.facts),
+            history=deepcopy(item.history),
+        )
+
+
+def _budget(db, ids):
+    """Reject oversized originals/history BEFORE materializing ORM JSON."""
+    total = 0
+    for model, column, condition in (
+        (
+            Document,
+            Document.body,
+            Document.body["associated_ecomm_id"].as_string().in_(ids),
+        ),
+        (Dossier, Dossier.history, Dossier.ecomm_id.in_(ids)),
+        (Dossier, Dossier.facts, Dossier.ecomm_id.in_(ids)),
+        (Dossier, Dossier.identity, Dossier.ecomm_id.in_(ids)),
+        (
+            EcommApiProductEdit,
+            EcommApiProductEdit.fields,
+            EcommApiProductEdit.ecomm_id.in_(ids),
+        ),
+        (
+            EcommApiProductEdit,
+            EcommApiProductEdit.history,
+            EcommApiProductEdit.ecomm_id.in_(ids),
+        ),
+    ):
+        total += (
+            db.scalar(
+                select(
+                    func.coalesce(func.sum(func.length(cast(column, Text))), 0)
+                ).where(condition)
+            )
+            or 0
+        )
+        # JSON text is unicode; allow at most 4 bytes per character.
+        if total * 4 > CONTEXT_BYTES:
+            raise ValueError(
+                "Documentos o historial exceden el presupuesto; reducí la selección."
+            )
+
+
+def _taxonomy_review(research, ident, edit, schedule, channel):
+    """Consume reviewed mappings when installed; absence never means approved.
+
+    This feature's standalone PR does not require a schema or another PR.
+    The optional module is the existing taxonomy capability's public contract.
+    """
+    fallback = {
+        "state": "UNAVAILABLE",
+        "channel": channel.upper(),
+        "mapping_version": 0,
+        "record": None,
+        "source_pair": None,
+        "official_external_category_verified": False,
+        "external_category_ids": None,
+    }
+    try:
+        module = importlib.import_module("app.services.documental.taxonomy_review")
+    except ModuleNotFoundError as exc:
+        if exc.name != "app.services.documental.taxonomy_review":
+            raise
+        return fallback
+    try:
+        item = research.dossier(ident)
+        approved, blocked = [], False
+        for fact in item.facts:
+            if fact.get("state") == "APPROVED":
+                issues = research.blockers(item, fact)
+                blocked |= bool(issues)
+                if not issues:
+                    approved.append(fact)
+        inspection = {
+            "ecomm_id": ident,
+            "conflicts": blocked
+            or bool(edit and edit.source_sku != research.source_record(ident)["sku"]),
+            "stale": bool(schedule["review_due"]),
+            "approved_taxonomy": [
+                {"field": f["field"], "value": f["value"], "evidence_id": f["id"]}
+                for f in approved
+                if f["field"] in {"category", "subcategory"}
+            ],
+            "expected": {
+                "identity_hash": item.identity_digest,
+                "workspace_version": edit.version if edit else 0,
+                "facts": sorted(
+                    (f["id"], f["version"], fact_digest(f)) for f in approved
+                ),
+                "documents": sorted(
+                    (d.id, d.version, d.digest) for d in research.documents(ident)
+                ),
+            },
+        }
+        return module.current_review(inspection, item.history, channel.upper())
+    except (ValueError, KeyError):
+        return {**fallback, "state": "BLOCKED"}
+
+
+def preview_commercial_export(db, session, channel, ids):
+    if channel not in {"ml", "tn"}:
+        raise ValueError("Canal de exportación inválido.")
+    if (
+        not isinstance(ids, list)
+        or not 1 <= len(ids) <= MAX_ITEMS
+        or len(set(ids)) != len(ids)
+        or not all(isinstance(i, str) and valid_variant_id(i) for i in ids)
+    ):
+        raise ValueError("Seleccioná entre 1 y 20 Ecomm ID únicos y válidos.")
+    if session is None:
+        raise ValueError("La exportación requiere una sesión autenticada.")
+    catalog = sources(db, lock=True)
+    if any(ident not in catalog for ident in ids):
+        raise ValueError("Una variante ya no está en la captura API completa.")
+    _budget(db, ids)
+    edits = {
+        e.ecomm_id: e
+        for e in db.scalars(
+            select(EcommApiProductEdit)
+            .where(EcommApiProductEdit.ecomm_id.in_(ids))
+            .order_by(EcommApiProductEdit.ecomm_id)
+            .with_for_update(read=True)
+        )
+    }
+    # Same ordering as commercial saves: source, commercial rows, documentary
+    # mutex. This prevents a concurrent revocation during fingerprint/output.
+    if (
+        db.scalar(select(Control).where(Control.id == 1).with_for_update(read=True))
+        is None
+    ):
+        raise ValueError("Falta el control documental; exportación bloqueada.")
+    docs = {
+        d.id: d
+        for d in db.scalars(
+            select(Document)
+            .options(
+                load_only(Document.id, Document.version, Document.digest, Document.body)
+            )
+            .where(Document.body["associated_ecomm_id"].as_string().in_(ids))
+        )
+    }
+    dossiers = {
+        d.ecomm_id: d
+        for d in db.scalars(select(Dossier).where(Dossier.ecomm_id.in_(ids)))
+    }
+    research = ReadOnlyResearch(db, session, catalog, edits, docs, dossiers)
+    items = []
+    for ident in ids:
+        source, edit = catalog[ident], edits.get(ident)
+        fields = (
+            {**blank_fields(), **dict(edit.fields or {})} if edit else blank_fields()
+        )
+        schedule = review_schedule(edit)
+        reasons = []
+        if not edit or edit.status != "READY_FOR_CHANNELS":
+            reasons.append(
+                "La ficha no tiene aprobación editorial interna para canales."
+            )
+        if edit and edit.source_sku != source["sku"]:
+            reasons.append("Cambió el SKU del Ecomm ID; resolver identidad.")
+        if source.get("identity_blockers"):
+            reasons.append("Códigos originales contradictorios; resolver identidad.")
+        if not _readiness(fields)["ready"]:
+            reasons.append("La ficha comercial está incompleta.")
+        if schedule["review_reason"] != "CURRENT":
+            reasons.append("Falta revisión mensual vigente de la ficha.")
+        evidence = None
+        try:
+            evidence = require_primary_evidence(
+                db, session, ident, fields, research=research
+            )
+        except ValueError as exc:
+            reasons.append(str(exc))
+        mapping = _taxonomy_review(research, ident, edit, schedule, channel)
+        mapping_record = mapping.get("record") or {}
+        target = (
+            mapping_record.get("target_pair")
+            if mapping.get("state") == "APPROVED"
+            else None
+        )
+        items.append(
+            {
+                "ecomm_id": ident,
+                "sku": source["sku"],
+                "name": source["product_name"],
+                "source_presentation": source.get("variant_description"),
+                "source_is_combo": source.get("is_combo"),
+                "source_parent_is_combo": source.get("parent_is_combo"),
+                "barcode_original": source.get("barcode"),
+                "gtin_original": source.get("gtin_raw"),
+                "captured_at": source.get("captured_at"),
+                "workspace_version": edit.version if edit else 0,
+                "editorial_status": edit.status if edit else "NOT_STARTED",
+                "review_schedule": schedule,
+                "evidence_verified": evidence is not None,
+                "document_id": evidence["document_id"] if evidence else None,
+                "document_sha256": evidence["document_sha256"] if evidence else None,
+                "commercial_fields": {k: deepcopy(fields[k]) for k in CONTENT_FIELDS},
+                "source_urls": sorted(
+                    {s["url"] for s in fields["sources"] if s.get("url")}
+                ),
+                "prepared_internal": not reasons,
+                "state": "PREPARED_FOR_HUMAN_CHANNEL_REVIEW"
+                if not reasons
+                else "BLOCKED",
+                "blockers": reasons,
+                "channel_taxonomy": {
+                    "state": mapping["state"],
+                    "mapping_version": mapping["mapping_version"],
+                    "taxonomy_revision": mapping_record.get("taxonomy_revision"),
+                    "source_pair": mapping.get("source_pair"),
+                    "target_pair": target,
+                    "evidence_ids": mapping_record.get("evidence_ids") or [],
+                    "reviewer": mapping_record.get("reviewer"),
+                    "official_external_category_verified": False,
+                    "external_category_ids": None,
+                },
+                "channel_requirements_pending": (
+                    ["Revisar o revalidar la equivalencia taxonómica para este canal."]
+                    if mapping.get("state") != "APPROVED"
+                    else []
+                )
+                + [
+                    "Verificar los identificadores oficiales y el formato vigente del canal antes de cualquier importación o publicación."
+                ],
+                "publication_enabled": False,
+            }
+        )
+    fingerprint = digest(
+        {
+            "channel": channel,
+            "items": items,
+            "dossiers": sorted(
+                (
+                    d.ecomm_id,
+                    d.version,
+                    d.identity_digest,
+                    digest(d.facts),
+                    digest(d.history),
+                )
+                for d in dossiers.values()
+            ),
+            "documents": sorted(
+                (d.id, d.version, d.digest, digest(d.body)) for d in docs.values()
+            ),
+            "editorial_history": sorted(
+                (e.ecomm_id, digest(e.history)) for e in edits.values()
+            ),
+        }
+    )
+    result = {
+        "mode": "READ_ONLY_COMMERCIAL_REVIEW_PACKAGE",
+        "channel": channel,
+        "source": "ECOMM_APP_API_STAGE",
+        "preview_fingerprint": fingerprint,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "total": len(items),
+        "prepared_internal": sum(i["prepared_internal"] for i in items),
+        "blocked": sum(not i["prepared_internal"] for i in items),
+        "items": items,
+        "native_provider_import_file": False,
+        "external_writes_enabled": False,
+        "provider_calls": 0,
+        "ai_requests": 0,
+    }
+    if len(json.dumps(result, ensure_ascii=False).encode()) > MAX_BYTES:
+        raise ValueError("La previsualización supera 10 MiB; reducí la selección.")
+    return result
+
+
+def download_commercial_export(db, session, channel, ids, expected_fingerprint):
+    preview = preview_commercial_export(db, session, channel, ids)
+    _check_fingerprint(expected_fingerprint, preview["preview_fingerprint"])
+    out = StringIO(newline="")
+    writer = csv.writer(out, delimiter=";", lineterminator="\r\n")
+    writer.writerow(
+        [
+            "canal",
+            "ecomm_id",
+            "sku",
+            "nombre_api",
+            "presentacion_api",
+            "combo_api",
+            "estado_revision",
+            "bloqueos",
+            "requisitos_canal_pendientes",
+            "version_ficha",
+            "captura_api",
+            "ultima_revision",
+            "documento_original_sha256",
+            "estado_taxonomia_canal",
+            "version_mapeo_canal",
+            "revision_taxonomia",
+            "categoria_canal_revisada",
+            "subcategoria_canal_revisada",
+            "hechos_taxonomia",
+            *CONTENT_FIELDS,
+            "fuentes_documentales",
+            "publicacion_habilitada",
+            "formato_nativo_proveedor",
+        ]
+    )
+    for item in preview["items"]:
+        values = [
+            channel,
+            item["ecomm_id"],
+            item["sku"],
+            item["name"],
+            item["source_presentation"],
+            item["source_is_combo"],
+            item["state"],
+            " | ".join(item["blockers"]),
+            " | ".join(item["channel_requirements_pending"]),
+            item["workspace_version"],
+            item["captured_at"],
+            item["review_schedule"]["last_review_at"],
+            item["document_sha256"],
+        ]
+        taxonomy = item["channel_taxonomy"]
+        target = taxonomy["target_pair"] or {}
+        values.extend(
+            [
+                taxonomy["state"],
+                taxonomy["mapping_version"],
+                taxonomy["taxonomy_revision"],
+                target.get("category"),
+                target.get("subcategory"),
+                " | ".join(taxonomy["evidence_ids"]),
+            ]
+        )
+        values.extend(
+            json.dumps(item["commercial_fields"][k], ensure_ascii=False)
+            if isinstance(item["commercial_fields"][k], list)
+            else item["commercial_fields"][k]
+            for k in CONTENT_FIELDS
+        )
+        values.extend([" | ".join(item["source_urls"]), "NO", "NO"])
+        writer.writerow([_cell(v) for v in values])
+    data = ("\ufeff" + out.getvalue()).encode("utf-8")
+    if len(data) > MAX_BYTES:
+        raise ValueError("El CSV supera 10 MiB; no se exportó un archivo parcial.")
+    return data, preview
+
+
+def download_monthly_report(db, expected_fingerprint):
+    summary, rows = build_delivery_audit(db)
+    _check_fingerprint(expected_fingerprint, summary["preview_fingerprint"])
+    return export_delivery_csv(rows).encode("utf-8"), summary

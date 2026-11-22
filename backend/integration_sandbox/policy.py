@@ -49,9 +49,26 @@ CONNECTION_ACTIONS = frozenset({
 })
 
 
+def is_delivery_review_route(method: str, path: str) -> bool:
+    root = "/api/ecomm-app/workspace/"
+    if (method, path) in {
+        ("GET", root + "reports/monthly/preview"),
+        ("GET", root + "reports/monthly"),
+        ("POST", root + "reports/monthly"),
+        ("POST", root + "reports/monthly/download"),
+        ("POST", root + "exports/commercial/preview"),
+        ("POST", root + "exports/commercial/download"),
+    }:
+        return True
+    return bool(re.fullmatch(
+        root + r"reports/monthly/[0-9]{6}:[a-f0-9]{10}"
+        + ("" if method == "GET" else r"/(?:acknowledge|download)"), path,
+    )) if method in {"GET", "POST"} else False
+
+
 def route_allowed(method: str, path: str, *, connections=False, production_compat=False) -> bool:
     return (
-        (production_compat and (method, path) in {("GET", "/api/ui/v2"),("GET", "/api/ecomm-app/stage/status"),("GET", "/api/mercadolibre/status"),("GET", "/api/ecomm-app/stage/ml-reconciliation-preview")})
+        (production_compat and ((method, path) in {("GET", "/api/ui/v2"),("GET", "/api/ecomm-app/stage/status"),("GET", "/api/mercadolibre/status"),("GET", "/api/ecomm-app/stage/ml-reconciliation-preview")} or is_delivery_review_route(method, path)))
         or (connections and (method, path) in CONNECTION_ACTIONS)
         or
         (method, path) in ALLOWED_ROUTES
