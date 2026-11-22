@@ -112,6 +112,33 @@ def test_exact_sku_keeps_candidate_and_comparison_evidence_never_approves(db):
         assert m["summary"]["comparison"][channel]["variant_states"]["candidates"] == 1
 
 
+def test_single_variant_channel_read_keeps_global_identity_and_matches_full_audit(db):
+    products = [
+        product(1, "DUP-SKU", name="Mix A", size="250 g"),
+        product(2, "DUP-SKU", name="Mix B", size="500 g"),
+        product(3, "UNIQUE-SKU", name="Mix C", size="250 g"),
+    ]
+    full = captures(
+        db,
+        products,
+        [ml("MLA1", "DUP-SKU", title="Mix A 250 g")],
+        [tn("mix-a", "DUP-SKU", name="Mix A", size="250 g")],
+    )
+    targeted = build_channel_coverage(
+        db, pages(products), api_validation=True, now=NOW, target_ids={"1"},
+    )
+    assert set(targeted["items_by_id"]) == {"1"}
+    # The duplicate SKU belongs to two distinct Ecomm variants even though
+    # this request only classifies one of them.
+    assert targeted["items_by_id"]["1"] == full["items_by_id"]["1"]
+    assert targeted["items_by_id"]["1"]["ml"]["status"] == "AMBIGUOUS_API_SKU"
+    assert targeted["sources"] == full["sources"]
+    assert targeted["policy"] == full["policy"]
+    assert not build_channel_coverage(
+        db, pages(products), api_validation=True, now=NOW, target_ids={"999999"},
+    )["items_by_id"]
+
+
 def test_missing_or_different_sku_can_use_valid_gtin_without_linking(db):
     m = captures(
         db,
