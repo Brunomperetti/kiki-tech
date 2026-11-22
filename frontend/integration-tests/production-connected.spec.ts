@@ -464,6 +464,9 @@ test("lote desde v2: seis Ecomm ID exactos, previsualización, confirmación y t
   await expect(page.getByTestId("batch-progress")).toContainText(
     "Pendiente: 6",
   );
+  // The browser defaults to dismissing dialogs. The operator must explicitly
+  // authorize this local review-task batch before the backend may run it.
+  page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", { name: "Confirmar e iniciar lote", exact: true })
     .click();
