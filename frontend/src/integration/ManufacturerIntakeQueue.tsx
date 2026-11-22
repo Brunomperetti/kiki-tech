@@ -23,6 +23,9 @@ type JobItem = {
   document_id: string | null;
   error: string | null;
   next_action: string | null;
+  claim_until?: string | null;
+  recoverable?: boolean;
+  retry_available?: boolean;
 };
 type Job = {
   mode: "MANUAL_RESUMABLE_SOURCE_INTAKE";
@@ -31,6 +34,17 @@ type Job = {
   state: string;
   total: number;
   counts: Record<string, number>;
+  coverage?: {
+    total_variants: number;
+    documents_recorded: number;
+    without_recorded_document: number;
+    cancelled: number;
+    completed_steps: number;
+    facts_approved_by_operation: 0;
+    commercial_fields_saved: 0;
+  };
+  recoverable_items?: number;
+  max_attempts?: number;
   items: JobItem[];
   sitemap_url: string;
   selection_mode: "EXACT_OPERATOR_URL" | "REVIEWED_SITEMAP";
@@ -43,26 +57,47 @@ type Job = {
 
 function verified(value: unknown): Job {
   const row = value as Job;
+  const states = ["PENDING", "RUNNING", "IMPORTED", "ALREADY_PRESENT", "BLOCKED", "CANCELLED"];
   if (!row || row.mode !== "MANUAL_RESUMABLE_SOURCE_INTAKE" ||
       row.external_writes_enabled !== false || row.manual_steps_only !== true ||
       row.ai_requests !== 0 || row.claims_approved !== 0 ||
       !["EXACT_OPERATOR_URL", "REVIEWED_SITEMAP"].includes(row.selection_mode) ||
       !/^[a-f0-9-]{36}$/.test(row.id) ||
-      !Number.isSafeInteger(row.revision) || !Array.isArray(row.items) ||
+      !Number.isSafeInteger(row.revision) || row.revision < 1 || !Array.isArray(row.items) ||
+      row.total !== row.items.length || row.total < 1 || row.total > 20 ||
+      new Set(row.items.map(item => item.ecomm_id)).size !== row.total ||
+      !row.counts || states.some(state =>
+        !Number.isSafeInteger(row.counts[state]) || row.counts[state] < 0 ||
+        row.counts[state] !== row.items.filter(item => item.state === state).length) ||
+      (row.recoverable_items !== undefined &&
+        (!Number.isSafeInteger(row.recoverable_items) ||
+          row.recoverable_items !== row.items.filter(item => item.recoverable === true).length)) ||
       row.items.some(item => !/^[1-9][0-9]*$/.test(item.ecomm_id) ||
-        !["PENDING", "RUNNING", "IMPORTED", "ALREADY_PRESENT", "BLOCKED", "CANCELLED"].includes(item.state))) {
+        !Number.isSafeInteger(item.attempts) || item.attempts < 0 ||
+        (item.recoverable === true && item.state !== "RUNNING") ||
+        !states.includes(item.state))) {
     throw new Error("Respuesta de cola incompatible; no se procesó otra variante.");
   }
+  if (row.coverage && (
+    row.coverage.total_variants !== row.total ||
+    row.coverage.documents_recorded !== row.counts.IMPORTED + row.counts.ALREADY_PRESENT ||
+    row.coverage.without_recorded_document !== row.counts.PENDING + row.counts.RUNNING + row.counts.BLOCKED ||
+    row.coverage.cancelled !== row.counts.CANCELLED ||
+    row.coverage.completed_steps !== row.coverage.documents_recorded + row.coverage.cancelled ||
+    row.coverage.facts_approved_by_operation !== 0 ||
+    row.coverage.commercial_fields_saved !== 0
+  )) throw new Error("La cobertura del lote no coincide con sus variantes.");
   return row;
 }
 
 export function ManufacturerIntakeQueue({
-  csrf, selected, sitemap, disabled, onOpen,
+  csrf, selected, sitemap, disabled, onOpen, executionEnabled = true,
 }: {
   csrf: string;
   selected: Set<string>;
   sitemap?: Sitemap;
   disabled: boolean;
+  executionEnabled?: boolean;
   onOpen: (id: string) => void;
 }) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -122,7 +157,7 @@ export function ManufacturerIntakeQueue({
   ) || [];
 
   function create() {
-    if (!sitemap || !candidates.length || candidates.length > 20 ||
+    if (!executionEnabled || !sitemap || !candidates.length || candidates.length > 20 ||
         !window.confirm(
           `¿Crear un lote reanudable con ${candidates.length} fuentes candidatas? Cada página se descargará únicamente cuando pulses el siguiente paso. No se aprueban hechos ni se publican productos.`
         )) return;
@@ -141,6 +176,7 @@ export function ManufacturerIntakeQueue({
   }
 
   function createExactManifest() {
+    if (!executionEnabled) return;
     const entries = exactUrls.trim().split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     if (!entries.length || entries.length > 20) {
       setError("Ingresá entre 1 y 20 líneas de un mismo fabricante.");
@@ -191,7 +227,7 @@ export function ManufacturerIntakeQueue({
   }
 
   function process() {
-    if (!current || !window.confirm(
+    if (!executionEnabled || !current || !window.confirm(
       "¿Capturar una sola página del fabricante en este paso? Guardará su HTML como evidencia pendiente, sin publicar ni aprobar información."
     )) return;
     const job = current;
@@ -201,11 +237,21 @@ export function ManufacturerIntakeQueue({
   }
 
   function retry(ecommId: string) {
-    if (!current) return;
+    if (!executionEnabled || !current) return;
     const job = current;
     void run(async () => { await mutation(
       `/${job.id}/retry`,
       { expected_revision: job.revision, confirm: true, ecomm_id: ecommId },
+    ); });
+  }
+
+  function recover() {
+    if (!current || !current.recoverable_items || !window.confirm(
+      "¿Recuperar los pasos cuyo plazo de ejecución venció? KIKI comprobará sólo los documentos locales. No descargará páginas ni reintentará fuentes; deberás decidir cada siguiente paso."
+    )) return;
+    const job = current;
+    void run(async () => { await mutation(
+      `/${job.id}/recover`, { expected_revision: job.revision, confirm: true },
     ); });
   }
 
@@ -226,6 +272,10 @@ export function ManufacturerIntakeQueue({
   return <section className="b-detail" aria-label={rootName}>
     <h3>{rootName}</h3>
     <p>Conserva el avance en KIKI aunque cierres el navegador. Procesa una variante por clic; los documentos quedan pendientes de revisar.</p>
+    {!executionEnabled && <p role="status">
+      Descargas deshabilitadas. Podés consultar el avance, recuperar pasos vencidos
+      y cancelar pendientes sin acceder a fabricantes.
+    </p>}
     {capabilities?.document_exact_url_manifest === true && <details>
       <summary>Preparar lote por URLs exactas (sin sitemap)</summary>
       <p>
@@ -252,7 +302,7 @@ export function ManufacturerIntakeQueue({
       </p>
     </details>}
     <div className="b-actions">
-      <button type="button" disabled={busy || disabled || !candidates.length} onClick={create}>
+      <button type="button" disabled={busy || disabled || !executionEnabled || !candidates.length} onClick={create}>
         Preparar lote con {candidates.length} fuentes
       </button>
       <button type="button" disabled={busy || disabled} onClick={() => void run(refresh)}>
@@ -271,18 +321,31 @@ export function ManufacturerIntakeQueue({
     </label>}
     {current && <div role="region" aria-label="Progreso de fuentes del fabricante">
       <p><strong>{current.state}</strong> · {current.counts.IMPORTED || 0} de {current.total} incorporadas · {current.counts.BLOCKED || 0} bloqueadas · {current.counts.PENDING || 0} pendientes.</p>
+      {current.coverage && <p role="status">
+        Cobertura documental: {current.coverage.documents_recorded} de {current.total}
+        {" "}con incorporación registrada · {current.coverage.without_recorded_document}
+        {" "}sin documento registrado · {current.coverage.cancelled} canceladas.
+        {" "}No acredita hechos aprobados ni fichas completas.
+      </p>}
       <div className="b-actions">
-        <button type="button" disabled={busy || disabled || !canStep || running}
+        <button type="button" disabled={busy || disabled || !executionEnabled || !canStep || running}
           onClick={process}>Procesar siguiente fuente</button>
+        <button type="button" disabled={busy || disabled || !current.recoverable_items}
+          onClick={recover}>Recuperar pasos vencidos sin descargar</button>
         <button type="button" disabled={busy || disabled || running ||
           current.state === "CANCELLED" || !current.items.some(i => i.state === "PENDING")}
           onClick={cancel}>Cancelar pendientes</button>
       </div>
       {current.items.map(item => <article key={item.ecomm_id} className="b-detail">
         <p><strong>Ecomm {item.ecomm_id}</strong> · {item.state} · intentos {item.attempts}</p>
+        {item.state === "RUNNING" && <p>
+          Plazo del paso: {item.claim_until || "No disponible"}.
+          {" "}{item.recoverable ? "Puede recuperarse sin descargar." : "Actualizá estados al vencer el plazo; no se interrumpe un paso activo."}
+        </p>}
         <p>{item.error || "Documento pendiente de comprobación de identidad y procedencia"}</p>
-        {item.state === "BLOCKED" && item.attempts < 3 && <button type="button"
-          disabled={busy || disabled} onClick={() => retry(item.ecomm_id)}>Reintentar esta fuente</button>}
+        {item.state === "BLOCKED" && item.attempts < (current.max_attempts ?? 3) &&
+          item.retry_available !== false && <button type="button"
+          disabled={busy || disabled || !executionEnabled} onClick={() => retry(item.ecomm_id)}>Reintentar esta fuente</button>}
         {["IMPORTED", "ALREADY_PRESENT"].includes(item.state) && <button type="button"
           disabled={busy || disabled} onClick={() => onOpen(item.ecomm_id)}>
           Revisar evidencia incorporada

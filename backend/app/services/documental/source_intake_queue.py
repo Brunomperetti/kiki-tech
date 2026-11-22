@@ -27,6 +27,7 @@ from .source_intake_storage import SourceIntakeJob
 MAX_ITEMS = 20
 MAX_STEPS_PER_REQUEST = 1
 CLAIM_TTL = timedelta(minutes=10)
+MAX_ATTEMPTS = 3
 DONE = frozenset({"IMPORTED", "ALREADY_PRESENT", "CANCELLED"})
 VALID = frozenset({"PENDING", "RUNNING", "BLOCKED", *DONE})
 
@@ -44,7 +45,17 @@ def _present(db, ident, url):
     )
 
 
+def _claim_expired(row, instant):
+    """A missing or invalid lease cannot authorize preemption of a worker."""
+    try:
+        deadline = datetime.fromisoformat(row.get("claim_until") or "")
+    except (TypeError, ValueError):
+        return False
+    return deadline.tzinfo is not None and instant >= deadline
+
+
 def _summary(job):
+    instant = now()
     counts = {state: 0 for state in sorted(VALID)}
     for item in job.items:
         counts[item["state"]] += 1
@@ -65,10 +76,31 @@ def _summary(job):
         "updated_at": job.updated_at.isoformat(),
         "total": len(job.items),
         "counts": counts,
+        "coverage": {
+            "total_variants": len(job.items),
+            "documents_recorded": counts["IMPORTED"] + counts["ALREADY_PRESENT"],
+            "without_recorded_document": counts["PENDING"] + counts["RUNNING"] + counts["BLOCKED"],
+            "cancelled": counts["CANCELLED"],
+            "completed_steps": sum(counts[state] for state in DONE),
+            "facts_approved_by_operation": 0,
+            "commercial_fields_saved": 0,
+        },
+        "recoverable_items": sum(
+            row["state"] == "RUNNING" and _claim_expired(row, instant)
+            for row in job.items
+        ) if job.state != "CANCELLED" else 0,
+        "max_attempts": MAX_ATTEMPTS,
         "items": [{
             key: row.get(key)
             for key in ("ecomm_id", "url", "state", "attempts",
-                        "document_id", "error", "next_action")
+                        "document_id", "error", "next_action", "claim_until")
+        } | {
+            "recoverable": row["state"] == "RUNNING" and _claim_expired(row, instant)
+            and job.state != "CANCELLED",
+            "retry_available": row["state"] == "BLOCKED"
+            and row["attempts"] < MAX_ATTEMPTS
+            and row.get("next_action") != "REVIEW_IDENTITY"
+            and job.state != "CANCELLED",
         } for row in job.items],
         "sitemap_url": job.sitemap_url,
         "sitemap_sha256": job.sitemap_sha256,
@@ -302,8 +334,7 @@ class SourceIntakeQueue:
         for row in items:
             if row["state"] != "RUNNING":
                 continue
-            deadline = datetime.fromisoformat(row["claim_until"])
-            if instant < deadline:
+            if not _claim_expired(row, instant):
                 continue
             doc = _present(self.db, row["ecomm_id"], row["url"])
             row["state"] = "IMPORTED" if doc else "BLOCKED"
@@ -313,6 +344,21 @@ class SourceIntakeQueue:
             row["claim_token"] = row["claim_until"] = None
             changed = True
         return changed
+
+    def recover(self, ident, revision):
+        """Resolve expired leases using local receipts; never fetch or retry.
+
+        A second explicit operator action is required to retry a failed item
+        or process any pending variant. A former worker loses ownership after
+        recovery, so its delayed response cannot overwrite this decision.
+        """
+        job = self._get(ident, locked=True)
+        if job.revision != revision or job.state == "CANCELLED":
+            raise ValueError("El lote cambió o fue cancelado.")
+        rows = deepcopy(job.items)
+        if not self._recover(rows, instant=now()):
+            raise ValueError("No hay pasos interrumpidos con plazo vencido para recuperar.")
+        return self._update(job, rows, "RECOVERED_OFFLINE")
 
     def step(
         self, ident, revision, *, importer=capture_selected,
@@ -427,7 +473,7 @@ class SourceIntakeQueue:
             raise ValueError("El lote cambió o fue cancelado.")
         rows = deepcopy(job.items)
         match = next((x for x in rows if x["ecomm_id"] == ecomm_id), None)
-        if not match or match["state"] != "BLOCKED" or match["attempts"] >= 3:
+        if not match or match["state"] != "BLOCKED" or match["attempts"] >= MAX_ATTEMPTS:
             raise ValueError("Esta variante no admite reintento automático.")
         snapshot = sources(self.db)
         current = snapshot.get(ecomm_id)
