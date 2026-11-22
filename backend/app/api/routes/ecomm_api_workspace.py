@@ -17,8 +17,16 @@ from ...services.ecomm_api_work_queue_service import build_queue
 from ...services.ecomm_api_barcode_service import api_summary, api_evidence
 from ...services.research_manifest_service import build_research_manifest
 from ...services.research_batch_plan_service import build_research_batch_plan
-from ...services.documentary_cohort_planner_service import build_documentary_cohorts, export_documentary_cohorts_csv
-from ...services.contractual_delivery_audit_service import build_delivery_audit, export_delivery_csv
+from ...services.documentary_cohort_planner_service import (
+    build_documentary_cohorts,
+    export_documentary_cohorts_csv,
+)
+from ...services.contractual_delivery_audit_service import (
+    build_delivery_audit,
+    export_delivery_csv,
+)
+from ...services.documental.taxonomy_review import TaxonomyReview
+from ...core.config import get_settings
 
 router = APIRouter(prefix="/api/ecomm-app/workspace", tags=["ecomm-api-workspace"])
 
@@ -78,6 +86,58 @@ class SaveProductEdit(BaseModel):
 class GenerateAiSuggestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=0)
+
+
+class TaxonomyReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    expected_workspace_version: int = Field(ge=0)
+    expected_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+    channel: Literal["KIKI", "ECOMM", "ML", "TN"]
+    decision: Literal["APPROVED", "REVOKED"]
+    taxonomy_revision: str = Field(min_length=1, max_length=100)
+    target_category: str = Field(min_length=1, max_length=160)
+    target_subcategory: str = Field(min_length=1, max_length=160)
+    reason: str = Field(min_length=20, max_length=600)
+    confirm: Literal[True]
+
+
+def require_taxonomy_workspace():
+    if not get_settings().kiki_document_workspace_enabled:
+        raise HTTPException(403, "La clasificación documentada está deshabilitada.")
+
+
+@router.get(
+    "/{ecomm_id}/taxonomy-review", dependencies=[Depends(require_taxonomy_workspace)]
+)
+def taxonomy_review_state(
+    ecomm_id: str,
+    channel: Literal["KIKI", "ECOMM", "ML", "TN"] = "KIKI",
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
+):
+    try:
+        return TaxonomyReview(db, session).get(ecomm_id, channel)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post(
+    "/{ecomm_id}/taxonomy-review", dependencies=[Depends(require_taxonomy_workspace)]
+)
+def save_taxonomy_review(
+    ecomm_id: str,
+    body: TaxonomyReviewRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    try:
+        values = body.model_dump(exclude={"confirm"})
+        return TaxonomyReview(db, session).review(ecomm_id, **values)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get("/ai-proposals")
@@ -155,7 +215,6 @@ def work_queue(
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
-
 
 
 @router.get("/audit/contractual")
@@ -405,7 +464,10 @@ def save_edit(
                 ecomm_id, proposal_id, proposal_revision, body
             )
         return EcommApiProductWorkspace(db).save(
-            ecomm_id, body.fields.model_dump(), body.status, body.expected_version,
+            ecomm_id,
+            body.fields.model_dump(),
+            body.status,
+            body.expected_version,
             session=_session,
         )
     except ValueError as exc:
