@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm import Session
 
-from app.services.documental.contracts import Incorporate, Provenance
+from app.services.documental.contracts import Incorporate, Provenance, BatchFactApproval, BatchFactReview
 from app.services.documental.local_documents import LocalDocuments, parse_local
 from app.services.documental.research import Research
 from app.services.documental.proposals import Proposals
@@ -112,13 +112,41 @@ def test_operator_saved_page_is_archived_before_any_identity_or_fact_approval(
         # A proposal from unapproved facts is empty: human approval is mandatory.
         assert Proposals(db, user).latest(IDENT)["authorized_facts"] == []
 
-        for fact in extraction["facts"]:
-            dossier = service.research.dossier(IDENT)
-            live = next(f for f in dossier.facts if f["id"] == fact["id"])
-            extraction = service.research.review(
-                IDENT, dossier.version, live["id"], live["version"], "APPROVED",
-                "Verifiqué el fragmento estructural del HTML de prueba.",
+        # Batch review must reject one stale fact without approving any others.
+        live_case = service.research.dossier(IDENT)
+        batch = [
+            BatchFactApproval(
+                fact_id=fact["id"],
+                expected_fact_version=fact["version"],
+                reason=f"Revisé el fragmento individual del campo {fact['field']}.",
             )
+            for fact in extraction["facts"]
+        ]
+        with pytest.raises(ValueError, match="cambió de versión"):
+            service.research.review_batch(
+                IDENT, live_case.version, doc_id, latest_doc.version,
+                [batch[0], batch[1].model_copy(update={"expected_fact_version": 999})],
+            )
+        assert all(f["state"] == "PENDING" for f in live_case.facts)
+        # Human selection of each claim + current versions: one persisted decision.
+        request = BatchFactReview(
+            expected_version=live_case.version,
+            document_id=doc_id,
+            document_version=latest_doc.version,
+            confirm=True,
+            facts=batch,
+        )
+        extraction = service.research.review_batch(
+            IDENT, request.expected_version, request.document_id,
+            request.document_version, request.facts,
+        )
+        assert extraction["history"][-1]["action"] == "REVIEW_BATCH"
+        assert all(f["verified"] for f in extraction["facts"])
+        with pytest.raises(ValueError, match="ya fue decidido"):
+            service.research.review_batch(
+                IDENT, extraction["version"], doc_id, latest_doc.version, batch,
+            )
+        assert all(f["state"] == "APPROVED" for f in service.research.dossier(IDENT).facts)
         # Reconfirming a source already reviewed must preserve the immutable
         # source version/hash and the operator-approved evidence.
         dossier_before = service.research.dossier(IDENT)

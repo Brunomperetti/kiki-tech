@@ -103,6 +103,8 @@ export function ResearchPanel({
   const [message, setMessage] = useState("");
   const [selected, select] = useState("alm-tecnica");
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [batchSelected, setBatchSelected] = useState<Record<string, boolean>>({});
+  const [batchReason, setBatchReason] = useState("");
   const [identityReason, setIdentityReason] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaLocation, setMediaLocation] = useState("");
@@ -111,6 +113,8 @@ export function ResearchPanel({
   const [busy, setBusy] = useState(false);
   const [revision, reload] = useState(0);
   const rootRef = useRef<HTMLElement>(null);
+  const identitySectionRef = useRef<HTMLElement>(null);
+  const batchSectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (error) rootRef.current?.scrollIntoView({ block: "start" });
   }, [error]);
@@ -141,6 +145,15 @@ export function ResearchPanel({
   // Trust the server-side decision bound to document version and API identity.
   // The UI must not infer a valid approval from partial metadata.
   const identityReviewCurrent = document?.identity_reconciliation?.current === true;
+  const identityReady = !!document && document.body.source?.review_state === "REVIEWED"
+    && (identityReviewCurrent || document.issues.length === 0);
+  const pendingInDocument = data?.facts.filter((fact) =>
+    fact.document_id === document?.id &&
+    fact.document_version === document?.version &&
+    fact.state === "PENDING"
+  ) || [];
+  const selectableFacts = pendingInDocument.filter((fact) => fact.blockers.length === 0);
+  const selectedFacts = selectableFacts.filter((fact) => batchSelected[fact.id] === true);
   const selectedMedia = media.find((item) => item.url === mediaUrl) || media[0];
   const mediaGrantHistory = [...(data?.history || [])].reverse().find((event) => {
     if (event.action !== "MEDIA_RIGHTS_REVIEW" || !event.detail || !selectedMedia)
@@ -160,6 +173,7 @@ export function ResearchPanel({
           "Evidencia guardada en KIKI PostgreSQL. La ficha comercial no se modificó.",
         ),
       );
+      return true;
     } catch (err) {
       const failure = err as CatalogError;
       setError(failure.message);
@@ -170,6 +184,7 @@ export function ResearchPanel({
           /* Retain last inspected result, never fabricate new evidence. */
         }
       }
+      return false;
     } finally {
       setBusy(false);
     }
@@ -188,6 +203,31 @@ export function ResearchPanel({
       decision,
       reason: notes[fact.id]?.trim() || "",
     });
+  }
+  async function reviewSelectedFacts() {
+    if (
+      !production || !data || !document || !identityReady ||
+      !selectedFacts.length || batchReason.trim().length < 20
+    ) return;
+    const selections = [...selectedFacts];
+    if (!window.confirm(
+      `¿Confirmás que contrastaste individualmente estos ${selections.length} hechos con los fragmentos del documento actual? No se certifica el EAN ni se publica nada.\n\n${selections.map((f) => `• ${f.label}: ${f.value}`).join("\n")}`,
+    )) return;
+    const ok = await mutate(`${researchPath(id)}/facts/review-batch`, {
+      expected_version: data.version,
+      document_id: document.id,
+      document_version: document.version,
+      confirm: true,
+      facts: selections.map((fact) => ({
+        fact_id: fact.id,
+        expected_fact_version: fact.version,
+        reason: `${batchReason.trim()} — ${fact.label}`,
+      })),
+    });
+    if (ok) {
+      setBatchSelected({});
+      setBatchReason("");
+    }
   }
   async function reviewIdentity(decision: "APPROVED" | "REVOKED") {
     if (!data || !document || !window.confirm(
@@ -319,6 +359,42 @@ export function ResearchPanel({
               reutilizan documentos de otras variantes.
             </p>
           )}
+          {production && document && (
+            <section className="r-next-action" aria-label="Próximo paso de revisión">
+              <strong>Próximo paso para esta variante</strong>
+              {!identityReady ? (
+                <>
+                  <p>
+                    Revisá primero si el nombre y la presentación del documento
+                    corresponden a la variante Ecomm-App. KIKI no aprobará hechos
+                    hasta registrar una equivalencia válida para esta versión.
+                  </p>
+                  <button type="button" onClick={() =>
+                    identitySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+                  }>
+                    Ir a conciliar identidad
+                  </button>
+                </>
+              ) : pendingInDocument.length > 0 ? (
+                <>
+                  <p>
+                    Identidad revisada. Hay {pendingInDocument.length} hechos pendientes.
+                    Seleccioná únicamente los que hayas cotejado con sus fragmentos.
+                  </p>
+                  <button type="button" onClick={() =>
+                    batchSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+                  }>
+                    Ir a revisión de hechos
+                  </button>
+                </>
+              ) : (
+                <p>
+                  No hay hechos pendientes de este original. Revisá las demás
+                  fuentes y los permisos multimedia antes de considerar canales.
+                </p>
+              )}
+            </section>
+          )}
           <DocumentImport
             id={id}
             csrf={csrf}
@@ -382,7 +458,10 @@ export function ResearchPanel({
               aria-label="Documento disponible"
               value={selected}
               disabled={busy}
-              onChange={(event) => select(event.target.value)}
+              onChange={(event) => {
+                select(event.target.value);
+                setBatchSelected({});
+              }}
             >
               {data.documents.map((doc) => (
                 <option key={doc.id} value={doc.id}>
@@ -399,7 +478,7 @@ export function ResearchPanel({
                 {document.body.provenance}
               </p>
               {production && document.body.synthetic === false && (
-                <section aria-label="Conciliación de identidad del fabricante" className="r-document">
+                <section ref={identitySectionRef} aria-label="Conciliación de identidad del fabricante" className="r-document">
                   <h4>¿Es realmente el mismo producto?</h4>
                   <p>
                     Ecomm-App puede usar una descripción distinta de la del fabricante.
@@ -585,6 +664,82 @@ export function ResearchPanel({
                 )}
               </div>
             </div>
+          )}
+          {production && document && (
+            <section
+              className="r-batch-review"
+              ref={batchSectionRef}
+              aria-label="Revisión rápida y verificable de hechos"
+            >
+              <h4>Revisión de hechos del documento vigente</h4>
+              <p>
+                Seleccioná cada hecho que verificaste contra la cita visible. Una
+                confirmación registra todas las decisiones seleccionadas con
+                control de versión. Ninguna casilla viene marcada de antemano.
+              </p>
+              {!identityReady && (
+                <p className="r-error">
+                  Primero registrá la equivalencia de identidad de este original.
+                  Las aprobaciones permanecen bloqueadas hasta entonces.
+                </p>
+              )}
+              {pendingInDocument.length === 0 ? (
+                <p>No hay hechos pendientes de este documento.</p>
+              ) : (
+                <>
+                  {pendingInDocument.map((fact) => (
+                    <label className="r-batch-fact" key={fact.id}>
+                      <input
+                        type="checkbox"
+                        checked={batchSelected[fact.id] === true && fact.blockers.length === 0}
+                        disabled={busy || !identityReady || fact.blockers.length > 0}
+                        onChange={(event) => setBatchSelected((previous) => ({
+                          ...previous,
+                          [fact.id]: event.target.checked,
+                        }))}
+                      />
+                      <span>
+                        <strong>{fact.label}: {fact.value} {fact.unit || ""}</strong>
+                        <small>
+                          Documento v{fact.document_version} · {fact.location}
+                        </small>
+                        <q>{fact.quote}</q>
+                        {fact.blockers.length > 0 && (
+                          <small>Bloqueado: {fact.blockers.join(" · ")}</small>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                  <label>
+                    Motivo de revisión de los hechos seleccionados
+                    <textarea
+                      aria-label="Motivo de la revisión conjunta de hechos"
+                      value={batchReason}
+                      minLength={20}
+                      maxLength={450}
+                      onChange={(event) => setBatchReason(event.target.value)}
+                      placeholder="Contrasté individualmente los valores, presentaciones y fragmentos del documento original."
+                    />
+                  </label>
+                  <div className="r-actions">
+                    <button
+                      type="button"
+                      disabled={
+                        busy || !identityReady || !selectedFacts.length ||
+                        batchReason.trim().length < 20
+                      }
+                      onClick={() => void reviewSelectedFacts()}
+                    >
+                      Confirmar {selectedFacts.length} hechos revisados
+                    </button>
+                  </div>
+                  <small>
+                    Solo guarda evidencias internas. No acredita EAN, licencia
+                    de imágenes, identidad de fabricante ni publicación.
+                  </small>
+                </>
+              )}
+            </section>
           )}
           <h4>Hechos registrados · Revisión individual</h4>
           {data.facts.length === 0 && (

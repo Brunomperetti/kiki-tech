@@ -21,6 +21,34 @@ class FactReview(BaseModel):
     reason: str = Field(min_length=10, max_length=600)
 
 
+class BatchFactApproval(BaseModel):
+    """One explicitly inspected fact; batch approval never infers evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+    fact_id: str = Field(pattern=r"^[a-f0-9]{24}$")
+    expected_fact_version: int = Field(ge=1)
+    reason: str = Field(min_length=10, max_length=600)
+
+
+class BatchFactReview(BaseModel):
+    """Manual approval of up to 20 independent cited facts in one atomic step."""
+
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    document_id: str = Field(pattern=r"^local-[a-f0-9]{32}$")
+    document_version: int = Field(ge=1)
+    confirm: Literal[True]
+    facts: list[BatchFactApproval] = Field(min_length=1, max_length=20)
+
+    @field_validator("facts")
+    @classmethod
+    def unique_facts(cls, value):
+        ids = [item.fact_id for item in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("No se puede revisar dos veces el mismo hecho.")
+        return value
+
+
 class DocumentIdentityReview(BaseModel):
     """Explicit per-source name/presentation reconciliation; never EAN approval."""
     model_config = ConfigDict(extra="forbid")
