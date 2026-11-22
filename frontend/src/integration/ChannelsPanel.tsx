@@ -22,13 +22,16 @@ export function ChannelsPanel({
   onBusy: (v: boolean) => void;
   onReviewed: () => void;
 }) {
-  const [data, setData] = useState<ChannelReport>(),
+  const [channelData, setData] = useState<ChannelReport>(),
     [error, setError] = useState(""),
+    [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [revision, reload] = useState(0);
   const [notes, setNotes] = useState<Record<string, string>>({}),
     [quantities, setQuantities] = useState<Record<string, string>>({}),
     [checks, setChecks] = useState<Record<string, string[]>>({});
+  // Never display an earlier variant's channel data after product switching.
+  const data = channelData?.ecomm_id === id ? channelData : undefined;
   useEffect(() => {
     onBusy(busy);
     return () => onBusy(false);
@@ -36,7 +39,8 @@ export function ChannelsPanel({
   useEffect(() => {
     if (isAuxiliaryPilot(id)) return;
     const c = new AbortController();
-    setData(undefined);
+    setLoading(true);
+    setData((current) => current?.ecomm_id === id ? current : undefined);
     setError("");
     loadChannels(id, c.signal)
       .then((v) => {
@@ -44,6 +48,9 @@ export function ChannelsPanel({
       })
       .catch((e) => {
         if (!c.signal.aborted) setError(e.message);
+      })
+      .finally(() => {
+        if (!c.signal.aborted) setLoading(false);
       });
     return () => c.abort();
   }, [id, revision]);
@@ -137,9 +144,19 @@ export function ChannelsPanel({
           decidir.
         </p>
       )}
-      <button disabled={busy} onClick={() => reload((v) => v + 1)}>
-        Volver a consultar canales
+      <button disabled={busy || loading} onClick={() => reload((v) => v + 1)}>
+        {loading ? "Consultando capturas…" : "Volver a consultar canales"}
       </button>
+      {loading && (
+        <p role="status" className="r-notice">
+          {data
+            ? "Actualizando comparación. Se muestran los resultados anteriores hasta terminar la consulta; no se pueden validar vínculos mientras se actualiza."
+            : "Consultando capturas internas de Mercado Libre y Tiendanube. No sincroniza ni publica productos."}
+        </p>
+      )}
+      {!loading && !data && !error && (
+        <p role="status">No hay resultados para mostrar. Volvé a consultar canales.</p>
+      )}
       {data && (
         <details className="r-reference">
           <summary>Identidad API utilizada en esta revisión · {id}</summary>
@@ -340,7 +357,7 @@ export function ChannelsPanel({
                         expresamente; «no combo» no demuestra por sí solo una
                         unidad.
                       </p>
-                      <fieldset disabled={blocked || busy || !!error}>
+                      <fieldset disabled={blocked || busy || loading || !!error}>
                         <legend>Datos contrastados</legend>
                         {Object.entries(labels).map(([k, label]) => (
                           <label className="r-check" key={k}>
