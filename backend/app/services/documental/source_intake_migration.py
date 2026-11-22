@@ -20,9 +20,17 @@ UP = (
     "CREATE INDEX kiki_source_intake_created_idx "
     "ON kiki_source_intake_jobs(created_at DESC)",
 )
-# Dropping coordination would delete operator history. Export and require an
-# empty table, with explicit approval, before any DOWN.
+# Fail-closed DOWN: a single SQL statement holds an ACCESS EXCLUSIVE lock
+# across both the nonempty check and DROP, even with autocommit enabled.
+# Production rollback is normally CODE/FLAGS ONLY: retain this table and
+# its operator history. Run DOWN solely with separate approval and after
+# proving it is empty. Never truncate/delete rows to make DOWN pass.
 DOWN = (
-    "DROP INDEX kiki_source_intake_created_idx",
-    "DROP TABLE kiki_source_intake_jobs",
+    "DO $kiki_intake_down$ BEGIN "
+    "LOCK TABLE public.kiki_source_intake_jobs IN ACCESS EXCLUSIVE MODE; "
+    "IF EXISTS (SELECT 1 FROM public.kiki_source_intake_jobs LIMIT 1) THEN "
+    "RAISE EXCEPTION 'KIKI_INTAKE_DOWN_BLOCKED_NONEMPTY: conservar historial'; "
+    "END IF; "
+    "EXECUTE 'DROP TABLE public.kiki_source_intake_jobs'; "
+    "END $kiki_intake_down$",
 )

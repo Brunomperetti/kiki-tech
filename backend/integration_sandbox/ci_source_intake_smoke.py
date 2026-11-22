@@ -57,6 +57,35 @@ def main():
         assert db.execute(
             "SELECT revision, items->0->>'state' FROM kiki_source_intake_jobs"
         ).fetchone() == (1, "PENDING")
+        # Commit a fake job, then reopen: this tests real durability on PG18.
+        db.commit()
+    with psycopg.connect(
+        host="127.0.0.1", port=5432, dbname="kiki_ci_synthetic",
+        user="kiki_ci", password="synthetic_ci_only", connect_timeout=5,
+    ) as db:
+        assert db.execute(
+            "SELECT revision, items->0->>'state' FROM kiki_source_intake_jobs"
+        ).fetchone() == (1, "PENDING")
+        db.execute("SET LOCAL lock_timeout = '5s'")
+        # Never destroy a queued job. A savepoint ensures the failed DO does
+        # not abort the rest of the isolated test transaction.
+        try:
+            with db.transaction():
+                for sql in DOWN:
+                    db.execute(sql)
+        except psycopg.Error as exc:
+            assert "KIKI_INTAKE_DOWN_BLOCKED_NONEMPTY" in str(exc), str(exc)
+        else:
+            raise AssertionError("DOWN unexpectedly removed a nonempty queue")
+        assert db.execute(
+            "SELECT COUNT(*) FROM public.kiki_source_intake_jobs"
+        ).fetchone()[0] == 1
+        assert db.execute(
+            "SELECT COUNT(*) FROM ci_intake_guard"
+        ).fetchone()[0] == 1
+        # Verify empty-only DOWN after explicitly removing only the synthetic
+        # row. This is a CI fixture cleanup, never a production procedure.
+        db.execute("DELETE FROM public.kiki_source_intake_jobs")
         for sql in DOWN:
             db.execute(sql)
         assert db.execute(
@@ -65,8 +94,9 @@ def main():
         assert db.execute(
             "SELECT COUNT(*) FROM ci_intake_guard"
         ).fetchone()[0] == 1
-        db.rollback()
-    print("Disposable PG18 source intake: schema, JSON, reversible DDL and legacy guard PASS")
+        db.commit()
+    print("Disposable PG18 source intake: durable JSON, blocked nonempty DOWN, "
+          "empty-only rollback and legacy guard PASS")
 
 
 if __name__ == "__main__":
