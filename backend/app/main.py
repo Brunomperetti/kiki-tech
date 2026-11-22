@@ -83,6 +83,8 @@ def create_app(settings=None) -> FastAPI:
     application.include_router(connections_router)
     from .api.routes.documental_workspace import router as documental_router
     application.include_router(documental_router)
+    from .api.routes.commercial_exports import router as commercial_exports_router
+    application.include_router(commercial_exports_router)
     from .api.routes.ecomm_api_channels import router as channel_router
     application.include_router(channel_router)
 

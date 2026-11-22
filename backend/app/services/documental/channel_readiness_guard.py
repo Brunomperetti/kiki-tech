@@ -111,12 +111,12 @@ def _commercial_coverage(research, item, fields, approved):
     }
 
 
-def require_primary_evidence(db, session, ecomm_id, fields):
+def require_primary_evidence(db, session, ecomm_id, fields, *, research=None):
     if session is None:
         raise ValueError("Validación documental exige una sesión autenticada.")
     # Reuse exactly the documentary mutex and current-source reconciliation:
     # no parallel editor save can race a revocation of the same evidence.
-    research = Research(db, session)
+    research = research if research is not None else Research(db, session)
     dossier = research.dossier(ecomm_id)
     candidates = [
         s for s in (fields.get("sources") or [])

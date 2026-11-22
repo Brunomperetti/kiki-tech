@@ -11,13 +11,13 @@ import csv
 
 from sqlalchemy import select
 
-from app.database.models import EcommApiProductEdit
+from app.database.models import EcommApiProductEdit, CatalogSnapshot
 from app.services.ecomm_api_work_queue_service import build_queue
 from app.services.ecomm_api_product_workspace_service import (
     _readiness, blank_fields, review_schedule,
 )
-from app.services.documental.storage import Document, Dossier
-from app.services.research_manifest_service import _cell
+from app.services.documental.storage import Document, Dossier, digest
+from app.services.ecomm_channel_export import safe_cell
 
 GAPS = (
     "IDENTITY_CONFLICT", "BARCODE_RESEARCH_NOT_ELIGIBLE",
@@ -287,7 +287,31 @@ def summarize_rows(rows):
     }
 
 
+def _audit_state(db):
+    """Compact optimistic generation signature; no table locks or originals."""
+    captures = [
+        (source, updated.isoformat() if updated else None, first)
+        for source, updated, first in db.execute(select(
+            CatalogSnapshot.source, CatalogSnapshot.updated_at,
+            CatalogSnapshot.payload[0]["captured_at"].as_string(),
+        ).where(CatalogSnapshot.source.in_(("ECOMM_APP_API_STAGE", "MERCADOLIBRE_API", "TIENDANUBE"))))
+    ]
+    return digest({
+        "captures": sorted(captures),
+        "edits": sorted(tuple(row) for row in db.execute(select(
+            EcommApiProductEdit.ecomm_id, EcommApiProductEdit.version,
+        ))),
+        "documents": sorted(tuple(row) for row in db.execute(select(
+            Document.id, Document.version, Document.digest,
+        ))),
+        "dossiers": sorted(tuple(row) for row in db.execute(select(
+            Dossier.ecomm_id, Dossier.version, Dossier.identity_digest,
+        ))),
+    })
+
+
 def build_delivery_audit(db):
+    before = _audit_state(db)
     work = build_queue(db, export_rows=True)
     rows = work["items"]
     if len(rows) > MAX_VARIANTS or len({r["ecomm_id"] for r in rows}) != len(rows):
@@ -304,7 +328,23 @@ def build_delivery_audit(db):
                     facts[row["ecomm_id"]], fact_fields[row["ecomm_id"]])
         for row in rows
     ]
-    return summarize_rows(report), report
+    summary = summarize_rows(report)
+    # Bind a reviewed report to the exact capture, editorial versions and
+    # documentary decisions. A same-count change still invalidates download.
+    summary["preview_fingerprint"] = digest({
+        "state_signature": before,
+        "rows": report,
+        "edits": sorted((e.ecomm_id, e.version, digest(e.fields), digest(e.history))
+                        for e in edit_map.values()),
+        "documents": sorted(current.items()),
+        "dossiers": sorted(tuple(row) for row in db.execute(select(
+            Dossier.ecomm_id, Dossier.version, Dossier.identity_digest,
+        ))),
+    })
+    if before != _audit_state(db):
+        raise ValueError("El catálogo o sus revisiones cambiaron durante la auditoría; repetí el informe.")
+    summary["report_scope"] = "CAPTURE_AND_VERSIONS_AT_AUDIT_TIME"
+    return summary, report
 
 
 def export_delivery_csv(rows):
@@ -334,5 +374,10 @@ def export_delivery_csv(rows):
             "SI" if r.get("fields_complete") else "NO",
             r.get("fields_percent", 0), r.get("quality_stage", "REVIEW_IDENTITY"),
         )
-        csv_writer.writerow([_cell(str(v) if isinstance(v, int) else v) for v in values])
-    return "\ufeff" + out.getvalue()
+        csv_writer.writerow([safe_cell(v) for v in values])
+        if out.tell() > 10 * 1024 * 1024:
+            raise ValueError("El informe supera 10 MiB; no se exportó un archivo parcial.")
+    result = "\ufeff" + out.getvalue()
+    if len(result.encode("utf-8")) > 10 * 1024 * 1024:
+        raise ValueError("El informe supera 10 MiB; no se exportó un archivo parcial.")
+    return result

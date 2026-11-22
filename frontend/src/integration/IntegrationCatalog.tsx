@@ -809,6 +809,8 @@ export function IntegrationCatalog() {
             ))}
           </div>
           <ResearchBatchPlanner
+            selectedIds={[...checked]}
+            csrf={session?.csrf_token || ""}
             onSearch={(sku) => update({
               q: sku, filter: "research_gtin_unique",
               page: "", product: "", tab: "",

@@ -37,8 +37,12 @@ const labels: Record<string, string> = {
 
 export function ResearchBatchPlanner({
   onSearch,
+  selectedIds = [],
+  csrf = "",
 }: {
   onSearch: (sku: string) => void;
+  selectedIds?: string[];
+  csrf?: string;
 }) {
   const [plan, setPlan] = useState<Plan>();
   const [error, setError] = useState("");
@@ -81,7 +85,7 @@ export function ResearchBatchPlanner({
         ambigua, packs y GTIN no conciliables. No consulta fabricantes, no
         consume IA ni guarda fichas.
       </p>
-      <ContractualCatalogAudit />
+      <ContractualCatalogAudit selectedIds={selectedIds} csrf={csrf} />
       <button type="button" disabled={busy} onClick={() => void load(0)}>
         {busy ? "Preparando lote…" : "Ver próximo lote de 10 productos"}
       </button>

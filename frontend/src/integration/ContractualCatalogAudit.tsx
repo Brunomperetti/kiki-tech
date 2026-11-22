@@ -2,11 +2,13 @@ import { useState } from "react";
 import { request } from "./catalog-adapter";
 import { downloadReviewCsv } from "./csv-download";
 import { DocumentaryCohortPanel } from "./DocumentaryCohortPanel";
+import { CommercialExportPanel, MonthlyReportPanel } from "./CommercialExportPanel";
 
-type Audit = {
+export type Audit = {
   mode: "READ_ONLY_CONTRACTUAL_CATALOG_AUDIT";
   source: "ECOMM_APP_API_STAGE";
   generated_at: string;
+  preview_fingerprint: string;
   total: number;
   internal_fiches_complete: number;
   fields_complete: number;
@@ -57,7 +59,7 @@ const gapLabels: Record<string, string> = {
   READY_WITHOUT_VERIFIED_DOCUMENTAL_GATE: "Fichas listas que necesitan corroboración documental",
 };
 
-export function ContractualCatalogAudit() {
+export function ContractualCatalogAudit({ selectedIds = [], csrf = "" }: { selectedIds?: string[]; csrf?: string }) {
   const [report, setReport] = useState<Audit>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -68,11 +70,12 @@ export function ContractualCatalogAudit() {
     setError("");
     setReport(undefined);
     try {
-      const response = await request("/api/ecomm-app/workspace/audit/contractual");
+      const response = await request("/api/ecomm-app/workspace/reports/monthly/preview");
       const value = await response.json() as Audit & { detail?: string };
       if (!response.ok) throw new Error(value.detail || "No se pudo auditar el catálogo.");
       if (value.mode !== "READ_ONLY_CONTRACTUAL_CATALOG_AUDIT" ||
           value.source !== "ECOMM_APP_API_STAGE" ||
+          !/^[a-f0-9]{64}$/.test(value.preview_fingerprint || "") ||
           value.external_writes_enabled !== false || value.ai_requests !== 0 ||
           value.network_requests !== 0 || value.monthly_review_confirmed !== false ||
           !Number.isSafeInteger(value.total) || value.total < 0 ||
@@ -112,7 +115,11 @@ export function ContractualCatalogAudit() {
     setBusy(true);
     setError("");
     try {
-      const response = await request("/api/ecomm-app/workspace/audit/contractual.csv");
+      if (!report) throw new Error("Previsualizá el informe antes de descargar.");
+      const response = await request("/api/ecomm-app/workspace/reports/monthly/download", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+        body: JSON.stringify({ expected_fingerprint: report.preview_fingerprint, confirm: true }),
+      });
       if (!response.ok) throw new Error("La auditoría no pudo exportarse.");
       downloadReviewCsv(await response.blob(), "kiki-auditoria-comercial-mensual.csv");
     } catch (exc) {
@@ -133,8 +140,8 @@ export function ContractualCatalogAudit() {
       <button type="button" disabled={busy} onClick={() => void audit()}>
         {busy ? "Auditando…" : "Auditar catálogo completo"}
       </button>
-      <button type="button" disabled={busy} onClick={() => void exportCsv()}>
-        Exportar pendientes (CSV)
+      <button type="button" disabled={busy || !report || !csrf} onClick={() => void exportCsv()}>
+        Confirmar y exportar pendientes (CSV)
       </button>
     </div>
     {error && <p role="alert">{error}</p>}
@@ -189,6 +196,8 @@ export function ContractualCatalogAudit() {
         </li>)}
       </ul>
       <DocumentaryCohortPanel />
+      <MonthlyReportPanel report={report} csrf={csrf} />
     </div>}
+    <CommercialExportPanel ids={selectedIds} csrf={csrf} />
   </section>;
 }
