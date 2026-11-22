@@ -11,6 +11,10 @@ const source = {
   category: "Categoría sintética",
   subcategory: "Subcategoría sintética",
 };
+const contractHeaders = {
+  "Content-Type": "application/json",
+  "X-Kiki-UI-Contract": "kiki-same-origin-v2-1",
+};
 const calls = new WeakMap<Page, string[]>();
 
 test.beforeEach(async ({ page }) => {
@@ -67,6 +71,7 @@ async function openPlan(page: Page, conflict = false) {
     "**/api/ecomm-app/workspace/commercial-plan/preview",
     (route) =>
       route.fulfill({
+        headers: contractHeaders,
         json: {
           mode: "READ_ONLY_COMMERCIAL_EVIDENCE_PLAN",
           total: 1,
@@ -132,6 +137,7 @@ async function openPlan(page: Page, conflict = false) {
       if (conflict)
         return route.fulfill({
           status: 409,
+          headers: contractHeaders,
           json: {
             detail:
               "La investigación cambió en otra sesión. Recuperá la versión nueva.",
@@ -139,7 +145,7 @@ async function openPlan(page: Page, conflict = false) {
         });
       approved = true;
     }
-    return route.fulfill({ json: state() });
+    return route.fulfill({ headers: contractHeaders, json: state() });
   });
   await page.locator(`[data-ecomm-id="${id}"]`).getByRole("checkbox").check();
   await page.getByRole("button", { name: "Operaciones", exact: true }).click();
