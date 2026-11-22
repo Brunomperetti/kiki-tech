@@ -150,16 +150,18 @@ def review_facts_batch(
     session=Depends(require_csrf),
 ):
     """Single explicit human decision for checked facts, no automatic approval."""
-    return execute(
-        db,
-        lambda: Research(db, session).review_batch(
+    try:
+        return Research(db, session).review_batch(
             ecomm_id,
             body.expected_version,
             body.document_id,
             body.document_version,
             body.facts,
-        ),
-    )
+        )
+    except ValueError as exc:
+        # A failed batch must not commit even an incidental pending ORM change.
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.post("/{ecomm_id}/documents/{document_id}/identity-review")
