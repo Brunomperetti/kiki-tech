@@ -1,0 +1,339 @@
+<PARSED TEXT FOR PAGE: 1 / 5>
+                                                                            KIKI TECH 2.0   /   PLAN MAESTRO DE EJECUCIÓN
+
+
+
+PLAN OPERATIVO · VERSIÓN 1.0 · 19 DE NOVIEMBRE DE 2026
+
+
+KIKI Tech 2.0
+Plan Maestro de Ejecución
+Documento de continuidad y control para completar el backoffice comercial sin perder el
+orden de desarrollo.
+
+  REGLA CENTRAL          Fuente válida primero. IA después. Validación humana antes de publicar.
+
+
+
+
+Objetivo contractual
+Construir un backoffice web capaz de gestionar y optimizar el catálogo real de KIKI Market por variante Ecomm
+ID + SKU: títulos cortos y largos, descripciones, detalles, características, presentaciones, fotos, videos, categorías,
+subcategorías y SEO. La gestión debe ser trazable y escalable, no convertirse en carga manual permanente.
+
+Flujo inalterable: DETECTAR → INVESTIGAR → PROCESAR → VALIDAR → PREPARAR / PUBLICAR CON AUTORIZACIÓN.
+
+
+
+Foto de situación y alcance de esta versión
+  BLOQUE                                      ÚLTIMA EVIDENCIA           LECTURA DE ESTADO
+
+                                                                         Última captura API documentada: 17/11. No usar
+  Catálogo operativo                          2.667 variantes
+                                                                         2.784 del Excel histórico como inventario actual.
+
+                                                                         Último control documentado el 19/11. Hay trabajo
+  Fichas comerciales listas                   0 confirmadas              de software, pero no un piloto comercial
+                                                                         aprobado.
+
+                                                                         Auditoría, manifiestos por URL y reextracción
+  Operaciones por lotes                       PR #191–193 integradas     implementados; no equivale a activación
+                                                                         productiva de todas las colas.
+
+                                                                         CI completada con éxito; todavía sin fusión ni
+  Revisión mensual                            PR #194 abierta
+                                                                         despliegue.
+
+                                                                         No integrable en su estado actual; requiere
+  CI de web productiva                        PR #173 borrador
+                                                                         actualización contra main y validación específica.
+
+Estas cifras y estados reflejan la última evidencia documentada/consultada, no una inspección nueva de la base productiva. El
+estado de Render no se comprobó de nuevo en esta sesión.
+
+
+
+Jerarquía de fuentes para continuar
+1. Plan Maestro contractual GitHub #174 (criterios de aceptación y bitácora).
+
+2. Presupuesto KIKI Brunito FINAL — septiembre de 2026, sección 02 “Catálogo y Backoffice”.
+
+3. Código actual en main, PRs y pruebas; después, evidencia de producción y aprobación de usuario.
+
+4. Conversaciones KIKI tech_A, KIKI tech_B y KIKI tech_C como antecedentes de decisiones y UX.
+
+
+
+
+                                                                        DOCUMENTO DE CONTINUIDAD · 19/11/2026 | PÁG. 1
+<PARSED TEXT FOR PAGE: 2 / 5>
+                                                                             KIKI TECH 2.0      /   PLAN MAESTRO DE EJECUCIÓN
+
+
+
+
+Secuencia de ejecución — sin saltar etapas
+La etapa siguiente se abre cuando la anterior tiene evidencia verificable, o cuando queda documentado el bloqueo y se
+autoriza una vía alternativa. Las mejoras cosméticas no sustituyen un ciclo real de producto.
+
+
+01 | Consolidar la base y habilitar con seguridad
+Estado de partida: PR #194 revisada inicialmente (CI exitosa, aún abierta); PR #173 sigue en borrador; cola documental
+productiva pendiente.
+
+Objetivo. Garantizar una base estable, recuperable y con controles de revisión confiables antes de activar
+procesos masivos.
+
+ • Revisar y cerrar técnicamente la PR #194: reloj de 30 días, cambios posteriores, historial, 409, CSV y pruebas
+   backend/frontend/PostgreSQL 18.
+
+ • Actualizar/validar la PR #173 para que CI compile también el build real de /v2/, no solo la demo.
+
+ • Verificar respaldo auténtico restaurable de PostgreSQL; ensayar restauración y migración en entorno
+   aislado.
+
+ • Comprobar presencia de la tabla kiki_source_intake_jobs y planificar su migración explícita solo después del
+   ensayo.
+
+ • Inventariar los flags de fabricante, allowlist, consumo y límites; activarlos solamente por separado y con
+   permiso.
+
+Criterio de cierre. CI correcta; prueba de restauración verificable; checklist de migración aprobado; controles
+de producción sin regresiones; decisiones y autorizaciones registradas.
+
+Dependencia / precaución: NO fusionar, desplegar, migrar, encender flags ni generar llamadas a fabricantes sin autorización
+separada.
+
+
+02 | Un producto real completo de punta a punta
+Estado de partida: Natural Seed Ecomm ID 7518949 / SKU 9995: original revisado, 3 hechos STALE y 0 hechos aprobados en
+el último control.
+
+Objetivo. Demostrar que el circuito produce una ficha comercial útil y respaldada, no solo indicadores o
+pantallas.
+
+ • Abrir la ficha del piloto y cotejar nombre, variante, presentación y barcode exclusivamente con la captura
+   Ecomm-App API.
+
+ • Resolver la discrepancia nominal/presentación con equivalencia revisada por operador; la falta de EAN en la
+   página del fabricante no certifica ni invalida por sí sola.
+
+ • Reextraer hechos del original auténtico, revisarlos uno por uno y aprobar únicamente lo demostrado.
+
+ • Generar y revisar título, descripción corta/larga, atributos, categoría/SEO y recursos multimedia realmente
+   autorizados.
+
+ • Guardar, recuperar e inspeccionar historial, versiones y bloqueo de concurrencia; mantener el producto sin
+   publicación externa.
+
+Criterio de cierre. Una ficha real revisada por un usuario de KIKI, con cada afirmación respaldada, estado
+explicable, historial persistente y demostración en /v2/.
+
+Dependencia / precaución: Si Natural Seed queda bloqueado, documentar la causa y pasar a un piloto alternativo con fuente
+verificada (por ejemplo Natufarma o Biosa, tras revisar condiciones y coincidencia).
+
+
+
+
+                                                                         DOCUMENTO DE CONTINUIDAD · 19/11/2026 | PÁG. 2
+<PARSED TEXT FOR PAGE: 3 / 5>
+                                                                            KIKI TECH 2.0   /   PLAN MAESTRO DE EJECUCIÓN
+
+
+
+
+Industrialización y calidad comercial
+
+03 | Escalar la automatización por lotes
+Estado de partida: Hay auditoría general, lotes editoriales y reextracción de hasta 20 variantes; la cola documental por URLs
+aún no está activada completamente en producción.
+
+Objetivo. Convertir el piloto en un mecanismo reutilizable por fabricante, con revisión humana concentrada en
+excepciones.
+
+ • Formar cohortes desde el catálogo API según fabricante, calidad de identidad, GTIN, packs y disponibilidad
+   de evidencia.
+
+ • Procesar manifiestos controlados de hasta 20 variantes del mismo fabricante; deduplicación, reintentos,
+   reanudación y límites de cuota.
+
+ • Extraer hechos candidatos con citas y procedencia; validar identidad y detectar contradicciones antes de
+   generar texto.
+
+ • Generar propuestas editoriales asistidas sin inventar datos; separar READY, PENDING, BLOCKED y
+   REVIEW_REQUIRED.
+
+ • Registrar cobertura por SKU, tasa de éxito, excepciones y consumo real de infraestructura/IA (si se habilita).
+
+Criterio de cierre. Lote real repetible y auditable; interrupciones recuperables; cero
+aprobaciones/publicaciones automáticas indebidas; trabajo humano limitado a control y excepciones.
+
+Dependencia / precaución: No iniciar un worker permanente, navegación masiva de fabricantes ni IA paga sin autorización y
+evaluación de costos.
+
+
+04 | Cerrar SEO, taxonomía y multimedia auténtica
+Estado de partida: Hay diagnóstico de taxonomía/SEO y extracción documental; falta un mapeo versionado aceptado y un
+circuito completo de medios.
+
+Objetivo. Transformar los hechos aprobados en fichas comercialmente expresivas y preparadas para cada
+canal.
+
+ • Crear y validar mapeos versionados de categorías/subcategorías KIKI           ↔ Ecomm-App/ML/Tiendanube.
+ • Preparar títulos SEO, metadescripciones, keywords, títulos de catálogo y descripciones cortas/largas con
+   revisión editorial.
+
+ • Incorporar imágenes y videos del producto/variante exactos, con URL, fuente, derechos/permiso y alt text.
+
+ • Bloquear alegaciones técnicas, ingredientes, alérgenos, claims sanitarios o certificaciones que no estén
+   probadas.
+
+ • Verificar que no se alteren por accidente stock, precios, costos, identidad o contenido ya aprobado.
+
+Criterio de cierre. Ficha piloto completa y salida de ejemplo coherente para canales, con SEO, medios y fuentes
+verificados; equivalencias de categorías aceptadas.
+
+Dependencia / precaución: Una imagen pública de fabricante no equivale automáticamente a una licencia de uso ni autoriza
+reutilizarla en otra variante.
+
+
+
+
+                                                                        DOCUMENTO DE CONTINUIDAD · 19/11/2026 | PÁG. 3
+<PARSED TEXT FOR PAGE: 4 / 5>
+                                                                              KIKI TECH 2.0   /   PLAN MAESTRO DE EJECUCIÓN
+
+
+
+
+Control mensual y aceptación
+
+05 | Revisión mensual y salida comercial controlada
+Estado de partida: Auditoría integral #191 disponible; #194 corrige trazabilidad de los 30 días pero no crea por sí sola el
+proceso mensual general.
+
+Objetivo. Conservar calidad del catálogo tras nuevas capturas, cambios y vencimientos; preparar exportaciones
+útiles sin publicar a ciegas.
+
+ • Ejecutar una revisión general real al menos una vez al mes: cambios Ecomm API, fuentes, fichas,
+   integraciones y pendientes.
+
+ • Distinguir revisión confirmada, vencida, editada después de la revisión y sin constancia; nunca reiniciar el
+   plazo por guardar.
+
+ • Emitir informe integral y CSV por Ecomm ID + SKU con responsables y siguiente acción.
+
+ • Preparar exportación por canal con previsualización, mapeo y controles de identidad; exigir aprobación de
+   cada operación externa.
+
+ • Registrar evidencia y fecha de la revisión general; no confundir ejecutar un diagnóstico con haber
+   confirmado una fuente.
+
+Criterio de cierre. Primer ciclo mensual documentado; informe completo y recuperable; ejemplos de
+exportación correctos; ninguna escritura externa sin autorización.
+
+Dependencia / precaución: La revisión general mensual no obliga a editar manualmente cada producto del catálogo.
+
+
+06 | Validar el 100% del alcance y cerrar
+Estado de partida: Pendiente: no se ha demostrado el circuito integral de una ficha lista ni aceptación de
+Guillermo/Mercedes.
+
+Objetivo. Acreditar funcionamiento del software y clasificación explicable del catálogo completo sin falsificar
+cobertura.
+
+ • Auditar el 100% de variantes de la captura API: ficha validada, investigación, bloqueo por fuente, pack
+   ambiguo o excepción registrada.
+
+ • Probar unidad, pack, código único/repetido, identidad cambiada, fuente vencida/revocada y datos
+   incompletos.
+
+ • Probar pérdida/reanudación de lote, conflictos 409, respaldos, persistencia e historial.
+
+ • Recorrer /v2/ en escritorio y móvil con Guillermo y Mercedes; comprobar que el flujo sea usable sin soporte
+   continuo.
+
+ • Registrar aceptación formal, pendientes residuales y plan de operación mensual.
+
+Criterio de cierre. 100% del alcance funcional probado + 100% de variantes clasificadas en un estado real y
+justificable + aceptación explícita de usuarios responsables.
+
+Dependencia / precaución: No afirmar “100% de fichas enriquecidas” cuando las fuentes disponibles no permiten completar
+todas.
+
+
+
+
+                                                                          DOCUMENTO DE CONTINUIDAD · 19/11/2026 | PÁG. 4
+<PARSED TEXT FOR PAGE: 5 / 5>
+                                                                              KIKI TECH 2.0   /   PLAN MAESTRO DE EJECUCIÓN
+
+
+
+
+Punto exacto para retomar mañana o en otro chat
+
+  PRÓXIMO MOVIMIENTO             Cerrar revisión técnica de #194 → revisar CI productiva #173 → confirmar
+  backup restaurable → ensayo migratorio aislado → piloto Natural Seed.
+
+
+
+
+Control operativo al 19/11/2026
+ • PR #191: auditoría integral de catálogo integrada y desplegada según bitácora del Plan Maestro.
+
+ • PR #192: manifiestos de URL exacta de fabricante integrados; cola de intake aún no habilitada en producción
+   según último control.
+
+ • PR #193: reextracción de hechos de fuentes revisadas, hasta 20 variantes; integrada y desplegada según
+   bitácora.
+
+ • PR #194: abierta, mergeable, 6 archivos modificados, CI workflow con resultado success. No fusionada ni
+   desplegada.
+
+ • PR #173: abierta como borrador, no mergeable en el estado consultado; proteger build productivo real.
+
+ • Piloto Natural Seed: reconciliación de identidad pendiente, 3 hechos STALE, ninguna aprobación comercial
+   confirmada.
+
+ • Esta sesión: lectura/revisión del repositorio y creación del documento. Sin cambios productivos.
+
+Reglas de trabajo que no se negocian
+ • Fuente auténtica y trazable antes de producir copy con IA.
+
+ • Toda variante se identifica por Ecomm ID + SKU y presentación; el EAN es señal de investigación, no
+   certificación automática.
+
+ • Ecomm-App operativo solo por API; Excel/CSV antiguos sirven como histórico, no como verdad actual.
+
+ • Mantener FastAPI, React, PostgreSQL, sesiones, CSRF y todas las integraciones ya existentes.
+
+ • No cambiar credenciales, despliegues, permisos, migraciones, banderas ni precios/stock/publicaciones sin
+   autorización explícita.
+
+ • Cada etapa termina con evidencia real, no solo tests sintéticos; usar datos reales con salvaguardas y
+   consentimiento operativo.
+
+ • Priorizar el flujo de negocio, la escala y las excepciones; no desviar recursos a mejoras cosméticas
+   prematuras.
+
+Plantilla de relevo para próximas conversaciones
+
+  “Continuamos KIKI Tech 2.0 siguiendo el Plan Maestro GitHub #174 y el documento KIKI Tech 2.0 – Plan Maestro
+  de Ejecución del 19/11/2026. No saltes etapas. Primero comprobá el estado actualizado de las PR #194 y #173, la
+  restauración aislada del respaldo y la migración de cola documental; después completá el piloto Natural Seed
+  Ecomm ID 7518949 / SKU 9995 antes de masificar. No fusionar, desplegar ni activar proveedores sin mi
+  autorización.”
+
+
+Referencias operativas
+Plan Maestro #174: https://github.com/Brunomperetti/kiki-tech/issues/174
+
+PR #194: https://github.com/Brunomperetti/kiki-tech/pull/194
+
+PR #173: https://github.com/Brunomperetti/kiki-tech/pull/173
+
+Repositorio: https://github.com/Brunomperetti/kiki-tech
+
+
+                                                                           DOCUMENTO DE CONTINUIDAD · 19/11/2026 | PÁG. 5
