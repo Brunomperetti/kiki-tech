@@ -119,6 +119,30 @@ def test_operator_saved_page_is_archived_before_any_identity_or_fact_approval(
                 IDENT, dossier.version, live["id"], live["version"], "APPROVED",
                 "Verifiqué el fragmento estructural del HTML de prueba.",
             )
+        # Reconfirming a source already reviewed must preserve the immutable
+        # source version/hash and the operator-approved evidence.
+        dossier_before = service.research.dossier(IDENT)
+        dossier_version_before = dossier_before.version
+        original_version = latest_doc.version
+        original_digest = latest_doc.digest
+        original_history_length = len(latest_doc.history)
+        reaffirmed = service.provenance(
+            IDENT, doc_id, Provenance(
+                expected_document_version=original_version,
+                decision="REVIEWED",
+                reason="Volví a cotejar el original archivado sin cambiar sus datos.",
+            ),
+        )
+        assert latest_doc.version == original_version
+        assert latest_doc.digest == original_digest
+        assert len(latest_doc.history) == original_history_length
+        assert reaffirmed["version"] == dossier_version_before + 1
+        assert reaffirmed["history"][-1]["action"] == "PROVENANCE_RECONFIRMED"
+        assert reaffirmed["history"][-1]["detail"]["document_hash"] == original_digest
+        assert all(f["verified"] for f in reaffirmed["facts"])
+        assert service.research.equivalence_current(
+            service.research.dossier(IDENT), latest_doc
+        )
         draft = Proposals(db, user).generate(IDENT, 0)
         assert draft["fields"]["title"]["value"] == "Mix Ensaladas y Sopas · 250 g"
         assert draft["fields"]["short_title"]["value"] == "Mix Ensaladas y Sopas"
