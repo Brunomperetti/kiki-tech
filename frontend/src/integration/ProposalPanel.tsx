@@ -28,6 +28,28 @@ const labels: Record<string, string> = {
   subcategory: "Subcategoría",
   seo_title: "Título SEO",
   seo_description: "Descripción SEO",
+  seo_keywords: "Palabras clave SEO",
+  proposed_gtin: "GTIN propuesto",
+  note: "Nota interna",
+  media: "Imágenes y videos",
+  sources: "Fuentes",
+};
+const completionLabels: Record<string, string> = {
+  PROPOSED_REVIEW_REQUIRED: "Propuesto con evidencia · Revisar",
+  ACCEPTED_FOR_INTERNAL_DRAFT: "Aceptado para borrador interno",
+  REJECTED: "Propuesta rechazada",
+  STALE: "Respaldo o versión cambió · Volver a revisar",
+  SAVED_IN_INTERNAL_DRAFT:
+    "Guardado en borrador interno · No certifica publicación",
+  PROPOSED_NOT_APPLIED: "Propuesto sin aplicar · Conservar revisión individual",
+  EXISTING_CONTENT_UNVERIFIED:
+    "Contenido guardado · Autenticidad sin certificar",
+  MANUAL_RESOURCE_REVIEW_REQUIRED:
+    "Adjuntar recurso exacto y permiso documentado",
+  MANUAL_SOURCE_REVIEW_REQUIRED: "Registrar y revisar fuente",
+  API_CODE_REVIEW_REQUIRED: "Revisar código API y documentación de la variante",
+  OPERATOR_NOTE: "Nota opcional del operador",
+  NEEDS_APPROVED_EVIDENCE: "Falta evidencia aprobada para proponer",
 };
 const show = (v: unknown) =>
   typeof v === "string" ? v : JSON.stringify(v, null, 2);
@@ -240,7 +262,10 @@ export function ProposalPanel({
         <strong>
           {isAuxiliaryPilot(record.ecomm_id)
             ? "Propuesta documental local · Sin IA real"
-            : "Demostración determinista · Sin IA real"}
+            : environmentText(
+                "Demostración determinista · Sin IA real",
+                "Redacción desde hechos aprobados · Sin consumo OpenAI",
+              )}
         </strong>
         <p>
           Usa sólo hechos aprobados de documentos{" "}
@@ -249,11 +274,36 @@ export function ProposalPanel({
             : data?.synthetic_only === false
               ? "locales autorizados"
               : "sintéticos"}
-          . No representa investigación oficial. No completa datos desconocidos.
+          . La propuesta no investiga sitios ni certifica por sí sola el origen.
+          No completa datos desconocidos.
         </p>
       </div>
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
+      {data?.completion && (
+        <details
+          className="r-document"
+          aria-label="Cobertura de los campos comerciales"
+        >
+          <summary>
+            Estado de los {data.completion.total_fields} campos comerciales
+          </summary>
+          <p>{data.completion.policy}</p>
+          <dl>
+            {data.completion.fields.map((row) => (
+              <div key={row.field}>
+                <dt>{labels[row.field] || row.field}</dt>
+                <dd>
+                  {completionLabels[row.state] || row.state}
+                  {row.evidence_ids.length > 0 && (
+                    <small> · Hechos: {row.evidence_ids.join(", ")}</small>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
       {blocked && (
         <p role="alert">
           Guardá o descartá los cambios del editor antes de revisar propuestas.

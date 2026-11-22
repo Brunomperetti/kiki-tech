@@ -610,6 +610,7 @@ class Research:
 
     def serialize(self, item):
         from .local_documents import public_body
+        from .media_rights import media_permission_report
 
         assisted = self.assisted(item)
 
@@ -624,12 +625,15 @@ class Research:
             fact["verified"] = fact["state"] == "APPROVED" and not fact["blockers"]
             fact["label"] = LABELS[fact["field"]]
             facts.append(fact)
+        edit = self.edit_record(item.ecomm_id)
+        saved_media = (edit.fields or {}).get("media", []) if edit else []
         result = {
             "ecomm_id": item.ecomm_id,
             "version": item.version,
             "identity": item.identity,
             "facts": facts,
             "history": item.history,
+            "media_rights": media_permission_report(self, item, saved_media),
             "missing": [
                 LABELS[key]
                 for key in REQUIRED

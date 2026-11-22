@@ -155,6 +155,16 @@ export function ResearchPanel({
   const selectableFacts = pendingInDocument.filter((fact) => fact.blockers.length === 0);
   const selectedFacts = selectableFacts.filter((fact) => batchSelected[fact.id] === true);
   const selectedMedia = media.find((item) => item.url === mediaUrl) || media[0];
+  const effectiveMediaPermission = data?.media_rights?.find((item) =>
+    item.kind === selectedMedia?.kind && item.url === selectedMedia?.url &&
+    item.source_url === selectedMedia?.source_url
+  );
+  const mediaPermissionLabels = {
+    APPROVED_CURRENT: "Permiso documentado vigente para este recurso y variante",
+    REVOKED: "Permiso revocado · No reutilizar",
+    STALE: "Permiso sin vigencia · Cambió el documento, recurso o identidad",
+    NO_PERMISSION: "Sin permiso documentado para uso comercial",
+  };
   const mediaGrantHistory = [...(data?.history || [])].reverse().find((event) => {
     if (event.action !== "MEDIA_RIGHTS_REVIEW" || !event.detail || !selectedMedia)
       return false;
@@ -531,6 +541,11 @@ export function ResearchPanel({
               {production && document.body.synthetic === false && media.length > 0 && (
                 <section className="r-document" aria-label="Autorizaciones para imágenes y videos">
                   <h4>Permisos de uso multimedia</h4>
+                  <p role="status" aria-label="Estado efectivo del permiso multimedia">
+                    {effectiveMediaPermission
+                      ? mediaPermissionLabels[effectiveMediaPermission.state]
+                      : "Guardá el recurso y recuperá las evidencias para verificar su permiso; una decisión histórica no acredita vigencia."}
+                  </p>
                   <p>
                     La presencia de una foto o video en una web pública no concede
                     permiso de reutilización. Seleccioná el archivo comercial y
