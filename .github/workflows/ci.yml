@@ -81,6 +81,12 @@ jobs:
         env:
           KIKI_CI_SYNTHETIC_ONLY: "1"
         run: python -m integration_sandbox.ci_source_intake_smoke
+      - name: Exercise synthetic directory backup restoration and intake migration
+        working-directory: backend
+        env:
+          KIKI_CI_SYNTHETIC_ONLY: "1"
+          KIKI_CI_PG18_CONTAINER: ${{ job.services.postgres.id }}
+        run: python -m integration_sandbox.ci_source_intake_restore_smoke
 
   production-supervisor-no-cap-kill:
     runs-on: ubuntu-latest
