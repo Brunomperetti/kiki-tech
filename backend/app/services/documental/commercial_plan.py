@@ -4,12 +4,14 @@ This is not a content generator or an AI/provider call. It reuses the same
 versioned, approved-fact inspection as the established editorial batch engine.
 Only field NAMES and blockers are returned; no unverifiable marketing copy.
 """
+
 from collections import Counter
 
 from app.core.config import get_settings
 from app.integrations.ecomm_app.api_catalog_browser import valid_variant_id
 from app.services.editorial_batches.context import Context, sources
 from .taxonomy_alignment import align_taxonomy, reviewed_internal_pairs, seo_field_audit
+from .taxonomy_review import current_review, histories_for
 
 
 MAX_ITEMS = 20
@@ -36,8 +38,11 @@ def task_for(inspection, taxonomy=None):
     if not inspection["sufficient_evidence"]:
         return "APPROVE_FACTS"
     if taxonomy and taxonomy["state"] in {
-        "CONFLICTING_APPROVED_FACTS", "SAVED_SOURCE_MISMATCH",
-        "INCOMPLETE_SAVED", "NO_REVIEWED_PAIRS", "NEEDS_MAPPING",
+        "CONFLICTING_APPROVED_FACTS",
+        "SAVED_SOURCE_MISMATCH",
+        "INCOMPLETE_SAVED",
+        "NO_REVIEWED_PAIRS",
+        "NEEDS_MAPPING",
     }:
         return "REVIEW_TAXONOMY"
     if inspection["eligible"]:
@@ -56,7 +61,11 @@ def summarize_inspections(rows, vocabulary=None):
         if inspected.get("conflicts") or inspected.get("stale"):
             # No cached proposal may look actionable while evidence is invalid.
             supported = []
-        elif taxonomy["state"] != "EXACT_REVIEWED_PAIR":
+        elif taxonomy["state"] != "EXACT_REVIEWED_PAIR" and not (
+            taxonomy["state"] == "REVIEWED_INTERNAL_MAPPING"
+            and taxonomy["reviewed_mapping"]["record"]["source_pair"]
+            == taxonomy["reviewed_mapping"]["record"]["target_pair"]
+        ):
             # An approved manufacturer label is not automatically a KIKI
             # category. Keep it out of supported editorial fields until mapped.
             held = [key for key in supported if key in {"category", "subcategory"}]
@@ -66,22 +75,26 @@ def summarize_inspections(rows, vocabulary=None):
         if seo_fields["seo_keywords"] == "REVIEW_TAXONOMY":
             supported = [field for field in supported if field != "seo_keywords"]
             missing = list(dict.fromkeys([*missing, "seo_keywords"]))
-        result.append({
-            "ecomm_id": ident,
-            "name": inspected.get("name") or "",
-            "presentation": inspected.get("presentation"),
-            "next_task": task,
-            "next_task_label": TASK_LABELS[task],
-            "approved_facts": inspected.get("approved_fact_count", 0),
-            "fields_supported": supported,
-            "fields_needing_support": missing,
-            "taxonomy_alignment": taxonomy,
-            "seo_fields": seo_fields,
-            "reasons": list(dict.fromkeys(inspected.get("reasons") or []))[:8],
-            "review_due": bool((inspected.get("review_schedule") or {}).get("review_due")),
-            "human_review_required": True,
-            "commercial_fiche_saved": False,
-        })
+        result.append(
+            {
+                "ecomm_id": ident,
+                "name": inspected.get("name") or "",
+                "presentation": inspected.get("presentation"),
+                "next_task": task,
+                "next_task_label": TASK_LABELS[task],
+                "approved_facts": inspected.get("approved_fact_count", 0),
+                "fields_supported": supported,
+                "fields_needing_support": missing,
+                "taxonomy_alignment": taxonomy,
+                "seo_fields": seo_fields,
+                "reasons": list(dict.fromkeys(inspected.get("reasons") or []))[:8],
+                "review_due": bool(
+                    (inspected.get("review_schedule") or {}).get("review_due")
+                ),
+                "human_review_required": True,
+                "commercial_fiche_saved": False,
+            }
+        )
     tally = Counter(row["next_task"] for row in result)
     taxonomy_counts = Counter(row["taxonomy_alignment"]["state"] for row in result)
     return {
@@ -108,11 +121,17 @@ def summarize_inspections(rows, vocabulary=None):
 
 
 def commercial_plan(
-    db, session, ids, *, source_loader=sources, context_type=Context,
+    db,
+    session,
+    ids,
+    *,
+    source_loader=sources,
+    context_type=Context,
     taxonomy_loader=reviewed_internal_pairs,
 ):
     if (
-        not 1 <= len(ids) <= MAX_ITEMS or len(set(ids)) != len(ids)
+        not 1 <= len(ids) <= MAX_ITEMS
+        or len(set(ids)) != len(ids)
         or not all(isinstance(i, str) and valid_variant_id(i) for i in ids)
     ):
         raise ValueError("Seleccioná entre 1 y 20 Ecomm ID únicos y válidos.")
@@ -125,6 +144,15 @@ def commercial_plan(
     )
     try:
         reports = [(ident, context.inspect(db, session, ident)) for ident in ids]
+        if isinstance(context, Context):
+            histories = histories_for(
+                db, ids, byte_limit=get_settings().kiki_editorial_context_bytes
+            )
+            for ident, inspected in reports:
+                inspected["ecomm_id"] = ident
+                inspected["reviewed_taxonomy_mapping"] = current_review(
+                    inspected, histories.get(ident, []), "KIKI"
+                )
         vocabulary = taxonomy_loader(db)
         return summarize_inspections(reports, vocabulary)
     finally:
