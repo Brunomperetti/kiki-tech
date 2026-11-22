@@ -337,8 +337,13 @@ def build_channel_coverage(
     now=None,
     snapshots=None,
     include_reverse=False,
+    target_ids=None,
 ):
-    """Map all API variant IDs to independently classified channel evidence."""
+    """Map API variants to channel evidence, optionally limiting per-variant work.
+
+    SKU ownership is still computed across the entire API capture, and all
+    channel rows are indexed. Global audits omit target_ids.
+    """
     if snapshots is None:
         captures = {
             capture.source: capture
@@ -440,6 +445,8 @@ def build_channel_coverage(
                     raise ValueError(
                         "Ecomm ID inválido o repetido; no se fusionan variantes."
                     )
+                if target_ids is not None and ident not in target_ids:
+                    continue
                 name = _text(
                     parent.get("description") or var.get("variant_description")
                 )
