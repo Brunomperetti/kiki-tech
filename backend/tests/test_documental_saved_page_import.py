@@ -146,7 +146,7 @@ def test_operator_saved_page_is_archived_before_any_identity_or_fact_approval(
             service.research.review_batch(
                 IDENT, extraction["version"], doc_id, latest_doc.version, batch,
             )
-        assert all(f["verified"] for f in service.research.dossier(IDENT).facts)
+        assert all(f["state"] == "APPROVED" for f in service.research.dossier(IDENT).facts)
         # Reconfirming a source already reviewed must preserve the immutable
         # source version/hash and the operator-approved evidence.
         dossier_before = service.research.dossier(IDENT)
