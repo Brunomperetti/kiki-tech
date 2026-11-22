@@ -752,6 +752,63 @@ class Research:
             self.refresh(item)
         return self.serialize(item)
 
+    def review_batch(
+        self, ident, expected_version, document_id, document_version, decisions
+    ):
+        """Approve only individually selected, fully cited claims of one current source.
+
+        The operator must explicitly select each fact and provide a reason.
+        Validate all claims and optimistic versions before modifying any state.
+        """
+        item = self.dossier(ident)
+        self.expect(item, expected_version)
+        doc = self._document(document_id)
+        self.validate_document(ident, doc)
+        if (
+            not doc
+            or doc.version != document_version
+            or doc.body.get("associated_ecomm_id") != ident
+            or doc.body.get("source", {}).get("review_state") != "REVIEWED"
+            or doc.body.get("parse_status") != "TEXT_EXTRACTED"
+        ):
+            raise ValueError("El documento no es el original vigente revisado de esta variante.")
+        if not decisions or len(decisions) > 20:
+            raise ValueError("Seleccioná de uno a veinte hechos para revisar.")
+        requested = [decision.fact_id for decision in decisions]
+        if len(requested) != len(set(requested)):
+            raise ValueError("No se puede revisar un mismo hecho dos veces.")
+        facts = deepcopy(item.facts)
+        selected = []
+        for decision in decisions:
+            fact = next((f for f in facts if f["id"] == decision.fact_id), None)
+            if (
+                not fact
+                or fact["ecomm_id"] != ident
+                or fact["document_id"] != document_id
+                or fact["document_version"] != document_version
+                or fact["version"] != decision.expected_fact_version
+                or fact["state"] != "PENDING"
+            ):
+                raise ValueError("Un hecho cambió de versión, ya fue decidido o pertenece a otra fuente.")
+            if len(decision.reason.strip()) < 10 or self.blockers(item, fact):
+                raise ValueError("Hay hechos sin cita válida, identidad conciliada o revisión suficiente.")
+            selected.append((fact, decision.reason.strip()))
+        for fact, reason in selected:
+            self.event(fact, "APPROVED", reason)
+        self.commit_change(
+            item,
+            facts,
+            "REVIEW_BATCH",
+            {
+                "document_id": document_id,
+                "document_version": document_version,
+                "decision": "APPROVED",
+                "fact_ids": requested,
+            },
+        )
+        self.refresh(item)
+        return self.serialize(item)
+
     def review(
         self, ident, expected_version, fact_id, expected_fact_version, decision, reason
     ):
