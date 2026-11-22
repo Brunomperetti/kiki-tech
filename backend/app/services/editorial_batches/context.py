@@ -4,7 +4,6 @@ from copy import deepcopy
 from types import SimpleNamespace
 from sqlalchemy import select, cast, func, Text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import defer
 from app.database.models import CatalogSnapshot, EcommApiProductEdit
 from app.integrations.ecomm_app.api_catalog_browser import (
     api_variant_row,
@@ -63,8 +62,9 @@ def sources(db, lock=False):
 class Context:
     """At most 100 variants and a configured bytes budget per context.
 
-    Document originals and document/fact histories never cross the DB boundary.
-    Rules/citations run on the unchanged current document sections and facts.
+    Document originals and individual fact histories stay in PostgreSQL.
+    Bounded documentary decisions retain the human identity approvals needed
+    by the existing rules; they never become new approvals.
     """
 
     def __init__(self, db, ids, source_map, byte_limit, *, lock=False, preview=False):
@@ -87,7 +87,7 @@ class Context:
                     EcommApiProductEdit,
                     [EcommApiProductEdit.fields, EcommApiProductEdit.history],
                 ),
-                (Dossier, [Dossier.facts]),
+                (Dossier, [Dossier.facts, Dossier.identity, Dossier.history]),
             ):
                 size = db.scalar(
                     select(
@@ -120,11 +120,7 @@ class Context:
                 raise ValueError("Falta el control documental; operación bloqueada.")
             self.dossiers = {
                 x.ecomm_id: x
-                for x in db.scalars(
-                    select(Dossier)
-                    .options(defer(Dossier.history))
-                    .where(Dossier.ecomm_id.in_(ids))
-                )
+                for x in db.scalars(select(Dossier).where(Dossier.ecomm_id.in_(ids)))
             }
         # JSONB subtraction is performed in PostgreSQL, before reading large PDFs.
         body = cast(Document.body, JSONB).op("-")("original_base64")
@@ -147,11 +143,15 @@ class Context:
                 id=row.id, version=row.version, digest=row.digest, body=row.body
             )
         budget += sum(
-            len(json.dumps(d.facts, ensure_ascii=False).encode())
+            len(
+                json.dumps(
+                    [d.facts, d.identity, d.history], ensure_ascii=False
+                ).encode()
+            )
             for d in self.dossiers.values()
         )
         budget += sum(
-            len(json.dumps(e.fields, ensure_ascii=False).encode())
+            len(json.dumps([e.fields, e.history], ensure_ascii=False).encode())
             for e in self.edits.values()
         )
         if budget > byte_limit:
@@ -227,6 +227,9 @@ class Context:
             identity=reference,
             identity_digest=identity,
             facts=deepcopy(dossier.facts) if dossier else [],
+            # Reviewed identity aliases are documentary decisions, not facts.
+            # The same Research rules need them even in a read-only preview.
+            history=deepcopy(dossier.history) if dossier else [],
         )
         approved, issues = [], []
         revoked = any(f["state"] == "REVOKED" for f in case.facts)
@@ -268,8 +271,11 @@ class Context:
             # These are only current approved documentary facts; never the
             # unreviewed taxonomy strings from the raw Ecomm-App catalogue.
             "approved_taxonomy": [
-                {"field": fact["field"], "value": fact["value"],
-                 "evidence_id": fact["id"]}
+                {
+                    "field": fact["field"],
+                    "value": fact["value"],
+                    "evidence_id": fact["id"],
+                }
                 for fact in approved
                 if fact["field"] in {"category", "subcategory"}
             ],
@@ -279,7 +285,8 @@ class Context:
                 "status": edit["status"],
             },
             "existing_seo_fields": [
-                field for field in ("seo_title", "seo_description", "seo_keywords")
+                field
+                for field in ("seo_title", "seo_description", "seo_keywords")
                 if edit["fields"].get(field)
             ],
             "supported_proposal_fields": sorted(generated),
