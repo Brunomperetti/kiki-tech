@@ -1,6 +1,12 @@
 """Evidence-locked AI copy tests: no network, no paid requests or real data."""
+import json
+from unittest.mock import patch
+from urllib.error import HTTPError
 import pytest
-from app.services.documental.evidence_ai import validate, tokens, COPY_FIELDS
+from app.services.documental.evidence_ai import (
+    validate, tokens, COPY_FIELDS, EvidenceAIError, call_openai,
+    validate_partial,
+)
 
 
 def approved():
@@ -72,3 +78,74 @@ def test_independent_resource_and_taxonomy_permissions_remain_unavailable():
     assert tokens("Ensaladas y Sopas 250 g") == [
         "ensaladas", "y", "sopas", "250", "g"
     ]
+
+
+def test_partial_model_response_keeps_only_evidence_supported_copy():
+    facts = approved()
+    title = selection(
+        "title", "Mix Ensaladas y Sopas de 250 g",
+        facts[0]["id"], facts[1]["id"],
+    )
+    title["description"] = {
+        "text": "Saludable Mix de 250 g para deportistas",
+        "evidence_ids": [facts[0]["id"], facts[1]["id"]],
+    }
+    good, bad = validate_partial(title, facts)
+    assert list(good) == ["title"]
+    assert bad == ["description"]
+    assert good["title"]["evidence_ids"] == ["a" * 24, "b" * 24]
+
+
+def test_model_response_without_supported_fields_fails_closed():
+    with pytest.raises(EvidenceAIError) as exc:
+        validate_partial(
+            selection("title", "Cura cualquier enfermedad", "a" * 24),
+            approved(),
+        )
+    assert exc.value.code == "REJECTED_EVIDENCE"
+
+
+def test_provider_http_error_category_is_safe_and_specific():
+    http_error = HTTPError(
+        "https://api.openai.com/v1/chat/completions",
+        401, "Unauthorized", None, None,
+    )
+    with patch("app.services.documental.evidence_ai.urlopen", side_effect=http_error):
+        with pytest.raises(EvidenceAIError) as exc:
+            call_openai(approved(), "test-model", "secret-not-in-error")
+    assert exc.value.code == "OPENAI_HTTP_401"
+    assert "HTTP 401" in str(exc.value)
+    assert "secret-not-in-error" not in str(exc.value)
+
+
+def test_provider_partial_success_reports_rejected_fields_without_new_facts():
+    facts = approved()
+    output = {
+        "choices": [{"message": {"content": json.dumps({"fields": {
+            "short_title": {
+                "text": "Mix Ensaladas y Sopas",
+                "evidence_ids": [facts[0]["id"]],
+            },
+            "description": {
+                "text": "Mix saludable ideal para niños",
+                "evidence_ids": [facts[0]["id"]],
+            },
+        }})}}],
+        "usage": {"prompt_tokens": 144, "completion_tokens": 82},
+    }
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self, _):
+            return json.dumps(output).encode()
+
+    with patch("app.services.documental.evidence_ai.urlopen", return_value=FakeResponse()):
+        fields, usage = call_openai(facts, "test-model", "synthetic-key")
+    assert list(fields) == ["short_title"]
+    assert usage["rejected_fields"] == ["description"]
+    assert usage["completion_tokens"] == 82
