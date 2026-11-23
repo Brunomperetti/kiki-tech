@@ -317,7 +317,7 @@ test("configuración de sólo lectura y funciones sin migración no simulan disp
     page.getByText(/Revisión de canales deshabilitada/),
   ).toBeVisible();
 });
-test("error de catálogo no usa fallback y permite regresar a la interfaz anterior", async ({
+test("error de catálogo se queda en KIKI 2.0 y no ofrece la interfaz retirada", async ({
   page,
 }) => {
   await page.route("**/api/ecomm-app/stage/catalog?*", (r) =>
@@ -332,15 +332,12 @@ test("error de catálogo no usa fallback y permite regresar a la interfaz anteri
     page.getByRole("heading", { name: "No se pudo cargar el catálogo" }),
   ).toBeVisible();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(0);
-  await page
-    .getByRole("link", { name: "Volver a la interfaz anterior", exact: true })
-    .click();
-  await expect(page).toHaveURL(/dashboard-classic/);
+  await expect(page).toHaveURL(/\/v2\//);
+  await expect(
+    page.getByRole("link", { name: "Volver a la interfaz anterior" }),
+  ).toHaveCount(0);
   await expect(
     page.getByText("Ecomm API: copia completa", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("KIKI Tech 2.0 no disponible", { exact: true }),
   ).toHaveCount(0);
 });
 
@@ -396,20 +393,27 @@ test("OpenAI existente: transporte simulado, versión visible y bloqueo por edic
   await expect(generate).toBeDisabled();
 });
 
-test("raíz original, sesión compartida y reversión de v2 sin bloquear la aplicación anterior", async ({
+test("rutas clásicas redirigen exclusivamente a KIKI 2.0 con la misma sesión", async ({
   page,
 }) => {
-  await page.goto("/");
-  await expect(page).toHaveURL(/dashboard-classic/);
-  await expect(
-    page.getByText("Ecomm API: copia completa", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Abrir KIKI Tech 2.0", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("Iniciar sesión", { exact: true })).toHaveCount(
-    0,
-  );
+  for (const route of ["/", "/dashboard-classic", "/products", "/queue", "/channels"]) {
+    await page.goto(route);
+    await expect(page).toHaveURL(/\/v2\/$/);
+    await expect(page.locator('[data-ecomm-id="900006"]')).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Volver a la interfaz anterior" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Ecomm API: copia completa", { exact: true }),
+    ).toHaveCount(0);
+  }
+
+  // Los enlaces antiguos con filtros conservan los parámetros al abrir v2.
+  await page.goto("/dashboard-classic?view=ecomm");
+  await expect(page).toHaveURL(/\/v2\/\?view=ecomm$/);
+  await expect(page.locator('[data-ecomm-id="900006"]')).toBeVisible();
+
+  // Un error de disponibilidad tampoco vuelve a abrir la antigua aplicación.
   await page.route("**/api/ui/v2", (r) =>
     r.fulfill({
       status: 404,
@@ -417,26 +421,19 @@ test("raíz original, sesión compartida y reversión de v2 sin bloquear la apli
       json: { detail: "KIKI Tech 2.0 deshabilitado" },
     }),
   );
-  await page
-    .getByRole("link", { name: "Abrir KIKI Tech 2.0", exact: true })
-    .click();
+  await page.reload();
   await expect(
     page.getByRole("heading", {
       name: "KIKI Tech 2.0 no disponible",
       exact: true,
     }),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Reintentar KIKI Tech 2.0" }))
+    .toBeVisible();
   await expect(page.locator("[data-ecomm-id]")).toHaveCount(0);
-  await page
-    .getByRole("link", { name: "Volver a la interfaz anterior", exact: true })
-    .click();
-  await expect(page).toHaveURL(/dashboard-classic/);
   await expect(
-    page.getByText("Ecomm API: copia completa", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Abrir KIKI Tech 2.0", exact: true }),
-  ).toBeVisible();
+    page.getByRole("link", { name: "Volver a la interfaz anterior" }),
+  ).toHaveCount(0);
 });
 
 test("lote desde v2: seis Ecomm ID exactos, previsualización, confirmación y tareas sin cambios comerciales", async ({
