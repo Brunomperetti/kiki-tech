@@ -600,7 +600,7 @@ export function IntegrationCatalog() {
               : "Verificando disponibilidad de KIKI Tech 2.0…"}
           </h1>
           <p>{runtimeError}</p>
-          <a href="/dashboard-classic">Volver a la interfaz anterior</a>
+          {runtimeError && <a href="/v2/">Reintentar KIKI Tech 2.0</a>}
           <button onClick={() => void logout()}>Cerrar sesión</button>
         </section>
       </main>
@@ -666,7 +666,7 @@ export function IntegrationCatalog() {
           {canWrite()
             ? "Edición interna habilitada; cada guardado requiere revisión."
             : "Sólo lectura: guardados, importaciones, OAuth y consumos bloqueados."}{" "}
-          <a href="/dashboard-classic">Volver a la interfaz anterior</a>
+
         </p>
       )}
       <div className="i-capture-strip" aria-label="Información de captura">
