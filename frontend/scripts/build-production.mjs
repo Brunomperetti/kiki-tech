@@ -27,13 +27,15 @@ await build({
         for (const output of Object.values(bundle)) {
           if (output.type !== "chunk") continue;
           for (const id of Object.keys(output.modules)) {
-            if (
-              /\\/prototype\\/(?:fixtures|commercial-demo|operations-model|Dashboard|DemoConnections)\\./.test(id)
-            )
+            const demoModules = [
+              "fixtures", "commercial-demo", "operations-model",
+              "Dashboard", "DemoConnections",
+            ];
+            if (demoModules.some((name) => id.includes("/prototype/" + name + ".")))
               throw new Error(
                 "Se intentó incluir un controlador o datos de demostración: " + id,
               );
-            if (/\\/LegacyApp\\.(?:tsx|ts|jsx|js)$/.test(id))
+            if (id.includes("/LegacyApp."))
               throw new Error(
                 "La interfaz clásica no debe incluirse en producción: " + id,
               );
