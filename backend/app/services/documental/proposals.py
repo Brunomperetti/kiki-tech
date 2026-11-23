@@ -17,7 +17,7 @@ from .research import Research, now, fact_digest
 from .storage import digest
 from .fields import LABELS
 from app.core.config import get_settings
-from .evidence_ai import MODEL as AI_MODEL, EVENT as AI_EVENT, call_openai
+from .evidence_ai import MODEL as AI_MODEL, EVENT as AI_EVENT, call_openai, EvidenceAIError
 
 MODEL = "deterministic-reviewed-evidence-v1"
 EVENT = "REVIEWED_EVIDENCE_PROPOSAL"
@@ -466,8 +466,10 @@ class Proposals:
         reservation = EcommAiEditor(self.db)._reserve(ident)
         try:
             generated, usage = call_openai(facts, settings.kiki_ai_model, settings.kiki_ai_api_key)
-        except ValueError:
-            reservation.status = "FAILED_PROVIDER"
+        except EvidenceAIError as exc:
+            # Keep the precise, non-sensitive failure category in the existing
+            # 32-character status field. No model text or API key is logged.
+            reservation.status = exc.code[:32]
             self.db.commit()
             raise
         edit2, item2, facts2, fingerprint2 = self.context(ident)

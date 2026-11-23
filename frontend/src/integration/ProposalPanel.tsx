@@ -383,6 +383,13 @@ export function ProposalPanel({
       )}
       {data?.available && (
         <>
+          {stale && (
+            <p role="alert">
+              Esta propuesta es anterior a la ficha o evidencia actual.
+              No se puede aplicar. Podés generar una nueva desde los hechos vigentes;
+              la propuesta histórica se conserva para auditoría.
+            </p>
+          )}
           {data.generator === "openai-reviewed-evidence-v1" && (
             <p className="r-notice" role="status">
               Redacción asistida por OpenAI desde hechos aprobados, con comprobación de términos
@@ -390,6 +397,13 @@ export function ProposalPanel({
               {data.provider_usage && (
                 <span>Consumo registrado: {data.provider_usage.prompt_tokens} tokens de entrada,
                 {" "}{data.provider_usage.completion_tokens} de salida.</span>
+              )}
+              {!!data.provider_usage?.rejected_fields?.length && (
+                <span>
+                  {" "}Campos descartados por falta de respaldo:
+                  {" "}{data.provider_usage.rejected_fields.join(", ")}.
+                  Esos campos no se propusieron ni se guardaron.
+                </span>
               )}
             </p>
           )}
@@ -409,7 +423,7 @@ export function ProposalPanel({
                 {v}
               </p>
             ))}
-          <details className="r-document" open>
+          <details className="r-document" open={!stale}>
             <summary>
               Datos que no se generaron y afirmaciones bloqueadas
             </summary>
