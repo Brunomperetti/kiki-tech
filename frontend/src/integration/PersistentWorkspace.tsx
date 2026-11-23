@@ -34,6 +34,7 @@ import {
   stateLabels,
 } from "./workspace-adapter";
 import { ResearchPanel, ResearchSummary } from "./ResearchPanel";
+import { Stage2PilotSummary, naturalSeedPilotId } from "./Stage2PilotSummary";
 import { ProposalPanel } from "./ProposalPanel";
 import { MamaPilotSummary } from "./MamaPilot";
 import { mamaPilotId } from "./mama-pilot";
@@ -508,6 +509,13 @@ export function PersistentWorkspace({
             {tab === "Ficha" && (
               <>
                 {gtinEvidence}
+                {production && variant.id === naturalSeedPilotId && (
+                  <Stage2PilotSummary
+                    record={record}
+                    revision={record.version}
+                    onTab={onTab}
+                  />
+                )}
                 <button
                   className="k-ai-entry"
                   disabled={saving || researchBusy || proposalBusy}
