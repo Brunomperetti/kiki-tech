@@ -12,6 +12,14 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from app.services.ecomm_api_product_workspace_service import TEXT_LIMITS
 
+class EvidenceAIError(ValueError):
+    """Safe, categorical failure: never expose provider bodies or input documents."""
+
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
+
+
 MODEL = "openai-reviewed-evidence-v1"
 EVENT = "GENERATED_FROM_APPROVED_FACTS_WITH_OPENAI"
 COPY_FIELDS = frozenset({
@@ -99,6 +107,33 @@ def validate(fields, approved, *, allow_fields=COPY_FIELDS):
     return accepted
 
 
+
+def validate_partial(fields, approved):
+    """Keep supported model fields; reject unsafe ones independently.
+
+    This does NOT downgrade validation: every retained field is checked by
+    the same strict per-field evidence/lexical validator as before.
+    """
+    if not isinstance(fields, dict) or not fields or len(fields) > len(COPY_FIELDS):
+        raise EvidenceAIError(
+            "INVALID_FORMAT", "OpenAI respondió, pero el formato de la ficha es inválido."
+        )
+    retained, rejected = {}, []
+    for field, candidate in fields.items():
+        try:
+            retained.update(validate({field: candidate}, approved))
+        except ValueError:
+            rejected.append(field if field in COPY_FIELDS else "campo_no_permitido")
+    if not retained:
+        raise EvidenceAIError(
+            "REJECTED_EVIDENCE",
+            "OpenAI respondió, pero ningún campo pasó los controles de evidencia. "
+            "No se guardó una propuesta ni se modificó la ficha. "
+            "El intento quedó registrado: no lo repitas hasta revisar el caso.",
+        )
+    return retained, sorted(set(rejected))
+
+
 def call_openai(approved, model, key):
     if not approved or len(approved) > 30:
         raise ValueError("IA documental: se necesita entre 1 y 30 hechos aprobados.")
@@ -143,18 +178,47 @@ def call_openai(approved, model, key):
     try:
         with urlopen(request, timeout=22) as response:
             raw = json.loads(response.read(70_000))
+    except HTTPError as exc:
+        code = int(exc.code)
+        raise EvidenceAIError(
+            "OPENAI_HTTP_" + str(code),
+            "OpenAI rechazó la solicitud (HTTP " + str(code) + "). "
+            "No se guardó una propuesta. Revisar la conexión/modelo/cuota "
+            "según ese código; no repetir hasta corregirlo.",
+        ) from None
+    except (URLError, TimeoutError, OSError):
+        raise EvidenceAIError(
+            "OPENAI_NETWORK",
+            "No se pudo conectar con OpenAI. Se registró el intento, sin cambios en la ficha.",
+        ) from None
+    except (ValueError, TypeError):
+        raise EvidenceAIError(
+            "INVALID_FORMAT",
+            "OpenAI devolvió una respuesta que no es JSON válido.",
+        ) from None
+
+    try:
         message = raw["choices"][0]["message"]["content"]
         result = json.loads(message)
         if not isinstance(result, dict) or set(result) != {"fields"}:
-            raise ValueError("Formato IA incorrecto.")
-        fields = validate(result["fields"], approved)
+            raise EvidenceAIError(
+                "INVALID_FORMAT",
+                "OpenAI respondió, pero el formato de su propuesta no es válido.",
+            )
+        fields, rejected_fields = validate_partial(result["fields"], approved)
         usage = raw.get("usage") or {}
         return fields, {
             "model": model,
             "prompt_tokens": int(usage.get("prompt_tokens") or 0),
             "completion_tokens": int(usage.get("completion_tokens") or 0),
             "max_output_tokens": 900,
+            "rejected_fields": rejected_fields,
         }
-    except (HTTPError, URLError, TimeoutError, KeyError, IndexError, TypeError,
-            json.JSONDecodeError, ValueError) as exc:
-        raise ValueError("IA documental: propuesta rechazada o proveedor no disponible; no se modificó la ficha.") from exc
+    except EvidenceAIError:
+        raise
+    except (KeyError, IndexError, TypeError, ValueError):
+        raise EvidenceAIError(
+            "INVALID_FORMAT",
+            "La respuesta de OpenAI no cumplió el formato esperado. "
+            "No se modificó la ficha.",
+        ) from None
