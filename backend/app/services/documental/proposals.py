@@ -16,6 +16,8 @@ from app.services.ecomm_api_product_workspace_service import EcommApiProductWork
 from .research import Research, now, fact_digest
 from .storage import digest
 from .fields import LABELS
+from app.core.config import get_settings
+from .evidence_ai import MODEL as AI_MODEL, EVENT as AI_EVENT, call_openai
 
 MODEL = "deterministic-reviewed-evidence-v1"
 EVENT = "REVIEWED_EVIDENCE_PROPOSAL"
@@ -249,9 +251,11 @@ class Proposals:
         if (
             not record
             or record.product_key != self.product_prefix + ident
-            or record.model != self.model
+            or record.model not in {self.model, AI_MODEL}
             or not record.history
-            or record.history[0].get("event") != self.event
+            or record.history[0].get("event") != (
+                AI_EVENT if record.model == AI_MODEL else self.event
+            )
         ):
             raise ValueError("La propuesta no pertenece a esta variante Ecomm-App.")
         return record
@@ -304,7 +308,8 @@ class Proposals:
                 ),
                 "isolated_only": self.research.isolated_only,
                 "internal_only": True,
-                "generator": self.model,
+                "generator": record.model,
+                "provider_usage": meta.get("provider_usage"),
                 "ecomm_id": item.ecomm_id,
                 "workspace_version": meta["workspace_version"],
                 "revision": len(record.history),
@@ -336,7 +341,7 @@ class Proposals:
             select(KikiAiEditorialDraft)
             .where(
                 KikiAiEditorialDraft.product_key == self.product_prefix + ident,
-                KikiAiEditorialDraft.model == self.model,
+                KikiAiEditorialDraft.model.in_((self.model, AI_MODEL)),
             )
             .order_by(KikiAiEditorialDraft.id.desc())
         ).first()
@@ -418,6 +423,97 @@ class Proposals:
         self.db.add(record)
         self.db.flush()
         return self.serialize(record, edit, item, facts, fingerprint)
+
+    def generate_ai(self, ident, expected_version):
+        """One paid request at operator click, never a product or channel write.
+
+        The existing 10/day Ecomm AI quota is shared. If the input changes while
+        OpenAI responds, discard its output and retain the intact source/editor.
+        """
+        settings = get_settings()
+        if not (
+            settings.kiki_document_ai_generation_enabled
+            and settings.kiki_ai_enabled
+            and settings.kiki_ai_api_key.strip()
+            and ident == settings.kiki_document_ai_pilot_id
+        ):
+            raise ValueError(
+                "IA documental no habilitada para esta variante o falta conexión OpenAI."
+            )
+        edit, item, facts, fingerprint = self.context(ident)
+        self.before_generate(ident, facts)
+        if (
+            edit["version"] != expected_version
+            or any(f.get("provenance", "").startswith("fixture://") for f in facts)
+        ):
+            raise ValueError("La ficha cambió o la fuente no es auténtica. No se consultó IA.")
+        existing = self.db.scalars(
+            select(KikiAiEditorialDraft).where(
+                KikiAiEditorialDraft.product_key == self.product_prefix + ident,
+                KikiAiEditorialDraft.model == AI_MODEL,
+                KikiAiEditorialDraft.source_hash == fingerprint,
+            ).order_by(KikiAiEditorialDraft.id.desc())
+        ).first()
+        if (
+            existing and existing.history
+            and existing.history[0].get("proposal", {}).get("workspace_version") == expected_version
+            and existing.review_status in {"PENDING_REVIEW", "REVIEWED"}
+        ):
+            return self.serialize(existing, edit, item, facts, fingerprint)
+        baseline, missing = self.generate_fields(facts)
+        # Release the editor lock before making a network call. Quota is
+        # reserved and committed first, with no automatic retries.
+        self.db.commit()
+        reservation = EcommAiEditor(self.db)._reserve(ident)
+        try:
+            generated, usage = call_openai(facts, settings.kiki_ai_model, settings.kiki_ai_api_key)
+        except ValueError:
+            reservation.status = "FAILED_PROVIDER"
+            self.db.commit()
+            raise
+        edit2, item2, facts2, fingerprint2 = self.context(ident)
+        if edit2["version"] != expected_version or fingerprint2 != fingerprint or edit2["fields"] != edit["fields"]:
+            reservation.status = "STALE"
+            self.db.commit()
+            raise ValueError("La ficha o evidencia cambió durante la llamada IA; no se guardó la propuesta.")
+        proposed = {**baseline, **generated}
+        missing = list(missing) + [
+            "La IA no acredita licencias, fabricante, EAN ni taxonomía sin hechos revisados.",
+            "La revisión humana por campo y el guardado explícito siguen siendo obligatorios.",
+        ]
+        meta = {
+            "workspace_version": edit2["version"],
+            "identity_hash": item2.identity_digest,
+            "base_fields": edit2["fields"],
+            "fields": proposed,
+            "missing": missing,
+            "decisions": {},
+            "provider_usage": usage,
+            "ai_fields": sorted(generated),
+        }
+        record = KikiAiEditorialDraft(
+            product_key=self.product_prefix + ident,
+            source_hash=fingerprint2,
+            original_name=item2.identity["name"],
+            source_facts=facts2,
+            model=AI_MODEL,
+            title=proposed.get("title", {}).get("value", ""),
+            description=proposed.get("description", {}).get("value", ""),
+            questions=missing[:3],
+            review_status="PENDING_REVIEW",
+            history=[{
+                "event": AI_EVENT, "at": now(), "actor": self.research.actor,
+                "proposal": meta,
+                "quality_warnings": [
+                    "Generación OpenAI limitada a hechos aprobados y vocabulario factual. "
+                    "No certifica la semántica, exige revisión humana antes de usar el borrador."
+                ],
+            }],
+        )
+        self.db.add(record)
+        self.db.flush()
+        reservation.status = "COMPLETED"
+        return self.serialize(record, edit2, item2, facts2, fingerprint2)
 
     @staticmethod
     def validate_edit(key, value, proposed):
