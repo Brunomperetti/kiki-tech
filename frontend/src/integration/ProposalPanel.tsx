@@ -1,4 +1,4 @@
-import { environmentText } from "./runtime";
+import { environmentText, production } from "./runtime";
 import { useEffect, useState } from "react";
 import type { EcommApiProductEdit } from "../types/ecomm-app";
 import { captureDate } from "./catalog-adapter";
@@ -167,6 +167,26 @@ export function ProposalPanel({
       );
     });
   }
+  async function generateWithAI() {
+    if (
+      !window.confirm(
+        "¿Generar una propuesta con OpenAI usando únicamente hechos documentales aprobados? " +
+        "Consume una solicitud de la cuota diaria compartida (máximo 10), limitada a 900 tokens de salida. " +
+        "No aprueba hechos, ni modifica la ficha, ni publica productos.",
+      )
+    ) return;
+    if (changed && !window.confirm("¿Descartar la selección local y generar con IA?")) return;
+    await act(async () => {
+      adopt(await mutateProposal(
+        record.ecomm_id, "/generate-ai",
+        { expected_version: record.version }, csrf,
+      ));
+      setMessage(
+        "OpenAI generó una propuesta con citas. Revisá campo por campo. " +
+        "No se cambió ninguna ficha ni se aprobó contenido automáticamente.",
+      );
+    });
+  }
   async function review() {
     if (!data?.available) return;
     await act(async () => {
@@ -320,6 +340,15 @@ export function ProposalPanel({
           "Generar propuesta respaldada",
         )}
       </button>
+      {production && record.ecomm_id === "7518949" && !draftId && (
+        <button
+          type="button"
+          disabled={busy || blocked}
+          onClick={() => void generateWithAI()}
+        >
+          Generar con IA desde hechos aprobados · Cuota del cliente
+        </button>
+      )}
       <button
         disabled={busy}
         onClick={() => {
@@ -354,6 +383,16 @@ export function ProposalPanel({
       )}
       {data?.available && (
         <>
+          {data.generator === "openai-reviewed-evidence-v1" && (
+            <p className="r-notice" role="status">
+              Redacción asistida por OpenAI desde hechos aprobados, con comprobación de términos
+              y citas. No certifica la semántica: revisión humana obligatoria.{" "}
+              {data.provider_usage && (
+                <span>Consumo registrado: {data.provider_usage.prompt_tokens} tokens de entrada,
+                {" "}{data.provider_usage.completion_tokens} de salida.</span>
+              )}
+            </p>
+          )}
           <p>
             Propuesta {data.draft_id} · Ecomm ID {data.ecomm_id} · Base de ficha
             v{data.workspace_version} · Revisión {data.revision} ·{" "}

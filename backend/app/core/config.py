@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     kiki_document_channel_guard_enabled: bool = False
     kiki_document_channel_guard_pilot_id: str = ""
     kiki_ai_enabled: bool = False
+    # Paid IA pilot: source-grounded text only, explicit opt-in.
+    kiki_document_ai_generation_enabled: bool = False
+    kiki_document_ai_pilot_id: str = "7518949"
     # Default-off UI controls; existing provider/worker flags remain required.
     kiki_auto_create_schema: bool = True
     kiki_document_parser_kernel_required: bool = False

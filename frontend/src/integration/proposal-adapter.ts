@@ -35,6 +35,8 @@ export type Proposal = {
   isolated_only: boolean;
   internal_only?: boolean;
   external_writes_enabled: false;
+  generator?: string;
+  provider_usage?: {model:string;prompt_tokens:number;completion_tokens:number;max_output_tokens:number} | null;
   ecomm_id: string;
   draft_id: number;
   revision: number;
