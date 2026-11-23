@@ -393,6 +393,19 @@ def generate(
     )
 
 
+@router.post("/{ecomm_id}/proposals/generate-ai")
+def generate_with_ai(
+    ecomm_id: str,
+    body: Generate,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Operator-initiated paid request, with the 10/day shared quota and cited facts."""
+    return execute(
+        db, lambda: Proposals(db, session).generate_ai(ecomm_id, body.expected_version)
+    )
+
+
 @router.post("/{ecomm_id}/proposals/{draft_id}/review")
 def review_proposal(
     ecomm_id: str,
