@@ -24,22 +24,21 @@ await build({
     {
       name: "no-demo-in-production",
       generateBundle(_options, bundle) {
-        for (const output of Object.values(bundle))
-          if (output.type === "chunk")
-            for (const id of Object.keys(output.modules))
-              if (
-                /\/prototype\/(?:fixtures|commercial-demo|operations-model|Dashboard|DemoConnections)\./.test(
-                  id,
-                )
-              )
-                throw new Error(
-                  "Se intentó incluir un controlador o datos de demostración: " +
-                    id,
-                );
-              if (/\/LegacyApp\.(?:tsx|ts|jsx|js)$/.test(id))
-                throw new Error(
-                  "La interfaz clásica no debe incluirse en producción: " + id,
-                );
+        for (const output of Object.values(bundle)) {
+          if (output.type !== "chunk") continue;
+          for (const id of Object.keys(output.modules)) {
+            if (
+              /\\/prototype\\/(?:fixtures|commercial-demo|operations-model|Dashboard|DemoConnections)\\./.test(id)
+            )
+              throw new Error(
+                "Se intentó incluir un controlador o datos de demostración: " + id,
+              );
+            if (/\\/LegacyApp\\.(?:tsx|ts|jsx|js)$/.test(id))
+              throw new Error(
+                "La interfaz clásica no debe incluirse en producción: " + id,
+              );
+          }
+        }
       },
     },
   ],
