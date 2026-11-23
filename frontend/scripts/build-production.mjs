@@ -36,6 +36,10 @@ await build({
                   "Se intentó incluir un controlador o datos de demostración: " +
                     id,
                 );
+              if (/\/LegacyApp\.(?:tsx|ts|jsx|js)$/.test(id))
+                throw new Error(
+                  "La interfaz clásica no debe incluirse en producción: " + id,
+                );
       },
     },
   ],
