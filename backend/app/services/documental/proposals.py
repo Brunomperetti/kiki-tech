@@ -433,7 +433,6 @@ class Proposals:
         settings = get_settings()
         if not (
             settings.kiki_document_ai_generation_enabled
-            and settings.kiki_ai_enabled
             and settings.kiki_ai_api_key.strip()
             and ident == settings.kiki_document_ai_pilot_id
         ):
