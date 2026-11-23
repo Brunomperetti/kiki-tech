@@ -103,6 +103,24 @@ def launch_child(command, env, writers, *, uid=None):
 
 
 def main():
+    # Explicitly approved one-shot intake migration for 23/11/2026.
+    # No flag, no DDL. The token is set only in the KIKI API Render service.
+    if os.environ.get("KIKI_SOURCE_INTAKE_SCHEMA_RELEASE_20261123") == "APPLY_ONCE_23NOV_KIKI":
+        try:
+            from app.database.session import engine
+            from app.services.documental.intake_release_20261123 import migrate_once
+            outcome = migrate_once(engine, expected_database="kiki_tech_db")
+            print(
+                "KIKI_INTAKE_MIGRATION_OK: created="
+                + str(outcome["created"]).lower() + "; table_verified=1",
+                flush=True,
+            )
+        except Exception:
+            print(
+                "KIKI_INTAKE_MIGRATION_FAILED: transacción revertida; API preservada. "
+                "Revisar error de esquema antes de habilitar la cola.",
+                flush=True,
+            )
     # Existing explicit migration gate; never perform schema DDL implicitly.
     if os.environ.get("KIKI_DOCUMENT_BOOTSTRAP_ON_STARTUP", "false").lower() == "true":
         try:
