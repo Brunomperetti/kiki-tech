@@ -36,7 +36,7 @@ export type Proposal = {
   internal_only?: boolean;
   external_writes_enabled: false;
   generator?: string;
-  provider_usage?: {model:string;prompt_tokens:number;completion_tokens:number;max_output_tokens:number} | null;
+  provider_usage?: {model:string;prompt_tokens:number;completion_tokens:number;max_output_tokens:number;rejected_fields?:string[]} | null;
   ecomm_id: string;
   draft_id: number;
   revision: number;
