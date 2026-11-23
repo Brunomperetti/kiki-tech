@@ -13,28 +13,16 @@ const Catalog = lazy(() =>
     default: m.IntegrationCatalog,
   })),
 );
-const Legacy = lazy(() =>
-  import("../LegacyApp").then((m) => ({ default: m.App })),
-);
-const v2 = /^\/v2(?:\/|$)/.test(location.pathname);
-if (v2 && location.pathname !== "/v2/")
+// The classic application is retired. Every legacy URL uses the same v2
+// application and session; legacy code is never imported into production.
+if (location.pathname !== "/v2/")
   history.replaceState(null, "", "/v2/" + location.search + location.hash);
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Suspense fallback={<p role="status">Cargando KIKI Tech…</p>}>
-      {v2 ? (
-        <BrowserRouter basename="/v2">
-          <Catalog />
-        </BrowserRouter>
-      ) : (
-        <Legacy
-          notice={
-            <p className="n-notice">
-              <a href="/v2/">Abrir KIKI Tech 2.0</a>
-            </p>
-          }
-        />
-      )}
+      <BrowserRouter basename="/v2">
+        <Catalog />
+      </BrowserRouter>
     </Suspense>
   </React.StrictMode>,
 );
