@@ -47,9 +47,15 @@ test("cinco vistas locales, registros sin vincular y calidad sin backend", async
     name: "Calidad de la demostración",
   });
   await expect(
-    quality.getByRole("button", { name: /^EAN repetido/ }).locator("strong"),
+    quality
+      .getByRole("button", {
+        name: /^GTIN compartido · revisar presentaciones/,
+      })
+      .locator("strong"),
   ).toHaveText("2");
-  await quality.getByRole("button", { name: /^EAN repetido/ }).click();
+  await quality
+    .getByRole("button", { name: /^GTIN compartido · revisar presentaciones/ })
+    .click();
   await expect(page.locator(".d-table tbody tr")).toHaveCount(2);
   await expect(page).toHaveURL(/quality=ean_repeated/);
   await page.reload();

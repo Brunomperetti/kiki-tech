@@ -209,12 +209,21 @@ class HileretPostgreSQL(unittest.TestCase):
             {"presentation": "9 x 200 ml", "is_combo": True},
             {"presentation": "6 x 200 ml", "is_combo": True},
             {"brand": "Otra marca"},
-            {"ean": None},
             {"is_combo": None},
         ):
             wrong = deepcopy(shape)
             wrong["identity"].update(changes)
             self.assertTrue(Research.identity_issues(reference(UNIT_ID), wrong))
+        # Absence is not a contradictory barcode or proof of a different unit.
+        # These optional fields never become approved facts through identity checks.
+        for missing in ("ean",):
+            incomplete = deepcopy(shape)
+            incomplete["identity"][missing] = None
+            self.assertEqual(Research.identity_issues(reference(UNIT_ID), incomplete), [])
+            self.assertEqual(incomplete["claims"], [])
+        unknown_pack = deepcopy(pack)
+        unknown_pack["identity"]["is_combo"] = None
+        self.assertTrue(Research.identity_issues(reference(PACK_ID), unknown_pack))
         self.assertNotEqual(
             identity_digest(reference(UNIT_ID)), identity_digest(reference(PACK_ID))
         )

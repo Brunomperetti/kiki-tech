@@ -20,6 +20,7 @@ from app.services.documental.source_intake_queue import SourceIntakeQueue
 from app.services.documental.storage import Document, digest
 from test_documental_manufacturer_batch_intake import (
     FIRST, SECOND, SITEMAP, HASH, HOST, candidate, prepare_two, preview,
+    fake_source, parse_source,
 )
 from test_documental_complete_draft_flow import IDENT
 
@@ -65,13 +66,13 @@ def fake_importer(db, user, *, sitemap_url, sitemap_sha256, items,
                   configured_hosts):
     assert sitemap_url == SITEMAP and sitemap_sha256 == HASH
     assert configured_hosts == HOST and len(items) == 1
-    return {
-        "documents": [{
-            "ecomm_id": items[0]["ecomm_id"], "document_id": "local-" + "d" * 32,
-            "review_state": "PENDING",
-        }],
-        "facts_approved": 0,
-    }
+    from app.services.documental.manufacturer_batch_intake import capture_selected
+    return capture_selected(
+        db, user, sitemap_url=sitemap_url, sitemap_sha256=sitemap_sha256,
+        items=items, configured_hosts=configured_hosts,
+        previewer=lambda *_a: preview(*(candidate(row["ecomm_id"], row["url"]) for row in items)),
+        downloader=fake_source, parser=parse_source,
+    )
 
 
 def test_create_and_resume_in_new_session_without_browser_loop(tmp_path):
@@ -93,9 +94,11 @@ def test_create_and_resume_in_new_session_without_browser_loop(tmp_path):
         assert final["counts"]["IMPORTED"] == 2
         assert final["state"] == "COMPLETED"
         assert all(item["document_id"] for item in final["items"])
-        assert not db.scalars(select(Document).where(
+        archived = db.scalars(select(Document).where(
             Document.body["source"]["reference_url"].as_string() == SECOND
-        )).all()  # synthetic import never writes supplier docs
+        )).all()
+        assert len(archived) == 1
+        assert archived[0].body["source"]["review_state"] == "PENDING"
 
 
 def test_blocked_source_remains_retryable_without_resetting_other_variants(tmp_path):
@@ -103,11 +106,11 @@ def test_blocked_source_remains_retryable_without_resetting_other_variants(tmp_p
     with Session(engine) as db:
         queue, report = prepare_job(db)
         def fail(*args, **kwargs):
-            raise ValueError("robots.txt denegó acceso")
+            raise TimeoutError("Synthetic manufacturer temporarily unavailable")
         blocked = queue.step(report["id"], report["revision"], importer=fail)
         assert blocked["counts"]["BLOCKED"] == 1
         assert blocked["counts"]["PENDING"] == 1
-        assert "robots.txt" in blocked["items"][0]["error"]
+        assert blocked["items"][0]["processing"]["error_code"] == "SOURCE_UNAVAILABLE"
         # Other products continue while the first is blocked.
         next_step = queue.step(report["id"], blocked["revision"], importer=fake_importer)
         assert next_step["counts"]["IMPORTED"] == 1

@@ -292,9 +292,11 @@ test("una fuente nueva contradictoria invalida la propuesta y excluye esa afirma
   await page
     .getByRole("button", { name: "Recuperar propuesta guardada", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Las evidencias o la identidad cambiaron",
-  );
+  await expect(
+    page.getByRole("alert").filter({
+      hasText: "Las evidencias o la identidad cambiaron",
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", {
       name: "Guardar selección en ficha",
@@ -418,7 +420,7 @@ test("SKU compartido no reutiliza hechos de 250 g para la presentación 1 kg", a
     { name: "Contenido neto", value: "1000 g" },
   ]);
   expect(proposal.missing).toContain(
-    "Títulos: falta nombre o presentación con respaldo aprobado.",
+    "Títulos y palabras clave SEO: falta nombre o presentación con respaldo aprobado.",
   );
 });
 

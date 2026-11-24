@@ -159,7 +159,7 @@ def test_failed_fetch_blocks_only_one_item_and_retry_preserves_other(tmp_path):
         q = SourceIntakeQueue(db, SimpleNamespace(id=1), HOST)
         ticket = q.create_explicit(str(uuid4()), entries())
         def rejected(*_args, **_kwargs):
-            raise ValueError("robots.txt bloquea el producto")
+            raise TimeoutError("Synthetic manufacturer temporarily unavailable")
         failed = q.step(ticket["id"], ticket["revision"],
                         explicit_importer=rejected)
         assert failed["counts"]["BLOCKED"] == 1

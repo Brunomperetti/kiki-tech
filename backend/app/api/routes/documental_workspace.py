@@ -21,6 +21,10 @@ from app.services.documental.sitemap_discovery import preview_candidates
 from app.services.documental.manufacturer_batch_intake import capture_selected
 from app.services.documental.source_intake_queue import SourceIntakeQueue
 from app.services.documental.source_intake_storage import SourceIntakeJob
+from app.services.documental.source_intake_report import (
+    build_intake_report, export_intake_exceptions,
+)
+from app.api.routes.commercial_exports import csv_response
 from sqlalchemy import inspect
 from uuid import UUID
 from app.services.documental.contracts import (
@@ -592,6 +596,11 @@ class IntakeRetry(IntakeRevision):
     ecomm_id: str = Field(pattern=r"^[1-9][0-9]{0,19}$")
 
 
+class IntakeComplete(IntakeRetry):
+    expected_document_version: int | None = Field(default=None, ge=1)
+    expected_document_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
 @router.get("/sources/intake-jobs")
 def source_intake_jobs(
     db: Session = Depends(get_db),
@@ -639,6 +648,44 @@ def source_intake_create(
     except Exception:
         db.rollback()
         raise
+
+
+@router.get("/sources/intake-jobs/{job_id}/report")
+def source_intake_report(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
+):
+    """Recompute local evidence/version state; no download or field writes."""
+    _resumable_intake_state_ready(db)
+    try:
+        return build_intake_report(db, session, str(job_id))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+    finally:
+        db.rollback()
+
+
+@router.get("/sources/intake-jobs/{job_id}/exceptions.csv")
+def source_intake_exceptions(
+    job_id: UUID,
+    expected_revision: int = Query(ge=1),
+    expected_fingerprint: str = Query(pattern=r"^[a-f0-9]{64}$"),
+    db: Session = Depends(get_db),
+    session=Depends(require_session),
+):
+    _resumable_intake_state_ready(db)
+    try:
+        report = build_intake_report(db, session, str(job_id))
+        content = export_intake_exceptions(report, expected_revision, expected_fingerprint)
+        return csv_response(
+            content, "kiki-lote-documental-excepciones.csv", report["total"],
+            report["fingerprint"],
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+    finally:
+        db.rollback()
 
 
 @router.post("/sources/intake-jobs/exact-urls")
@@ -743,6 +790,26 @@ def source_intake_cancel(
     try:
         return SourceIntakeQueue(db, session, "").cancel(
             str(job_id), body.expected_revision,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/sources/intake-jobs/{job_id}/complete")
+def source_intake_complete_archived(
+    job_id: UUID,
+    body: IntakeComplete,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    """Recover extraction from the pinned original with the downloader disabled."""
+    _resumable_intake_state_ready(db)
+    try:
+        return SourceIntakeQueue(db, session, "").complete_archived(
+            str(job_id), body.expected_revision, body.ecomm_id,
+            expected_document_version=body.expected_document_version,
+            expected_document_digest=body.expected_document_digest,
         )
     except ValueError as exc:
         db.rollback()

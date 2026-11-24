@@ -143,18 +143,18 @@ def test_retry_limit_and_cancelled_coverage_preserve_completed_documents(tmp_pat
             queue.recover(first["id"], cancelled["revision"])
         db.rollback()
 
-        queue, first = prepare_job(db, items=[selected()[0]])
+        queue, first = prepare_job(db, items=[selected()[1]])
         def rejected(*_a, **_k):
-            raise ValueError("Synthetic source temporarily unavailable")
+            raise TimeoutError("Synthetic source temporarily unavailable")
         for attempt in range(1, 4):
             state = queue.step(first["id"], first["revision"], importer=rejected)
             assert state["items"][0]["attempts"] == attempt
             assert state["max_attempts"] == 3
             if attempt < 3:
-                first = queue.retry(first["id"], state["revision"], IDENT)
+                first = queue.retry(first["id"], state["revision"], "9912345")
         assert state["items"][0]["retry_available"] is False
         with pytest.raises(ValueError, match="reintento"):
-            queue.retry(first["id"], state["revision"], IDENT)
+            queue.retry(first["id"], state["revision"], "9912345")
 
 
 def test_twenty_variant_coverage_reconciles_and_rejects_duplicate_or_oversized_batch(tmp_path):

@@ -27,6 +27,29 @@ HOST_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
 ROBOT_AGENT = "KIKI-Catalog-Research"
 
 
+class SourceFetchError(ValueError):
+    """Safe HTTP outcome: no response body, URL credentials or raw exception."""
+
+    def __init__(self, status, *, request_count, message=None):
+        self.code = f"SOURCE_HTTP_{int(status)}"
+        self.retryable = status in {408, 429, 500, 502, 503, 504}
+        self.request_count = request_count
+        super().__init__(message or (
+            "El fabricante no entregó la página HTML pública. "
+            "No se siguen redirecciones ni se eluden restricciones."
+        ))
+
+
+class SourceTransportError(ValueError):
+    def __init__(self, message, *, code="SOURCE_NETWORK"):
+        self.code = code
+        self.retryable = code == "SOURCE_NETWORK"
+        # A connect/TLS failure may happen before any HTTP bytes are sent.
+        # Report unknown instead of inventing a completed HTTP request.
+        self.request_count = None
+        super().__init__(message)
+
+
 def allowed_hosts(csv_value):
     hosts = {v.strip().lower() for v in (csv_value or "").split(",") if v.strip()}
     if any(not HOST_PATTERN.fullmatch(h) or ".." in h for h in hosts):
@@ -171,10 +194,14 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None, max_byte
 
     try:
         robots = transport.get(host, ip, "/robots.txt", MAX_ROBOTS_BYTES)
+    except ssl.SSLError:
+        raise SourceTransportError("TLS del fabricante no verificable; no se accedió al producto.", code="SOURCE_TLS_BLOCKED") from None
     except (OSError, http.client.HTTPException):
-        raise ValueError(
-            "No se pudo consultar robots.txt por HTTPS. No se accedió al producto."
+        raise SourceTransportError(
+            "No se pudo consultar robots.txt por HTTPS. No se accedió al producto.",
         ) from None
+    if robots.status != 200:
+        raise SourceFetchError(robots.status, request_count=1, message="No se pudo verificar robots.txt; la fuente no se descargó.")
     if (
         robots.status != 200
         or ipaddress.ip_address(robots.remote_ip) != ipaddress.ip_address(ip)
@@ -206,15 +233,14 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None, max_byte
 
     try:
         result = transport.get(host, ip, path, max_bytes)
+    except ssl.SSLError:
+        raise SourceTransportError("TLS del fabricante no verificable; no se archivó contenido.", code="SOURCE_TLS_BLOCKED") from None
     except (OSError, http.client.HTTPException):
-        raise ValueError(
-            "Consulta HTTPS al fabricante no disponible; no se archivó contenido."
+        raise SourceTransportError(
+            "Consulta HTTPS al fabricante no disponible; no se archivó contenido.",
         ) from None
     if result.status != 200:
-        raise ValueError(
-            "El fabricante no entregó la página HTML pública. "
-            "No se siguen redirecciones ni se eluden restricciones."
-        )
+        raise SourceFetchError(result.status, request_count=2)
     if (
         ipaddress.ip_address(result.remote_ip) != ipaddress.ip_address(ip)
         or result.encoding.lower() != "identity"
@@ -246,4 +272,5 @@ def fetch_html(url, configured_hosts, *, resolver=None, transport=None, max_byte
         "network_enabled": True,
         "acquired_at": datetime.now(timezone.utc).isoformat(),
         "mode": "ALLOWLISTED_SINGLE_PILOT",
+        "request_count": 2,
     }
