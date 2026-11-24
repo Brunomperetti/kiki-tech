@@ -26,7 +26,9 @@ jobs:
       - run: pytest -q
 
   frontend:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 does not support the Ubuntu 26.04 runner currently
+    # selected by ubuntu-latest; use the supported 24.04 image for Chromium.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
