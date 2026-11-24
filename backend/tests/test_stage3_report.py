@@ -209,3 +209,32 @@ def test_smoke_entrypoint_refuses_production_and_accidental_ci_impersonation():
         {"KIKI_INTEGRATION_MODE": "local-synthetic", "DATABASE_URL": LOCAL_URL},
         local=True,
     ) == ("local", LOCAL_URL)
+
+
+def test_truncated_history_preserves_report_actor_contract(tmp_path):
+    """At 512+ events, history remains accepted by the strict frontend report."""
+    from sqlalchemy.orm import Session
+    from app.services.documental.source_intake_queue import MAX_HISTORY_EVENTS
+    from app.services.documental.source_intake_storage import SourceIntakeJob
+    from test_documental_resumable_source_intake import fixture, prepare_job
+
+    engine = fixture(tmp_path)
+    with Session(engine) as db:
+        queue, initial = prepare_job(db)
+        job = db.get(SourceIntakeJob, initial["id"])
+        job.history = [
+            {"action": "SYNTHETIC", "at": "2026-11-24T00:00:00+00:00", "by": "fixture"}
+            for _ in range(MAX_HISTORY_EVENTS)
+        ]
+        db.commit()
+
+        for dropped in (1, 2):
+            queue._update(job, job.items, "MANUAL_MAINTENANCE")
+            history = job.history
+            assert len(history) == MAX_HISTORY_EVENTS
+            assert history[0]["action"] == "HISTORY_TRUNCATED"
+            assert history[0]["events_dropped"] == dropped
+            assert history[-1]["action"] == "MANUAL_MAINTENANCE"
+            assert all(
+                isinstance(event.get("by"), str) and event["by"] for event in history
+            )
