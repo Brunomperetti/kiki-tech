@@ -228,7 +228,8 @@ def test_truncated_history_preserves_report_actor_contract(tmp_path):
         ]
         db.commit()
 
-        for dropped in (1, 2):
+        # The truncation marker itself occupies one of the 512 slots.
+        for dropped in (2, 3):
             queue._update(job, job.items, "MANUAL_MAINTENANCE")
             history = job.history
             assert len(history) == MAX_HISTORY_EVENTS
