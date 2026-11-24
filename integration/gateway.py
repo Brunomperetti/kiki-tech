@@ -27,6 +27,10 @@ from integration_sandbox.hileret_brochure import MAX_HTTP_BODY  # noqa: E402
 HILERET_ID = r"PILOT-HILERET-200-(?:UNIT|PACK6)-SYNTHETIC"
 CONNECTIONS = False
 PRODUCTION_COMPAT = False
+STAGE3 = False
+PRODUCTION_WEB_PATHS = frozenset({
+    "/", "/v2", "/v2/", "/dashboard-classic", "/products", "/queue", "/channels",
+})
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.integration-dist"
 WEB_CSP = (
@@ -69,11 +73,11 @@ class Handler(BaseHTTPRequestHandler):
             self.deny(403)
             return
         if self.command == "GET" and (
-            path.path == "/" or (PRODUCTION_COMPAT and path.path in {"/v2", "/v2/", "/dashboard-classic"}) or path.path.startswith("/assets/")
+            path.path == "/" or (PRODUCTION_COMPAT and path.path in PRODUCTION_WEB_PATHS) or path.path.startswith("/assets/")
         ):
             self.serve_static(path.path)
             return
-        if not route_allowed(self.command, path.path, connections=CONNECTIONS, production_compat=PRODUCTION_COMPAT):
+        if not route_allowed(self.command, path.path, connections=CONNECTIONS, production_compat=PRODUCTION_COMPAT, stage3=STAGE3):
             self.deny(403)
             return
         try:
@@ -183,7 +187,7 @@ class Handler(BaseHTTPRequestHandler):
             connection.close()
 
     def serve_static(self, path):
-        if path == "/" or (PRODUCTION_COMPAT and path in {"/v2", "/v2/", "/dashboard-classic"}):
+        if path == "/" or (PRODUCTION_COMPAT and path in PRODUCTION_WEB_PATHS):
             file = WEB_ROOT / ("index.html" if PRODUCTION_COMPAT else "integration.html")
             content_type = "text/html; charset=utf-8"
         elif re.fullmatch(r"/assets/[A-Za-z0-9_-]+\.(js|css)", path):
@@ -244,8 +248,20 @@ if __name__ == "__main__":
     if compat_mode not in {"off", "isolated-only"}:
         raise RuntimeError("Modo de compatibilidad inválido.")
     PRODUCTION_COMPAT = compat_mode == "isolated-only"
+    stage3_flag = directory / "stage3-mode"
+    stage3_mode = stage3_flag.read_text().strip() if stage3_flag.exists() else "off"
+    if stage3_mode not in {"off", "local-synthetic"} or (
+        stage3_mode == "local-synthetic" and (not PRODUCTION_COMPAT or CONNECTIONS)
+    ):
+        raise RuntimeError("Modo documental de etapa 3 inválido.")
+    STAGE3 = stage3_mode == "local-synthetic"
     if PRODUCTION_COMPAT:
         WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.production-dist"
+    print(
+        "Pasarela aislada: perfil=" + compat_mode + "; etapa3=" + stage3_mode
+        + "; índice=" + str((WEB_ROOT / ("index.html" if PRODUCTION_COMPAT else "integration.html")).is_file()),
+        flush=True,
+    )
     SOCKET = directory / "api.sock"
     os.umask(0o077)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

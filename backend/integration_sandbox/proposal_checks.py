@@ -158,7 +158,11 @@ class ProposalPostgreSQL(unittest.TestCase):
         before = self.workspace()
         proposal = self.full()
         self.assertEqual(self.workspace(), before)
-        self.assertEqual(len(proposal["fields"]), 13)
+        self.assertEqual(set(proposal["fields"]), {
+            "brand", "manufacturer", "title", "short_title", "description",
+            "short_description", "details", "attributes", "presentation",
+            "category", "subcategory", "seo_title", "seo_description", "seo_keywords",
+        })
         self.assertEqual(proposal["generator"], "deterministic-synthetic-evidence-v1")
         self.assertTrue(proposal["source_current"])
         self.assertEqual(len(proposal["evidence"]), 12)

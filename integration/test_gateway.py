@@ -113,11 +113,14 @@ class GatewayTests(unittest.TestCase):
             ("GET", "/health", {"Origin": "https://production.invalid"}),
             ("POST", "/api/mercadolibre/sync", {}),
             ("GET", "/images/https://admin.ecomm-app.com/example.jpg", {}),
-            ("GET", "/api/ecomm-app/stage/auto/status", {}),
+            ("POST", "/api/ecomm-app/stage/manual/start", {}),
             ("GET", "/dashboard", {}),
         ]:
             with self.subTest(path=path):
                 self.assertEqual(self.request(method, path, headers=headers)[0], 403)
+        # Existing read-only connection status is allowed through the gateway,
+        # but still requires an authenticated session and cannot run a capture.
+        self.assertEqual(self.request("GET", "/api/ecomm-app/stage/auto/status")[0], 401)
 
     def test_other_methods_and_dashboard_are_not_forwarded(self):
         for method, path in [

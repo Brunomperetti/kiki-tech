@@ -7,6 +7,7 @@ No vendor writes, AI or approval of source, identity or individual facts.
 """
 import base64
 from datetime import datetime, timezone
+from hashlib import sha256
 
 from sqlalchemy import select
 
@@ -14,7 +15,7 @@ from app.services.documental.contracts import Incorporate
 from app.services.documental.local_documents import LocalDocuments, parse_local
 from app.services.documental.storage import Dossier, Document
 from app.services.editorial_batches.context import sources
-from .manufacturer_batch_intake import _identity
+from .manufacturer_batch_intake import _identity, _eligible_unit, _reject_duplicate_original
 from .source_fetch import fetch_html, allowed_hosts, target
 
 MAX_SOURCE_BYTES = 4 * 1024 * 1024
@@ -76,7 +77,7 @@ def import_explicit_url(
         raise ValueError("Describí el origen de esta página (10-600 caracteres).")
     initial = sources(db)
     row = initial.get(ecomm_id)
-    if not row or not row.get("sku") or row.get("is_combo") is not False:
+    if not _eligible_unit(row):
         raise ValueError("Variante, SKU o presentación pack no apta para el piloto.")
     baseline = _identity(row)
     current = db.scalar(select(Dossier.version).where(Dossier.ecomm_id == ecomm_id))
@@ -101,6 +102,7 @@ def import_explicit_url(
         or trace.get("tls_hostname_verified") is not True
         or trace.get("network_enabled") is not True
         or trace.get("redirects_followed") != 0
+        or trace.get("sha256") != sha256(original).hexdigest()
     ):
         raise ValueError("La descarga no acreditó todos los controles HTTPS y robots.")
     imported = Incorporate(
@@ -122,16 +124,19 @@ def import_explicit_url(
     # Never silently attach it to an edited/renumbered Ecomm variant.
     db.expire_all()
     latest = sources(db, lock=True)
-    if _identity(latest.get(ecomm_id) or {}) != baseline:
+    if (
+        not _eligible_unit(latest.get(ecomm_id))
+        or _identity(latest.get(ecomm_id) or {}) != baseline
+    ):
         raise ValueError(
             "La variante Ecomm-App cambió durante la consulta; no se archivó."
         )
     service = LocalDocuments(db, session)
     case = service.research.dossier(ecomm_id)
     service.research.expect(case, expected_version)
-    _reject_repeated(
-        service.research.documents(ecomm_id), reference_url, today=today
-    )
+    existing_documents = service.research.documents(ecomm_id)
+    _reject_repeated(existing_documents, reference_url, today=today)
+    _reject_duplicate_original(existing_documents, trace["sha256"])
     result = service.incorporate(
         ecomm_id, imported, parsed,
         source_retrieval={

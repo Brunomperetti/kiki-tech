@@ -1,7 +1,9 @@
 from .policy import route_allowed, CSP, preflight
 
 
-def create_sandbox_app(*, autonomous=False, connections=False, production_compat=False):
+def create_sandbox_app(*, autonomous=False, connections=False, production_compat=False, stage3=False):
+    if stage3 and (not production_compat or autonomous or connections):
+        raise RuntimeError("Etapa 3 requiere el perfil productivo aislado y ejecución manual independiente.")
     preflight()
     # Import ONLY after configuration, socket guard and database identity checks.
     from argon2 import PasswordHasher
@@ -36,6 +38,10 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
         kiki_editorial_batches_enabled=True,
         kiki_editorial_executor_enabled=autonomous,
         kiki_editorial_lease_seconds=6,
+        kiki_document_resumable_intake_enabled=stage3,
+        kiki_document_explicit_url_intake_enabled=stage3,
+        kiki_document_parser_kernel_required=stage3,
+        kiki_document_source_fetch_hosts="fabricante-stage3.invalid" if stage3 else "",
     )
     # Harness-only binding, before any service imports. Production get_settings is unchanged.
     config.get_settings = lambda: settings
@@ -67,6 +73,9 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
     # Same contract and service; sandbox-only preconditions precede the old route.
     # Production router, DTO and service remain untouched.
     application.router.routes[0:0] = editor_router.routes
+    if stage3:
+        from .stage3_fixtures import install_routes
+        install_routes(application)
 
     @asynccontextmanager
     async def synthetic_lifespan(app):
@@ -100,6 +109,16 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
                 if not inspect(connection).has_table("kiki_editorial_batch_signals"):
                     for statement in EXECUTOR_UP:
                         connection.execute(text(statement))
+            if stage3:
+                # Test-only explicit migration after preflight and synthetic
+                # source verification, never production app startup DDL.
+                from app.services.documental.source_intake_migration import UP as INTAKE_UP
+                with engine.begin() as connection:
+                    if not inspect(connection).has_table("kiki_source_intake_jobs"):
+                        for statement in INTAKE_UP:
+                            connection.execute(text(statement))
+                from .stage3_fixtures import initialize
+                initialize(app, SessionLocal)
             try:
                 yield
             finally:
@@ -109,7 +128,7 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
 
     @application.middleware("http")
     async def isolation_boundary(request, call_next):
-        if not route_allowed(request.method, request.url.path, connections=connections, production_compat=production_compat):
+        if not route_allowed(request.method, request.url.path, connections=connections, production_compat=production_compat, stage3=stage3):
             response = JSONResponse(
                 status_code=403,
                 content={"detail": "Operación deshabilitada en etapa 2B sintética."},

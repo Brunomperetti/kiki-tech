@@ -66,6 +66,30 @@ async function mockCatalog(page: Page, body: unknown, status = 200) {
           : Math.min(Number(value), catalog.total_variants_in_capture ?? 0),
       ]),
     );
+    if (catalog.total_variants_in_capture === 0) {
+      // Keep the synthetic channel matrix consistent with an empty master;
+      // captured external records remain distinct, now without candidates.
+      for (const channel of ["ml", "tn"]) {
+        const comparison =
+          queue.channel_coverage?.summary?.comparison?.[channel];
+        if (!comparison) continue;
+        for (const key of [
+          "variants",
+          "stale_variants",
+          "variants_with_candidates",
+          "variants_with_pending_candidates",
+          "candidate_pairs",
+          "records_with_candidates",
+          "verified_records",
+          "confirmed_publications",
+        ])
+          comparison[key] = 0;
+        comparison.variant_states = Object.fromEntries(
+          Object.keys(comparison.variant_states).map((key) => [key, 0]),
+        );
+        comparison.records_without_candidate = comparison.valid_records;
+      }
+    }
     queue.items = catalog.items.map((source) => ({
       ...(rows.find(
         (x: { ecomm_id: unknown }) => x.ecomm_id === source.ecomm_id,

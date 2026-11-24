@@ -8,7 +8,9 @@ vendor data, prices, images or channel publications are approved or written.
 from __future__ import annotations
 
 import base64
+import json
 from datetime import datetime, timezone
+from hashlib import sha256
 
 from sqlalchemy import select
 
@@ -24,10 +26,58 @@ MAX_HTML_BYTES = 4 * 1024 * 1024
 
 
 def _identity(row):
-    """Fields that must not change during outbound network and isolated parsing."""
-    return tuple(str(row.get(key) or "") for key in (
-        "sku", "product_name", "variant_description", "gtin", "is_combo",
-    ))
+    """Typed, JSON-roundtrippable identity, never stock or editorial overlays.
+
+    Keep raw codes as well as their compatibility projection: a changed
+    barcode must not hide behind an unchanged ``gtin``. Flat type tags prevent
+    False, 0, None and empty text from becoming the same persisted signature.
+    Previously persisted narrower signatures fail closed and need review.
+    """
+    values = []
+    for key in (
+        "ecomm_id", "sku", "parent_code", "product_name",
+        "variant_description", "gtin", "barcode", "gtin_raw",
+        "is_combo", "parent_is_combo", "identity_blockers", "brand", "manufacturer",
+    ):
+        value = row.get(key)
+        values.extend((
+            type(value).__name__,
+            value if value is None or type(value) in (str, bool, int)
+            else json.dumps(value, sort_keys=True, ensure_ascii=False),
+        ))
+    return tuple(values)
+
+
+def _eligible_unit(row):
+    """A false variant flag cannot override an explicit pack parent/conflict."""
+    if (
+        not row or not isinstance(row.get("sku"), str) or not row["sku"].strip()
+        or row.get("is_combo") is not False
+        or row.get("parent_is_combo") not in (None, False)
+        or type(row.get("parent_is_combo")) not in (type(None), bool)
+        or row.get("identity_blockers")
+    ):
+        return False
+    codes = [row.get(key) for key in ("barcode", "gtin_raw", "gtin")]
+    if any(code is not None and not isinstance(code, str) for code in codes):
+        return False
+    return len({code for code in codes if code}) <= 1
+
+
+def _reject_duplicate_original(documents, checksum):
+    """Same variant/bytes under another URL is review work, not a new source.
+
+    Call only with the exact variant's documents under the documentary mutex.
+    Do not relabel an existing original or transfer its human approvals.
+    """
+    if any(
+        (doc.body.get("original") or {}).get("sha256") == checksum
+        for doc in documents
+    ):
+        raise ValueError(
+            "El mismo original SHA-256 ya está archivado para esta variante; "
+            "revisá la fuente existente sin duplicar ni transferir decisiones."
+        )
 
 
 def preflight(preview, items, sitemap_sha256):
@@ -84,7 +134,7 @@ def capture_selected(
     selected = {}
     for ident in ids:
         row = initial_rows.get(ident)
-        if not row or not row.get("sku") or row.get("is_combo") is not False:
+        if not _eligible_unit(row):
             raise ValueError(
                 "Ecomm ID, SKU o tipo de venta no es válido para capturar documentos."
             )
@@ -121,6 +171,8 @@ def capture_selected(
         )
         if not original or len(original) > MAX_HTML_BYTES:
             raise ValueError("Documento excede el límite de 4 MiB.")
+        if trace.get("sha256") != sha256(original).hexdigest():
+            raise ValueError("El SHA-256 recibido no coincide con el original.")
         imported = Incorporate(
             kind="FILE",
             web_snapshot=True,
@@ -151,7 +203,11 @@ def capture_selected(
     # established documentary mutex. All database commits stay atomic.
     db.expire_all()
     refreshed = sources(db, lock=True)
-    if any(_identity(refreshed.get(ident) or {}) != selected[ident] for ident in ids):
+    if any(
+        not _eligible_unit(refreshed.get(ident))
+        or _identity(refreshed.get(ident) or {}) != selected[ident]
+        for ident in ids
+    ):
         raise ValueError(
             "Ecomm-App cambió mientras se consultaban fuentes; no se importó nada."
         )
@@ -163,14 +219,16 @@ def capture_selected(
         dossier = documents.research.dossier(item["ecomm_id"])
         documents.research.expect(dossier, body.expected_version)
         # No silent replacement/re-import of a previously reviewed original.
+        existing_documents = documents.research.documents(item["ecomm_id"])
         if any(
             doc.body.get("source", {}).get("reference_url") == item["url"]
-            for doc in documents.research.documents(item["ecomm_id"])
+            for doc in existing_documents
         ):
             raise ValueError(
                 "Ya existe documentación para esta URL y variante. "
                 "Revisá la evidencia existente en vez de duplicarla."
             )
+        _reject_duplicate_original(existing_documents, trace["sha256"])
         result = documents.incorporate(
             item["ecomm_id"], body, parsed, source_retrieval=trace,
         )

@@ -66,8 +66,23 @@ def is_delivery_review_route(method: str, path: str) -> bool:
     )) if method in {"GET", "POST"} else False
 
 
-def route_allowed(method: str, path: str, *, connections=False, production_compat=False) -> bool:
+def is_stage3_route(method: str, path: str) -> bool:
+    prefix = r"/api/ecomm-app/workspace/"
+    intake = prefix + r"sources/intake-jobs"
+    job = r"/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}"
+    if method == "GET":
+        return bool(re.fullmatch(intake + r"(?:" + job + r"(?:/(?:report|exceptions\.csv))?)?", path))
+    if method == "POST":
+        return bool(re.fullmatch(intake + r"(?:/exact-urls|" + job + r"/(?:step|retry|recover|cancel|complete))", path)) or bool(re.fullmatch(
+            prefix + r"90000[3-6]/(?:evidence/facts/review-batch|documents/local-[a-f0-9]{32}/identity-review)", path,
+        ))
+    return False
+
+
+def route_allowed(method: str, path: str, *, connections=False, production_compat=False, stage3=False) -> bool:
     return (
+        (stage3 and production_compat and not connections and is_stage3_route(method, path))
+        or
         (production_compat and ((method, path) in {("GET", "/api/ui/v2"),("GET", "/api/ecomm-app/stage/status"),("GET", "/api/mercadolibre/status"),("GET", "/api/ecomm-app/stage/ml-reconciliation-preview")} or is_delivery_review_route(method, path)))
         or (connections and (method, path) in CONNECTION_ACTIONS)
         or

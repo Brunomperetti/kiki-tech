@@ -25,7 +25,14 @@ test("indicadores globales del backend filtran sin sumar tareas superpuestas", a
   // presents only actionable channel differences. Filters remain available.
   const response = await page.request.get(`${queuePath}?sort=capture`);
   const body = await response.json();
-  for (const key of ["identity", "untouched", "draft", "ready", "ready_for_channels", "pack"]) {
+  for (const key of [
+    "identity",
+    "untouched",
+    "draft",
+    "ready",
+    "ready_for_channels",
+    "pack",
+  ]) {
     expect(Number.isSafeInteger(body.summary[key])).toBe(true);
   }
   await expect(page.locator(".k-business-gap-card")).toHaveCount(4);
@@ -358,7 +365,13 @@ for (const suffix of [
   }) => {
     let queries = 0;
     page.on("request", (request) => {
-      if (new URL(request.url()).pathname.startsWith("/api/ecomm-app/"))
+      const path = new URL(request.url()).pathname;
+      // The independent, read-only connection-status header is allowed;
+      // invalid filters must not load catalogue/product/business data.
+      if (
+        path.startsWith("/api/ecomm-app/") &&
+        path !== "/api/ecomm-app/stage/auto/status"
+      )
         queries++;
     });
     await page.goto(`/?${suffix}`);
@@ -373,7 +386,6 @@ for (const suffix of [
   });
 }
 
-
 test("cuatro atajos Ver lista llevan a la lista exacta, limpian búsqueda y permiten volver", async ({
   page,
 }) => {
@@ -382,14 +394,30 @@ test("cuatro atajos Ver lista llevan a la lista exacta, limpian búsqueda y perm
   const cards = overview.locator(".k-business-gap-card");
   await expect(cards).toHaveCount(4);
   const cases = [
-    { idx: 0, path: /filter=ml_comparison_no_match/, selector: "#kiki-catalog-results",
-      label: /Lista: Ecomm-App sin coincidencia en Mercado Libre/ },
-    { idx: 1, path: /filter=tn_comparison_no_match/, selector: "#kiki-catalog-results",
-      label: /Lista: Ecomm-App sin coincidencia en Tiendanube/ },
-    { idx: 2, path: /view=ml.*linkage=no_match/, selector: "#kiki-channel-results",
-      label: /Lista: Mercado Libre sin candidato en Ecomm-App/ },
-    { idx: 3, path: /view=tn.*linkage=no_match/, selector: "#kiki-channel-results",
-      label: /Lista: Tiendanube sin candidato en Ecomm-App/ },
+    {
+      idx: 0,
+      path: /filter=ml_comparison_no_match/,
+      selector: "#kiki-catalog-results",
+      label: /Lista: Ecomm-App sin coincidencia en Mercado Libre/,
+    },
+    {
+      idx: 1,
+      path: /filter=tn_comparison_no_match/,
+      selector: "#kiki-catalog-results",
+      label: /Lista: Ecomm-App sin coincidencia en Tiendanube/,
+    },
+    {
+      idx: 2,
+      path: /view=ml.*linkage=no_match/,
+      selector: "#kiki-channel-results",
+      label: /Lista: Mercado Libre sin candidato en Ecomm-App/,
+    },
+    {
+      idx: 3,
+      path: /view=tn.*linkage=no_match/,
+      selector: "#kiki-channel-results",
+      label: /Lista: Tiendanube sin candidato en Ecomm-App/,
+    },
   ];
   for (const current of cases) {
     // Existing search cannot silently narrow a global indicator.
@@ -401,8 +429,15 @@ test("cuatro atajos Ver lista llevan a la lista exacta, limpian búsqueda y perm
     const list = page.locator(current.selector);
     await expect(list).toBeFocused();
     await expect(list).toContainText(current.label);
-    const visibleCount = Number((await cards.nth(current.idx).locator("strong").innerText())
-      .replace(/\./g, ""));
+    await expect(cards.nth(current.idx).locator("strong")).toHaveText(
+      /^[\d.]+$/,
+    );
+    const visibleCount = Number(
+      (await cards.nth(current.idx).locator("strong").innerText()).replace(
+        /\./g,
+        "",
+      ),
+    );
     const shownCount = list.locator(".k-gap-list-banner");
     await expect(shownCount).toContainText(
       new Intl.NumberFormat("es-AR").format(visibleCount),

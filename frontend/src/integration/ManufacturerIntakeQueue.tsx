@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "./catalog-adapter";
 import { capabilities } from "./runtime";
+import { ManufacturerPipelineSummary, verifiedManufacturerReport } from "./ManufacturerPipelineReport";
 
 const endpoint = "/api/ecomm-app/workspace/sources/intake-jobs";
 type Candidate = {
@@ -26,8 +27,11 @@ type JobItem = {
   claim_until?: string | null;
   recoverable?: boolean;
   retry_available?: boolean;
+  complete_available?: boolean;
+  processing?: { phase: string; candidate_count?: number };
 };
 type Job = {
+  pipeline_schema_version?: "kiki-documental-pipeline-v1";
   mode: "MANUAL_RESUMABLE_SOURCE_INTAKE";
   id: string;
   revision: number;
@@ -61,6 +65,7 @@ function verified(value: unknown): Job {
   if (!row || row.mode !== "MANUAL_RESUMABLE_SOURCE_INTAKE" ||
       row.external_writes_enabled !== false || row.manual_steps_only !== true ||
       row.ai_requests !== 0 || row.claims_approved !== 0 ||
+      (row.pipeline_schema_version !== undefined && row.pipeline_schema_version !== "kiki-documental-pipeline-v1") ||
       !["EXACT_OPERATOR_URL", "REVIEWED_SITEMAP"].includes(row.selection_mode) ||
       !/^[a-f0-9-]{36}$/.test(row.id) ||
       !Number.isSafeInteger(row.revision) || row.revision < 1 || !Array.isArray(row.items) ||
@@ -350,6 +355,30 @@ export function ManufacturerIntakeQueue({
     ); });
   }
 
+  function completeLocal(ecommId: string) {
+    if (!current) return;
+    const job = current;
+    void run(async () => {
+      const response = await request(`${endpoint}/${job.id}/report`);
+      const report = verifiedManufacturerReport(await response.json(), job.id, job.revision, job.items);
+      const source = report.items.find(item => item.ecomm_id === ecommId);
+      if (!source || !Number.isSafeInteger(source.document_version) ||
+          !/^[a-f0-9]{64}$/.test(source.document_digest || "") ||
+          !/^[a-f0-9]{64}$/.test(source.document_sha256 || ""))
+        throw new Error("No hay una versión íntegra del original para completar localmente.");
+      if (!window.confirm(
+        `¿Completar localmente Ecomm ${ecommId} con el original v${source.document_version}, SHA-256 ${source.document_sha256}? ` +
+        "Confirmás que revisaste la procedencia y los cambios de metadatos. El servidor rechazará otra identidad o bytes diferentes. " +
+        "No descargará páginas ni aprobará hechos: los candidatos nuevos quedarán PENDIENTES y las fichas no se modificarán."
+      )) return;
+      await mutation(`/${job.id}/complete`, {
+        expected_revision: job.revision, ecomm_id: ecommId, confirm: true,
+        expected_document_version: source.document_version,
+        expected_document_digest: source.document_digest,
+      });
+    });
+  }
+
   function cancel() {
     if (!current || !window.confirm(
       "¿Cancelar las fuentes pendientes de este lote? La documentación ya incorporada se conservará."
@@ -440,13 +469,30 @@ export function ManufacturerIntakeQueue({
           onClick={cancel}>Cancelar pendientes</button>
       </div>
       {batchMessage && <p role="status">{batchMessage}</p>}
+      {current.pipeline_schema_version === "kiki-documental-pipeline-v1" && <ManufacturerPipelineSummary
+        jobId={current.id} revision={current.revision} busy={busy || disabled}
+        expectedItems={current.items.map(item => ({ ecomm_id: item.ecomm_id, url: item.url }))}
+        onOpen={onOpen}
+      />}
       {current.items.map(item => <article key={item.ecomm_id} className="b-detail">
         <p><strong>Ecomm {item.ecomm_id}</strong> · {item.state} · intentos {item.attempts}</p>
         {item.state === "RUNNING" && <p>
           Plazo del paso: {item.claim_until || "No disponible"}.
           {" "}{item.recoverable ? "Puede recuperarse sin descargar." : "Actualizá estados al vencer el plazo; no se interrumpe un paso activo."}
         </p>}
-        <p>{item.error || "Documento pendiente de comprobación de identidad y procedencia"}</p>
+        <p>{item.error || (["IMPORTED", "ALREADY_PRESENT"].includes(item.state)
+          ? "Original archivado. La procedencia, los hechos y las propuestas se revisan por separado en el informe documental."
+          : "Fuente pendiente de incorporación y comprobación de identidad y procedencia.")}</p>
+        {item.processing && <p>
+          Extracción local: {item.processing.phase}
+          {typeof item.processing.candidate_count === "number" && ` · ${item.processing.candidate_count} candidatos registrados`}.
+          {" "}Esta operación no aprueba hechos ni modifica fichas.
+        </p>}
+        {item.complete_available === true && <button type="button"
+          disabled={busy || disabled || running || current.state === "CANCELLED"}
+          onClick={() => completeLocal(item.ecomm_id)}>
+          Completar extracción local sin descargar
+        </button>}
         {item.state === "BLOCKED" && item.attempts < (current.max_attempts ?? 3) &&
           item.retry_available !== false && <button type="button"
           disabled={busy || disabled || !executionEnabled} onClick={() => retry(item.ecomm_id)}>Reintentar esta fuente</button>}

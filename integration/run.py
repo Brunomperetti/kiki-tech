@@ -24,7 +24,7 @@ COMPOSE = [
 ]
 
 
-def clean_environment(*, build=False):
+def clean_environment(*, build=False, browser=False):
     # Never pass application variables, .env, Docker endpoint/TLS/context selectors.
     allowed = {"PATH", "HOME", "DOCKER_CONFIG", "XDG_RUNTIME_DIR"}
     if build:
@@ -42,6 +42,11 @@ def clean_environment(*, build=False):
             "CODEX_PROXY_CERT",
         }
     result = {key: value for key, value in os.environ.items() if key in allowed}
+    if browser and os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE"):
+        executable = Path(os.environ["PLAYWRIGHT_CHROMIUM_EXECUTABLE"])
+        if not executable.is_absolute() or not executable.is_file():
+            raise RuntimeError("El navegador de prueba requiere una ruta absoluta existente.")
+        result["PLAYWRIGHT_CHROMIUM_EXECUTABLE"] = str(executable)
     if build:
         directory = ROOT / ".integration-runtime/buildx"
         directory.mkdir(parents=True, exist_ok=True)
@@ -60,7 +65,7 @@ def compose(*arguments, capture=False, build=False):
     )
 
 
-def verify_containers():
+def verify_containers(*, stage3=False):
     ids = compose("ps", "-q", capture=True).stdout.split()
     if len(ids) != 4:
         raise RuntimeError(
@@ -75,6 +80,13 @@ def verify_containers():
     )
     for container in json.loads(result.stdout):
         host = container["HostConfig"]
+        if stage3 and container["Config"]["Labels"].get("com.docker.compose.service") == "parser":
+            expected_caps = {"SYS_CHROOT", "SETUID", "SETGID", "CHOWN", "FOWNER"}
+            actual_caps = {value.removeprefix("CAP_") for value in (host.get("CapAdd") or [])}
+            if actual_caps != expected_caps or container["Config"]["User"] != "0:0" or "ALL" not in (host.get("CapDrop") or []):
+                raise RuntimeError("El lector stage3 no conserva la frontera exacta de privilegios.")
+            if any(entry.partition("=")[0] in {"DATABASE_URL", "APP_SESSION_SECRET", "ECOMM_APP_API_TOKEN", "KIKI_AI_API_KEY", "ML_CLIENT_SECRET"} for entry in container["Config"]["Env"]):
+                raise RuntimeError("Credenciales o base de datos prohibidas en el lector stage3.")
         if container["Config"]["Labels"].get(
             "com.docker.compose.service"
         ) == "collector" and (
@@ -106,6 +118,17 @@ def verify_containers():
             raise RuntimeError("Contenedor sin endurecimiento esperado.")
     print(
         "Aislamiento Docker verificado: network=none, sin puertos ni privilegios, raíz de sólo lectura."
+    )
+
+
+def build_stage3_reader():
+    """Build the existing production Dockerfile solely as an offline test reader."""
+    subprocess.run(
+        ["docker", "--host=unix:///var/run/docker.sock", "build",
+         "--file", str(ROOT / "backend/Dockerfile"),
+         "--secret", "id=proxy_ca,src=/etc/ssl/certs/ca-certificates.crt",
+         "--tag", "kiki-tech-production:stage3-test", str(ROOT / "backend")],
+        cwd=ROOT, env=clean_environment(build=True), check=True,
     )
 
 
@@ -146,8 +169,11 @@ def main():
     parser.add_argument("--autonomous", action="store_true", help="Escenario 2R: 5000 variantes sintéticas y ejecución backend.")
     parser.add_argument("--batches", action="store_true", help="Escenario documental sintético para lotes (up/browser-test).")
     parser.add_argument("--channels", action="store_true", help="Cargar escenario de canales sintético (sólo up/browser-test).")
+    parser.add_argument("--stage3", action="store_true", help="Etapa 3: pipeline con fabricante HTTP/DNS simulado y perfil /v2/ aislado (up/browser-test).")
     arguments = parser.parse_args()
     command = arguments.command
+    if arguments.stage3 and (command not in {"up", "browser-test"} or any((arguments.production_compat, arguments.connections, arguments.presentation, arguments.autonomous, arguments.batches, arguments.channels))):
+        parser.error("--stage3 requiere up/browser-test y un escenario independiente.")
     if arguments.production_compat and (command not in {"up", "browser-test"} or any((arguments.connections,arguments.presentation,arguments.autonomous,arguments.batches,arguments.channels))):
         parser.error("--production-compat requiere up/browser-test y escenario independiente.")
     if arguments.connections and (command not in {"up", "browser-test"} or any((arguments.presentation, arguments.autonomous, arguments.batches, arguments.channels))):
@@ -160,6 +186,8 @@ def main():
         parser.error("--batches requiere up/browser-test y no se combina con --channels.")
     if arguments.channels and command not in {"up", "browser-test"}:
         parser.error("--channels sólo es válido para up o browser-test en el entorno descartable.")
+    if arguments.stage3:
+        COMPOSE.extend(["--file", str(ROOT / "integration/stage3.compose.yaml")])
     if command == "build":
         subprocess.run(
             ["npm", "run", "build:integration"],
@@ -171,18 +199,25 @@ def main():
         # Runtime pull_policy stays "never"; only this explicit setup step may download.
         compose("pull", "--policy", "missing", "postgres", build=True)
     elif command in {"up", "test", "legacy-test", "browser-test"}:
-        if not (ROOT / "frontend/.integration-dist/integration.html").is_file():
+        production_profile = arguments.production_compat or arguments.stage3
+        frontend_file = ROOT / ("frontend/.production-dist/index.html" if production_profile else "frontend/.integration-dist/integration.html")
+        if not frontend_file.is_file():
             raise RuntimeError(
-                "Falta el frontend de integración. Ejecutá primero integration/run.py build."
+                "Falta el frontend aislado requerido; ejecutá build:production para /v2/ o integration/run.py build para integración."
             )
         directory = runtime_directory()
-        (directory / "production-compat-mode").write_text("isolated-only" if arguments.production_compat else "off")
+        (directory / "production-compat-mode").write_text("isolated-only" if production_profile else "off")
+        (directory / "stage3-mode").write_text("local-synthetic" if arguments.stage3 else "off")
         (directory / "connections-mode").write_text("offline-fixtures" if arguments.connections else "off")
-        (directory / "editorial-mode").write_text("backend" if command in {"up", "browser-test"} else "manual")
+        (directory / "editorial-mode").write_text("backend" if command in {"up", "browser-test"} and not arguments.stage3 else "manual")
         (directory / "editorial-workers").write_text("1")
         try:
+            if arguments.stage3:
+                build_stage3_reader()
             compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "90")
-            verify_containers()
+            verify_containers(stage3=arguments.stage3)
+            if arguments.stage3:
+                compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.stage3_fixtures", "--verify-reader")
             if arguments.presentation:
                 compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.presentation_fixtures")
             if arguments.autonomous:
@@ -279,9 +314,9 @@ def main():
             elif command == "browser-test":
                 # Runs its own gateway and Playwright against the actual isolated backend.
                 subprocess.run(
-                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--production-compat"] if arguments.production_compat else ["--connections"] if arguments.connections else ["--presentation"] if arguments.presentation else ["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
+                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--stage3"] if arguments.stage3 else ["--production-compat"] if arguments.production_compat else ["--connections"] if arguments.connections else ["--presentation"] if arguments.presentation else ["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
                     check=True,
-                    env=clean_environment(),
+                    env=clean_environment(browser=True),
                 )
             else:
                 for _ in range(60):
@@ -312,6 +347,7 @@ def main():
             compose("down", "--volumes")
             (directory / "connections-mode").write_text("off")
             (directory / "production-compat-mode").write_text("off")
+            (directory / "stage3-mode").write_text("off")
     elif command == "down":
         compose("down", "--volumes")
     else:

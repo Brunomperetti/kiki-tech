@@ -1,0 +1,28 @@
+# Private stage-3 acceptance profile. The production reader boundary is reused;
+# no application credentials, database volumes or external network enter it.
+services:
+  parser:
+    image: kiki-tech-production:stage3-test
+    pull_policy: never
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: !override [ALL]
+    cap_add: [SYS_CHROOT, SETUID, SETGID, CHOWN, FOWNER]
+    security_opt: !override [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 1
+    pids_limit: 16
+    command:
+      - sh
+      - -c
+      - chgrp 10000 /opt/kiki-reader/run && chmod 0770 /opt/kiki-reader/run && exec python /app/start.py --reader-only
+    volumes: !override
+      - ../.integration-runtime/documents:/opt/kiki-reader/run
+    healthcheck:
+      test: [CMD, python, -c, "import os; os.setgroups([]); os.setgid(10000); from start import health; assert health('/opt/kiki-reader/run/parser.sock')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  backend:
+    group_add: ["10000"]

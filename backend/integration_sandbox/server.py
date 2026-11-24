@@ -17,7 +17,11 @@ def main():
     compat_mode = compat_flag.read_text().strip() if compat_flag.exists() else "off"
     if compat_mode not in {"off", "isolated-only"}:
         raise RuntimeError("Modo de compatibilidad inválido.")
-    application = create_sandbox_app(production_compat=compat_mode=="isolated-only", autonomous=mode()=="backend", connections=connection_mode=="offline-fixtures")
+    stage3_flag = Path("/runtime/stage3-mode")
+    stage3_mode = stage3_flag.read_text().strip() if stage3_flag.exists() else "off"
+    if stage3_mode not in {"off", "local-synthetic"}:
+        raise RuntimeError("Modo documental de etapa 3 inválido.")
+    application = create_sandbox_app(production_compat=compat_mode=="isolated-only", autonomous=mode()=="backend", connections=connection_mode=="offline-fixtures", stage3=stage3_mode=="local-synthetic")
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa

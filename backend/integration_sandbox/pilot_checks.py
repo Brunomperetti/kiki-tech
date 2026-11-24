@@ -270,8 +270,13 @@ class PilotPostgreSQL(unittest.TestCase):
             )
 
     def test_concurrent_provenance_decisions_preserve_cas_and_originals(self):
-        data, key = self.prepare()
+        # Race two conflicting *changes* from the same pending original.
+        # Reconfirming an already REVIEWED source is intentionally idempotent
+        # and need not create a new document version or invalidate its facts.
+        data = self.ok(self.client.post(DOCUMENTS + "/import", json=self.payload()))
+        key = data["incorporated_document_id"]
         doc = next(d for d in data["documents"] if d["id"] == key)
+        self.assertEqual(doc["body"]["source"]["review_state"], "PENDING")
         barrier = Barrier(2)
 
         def decide(decision):

@@ -16,7 +16,7 @@ export function downloadReviewCsv(blob: Blob, filename: string) {
     !/^text\/csv(?:;|$)/i.test(blob.type) ||
     !blob.size ||
     blob.size > 10 * 1024 * 1024 ||
-    !/^(?:kiki-(ml|tn)-(all|no_match|pending)|kiki-comercial-(ml|tn)-revision|kiki-investigacion-gtin-unico|kiki-auditoria-comercial-mensual|kiki-lotes-documentales-no-verificados)\.csv$/.test(
+    !/^(?:kiki-(ml|tn)-(all|no_match|pending)|kiki-comercial-(ml|tn)-revision|kiki-investigacion-gtin-unico|kiki-auditoria-comercial-mensual|kiki-lotes-documentales-no-verificados|kiki-lote-documental-excepciones)\.csv$/.test(
       filename,
     )
   )

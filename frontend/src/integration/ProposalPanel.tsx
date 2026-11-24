@@ -383,7 +383,7 @@ export function ProposalPanel({
       )}
       {data?.available && (
         <>
-          {stale && (
+          {stale && data.state !== "APPLIED" && (
             <p role="alert">
               Esta propuesta es anterior a la ficha o evidencia actual.
               No se puede aplicar. Podés generar una nueva desde los hechos vigentes;
