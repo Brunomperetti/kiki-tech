@@ -413,7 +413,7 @@ class SourceIntakeQueue:
         if len(events) > MAX_HISTORY_EVENTS or (dropped and len(events) >= MAX_HISTORY_EVENTS):
             dropped += len(events) - (MAX_HISTORY_EVENTS - 1)
             events = events[-(MAX_HISTORY_EVENTS - 1):]
-        job.history = ([{"action": "HISTORY_TRUNCATED", "at": instant.isoformat(), "events_dropped": dropped}] if dropped else []) + events
+        job.history = ([{"action": "HISTORY_TRUNCATED", "at": instant.isoformat(), "by": self.actor, "events_dropped": dropped}] if dropped else []) + events
         self.db.commit()
         return self._serialize(job)
 
