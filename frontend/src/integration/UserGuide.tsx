@@ -3,6 +3,7 @@ import "./user-guide.css";
 
 const chapters = [
   {
+    target: "catalog" as const,
     title: "1. Consultar y actualizar el catálogo",
     where: "Mi catálogo · Actualizar desde Ecomm-App",
     steps: [
@@ -13,6 +14,7 @@ const chapters = [
     ],
   },
   {
+    target: "audit" as const,
     title: "2. Detectar productos que necesitan mejoras",
     where: "Auditoría real del inventario Ecomm-App · Mi catálogo",
     steps: [
@@ -23,6 +25,7 @@ const chapters = [
     ],
   },
   {
+    target: "Ficha" as const,
     title: "3. Editar y guardar una ficha comercial",
     where: "Mi catálogo → Ver ficha → Ficha",
     steps: [
@@ -34,6 +37,7 @@ const chapters = [
     ],
   },
   {
+    target: "Evidencias" as const,
     title: "4. Incorporar y revisar información del fabricante",
     where: "Ver ficha → Evidencias → Documentos y evidencias",
     steps: [
@@ -46,6 +50,7 @@ const chapters = [
     ],
   },
   {
+    target: "IA" as const,
     title: "5. Preparar textos y SEO desde evidencias",
     where: "Ver ficha → IA → Propuesta comercial desde evidencias",
     steps: [
@@ -57,6 +62,7 @@ const chapters = [
     ],
   },
   {
+    target: "operations" as const,
     title: "6. Investigar fuentes y procesar lotes",
     where: "Mi catálogo → Seleccionar variantes → Operaciones",
     steps: [
@@ -69,6 +75,7 @@ const chapters = [
     ],
   },
   {
+    target: "channels" as const,
     title: "7. Comparar Mercado Libre y Tiendanube",
     where: "Cobertura por canal · Ver ficha → Canales",
     steps: [
@@ -80,6 +87,7 @@ const chapters = [
     ],
   },
   {
+    target: "history" as const,
     title: "8. Revisar cambios y mantener el catálogo",
     where: "Historial · Operaciones · Configuración",
     steps: [
@@ -91,7 +99,9 @@ const chapters = [
   },
 ];
 
-export function UserGuide() {
+export type GuideTarget = (typeof chapters)[number]["target"];
+
+export function UserGuide({ onNavigate }: { onNavigate: (target: GuideTarget) => void }) {
   const [query, setQuery] = useState("");
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const term = normalize(query.trim());
@@ -114,6 +124,9 @@ export function UserGuide() {
               <div className="k-user-guide-steps">
                 <p><strong>Dónde:</strong> {chapter.where}</p>
                 <ol>{chapter.steps.map(step => <li key={step}>{step}</li>)}</ol>
+                <button type="button" className="k-user-guide-link" onClick={() => onNavigate(chapter.target)}>
+                  {["Ficha", "Evidencias", "IA"].includes(chapter.target) ? "Ir al producto · seleccionar variante" : "Ir a esta función"}
+                </button>
               </div>
             </details>
           ))}
