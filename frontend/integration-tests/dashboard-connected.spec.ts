@@ -446,3 +446,25 @@ test("cuatro atajos Ver lista llevan a la lista exacta, limpian búsqueda y perm
     await expect(overview).toBeInViewport();
   }
 });
+
+
+test("guía de uso accesible, plegable y buscable sin modificar el catálogo", async ({ page }) => {
+  await login(page);
+  const guide = page.locator("#guia-de-uso");
+  const heading = guide.locator(":scope > summary");
+  await expect(heading).toBeVisible();
+  await expect(guide).not.toHaveAttribute("open", "");
+  await heading.click();
+  const search = guide.getByRole("searchbox");
+  await expect(search).toBeVisible();
+  await expect(guide.locator(".k-user-guide-chapter")).toHaveCount(8);
+  await search.fill("taxonomia-inexistente");
+  await expect(guide.getByRole("status")).toContainText("No encontramos");
+  await search.fill("procesar lotes");
+  await expect(guide.locator(".k-user-guide-chapter")).toHaveCount(1);
+  await guide.locator(".k-user-guide-chapter > summary").click();
+  await expect(guide.getByText("Pulsá Guardar manifiesto de investigación.", { exact: false })).toBeVisible();
+  await heading.click();
+  await expect(search).not.toBeVisible();
+  await expect(page.getByLabel("Buscar productos", { exact: true })).toBeVisible();
+});
