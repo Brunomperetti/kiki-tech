@@ -12,6 +12,7 @@ import { EcommManualRefresh } from "./EcommManualRefresh";
 import { useConnections } from "./connections";
 import { recommendedAction } from "./product-actions";
 import { SavedHistory } from "./SavedHistory";
+import { UserGuide } from "./UserGuide";
 import {
   CommercialViews,
   ChannelComparisonMatrix,
@@ -625,6 +626,7 @@ export function IntegrationCatalog() {
       onLogout={logout}
       busy={busy}
     >
+      <UserGuide />
       {preferences && (
         <SettingsDialog
           connections={
