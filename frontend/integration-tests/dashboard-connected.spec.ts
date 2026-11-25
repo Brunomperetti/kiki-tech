@@ -468,3 +468,22 @@ test("guía de uso accesible, plegable y buscable sin modificar el catálogo", a
   await expect(search).not.toBeVisible();
   await expect(page.getByLabel("Buscar productos", { exact: true })).toBeVisible();
 });
+
+
+test("la guía lleva a auditoría y a la pestaña del producto elegido", async ({ page }) => {
+  await login(page);
+  const guide = page.locator("#guia-de-uso");
+  await guide.locator(":scope > summary").click();
+  const audit = guide.locator(".k-user-guide-chapter").filter({ hasText: "2. Detectar productos que necesitan mejoras" });
+  await audit.locator("summary").click();
+  await audit.getByRole("button", { name: "Ir a esta función", exact: true }).click();
+  await expect(page.locator("#guide-audit")).toBeFocused();
+  const evidence = guide.locator(".k-user-guide-chapter").filter({ hasText: "4. Incorporar y revisar información del fabricante" });
+  await evidence.locator("summary").click();
+  await evidence.getByRole("button", { name: "Ir al producto · seleccionar variante" }).click();
+  await expect(page.locator("#integration-search")).toBeFocused();
+  await expect(page.getByText("Guía: buscá tu producto", { exact: false })).toContainText("Evidencias");
+  await page.locator('[data-ecomm-id="900003"]').getByRole("button", { name: "Ver ficha", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Evidencias", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Guía: buscá tu producto", { exact: false })).toHaveCount(0);
+});
