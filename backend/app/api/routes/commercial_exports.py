@@ -48,6 +48,10 @@ class CommercialPreview(Strict):
     ecomm_ids: list[str] = Field(min_length=1, max_length=20)
 
 
+class TiendanubePreview(Strict):
+    ecomm_id: str = Field(pattern=r"^[1-9][0-9]{0,19}$")
+
+
 class CommercialDownload(CommercialPreview):
     expected_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
     confirm: Literal[True]
@@ -217,3 +221,14 @@ def archived_download(
         )
 
     return execute(db, operation)
+
+
+@router.post("/tiendanube/preview")
+def tiendanube_preview(
+    body: TiendanubePreview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    from app.services.tiendanube_publication_preview import local_preview
+
+    return execute(db, lambda: local_preview(db, session, body.ecomm_id))
