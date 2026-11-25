@@ -232,3 +232,14 @@ def tiendanube_preview(
     from app.services.tiendanube_publication_preview import local_preview
 
     return execute(db, lambda: local_preview(db, session, body.ecomm_id))
+
+
+@router.post("/mercadolibre/preview")
+def mercadolibre_preview(
+    body: TiendanubePreview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    from app.services.mercadolibre_publication_preview import local_preview
+
+    return execute(db, lambda: local_preview(db, session, body.ecomm_id))
