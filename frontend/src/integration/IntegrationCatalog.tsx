@@ -12,7 +12,7 @@ import { EcommManualRefresh } from "./EcommManualRefresh";
 import { useConnections } from "./connections";
 import { recommendedAction } from "./product-actions";
 import { SavedHistory } from "./SavedHistory";
-import { UserGuide } from "./UserGuide";
+import { UserGuide, type GuideTarget } from "./UserGuide";
 import {
   CommercialViews,
   ChannelComparisonMatrix,
@@ -80,6 +80,7 @@ export function IntegrationCatalog() {
     [historyOpen, setHistoryOpen] = useState(false),
     [advanced, setAdvanced] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [guideTab, setGuideTab] = useState<"Ficha" | "Evidencias" | "IA">();
   const [researchExportBusy, setResearchExportBusy] = useState(false);
   const [researchExportError, setResearchExportError] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -626,7 +627,23 @@ export function IntegrationCatalog() {
       onLogout={logout}
       busy={busy}
     >
-      <UserGuide />
+      <UserGuide onNavigate={(target: GuideTarget) => {
+        if (target === "history") {
+          setHistoryOpen(true);
+          return;
+        }
+        if (target === "Ficha" || target === "Evidencias" || target === "IA") {
+          setGuideTab(target);
+          document.getElementById("integration-search")?.focus();
+          return;
+        }
+        const id = target === "catalog" ? "integration-search"
+          : target === "audit" ? "guide-audit"
+          : target === "channels" ? "guide-channels" : "guide-operations";
+        const destination = document.getElementById(id) ?? document.getElementById("integration-search");
+        destination?.scrollIntoView({ block: "start" });
+        destination?.focus({ preventScroll: true });
+      }} />
       {preferences && (
         <SettingsDialog
           connections={
@@ -709,6 +726,8 @@ export function IntegrationCatalog() {
       />
       {session && <GtinExportPanel csrf={session.csrf_token} />}
       <section
+        id="guide-channels"
+        tabIndex={-1}
         aria-label="Cobertura por canal"
         className="i-commercial-overview"
       >
@@ -788,7 +807,7 @@ export function IntegrationCatalog() {
             }))}
           />
         </details>
-        <section className="i-more-metrics i-quality" aria-label="Calidad del catálogo">
+        <section id="guide-audit" tabIndex={-1} className="i-more-metrics i-quality" aria-label="Calidad del catálogo">
           <h3>Auditoría real del inventario Ecomm-App</h3>
           <p className="s-count-note">
             Se analizan todas las variantes y códigos de la captura API, no solamente
@@ -1063,6 +1082,12 @@ export function IntegrationCatalog() {
             Volver a consultar
           </button>
         </div>
+        {guideTab && (
+          <p className="k-user-guide-context" role="status">
+            Guía: buscá tu producto y pulsá Ver ficha para entrar directamente a {guideTab}.
+            {" "}<button type="button" onClick={() => setGuideTab(undefined)}>Cancelar recorrido</button>
+          </p>
+        )}
         <form
           className="d-filters i-filters"
           onSubmit={(event) => {
@@ -1386,7 +1411,7 @@ export function IntegrationCatalog() {
                       className="k-open-editor"
                       onClick={(event) => {
                         originRef.current = event.currentTarget;
-                        update({ product: item.id, tab: "Ficha" });
+                        if (update({ product: item.id, tab: guideTab ?? "Ficha" })) setGuideTab(undefined);
                       }}
                     >
                       Ver ficha
@@ -1435,6 +1460,7 @@ export function IntegrationCatalog() {
                 </button>
               </div>
             </footer>
+            <div id="guide-operations" tabIndex={-1}>
             {availableFeature("batches") ? (
               <BatchPanel
                 ids={checked}
@@ -1466,6 +1492,7 @@ export function IntegrationCatalog() {
                 inicia procesamiento.
               </p>
             )}
+            </div>
           </>
         )}
         {data && params.get("product") && !selected && (
