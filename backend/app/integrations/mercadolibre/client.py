@@ -139,5 +139,28 @@ class MercadoLibreClient:
             )
         return [attribute for attribute in required if isinstance(attribute, dict)]
 
+    def validate_item(self, payload: dict) -> dict:
+        """Official validation only; never POST to /items.
+
+        The caller must verify seller, permissions and the exact reviewed
+        payload before invoking this method. Only HTTP 204 is a clean pass.
+        """
+        if not isinstance(payload, dict) or not payload:
+            raise ValueError("Falta el payload de publicación.")
+        response = self.transport.request(
+            "POST",
+            f"{self.settings.ml_api_url}/items/validate",
+            headers={
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload, ensure_ascii=False),
+        )
+        if response.status_code != 204:
+            raise MercadoLibreHTTPError(
+                response.status_code, "Mercado Libre no confirmó una validación limpia"
+            )
+        return {"validated": True, "status_code": 204, "publication_created": False}
+
     def refresh_access_token(self, refresh_token: str) -> dict:
         return self.oauth.refresh(refresh_token)
