@@ -1,0 +1,26 @@
+.c-panel [hidden] { display: none !important; }
+.k-channel-overview { display: grid; gap: 14px; min-width: 0; }
+.k-channel-product, .k-channel-card, .k-channel-next {
+  border: 1px solid #dbe3ed; border-radius: 14px; padding: 16px;
+  background: #fff; color: #17263b; min-width: 0;
+}
+.k-channel-product h3, .k-channel-next h4, .k-channel-brand h4 {
+  margin: 5px 0; line-height: 1.3; overflow-wrap: anywhere;
+}
+.k-channel-eyebrow { font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: .07em; color: #526478; }
+.k-channel-meta { font-size: 12px; color: #526478; display: block; }
+.k-channel-ficha { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding-top: 12px; margin-top: 12px; border-top: 1px solid #e2e8f0; font-size: 14px; }
+.k-channel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 205px), 1fr)); gap: 12px; }
+.k-channel-card { display: flex; flex-direction: column; gap: 9px; border-top: 4px solid #3975d4; }
+.k-channel-ml { border-top-color: #d5ad05; }
+.k-channel-brand { display: flex; align-items: center; gap: 9px; }
+.k-channel-mark { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 9px; font-weight: 800; font-size: 12px; background: #e5efff; color: #245ab2; }
+.k-channel-ml .k-channel-mark { background: #fff4b8; color: #594900; }
+.k-channel-status { font-size: 16px; line-height: 1.35; }
+.k-channel-stale { font-size: 12px; color: #885800; font-weight: 600; }
+.k-channel-card button { margin-top: auto; }
+.k-channel-next { background: #f0f5ff; border-color: #c8d9f3; display: grid; gap: 8px; }
+.k-channel-next p { margin: 0; font-size: 13px; }
+.k-channel-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.k-channel-detail { display: grid; gap: 12px; min-width: 0; }
+.k-channel-detail > button:first-child { justify-self: start; }
