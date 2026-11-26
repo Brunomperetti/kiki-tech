@@ -820,6 +820,12 @@ export function PersistentWorkspace({
             {tab === "Canales" &&
               (availableFeature("channels") ? (
                 <ChannelsPanel
+                  key={variant.id}
+                  productTitle={variant.commercialName || variant.name || "Producto sin nombre"}
+                  productSku={variant.sku || ""}
+                  editorialLabel={stateLabels[record.status] || "Por revisar"}
+                  editorialReady={record.status === "READY_FOR_CHANNELS"}
+                  onOpenFicha={() => onTab("Ficha")}
                   id={variant.id}
                   csrf={csrf}
                   blocked={
