@@ -71,6 +71,9 @@ export function TiendanubePreviewPanel({
       {error && <p role="alert">{error}</p>}
       {!blocked && preview?.ecomm_id === id && (
         <div>
+          <p role="status"><strong>{preview.local_blockers.length ? "Ficha requiere revisión" : "Ficha revisada localmente"}</strong> · Envío no habilitado</p>
+          <details>
+            <summary>Ver requisitos pendientes y previsualización</summary>
           <p><strong>SKU:</strong> {preview.sku} · Ficha v{preview.workspace_version}</p>
           <p><strong>Título:</strong> {preview.payload_preview.name.es || "Pendiente"}</p>
           <p><strong>Descripción:</strong> {preview.payload_preview.description.es || "Pendiente"}</p>
@@ -79,6 +82,7 @@ export function TiendanubePreviewPanel({
             <ul>{preview.local_blockers.map((reason, i) => <li key={i}>{reason}</li>)}</ul>
           ) : <p>Controles locales superados. Aún requiere verificación remota.</p>}
           <p>Duplicados remotos: sin comprobar. Conexión y registro de envío pendientes.</p>
+          </details>
         </div>
       )}
       <button type="button" disabled>Enviar producto a Tiendanube (pendiente de habilitación)</button>
