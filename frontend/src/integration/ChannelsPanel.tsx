@@ -227,6 +227,13 @@ export function ChannelsPanel({
                   ? "Sin coincidencia en esta captura"
                   : channelLabels[c.evidence_state]}
               </strong>
+              <p>{!c.freshness.fresh && c.snapshot_available
+                ? "Datos desactualizados · Actualizar captura antes de validar."
+                : c.comparison_state === "no_match"
+                  ? "Sin publicación verificada."
+                  : c.note}</p>
+              <details className="r-reference" data-channel-details={channel}>
+                <summary>Ver detalles del canal ({c.candidates_total} coincidencias)</summary>
               <p>{c.note}</p>
               <p>
                 Origen: {c.source} ·{" "}
@@ -277,6 +284,8 @@ export function ChannelsPanel({
                     key={row.id + row.token + index}
                     data-channel-row={row.id}
                   >
+                    <details data-candidate-details>
+                      <summary>{row.title || "Nombre no informado"} · {row.sku || "Sin SKU"} · {row.identity_verified ? "Identidad revisada" : "Por revisar"}</summary>
                     <h4>{row.title || "Nombre no informado"}</h4>
                     <p>
                       {channel === "ml"
@@ -450,9 +459,11 @@ export function ChannelsPanel({
                         </div>
                       ))}
                     </details>
+                    </details>
                   </article>
                 );
               })}
+              </details>
             </section>
           );
         })}
