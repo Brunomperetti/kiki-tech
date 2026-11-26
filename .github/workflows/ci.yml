@@ -107,6 +107,11 @@ jobs:
         env:
           KIKI_CI_SYNTHETIC_ONLY: "1"
         run: python -m integration_sandbox.ci_stage3_pipeline_smoke
+      - name: Channel dispatch PostgreSQL 18 smoke
+        working-directory: backend
+        env:
+          KIKI_CI_SYNTHETIC_ONLY: "1"
+        run: python -m integration_sandbox.ci_channel_dispatch_smoke
 
   production-supervisor-no-cap-kill:
     runs-on: ubuntu-latest
