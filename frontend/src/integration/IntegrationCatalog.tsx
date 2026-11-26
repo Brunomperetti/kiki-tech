@@ -1277,6 +1277,8 @@ export function IntegrationCatalog() {
                         ? "Catálogo Ecomm-App · Captura guardada"
                         : "Catálogo Ecomm-App · Datos sintéticos"}
                     </small>
+                    <details>
+                      <summary>Ver presentación</summary>
                     <small>Original: {item.name ?? unavailable}</small>
                     <div className="i-presentation">
                       {item.presentation ?? unavailable}
@@ -1289,13 +1291,17 @@ export function IntegrationCatalog() {
                             : "Condición de combo no informada"}
                       </small>
                     </div>
+                    </details>
                   </td>
                   <td data-label="Identidad">
                     <strong>{item.sku ?? unavailable}</strong>
+                    <details>
+                      <summary>Ver códigos y marca</summary>
                     <small>Ecomm ID: {item.id}</small>
                     <small>Marca KIKI: {item.brand || unavailable}</small>
                     <small>Barcode: {item.barcode ?? unavailable}</small>
                     <small>GTIN: {item.gtinRaw ?? unavailable}</small>
+                    </details>
                     {!!item.identityBlockers?.length && (
                       <strong className="i-identity-warning">
                         Barcode y GTIN contradictorios · Guardado bloqueado
@@ -1332,10 +1338,11 @@ export function IntegrationCatalog() {
                         <strong>{label}</strong>
                         {!!state?.candidatesTotal && (
                           <small>
-                            {state.candidatesTotal} candidatos · Identidad por
-                            revisar
+                            {state.candidatesTotal} coincidencias por revisar
                           </small>
                         )}
+                        <details>
+                          <summary>Ver coincidencias y evidencia</summary>
                         {(state?.matchesPreview || []).map((match, index) => (
                           <div
                             className="i-match-preview"
@@ -1361,9 +1368,14 @@ export function IntegrationCatalog() {
                             )}
                           </div>
                         ))}
+                        <small>
+                          {state?.note ??
+                            "Sin evidencia suficiente. No implica que no esté publicado."}
+                        </small>
+                        </details>
                         {state?.fresh === false && (
                           <strong>
-                            Captura sin vigencia; coincidencias conservadas
+                            Captura desactualizada
                           </strong>
                         )}
                         {state?.snapshotAt && (
@@ -1379,10 +1391,7 @@ export function IntegrationCatalog() {
                             ? "Revisar candidatos"
                             : "Ver última captura"}
                         </button>
-                        <small>
-                          {state?.note ??
-                            "Sin evidencia suficiente. No implica que no esté publicado."}
-                        </small>
+
                       </td>
                     );
                   })}
