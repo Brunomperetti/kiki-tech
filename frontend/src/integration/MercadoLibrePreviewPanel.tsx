@@ -69,6 +69,9 @@ export function MercadoLibrePreviewPanel({
       {error && <p role="alert">{error}</p>}
       {!blocked && preview?.ecomm_id === id && (
         <div>
+          <p role="status"><strong>{preview.local_blockers.length ? "Ficha requiere revisión" : "Ficha revisada localmente"}</strong> · Envío no habilitado</p>
+          <details>
+            <summary>Ver requisitos pendientes y previsualización</summary>
           <p><strong>SKU:</strong> {preview.sku} · Ficha v{preview.workspace_version}</p>
           <p><strong>Título:</strong> {preview.commercial_preview.title || "Pendiente"}</p>
           <p><strong>Marca:</strong> {preview.commercial_preview.brand || "Pendiente"}</p>
@@ -78,6 +81,7 @@ export function MercadoLibrePreviewPanel({
           ) : <p>Controles locales superados. No equivale a una aprobación del canal.</p>}
           <h5>Validaciones oficiales pendientes</h5>
           <ul>{preview.channel_checks_pending.map((reason, i) => <li key={i}>{reason}</li>)}</ul>
+          </details>
         </div>
       )}
       <button type="button" disabled>Enviar producto a Mercado Libre (pendiente de habilitación)</button>

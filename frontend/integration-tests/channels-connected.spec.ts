@@ -41,6 +41,19 @@ async function open(page: Page, id = "900003") {
   await page.getByRole("tab", { name: "Canales", exact: true }).click();
   await expect(page.getByLabel("Canales por variante API")).toBeVisible();
   await expect(page.locator('[data-channel-panel="ml"]')).toBeVisible();
+  await expandChannel(page);
+}
+async function expandChannel(page: Page) {
+  const details = page.locator('[data-channel-details="ml"]');
+  await expect(details.locator(":scope > summary")).toBeVisible();
+  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open)))
+    await details.locator(":scope > summary").click();
+}
+async function expandCandidate(page: Page, id = "MLA900000003") {
+  await expandChannel(page);
+  const details = row(page, id).locator("[data-candidate-details]");
+  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open)))
+    await details.locator(":scope > summary").click();
 }
 async function read(page: Page, id = "900003"): Promise<ChannelReport> {
   const r = await page.request.get(root(id));
@@ -51,6 +64,7 @@ const row = (page: Page, id = "MLA900000003") =>
   page.locator(`[data-channel-panel="ml"] [data-channel-row="${id}"]`);
 async function fill(page: Page, ident = "MLA900000003", qty = "1") {
   const card = row(page, ident);
+  await expandCandidate(page, ident);
   await card
     .getByText("Revisar identidad y registrar decisión interna", {
       exact: true,
@@ -129,6 +143,7 @@ test("candidato y decisión Excel no confirman; revisión API confirma sólo la 
   await expect(page.locator('[data-channel-panel="ml"]')).toContainText(
     "Publicación confirmada en captura",
   );
+  await expandCandidate(page);
   await row(page)
     .getByText(/Historial de vinculación/)
     .click();
@@ -158,6 +173,7 @@ test("pack x2 y x6 siguen separados; mismo EAN no transfiere publicación y barc
   await expect(wrong).toContainText(
     "Pack sin composición/cantidad coincidente",
   );
+  await expandCandidate(page, "MLA900000002");
   await wrong
     .getByText("Revisar identidad y registrar decisión interna", {
       exact: true,
@@ -433,4 +449,21 @@ test("captura vencida conserva coincidencias TN, lista diferencias y exporta CSV
     .get(page)!
     .filter((p) => p.startsWith("POST ") && !p.includes("/auth/login"));
   expect(writes).toEqual([]);
+});
+
+
+test("catálogo y canales compactos conservan detalles disponibles sin desplegarlos", async ({ page }) => {
+  const cell = page.locator('[data-ecomm-id="900003"] [data-channel="ml"]');
+  await expect(cell.locator(".i-match-preview").first()).toBeHidden();
+  await cell.getByText("Ver coincidencias y evidencia", { exact: true }).click();
+  await expect(cell.locator(".i-match-preview").first()).toBeVisible();
+  await cell.getByRole("button", { name: "Revisar candidatos" }).click();
+  const details = page.locator('[data-channel-details="ml"]');
+  await expect(details.locator(":scope > summary")).toBeVisible();
+  await expect(row(page)).toBeHidden();
+  await expandChannel(page);
+  await expect(row(page).locator("[data-candidate-details] > summary")).toBeVisible();
+  await expect(row(page).getByText("Revisar identidad y registrar decisión interna", { exact: true })).toBeHidden();
+  await expandCandidate(page);
+  await expect(row(page).getByText("Revisar identidad y registrar decisión interna", { exact: true })).toBeVisible();
 });
