@@ -1,4 +1,5 @@
 import { environmentText } from "./runtime";
+import "./channel-cards.css";
 import { TiendanubePreviewPanel } from "./TiendanubePreviewPanel";
 import { MercadoLibrePreviewPanel } from "./MercadoLibrePreviewPanel";
 import { useEffect, useState } from "react";
@@ -17,13 +18,24 @@ export function ChannelsPanel({
   blocked,
   onBusy,
   onReviewed,
+  productTitle,
+  productSku,
+  editorialLabel,
+  editorialReady,
+  onOpenFicha,
 }: {
   id: string;
   csrf: string;
   blocked: boolean;
   onBusy: (v: boolean) => void;
   onReviewed: () => void;
+  productTitle: string;
+  productSku: string;
+  editorialLabel: string;
+  editorialReady: boolean;
+  onOpenFicha: () => void;
 }) {
+  const [view, setView] = useState<"overview" | "ml" | "tn" | "identity">("overview");
   const [channelData, setData] = useState<ChannelReport>(),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -124,9 +136,62 @@ export function ChannelsPanel({
       className="r-research c-panel"
       aria-label="Canales por variante API"
     >
-      <h3>Mercado Libre y Tiendanube</h3>
-      <TiendanubePreviewPanel key={id} id={id} csrf={csrf} blocked={blocked || busy} />
-      <MercadoLibrePreviewPanel key={"ml-" + id} id={id} csrf={csrf} blocked={blocked || busy} />
+      {view === "overview" && (
+        <div className="k-channel-overview" data-testid="channel-overview">
+          <div className="k-channel-product">
+            <span className="k-channel-eyebrow">Estado comercial</span>
+            <h3>{productTitle}</h3>
+            <span className="k-channel-meta">SKU {productSku || "Sin dato"}</span>
+            <div className="k-channel-ficha">
+              <span>Ficha comercial</span>
+              <strong>{editorialLabel}</strong>
+            </div>
+          </div>
+          <div className="k-channel-grid">
+            {(["ml", "tn"] as const).map((channel) => {
+              const c = data?.[channel];
+              const stale = c && (!c.freshness.fresh || !c.snapshot_available);
+              const label = !c || error ? "Sin verificar"
+                : c.comparison_state === "no_match" ? "Sin coincidencia en captura"
+                : c.identity_verified && c.freshness.fresh ? "Identidad revisada"
+                : c.candidates_total ? "Requiere revisión" : "Sin verificar";
+              return (
+                <article key={channel} className={"k-channel-card k-channel-" + channel}>
+                  <div className="k-channel-brand">
+                    <span className="k-channel-mark" aria-hidden="true">{channel === "ml" ? "ML" : "TN"}</span>
+                    <h4>{channel === "ml" ? "Mercado Libre" : "Tiendanube"}</h4>
+                  </div>
+                  <strong className="k-channel-status">{loading ? "Consultando…" : label}</strong>
+                  <span className="k-channel-meta">{c ? c.candidates_total + " coincidencias en captura" : "Sin datos de comparación"}</span>
+                  {stale && <span className="k-channel-stale">Captura desactualizada</span>}
+                  <button type="button" disabled={busy} onClick={() => setView(channel)}>
+                    {channel === "ml" ? "Ver Mercado Libre" : "Ver Tiendanube"}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+          <div className="k-channel-next">
+            <span className="k-channel-eyebrow">Siguiente paso</span>
+            <h4>{editorialReady ? "Revisar los canales" : "Completar y revisar la ficha"}</h4>
+            <p>{editorialReady ? "Consultá cada canal antes de preparar el envío." : "Completá la información comercial y sus evidencias antes de preparar el envío."}</p>
+            {!editorialReady && <button type="button" className="d-primary" disabled={busy} onClick={onOpenFicha}>Ir a la ficha comercial</button>}
+            <span className="k-channel-meta">Envíos externos no habilitados.</span>
+          </div>
+          {blocked && <p role="alert">Resolvé los cambios pendientes o bloqueos de la ficha antes de validar.</p>}
+          {error && <p role="alert">{error}</p>}
+          <div className="k-channel-tools">
+            <button type="button" disabled={busy || loading} onClick={() => reload((v) => v + 1)}>{loading ? "Consultando capturas…" : "Volver a consultar canales"}</button>
+            <button type="button" disabled={busy} onClick={() => setView("identity")}>Ver información técnica</button>
+          </div>
+        </div>
+      )}
+      <div className="k-channel-detail" hidden={view === "overview"}>
+      <button type="button" disabled={busy} onClick={() => setView("overview")}>← Volver al resumen de canales</button>
+      <h3>{view === "ml" ? "Mercado Libre" : view === "tn" ? "Tiendanube" : "Información técnica"}</h3>
+      <div hidden={view !== "tn"}><TiendanubePreviewPanel key={id} id={id} csrf={csrf} blocked={blocked || busy} /></div>
+      <div hidden={view !== "ml"}><MercadoLibrePreviewPanel key={"ml-" + id} id={id} csrf={csrf} blocked={blocked || busy} /></div>
+      <div hidden={view !== "identity"}>
       <p className="r-notice">
         Ecomm ID {id}.{" "}
         {environmentText(
@@ -136,6 +201,7 @@ export function ChannelsPanel({
         Sin consultas en vivo, sincronización ni publicaciones. Compartir SKU o
         EAN no vincula variantes.
       </p>
+      </div>
       {blocked && (
         <p role="alert">
           Guardá o descartá los cambios de ficha y resolvé la identidad antes de
@@ -162,7 +228,7 @@ export function ChannelsPanel({
         <p role="status">No hay resultados para mostrar. Volvé a consultar canales.</p>
       )}
       {data && (
-        <details className="r-reference">
+        <details className="r-reference" hidden={view !== "identity"}>
           <summary>Identidad API utilizada en esta revisión · {id}</summary>
           <p>
             Captura Ecomm-App: {captureDate(data.identity.captured_at)}. Datos
@@ -220,6 +286,7 @@ export function ChannelsPanel({
               className="r-document"
               key={channel}
               data-channel-panel={channel}
+              hidden={view !== channel}
             >
               <h4>{channel === "ml" ? "Mercado Libre" : "Tiendanube · CSV"}</h4>
               <strong>
@@ -467,6 +534,7 @@ export function ChannelsPanel({
             </section>
           );
         })}
+      </div>
     </section>
   );
 }
