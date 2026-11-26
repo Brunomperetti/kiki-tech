@@ -40,10 +40,12 @@ async function open(page: Page, id = "900003") {
   ).toBeVisible();
   await page.getByRole("tab", { name: "Canales", exact: true }).click();
   await expect(page.getByLabel("Canales por variante API")).toBeVisible();
-  await expect(page.locator('[data-channel-panel="ml"]')).toBeVisible();
   await expandChannel(page);
+  await expect(page.locator('[data-channel-panel="ml"]')).toBeVisible();
 }
 async function expandChannel(page: Page) {
+  const openMercadoLibre = page.getByRole("button", { name: "Ver Mercado Libre", exact: true });
+  if (await openMercadoLibre.isVisible()) await openMercadoLibre.click();
   const details = page.locator('[data-channel-details="ml"]');
   await expect(details.locator(":scope > summary")).toBeVisible();
   if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open)))
@@ -458,6 +460,15 @@ test("catálogo y canales compactos conservan detalles disponibles sin desplegar
   await cell.getByText("Ver coincidencias y evidencia", { exact: true }).click();
   await expect(cell.locator(".i-match-preview").first()).toBeVisible();
   await cell.getByRole("button", { name: "Revisar candidatos" }).click();
+  await expect(page.getByTestId("channel-overview")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ver Tiendanube", exact: true })).toBeVisible();
+  await expect(row(page)).toBeHidden();
+  await page.getByRole("button", { name: "Ver Tiendanube", exact: true }).click();
+  await expect(page.locator('[data-channel-panel="ml"]')).toBeHidden();
+  await expect(page.locator('[data-channel-panel="tn"]')).toBeVisible();
+  await page.getByRole("button", { name: "Volver al resumen de canales" }).click();
+  await expect(page.getByTestId("channel-overview")).toBeVisible();
+  await page.getByRole("button", { name: "Ver Mercado Libre", exact: true }).click();
   const details = page.locator('[data-channel-details="ml"]');
   await expect(details.locator(":scope > summary")).toBeVisible();
   await expect(row(page)).toBeHidden();
