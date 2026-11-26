@@ -1,4 +1,6 @@
 import { environmentText } from "./runtime";
+import { TiendanubePreviewPanel } from "./TiendanubePreviewPanel";
+import { MercadoLibrePreviewPanel } from "./MercadoLibrePreviewPanel";
 import { useEffect, useState } from "react";
 import { captureDate } from "./catalog-adapter";
 import {
@@ -123,6 +125,8 @@ export function ChannelsPanel({
       aria-label="Canales por variante API"
     >
       <h3>Mercado Libre y Tiendanube</h3>
+      <TiendanubePreviewPanel key={id} id={id} csrf={csrf} blocked={blocked || busy} />
+      <MercadoLibrePreviewPanel key={"ml-" + id} id={id} csrf={csrf} blocked={blocked || busy} />
       <p className="r-notice">
         Ecomm ID {id}.{" "}
         {environmentText(
