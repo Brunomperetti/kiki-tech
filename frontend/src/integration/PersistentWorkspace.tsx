@@ -96,6 +96,9 @@ export function PersistentWorkspace({
   useEffect(() => {
     if (error || remote || reauth) contentRef.current?.scrollTo({ top: 0 });
   }, [error, remote, reauth]);
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [tab, variant.id]);
   const dirty =
     !!record &&
     !!fields &&
@@ -820,6 +823,12 @@ export function PersistentWorkspace({
             {tab === "Canales" &&
               (availableFeature("channels") ? (
                 <ChannelsPanel
+                  key={variant.id}
+                  productTitle={variant.commercialName || variant.name || "Producto sin nombre"}
+                  productSku={variant.sku || ""}
+                  editorialLabel={stateLabels[record.status] || "Por revisar"}
+                  editorialReady={record.status === "READY_FOR_CHANNELS"}
+                  onOpenFicha={() => onTab("Ficha")}
                   id={variant.id}
                   csrf={csrf}
                   blocked={
@@ -842,7 +851,7 @@ export function PersistentWorkspace({
                   capturas comerciales permanecen disponibles en la tabla.
                 </p>
               ))}
-            <div className="i-save-bar">
+            {(tab !== "Canales" || dirty || saving) && <div className="i-save-bar">
               <span aria-live="polite">
                 {saving
                   ? "Guardando…"
@@ -879,10 +888,10 @@ export function PersistentWorkspace({
               >
                 Guardar estado editorial
               </button>
-            </div>
+            </div>}
           </>
         )}
-        <div className="i-disabled-actions">
+        {tab !== "Canales" && <div className="i-disabled-actions">
           {["Generar con IA", "Aprobar cambios", "Preparar por canal"].map(
             (label) => (
               <button key={label} disabled>
@@ -890,7 +899,7 @@ export function PersistentWorkspace({
               </button>
             ),
           )}
-        </div>
+        </div>}
         <button disabled={saving} onClick={onClose}>
           Volver a la tabla
         </button>
