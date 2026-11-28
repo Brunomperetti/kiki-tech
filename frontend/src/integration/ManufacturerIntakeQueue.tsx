@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "./catalog-adapter";
 import { capabilities } from "./runtime";
+import { validExactManufacturerUrl } from "./exact-manufacturer-url";
 import { ManufacturerPipelineSummary, verifiedManufacturerReport } from "./ManufacturerPipelineReport";
 
 const endpoint = "/api/ecomm-app/workspace/sources/intake-jobs";
@@ -236,7 +237,7 @@ export function ManufacturerIntakeQueue({
         const [ecomm_id, url, provenance_note] = columns.map(x => x.trim());
         if (!/^[1-9][0-9]{0,19}$/.test(ecomm_id) ||
             !selected.has(ecomm_id) ||
-            !/^https:\/\/[^/]+\/[^?#]+$/.test(url) ||
+            !validExactManufacturerUrl(url) ||
             provenance_note.length < 10 || provenance_note.length > 600) {
           throw new Error(
             `Línea ${i + 1}: seleccioná esa variante y completá URL HTTPS exacta y procedencia.`
