@@ -20,7 +20,7 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def _transport(method, url, *, headers, payload=None):
+def _transport(method, url, *, headers, payload=None, include_total=False):
     body = None if payload is None else json.dumps(payload, ensure_ascii=False).encode()
     request = Request(url, data=body, headers=headers, method=method)
     try:
@@ -28,7 +28,10 @@ def _transport(method, url, *, headers, payload=None):
             raw = response.read(4 * 1024 * 1024 + 1)
             if len(raw) > 4 * 1024 * 1024:
                 raise ValueError("Respuesta demasiado grande")
-            return json.loads(raw)
+            result = json.loads(raw)
+            if include_total:
+                return result, response.headers.get("x-total-count")
+            return result
     except HTTPError as exc:
         code = exc.code
         exc.close()
@@ -86,6 +89,23 @@ class TiendanubeClient:
         if not isinstance(result, list) or not all(isinstance(row, dict) for row in result):
             raise TiendanubeError(502)
         return result
+
+    def catalog_page(self, page):
+        """Sparse product identity data, with the provider's reported total."""
+        if type(page) is not int or page < 1:
+            raise ValueError("Página inválida")
+        params = {"page": page, "per_page": 100,
+                  "sort_by": "created-at-ascending",
+                  "fields": "id,name,brand,variants,visibility,published"}
+        result, total = self._transport(
+            "GET", self._base + "/products?" + urlencode(params),
+            headers=self._headers.copy(), include_total=True,
+        )
+        if (not isinstance(result, list) or len(result) > 100
+                or not isinstance(total, str)
+                or not re.fullmatch(r"[0-9]{1,8}", total)):
+            raise TiendanubeError(502)
+        return result, int(total)
 
     def get_product(self, product_id):
         result = self._get("/products/" + _id(product_id))
