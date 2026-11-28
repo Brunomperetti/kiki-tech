@@ -12,6 +12,7 @@ from urllib.parse import urlencode, urlsplit
 from .source_fetch import DNSResolver, vetted_ip, _PinnedHTTPSConnection, Result
 
 HOST = "api.search.brave.com"
+TAVILY_HOST = "api.tavily.com"
 LIMIT = 262144
 
 
@@ -28,6 +29,17 @@ class SearchConfig:
 
 class SearchTransport:
     def get(self, host, ip, path, *, token, timeout):
+        if host != HOST:
+            raise ValueError("Destino de búsqueda no permitido.")
+        return self._request(host, ip, "GET", path, token=token, timeout=timeout)
+
+    def post(self, host, ip, path, *, token, timeout, payload):
+        if host != TAVILY_HOST or path != "/search":
+            raise ValueError("Destino de búsqueda no permitido.")
+        return self._request(host, ip, "POST", path, token=token, timeout=timeout,
+                             body=json.dumps(payload).encode("utf-8"))
+
+    def _request(self, host, ip, method, path, *, token, timeout, body=None):
         connection = _PinnedHTTPSConnection(host, ip)
         connection.timeout = timeout
         try:
@@ -35,10 +47,13 @@ class SearchTransport:
             remote = connection.sock.getpeername()[0]
             if ipaddress.ip_address(remote) != ipaddress.ip_address(ip):
                 raise ValueError("El destino de búsqueda no corresponde al DNS validado.")
-            connection.request("GET", path, headers={
-                "Host": HOST, "Accept": "application/json", "Accept-Encoding": "identity",
-                "X-Subscription-Token": token, "Connection": "close",
-            })
+            headers = {"Host": host, "Accept": "application/json",
+                       "Accept-Encoding": "identity", "Connection": "close"}
+            if host == TAVILY_HOST:
+                headers.update({"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+            else:
+                headers["X-Subscription-Token"] = token
+            connection.request(method, path, body=body, headers=headers)
             response = connection.getresponse()
             if response.status != 200:
                 # Do not expose body, query, key, Location or exception details.
@@ -58,7 +73,7 @@ class SearchProvider:
         self.resolver = resolver or DNSResolver()
         self.transport = transport or SearchTransport()
         self.requests = 0
-        if (config.provider != "BRAVE" or type(config.max_requests) is not int
+        if (config.provider not in {"BRAVE", "TAVILY"} or type(config.max_requests) is not int
                 or not 1 <= config.max_requests <= 20 or not 1 <= config.max_results <= 10
                 or not 1 <= config.timeout_seconds <= 15):
             raise ValueError("Configuración de búsqueda no admitida.")
@@ -82,13 +97,26 @@ class SearchProvider:
         if not isinstance(name, str) or not name.strip() or not presentation:
             raise ValueError("Falta nombre y presentación de la variante API.")
         terms = [name, str(presentation), str(identity.get("sku") or ""), *sorted(codes), "fabricante producto oficial"]
+        if config.provider == "TAVILY":
+            # Public product identifiers only; never transmit internal SKU or Ecomm ID.
+            terms = [*sorted(codes), name, str(presentation), "fabricante producto oficial"]
         query = " ".join(" ".join(terms).split())[:500]
         if any(ord(c) < 32 for c in query):
             raise ValueError("Consulta inválida.")
-        ip = vetted_ip(HOST, self.resolver)
+        host = TAVILY_HOST if config.provider == "TAVILY" else HOST
+        ip = vetted_ip(host, self.resolver)
         self.requests += 1  # attempt counts even when transport fails
         try:
-            result = self.transport.get(HOST, ip, "/res/v1/web/search?"+urlencode({"q": query, "count": config.max_results}), token=config.api_key, timeout=config.timeout_seconds)
+            if config.provider == "TAVILY":
+                result = self.transport.post(host, ip, "/search", token=config.api_key,
+                    timeout=config.timeout_seconds, payload={
+                        "query": query, "search_depth": "basic", "topic": "general",
+                        "max_results": config.max_results, "auto_parameters": False,
+                        "include_answer": False, "include_raw_content": False,
+                        "include_images": False, "include_usage": True,
+                    })
+            else:
+                result = self.transport.get(host, ip, "/res/v1/web/search?"+urlencode({"q": query, "count": config.max_results}), token=config.api_key, timeout=config.timeout_seconds)
         except Exception:
             raise ValueError("La búsqueda no pudo completarse; sin reintentos automáticos.") from None
         if result.status != 200:
@@ -99,8 +127,11 @@ class SearchProvider:
             raise ValueError("Respuesta de búsqueda inválida.")
         try:
             payload = json.loads(result.body)
-            rows = payload.get("web", {}).get("results", [])
-        except (ValueError, TypeError, AttributeError):
+            if config.provider == "TAVILY":
+                rows = payload["results"]
+            else:
+                rows = payload.get("web", {}).get("results", [])
+        except (ValueError, TypeError, AttributeError, KeyError):
             raise ValueError("Formato de búsqueda inválido.") from None
         if not isinstance(rows, list) or len(rows) > 100:
             raise ValueError("Resultados de búsqueda fuera de límites.")
@@ -126,7 +157,7 @@ class SearchProvider:
                 continue
             seen.add(url)
             output.append({"url": url, "title": str(row.get("title") or "")[:300],
-                           "snippet": str(row.get("description") or "")[:1000],
+                           "snippet": str(row.get("content" if config.provider == "TAVILY" else "description") or "")[:1000],
                            "source_kind": "OFFICIAL_CANDIDATE" if parsed.hostname in config.official_hosts else "SECONDARY",
                            "official_verified": False, "evidence_approved": False})
         return {"query": query, "queried_at": datetime.now(timezone.utc).isoformat(),
