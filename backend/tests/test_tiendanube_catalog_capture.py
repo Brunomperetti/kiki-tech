@@ -100,3 +100,13 @@ def test_successful_refresh_is_separate_and_failed_refresh_preserves_capture():
         assert saved[SOURCE] == [first]
         assert saved["TIENDANUBE"] == [{"sku": "old-csv"}]
     engine.dispose()
+
+
+@pytest.mark.parametrize("visibility", ["visible", "hidden", "unlisted"])
+def test_documented_visibility_is_preserved(visibility):
+    row = product(1)
+    row["visibility"] = visibility
+    row["published"] = visibility == "visible"
+    capture = read_catalog(Pages([([row], 1)]))
+    assert capture["rows"][0]["visibility"] == visibility
+    assert capture["rows"][0]["published"] is (visibility == "visible")
