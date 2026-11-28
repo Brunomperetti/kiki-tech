@@ -19,6 +19,7 @@ from .ecomm_api_product_workspace_service import (
     review_schedule,
 )
 from .ecomm_channel_coverage_service import build_channel_coverage
+from .tiendanube_queue_status import FILTERS as TN_API_FILTERS, TiendanubeQueueStatus
 from .ecomm_api_barcode_service import api_candidates_for_pages
 from .ecomm_catalog_quality import (
     LABELS as QUALITY_FILTERS,
@@ -83,7 +84,7 @@ FILTERS |= {
     "ml_comparison_stale",
     "tn_comparison_stale",
 }
-FILTERS |= set(QUALITY_FILTERS)
+FILTERS |= set(QUALITY_FILTERS) | TN_API_FILTERS
 
 
 def filter_parts(value):
@@ -371,6 +372,7 @@ def build_queue(
         for v in parent.get("variants") or []
         if isinstance(v, dict) and not v.get("invalid") and _value(v.get("sku"))
     )
+    tn_api = TiendanubeQueueStatus(db, get_settings())
     rows = []
     quality = identity_index(pages)
     counts = Counter()
@@ -417,6 +419,10 @@ def build_queue(
                 item["flags"].extend(extra_flags)
                 if editorial_available and "evidence_approved" not in extra_flags:
                     item["flags"].append("needs_research")
+                api_status = tn_api.classify(sku, sku_owners)
+                if api_status is not None:
+                    item["tiendanube_api"] = api_status
+                    item["flags"].append(api_status["state"])
                 item["source"] = source
                 for channel in ("ml", "tn"):
                     counts[f"{channel}_ready_without_confirmation"] += int(

@@ -3,6 +3,19 @@ import { production, capabilities, environmentText } from "./runtime";
 export const catalogPath = "/api/ecomm-app/stage/catalog";
 export const captureSource = "ECOMM_APP_API_STAGE";
 export const unavailable = "Sin datos disponibles";
+export const tnApiLabels = {
+  tn_api_candidate: "Coincidencia por SKU · revisar identidad",
+  tn_api_no_match: "Sin coincidencia por SKU · API",
+  tn_api_conflict: "SKU ambiguo o ausente · revisar",
+  tn_api_unavailable: "Sin captura API disponible",
+  tn_api_stale: "Captura API desactualizada",
+} as const;
+export type TiendanubeApiStatus = {
+  state: keyof typeof tnApiLabels;
+  capturedAt: string | null;
+  matches: number;
+  fresh: boolean;
+};
 export type Variant = {
   id: string;
   name: string | null;
@@ -42,6 +55,7 @@ export type Variant = {
   >;
   reason?: string;
   flags?: string[];
+  tiendanubeApi?: TiendanubeApiStatus;
 };
 export const comparisonStates = [
   "verified",
@@ -337,6 +351,11 @@ export function adaptCatalog(
 }
 
 export const queueFilters = {
+  tn_api_candidate: "Tiendanube API · coincidencia única",
+  tn_api_no_match: "Tiendanube API · sin coincidencia SKU",
+  tn_api_conflict: "Tiendanube API · SKU por revisar",
+  tn_api_unavailable: "Tiendanube API · sin captura",
+  tn_api_stale: "Tiendanube API · captura vencida",
   ml_pending_candidates: "Candidatos por revisar · ML",
   tn_pending_candidates: "Candidatos por revisar · TN",
   ml_found: "Coincidencias encontradas en ML",
@@ -553,8 +572,20 @@ export function adaptQueue(
           note: text(v.note) ?? "Sin evidencia suficiente de publicación.",
         };
       };
+      let tiendanubeApi: TiendanubeApiStatus | undefined;
+      if (row.tiendanube_api !== undefined) {
+        const tn = object(row.tiendanube_api);
+        const state = String(tn.state);
+        if (tn.source !== "TIENDANUBE_API" || tn.identity_verified !== false ||
+          !Object.prototype.hasOwnProperty.call(tnApiLabels, state) ||
+          typeof tn.fresh !== "boolean" || !(row.flags as unknown[]).includes(state))
+          throw new Error("Estado Tiendanube API incompatible");
+        tiendanubeApi = { state: state as keyof typeof tnApiLabels,
+          capturedAt: date(tn.captured_at), matches: count(tn.matches), fresh: tn.fresh };
+      }
       return {
         ...variant,
+        tiendanubeApi,
         brand: text(row.proposed_brand),
         commercialName: text(row.proposed_title),
         editorialStatus: String(row.status),
