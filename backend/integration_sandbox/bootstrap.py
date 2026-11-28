@@ -139,6 +139,11 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
                 from .stage4_fixtures import initialize, install_automation
                 initialize(SessionLocal)
                 install_automation(app)
+                from pathlib import Path
+                tn_test = Path("/runtime/tn-submission-mode")
+                if tn_test.exists() and tn_test.read_text().strip() == "offline-hidden-only":
+                    from .tiendanube_submission_fixture import install
+                    install(app, settings)
             try:
                 yield
             finally:

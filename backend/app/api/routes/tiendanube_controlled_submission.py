@@ -15,8 +15,7 @@ from app.services.tiendanube_controlled_submission import (
 
 def available():
     settings = get_settings()
-    if not (settings.kiki_v2_enabled and settings.kiki_channel_workspace_enabled
-            and settings.kiki_document_workspace_enabled):
+    if not (settings.kiki_v2_enabled and settings.kiki_channel_workspace_enabled):
         raise HTTPException(403, "Envíos controlados deshabilitados")
 
 
@@ -28,6 +27,7 @@ class Preview(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_key: str = Field(pattern=r"^[a-f0-9-]{36}$")
     ecomm_id: str = Field(pattern=r"^[1-9][0-9]{0,19}$")
+    review_mode: Literal["DOCUMENTED", "MANUAL"] = "DOCUMENTED"
     operation: Literal["CREATE_HIDDEN", "UPDATE_CONTENT"]
     target_product_id: str | None = Field(default=None, pattern=r"^[1-9][0-9]{0,19}$")
     target_variant_id: str | None = Field(default=None, pattern=r"^[1-9][0-9]{0,19}$")
@@ -55,7 +55,7 @@ def execute(db, operation):
 
 @router.get("")
 def listing(ecomm_id: str, db: Session = Depends(get_db), session=Depends(require_session)):
-    return {"items": list_submissions(db, ecomm_id), "external_writes_enabled": get_settings().kiki_tiendanube_writes_enabled}
+    return {"items": list_submissions(db, ecomm_id), "external_writes_enabled": bool(get_settings().kiki_tiendanube_writes_enabled and get_settings().kiki_v2_writes_enabled and get_settings().kiki_tiendanube_read_enabled)}
 
 
 @router.get("/{submission_id}")

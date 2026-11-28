@@ -10,6 +10,10 @@ ROOT = "/api/ecomm-app/workspace/"
 
 
 def route_allowed(method, path):
+    if method == "GET" and re.fullmatch(ROOT + r"channels/tn/submissions(?:/[1-9][0-9]*)?", path):
+        return True
+    if method == "POST" and (path == ROOT + "channels/tn/submissions/preview" or re.fullmatch(ROOT + r"channels/tn/submissions/[1-9][0-9]*/send", path)):
+        return True
     if method == "GET" and path == ROOT + "channels/ml/validations":
         return True
     if method == "POST" and (path == ROOT + "channels/ml/validations/preview" or re.fullmatch(ROOT + r"channels/ml/validations/[1-9][0-9]*/validate", path)):

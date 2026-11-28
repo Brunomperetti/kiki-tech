@@ -142,6 +142,34 @@ class TiendanubeClient:
         return result
 
 
+    def create_hidden_product_payload(self, payload):
+        """Same product endpoint, explicit manual draft, strict field allowlist."""
+        if not self._writes_enabled:
+            raise PermissionError("Escritura Tiendanube deshabilitada")
+        allowed = {"name", "description", "brand", "seo_title", "seo_description", "published", "variants"}
+        if not isinstance(payload, dict) or set(payload) - allowed or payload.get("published") is not False:
+            raise ValueError("Sólo se admite la creación oculta con campos comerciales revisados")
+        for key in ("name", "description", "seo_title", "seo_description"):
+            if key in payload and (not isinstance(payload[key], dict) or set(payload[key]) != {"es"}
+                                   or not isinstance(payload[key]["es"], str)):
+                raise ValueError("Texto comercial inválido")
+        if not payload.get("name", {}).get("es", "").strip():
+            raise ValueError("Nombre obligatorio")
+        variants = payload.get("variants")
+        if (not isinstance(variants, list) or len(variants) != 1 or not isinstance(variants[0], dict)
+                or set(variants[0]) - {"sku", "barcode"} or not isinstance(variants[0].get("sku"), str)
+                or not variants[0]["sku"].strip()):
+            raise ValueError("Se requiere una única variante con SKU")
+        result = self._transport("POST", self._base + "/products", headers=self._headers.copy(), payload=payload)
+        if not isinstance(result, dict) or result.get("published") is not False:
+            raise TiendanubeError(502, outcome_unknown=True)
+        try:
+            _id(result.get("id"))
+        except ValueError:
+            raise TiendanubeError(502, outcome_unknown=True) from None
+        return result
+
+
     def update_product_content(self, product_id, *, name, description, brand=""):
         """Content-only PUT: visibility, variant identity, prices and stock excluded.
 
