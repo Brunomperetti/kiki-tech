@@ -94,3 +94,40 @@ def test_ingredients_outside_product_scope_are_not_claims():
         '<div class="container"><p>Ingredientes: FALSO</p></div>'
     )))
     assert "FALSO" not in repr(result)
+
+
+def test_ordinary_h2_heading_is_not_product_evidence():
+    result = parsed(
+        "<html><body><main><h1>Arroz 1 kg</h1></main>"
+        "<aside><h2>Otro producto 500 g</h2>"
+        "<h2>Ingredientes: maní</h2></aside></body></html>"
+    )
+    assert result["identity"]["name"] == "Arroz 1 kg"
+    assert result["identity"]["presentation"] is None
+    assert {claim["field"] for claim in result["claims"]} == {"product_name"}
+
+
+@pytest.mark.parametrize("heading", [
+    "Pack arroz 500 g",
+    "Arroz 500 g",
+    "Ingredientes: maní",
+])
+def test_unscoped_h2_does_not_become_identity_or_claim(heading):
+    result = parsed(f"<html><body><h2>{heading}</h2></body></html>")
+    assert result["identity"]["name"] is None
+    assert result["identity"]["presentation"] is None
+    assert not result["claims"]
+
+
+def test_structured_h2_without_form_still_uses_validated_fallback():
+    result = parsed(
+        "<html><body><main><h2>Fideos de arroz 500 g</h2>"
+        "<p>Ingredientes: harina de arroz</p></main></body></html>"
+    )
+    assert result["identity"]["presentation"] == "500 g"
+    assert result["identity_evidence"]["name"]["location"].startswith(
+        "web/structured-product/h2/"
+    )
+    assert {claim["field"] for claim in result["claims"]} == {
+        "product_name", "presentation", "ingredients",
+    }
