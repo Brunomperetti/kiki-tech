@@ -25,6 +25,32 @@ export function TiendanubePreviewPanel({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const active = useRef<AbortController>();
+  const [connection, setConnection] = useState("");
+  const [checking, setChecking] = useState(false);
+  async function checkConnection() {
+    setChecking(true);
+    setConnection("");
+    try {
+      const response = await request("/api/ecomm-app/workspace/tiendanube/connection/check", {
+        method: "POST",
+        headers: { "X-CSRF-Token": csrf },
+      });
+      const result = await response.json();
+      if (!response.ok || result.external_writes_enabled !== false) throw new Error("No se pudo verificar la conexión.");
+      const messages: Record<string, string> = {
+        CONNECTED_READ_ONLY: "Conexión verificada · Solo lectura",
+        DISABLED: "Conexión aún no habilitada",
+        NOT_CONFIGURED: "Faltan credenciales en el servidor",
+        INVALID_CONFIG: "Configuración inválida",
+        PROVIDER_ERROR: "Tiendanube no confirmó la conexión",
+      };
+      setConnection(messages[result.state] || "Estado no reconocido");
+    } catch {
+      setConnection("No se pudo verificar la conexión.");
+    } finally {
+      setChecking(false);
+    }
+  }
   useEffect(() => {
     setPreview(undefined);
     setError("");
@@ -64,6 +90,10 @@ export function TiendanubePreviewPanel({
   return (
     <section className="r-notice" aria-label="Preparar producto para Tiendanube">
       <h4>Tiendanube · Preparar envío</h4>
+      <button type="button" disabled={checking || !canWrite()} onClick={() => void checkConnection()}>
+        {checking ? "Verificando conexión…" : "Comprobar conexión Tiendanube"}
+      </button>
+      {connection && <p role="status">{connection}</p>}
       <p>Previsualización local de un producto oculto. No consulta ni modifica la tienda.</p>
       <button type="button" disabled={blocked || busy || !canWrite()} onClick={() => void load()}>
         {busy ? "Revisando ficha…" : "Previsualizar producto para Tiendanube"}
