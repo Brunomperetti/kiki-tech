@@ -10,11 +10,11 @@ Importing this module has no application, engine or database side effects.
 import base64
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import os
 import sys
-from threading import Barrier
+from threading import Barrier, Event
 from types import SimpleNamespace
 import unittest
 from uuid import uuid4
@@ -326,6 +326,9 @@ class Stage4Commercial(unittest.TestCase):
         Base.metadata.create_all(self.engine)
         ResearchBase.metadata.create_all(self.engine)
         EditorialBase.metadata.create_all(self.engine)
+        from app.services.documental.source_intake_storage import SourceIntakeBase
+
+        SourceIntakeBase.metadata.create_all(self.engine)
         self.capture = captured_variants()
         self.ids = [str(8_900_000 + i) for i in range(1, 21)]
         self.actor = SimpleNamespace(id="SYNTHETIC-E4-PG18-OPERATOR")
@@ -911,6 +914,636 @@ class Stage4Commercial(unittest.TestCase):
             self.assertEqual(
                 EcommApiProductWorkspace(db).get(self.ids[0])["version"], 1
             )
+
+    def test_periodic_policy_persists_cas_and_tasks_do_not_change_facts_or_editor(self):
+        from sqlalchemy.orm import Session
+        from app.services.monthly_catalog_reports import (
+            review_policy,
+            save_review_policy,
+            preview_periodic_review,
+        )
+        from app.services.documental.storage import Dossier
+
+        with Session(self.engine) as db:
+            self.seed(db)
+            original = deepcopy(db.get(Dossier, self.ids[0]).facts)
+            policy = review_policy(db)
+            save_review_policy(
+                db,
+                self.actor,
+                expected_version=0,
+                settings={
+                    **policy["settings"],
+                    "interval_days": 14,
+                    "evidence_max_age_days": 7,
+                },
+                reason="Configuración explícita SINTÉTICA de revisión, sin aprobación comercial.",
+            )
+            with self.assertRaises(ValueError):
+                save_review_policy(
+                    db,
+                    self.actor,
+                    expected_version=0,
+                    settings=policy["settings"],
+                    reason="Solicitud antigua que no debe reemplazar otra decisión.",
+                )
+            db.rollback()
+            preview = preview_periodic_review(db)
+            self.assertEqual(preview["total_variants"], 20)
+            self.assertEqual(preview["reason_counts"]["INCOMPLETE_FICHE"], 20)
+            self.assertEqual(preview["reason_counts"]["UNREVIEWED_PRODUCT"], 20)
+            self.assertEqual(preview["commercial_changes"], 0)
+            self.assertEqual(db.get(Dossier, self.ids[0]).facts, original)
+            self.no_editor_writes(db)
+        with Session(self.engine) as db:
+            self.assertEqual(review_policy(db)["settings"]["interval_days"], 14)
+            self.assertEqual(review_policy(db)["editorial_signoff_max_days"], 30)
+
+    def test_integral_twenty_api_variants_mock_search_actual_import_and_pending_citations(
+        self,
+    ):
+        from sqlalchemy.orm import Session
+        from app.services.documental.catalog_automation import CatalogAutomation
+        from app.services.documental.storage import Document, Dossier
+        from integration_sandbox.ci_stage3_pipeline_smoke import (
+            HOST,
+            MockManufacturer,
+            source_url,
+            synthetic_page,
+        )
+
+        ids = self.ids
+        calls = []
+
+        class Search:
+            def search(self, identity):
+                calls.append(identity["ecomm_id"])
+                return {
+                    "provider": "SYNTHETIC-PG18-SEARCH",
+                    "queried_at": datetime.now(timezone.utc).isoformat(),
+                    "results": [
+                        {
+                            "url": source_url(identity["ecomm_id"]),
+                            "title": "Referencia FICTICIA PG18",
+                            "snippet": "No es evidencia aprobada",
+                            "source_kind": "OFFICIAL_CANDIDATE",
+                            "official_verified": False,
+                        }
+                    ],
+                }
+
+        http = MockManufacturer(
+            {
+                f"/producto/{ident}/": synthetic_page(
+                    f"Lentejas prueba {index} 250 g", "250 g"
+                )
+                for index, ident in enumerate(ids, 1)
+            }
+        )
+        with Session(self.engine) as db:
+            created = CatalogAutomation(
+                db, self.actor, Search(), HOST, network_enabled=True
+            ).create(str(uuid4()), ids)
+            jobid = created["id"]
+        for index, ident in enumerate(ids, 1):
+            with Session(self.engine) as db:
+                service = CatalogAutomation(
+                    db, self.actor, Search(), HOST, network_enabled=True
+                )
+                before = service.detail(jobid)
+                result = service.step(
+                    jobid, before["revision"], explicit_importer=http.import_exact
+                )
+                self.assertEqual(result["counts"]["IMPORTED"], index)
+                row = next(row for row in result["items"] if row["ecomm_id"] == ident)
+                self.assertEqual(row["public_state"], "EVIDENCE_REVIEW_REQUIRED", row)
+                doc = db.get(Document, row["document_id"])
+                self.assertEqual(doc.body["source"]["review_state"], "PENDING")
+                self.assertEqual(
+                    doc.body["retrieval"]["selection_mode"],
+                    "AUTOMATED_SEARCH_CANDIDATE",
+                )
+                facts = db.get(Dossier, ident).facts
+                self.assertTrue(facts)
+                self.assertTrue(
+                    all(
+                        f["state"] == "PENDING" and f["reviewer"] is None for f in facts
+                    )
+                )
+                self.assertTrue(
+                    all(
+                        f["quote"] in doc.body["sections"][f["location"]] for f in facts
+                    )
+                )
+                self.no_editor_writes(db)
+        self.assertEqual(sorted(calls), ids)
+        self.assertEqual(len(http.calls), 40)
+        self.assertEqual(result["search_requests"], 20)
+        with Session(self.engine) as db:
+            service = CatalogAutomation(
+                db, self.actor, Search(), HOST, network_enabled=True
+            )
+            with self.assertRaises(ValueError):
+                service.step(
+                    jobid, created["revision"], explicit_importer=http.import_exact
+                )
+            db.rollback()
+            self.assertEqual(len(calls), 20)
+            self.assertEqual(len(http.calls), 40)
+            listing = service.listing()
+            self.assertEqual(len(listing["items"]), 1)
+            self.assertEqual(listing["items"][0]["id"], jobid)
+
+    def test_integral_approved_existing_original_reuses_deterministic_proposal_and_never_writes_fiche(
+        self,
+    ):
+        from sqlalchemy.orm import Session
+        from app.services.documental.catalog_automation import CatalogAutomation
+        from app.database.models import KikiAiEditorialDraft
+        from sqlalchemy import select, func
+
+        class NoSearch:
+            def search(self, _identity):
+                raise AssertionError(
+                    "Fresh archived original must not be researched again"
+                )
+
+        with Session(self.engine) as db:
+            self.seed(db)
+            service = CatalogAutomation(
+                db, self.actor, NoSearch(), "fabricante-e4.invalid"
+            )
+            job = service.create(str(uuid4()), self.ids[:1])
+            self.assertTrue(job["items"][0]["automation"]["reused_original"])
+            result = service.step(job["id"], job["revision"])
+            row = result["items"][0]
+            self.assertEqual(row["public_state"], "PROPOSAL_REVIEW_REQUIRED", row)
+            draftid = row["automation"]["proposal"]["draft_id"]
+            self.assertEqual(
+                db.get(KikiAiEditorialDraft, draftid).review_status, "PENDING_REVIEW"
+            )
+            again = service.prepare_proposals(job["id"], result["revision"])
+            self.assertEqual(
+                again["items"][0]["automation"]["proposal"]["draft_id"], draftid
+            )
+            self.assertEqual(
+                db.scalar(select(func.count()).select_from(KikiAiEditorialDraft)), 1
+            )
+            self.no_editor_writes(db)
+
+    def test_global_daily_search_reservation_cas_for_two_preclaimed_postgresql_jobs(
+        self,
+    ):
+        from sqlalchemy.orm import Session
+        from app.services.documental.catalog_automation import CatalogAutomation
+        from app.services.documental.source_intake_storage import SourceIntakeJob
+        from app.services.documental.source_intake_pipeline import PipelineError
+
+        calls = []
+
+        class Search:
+            def search(self, identity):
+                calls.append(identity["ecomm_id"])
+                return {
+                    "provider": "SYNTHETIC",
+                    "results": [],
+                    "queried_at": "2026-11-28T12:00:00+00:00",
+                }
+
+        claims = []
+        with Session(self.engine) as db:
+            for ident in self.ids[:2]:
+                service = CatalogAutomation(
+                    db,
+                    self.actor,
+                    Search(),
+                    "fabricante-e4.invalid",
+                    network_enabled=True,
+                    daily_search_limit=1,
+                )
+                job = service.create(str(uuid4()), [ident])
+                record = db.get(SourceIntakeJob, job["id"])
+                rows = deepcopy(record.items)
+                token = str(uuid4())
+                # Adversarial two-preclaimed recovery fixture: the ordinary
+                # queue already permits only one active provider step. Test
+                # the quota mutex independently in case leases preexist.
+                rows[0].update(state="RUNNING", claim_token=token, attempts=1)
+                record.items = rows
+                db.commit()
+                claims.append((record.id, ident, token))
+        barrier = Barrier(2)
+
+        def reserve(claim):
+            with Session(self.engine) as db:
+                service = CatalogAutomation(
+                    db,
+                    self.actor,
+                    Search(),
+                    "fabricante-e4.invalid",
+                    network_enabled=True,
+                    daily_search_limit=1,
+                )
+                barrier.wait(timeout=10)
+                try:
+                    service._resolve(*claim)
+                except PipelineError as error:
+                    db.rollback()
+                    return error.code
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = list(pool.map(reserve, claims))
+        self.assertEqual(
+            sorted(outcomes), ["GLOBAL_SEARCH_DAILY_BUDGET", "NO_AUTHORIZED_SOURCE"]
+        )
+        self.assertEqual(len(calls), 1)
+        with Session(self.engine) as db:
+            self.no_editor_writes(db)
+
+    def test_periodic_runner_two_process_ticks_and_restart_do_not_duplicate_or_sign_off(
+        self,
+    ):
+        from sqlalchemy import select, func
+        from sqlalchemy.orm import sessionmaker
+        from app.database.models import CatalogSnapshot
+        from app.services.periodic_review_runner import PeriodicReviewRunner, SOURCE
+        from app.services.documental.storage import Dossier
+
+        config = SimpleNamespace(
+            kiki_monthly_review_enabled=True,
+            kiki_v2_enabled=True,
+            kiki_editorial_executor_enabled=True,
+        )
+        factory = sessionmaker(bind=self.engine, expire_on_commit=False)
+        with factory() as db:
+            self.seed(db)
+            facts = deepcopy(db.get(Dossier, self.ids[0]).facts)
+        barrier = Barrier(2)
+
+        def tick(_):
+            runner = PeriodicReviewRunner(factory, config=config)
+            barrier.wait(timeout=10)
+            return runner.tick()["state"]
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(tick, range(2)))
+        self.assertEqual(results.count("COMPLETED_DIAGNOSTIC"), 1)
+        self.assertTrue(
+            all(
+                state in {"COMPLETED_DIAGNOSTIC", "BUSY", "THROTTLED", "NOT_DUE"}
+                for state in results
+            ),
+            results,
+        )
+        restarted = PeriodicReviewRunner(factory, config=config).tick()
+        self.assertIn(restarted["state"], {"THROTTLED", "NOT_DUE"})
+        with factory() as db:
+            self.assertEqual(
+                db.scalar(
+                    select(func.count())
+                    .select_from(CatalogSnapshot)
+                    .where(CatalogSnapshot.source.startswith("KIKI_MONTHLY:"))
+                ),
+                1,
+            )
+            archived = db.scalar(
+                select(CatalogSnapshot).where(
+                    CatalogSnapshot.source.startswith("KIKI_MONTHLY:")
+                )
+            ).payload[0]
+            self.assertIsNone(archived["human_acknowledgement"])
+            self.assertTrue(archived["created_by"].startswith("SYSTEM_AUTOMATION"))
+            ledger = db.scalar(
+                select(CatalogSnapshot).where(CatalogSnapshot.source == SOURCE)
+            ).payload[0]
+            self.assertEqual(len(ledger["tasks"]), 20)
+            self.assertEqual(len(ledger["history"]), 1)
+            self.assertEqual(ledger["human_acknowledgements_created"], 0)
+            self.assertEqual(db.get(Dossier, self.ids[0]).facts, facts)
+            self.no_editor_writes(db)
+
+    def test_periodic_original_reconfirmation_matches_exact_pg_json_receipt(self):
+        from sqlalchemy.orm import Session
+        from app.services.documental.storage import Document, Dossier, digest
+        from app.services.monthly_catalog_reports import preview_periodic_review
+
+        with Session(self.engine) as db:
+            docid = self.seed(db)[0]
+            document = db.get(Document, docid)
+            old = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+            document.body = {
+                **document.body,
+                "source": {**document.body["source"], "reviewed_at": old},
+            }
+            document.digest = digest(document.body)
+            db.commit()
+            before = preview_periodic_review(db)
+            self.assertEqual(before["reason_counts"]["EVIDENCE_EXPIRED"], 1)
+            item = db.get(Dossier, self.ids[0])
+            facts = deepcopy(item.facts)
+            event = {
+                "action": "PROVENANCE_RECONFIRMED",
+                "at": datetime.now(timezone.utc).isoformat(),
+                "actor": "SYNTHETIC-PG18-TEST-REVIEWER",
+                "detail": {
+                    "document_id": docid,
+                    "document_version": document.version,
+                    "document_hash": document.digest,
+                    "decision": "REVIEWED",
+                },
+            }
+            item.history = [*item.history, event]
+            item.version += 1
+            db.commit()
+            after = preview_periodic_review(db)
+            self.assertEqual(after["reason_counts"]["EVIDENCE_EXPIRED"], 0)
+            self.assertEqual(db.get(Dossier, self.ids[0]).facts, facts)
+            self.assertEqual(document.body["source"]["reviewed_at"], old)
+            self.no_editor_writes(db)
+
+    def test_integral_periodic_same_and_changed_html_refresh_exact_original_pg(self):
+        from sqlalchemy.orm import Session
+        from app.services.documental.catalog_automation import CatalogAutomation
+        from app.services.documental.storage import Document, Dossier, digest
+        from app.services.documental.research import Research
+        from integration_sandbox.ci_stage3_pipeline_smoke import (
+            HOST,
+            MockManufacturer,
+            source_url,
+            synthetic_page,
+        )
+
+        class Search:
+            def search(self, identity):
+                return {
+                    "provider": "SYNTHETIC",
+                    "results": [
+                        {
+                            "url": source_url(identity["ecomm_id"]),
+                            "source_kind": "OFFICIAL_CANDIDATE",
+                        }
+                    ],
+                }
+
+        for index, changed in enumerate((False, True), 1):
+            ident = self.ids[index - 1]
+            content = synthetic_page(f"Lentejas prueba {index} 250 g", "250 g")
+            http = MockManufacturer({f"/producto/{ident}/": content})
+            with Session(self.engine) as db:
+                service = CatalogAutomation(
+                    db, self.actor, Search(), HOST, network_enabled=True
+                )
+                initial = service.create(str(uuid4()), [ident])
+                acquired = service.step(
+                    initial["id"],
+                    initial["revision"],
+                    explicit_importer=http.import_exact,
+                )
+                doc = db.get(Document, acquired["items"][0]["document_id"])
+                body = deepcopy(doc.body)
+                old = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+                body["source"].update(registered_at=old, declared_consulted_at=old)
+                body["retrieval"]["acquired_at"] = old
+                doc.body = body
+                doc.digest = digest(body)
+                db.commit()
+                # Artificially aging metadata changes its digest in this
+                # fixture; refresh stale facts before the next CAS capture.
+                Research(db, self.actor).dossier(ident)
+                db.commit()
+                previous = doc.version
+                pending = service.create(str(uuid4()), [ident])
+                self.assertEqual(
+                    pending["items"][0]["automation"]["phase"], "REFRESH_REQUIRED"
+                )
+                if changed:
+                    http.pages[f"/producto/{ident}/"] += (
+                        b"<!-- FICTITIOUS changed original -->"
+                    )
+                result = service.step(
+                    pending["id"],
+                    pending["revision"],
+                    explicit_importer=http.import_exact,
+                )
+                row = result["items"][0]
+                self.assertEqual(row["processing"]["phase"], "EXTRACTED", row)
+                current = db.get(Document, row["document_id"])
+                self.assertEqual(current.version, previous + int(changed))
+                self.assertEqual(len(http.calls), 4)
+                self.assertTrue(
+                    all(f["state"] != "APPROVED" for f in db.get(Dossier, ident).facts)
+                )
+                reused = service.create(str(uuid4()), [ident])
+                self.assertTrue(reused["items"][0]["automation"]["reused_original"])
+                self.no_editor_writes(db)
+
+    def test_workspace_strong_orm_reference_cannot_overwrite_a_concurrent_version(self):
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from app.database.models import EcommApiProductEdit
+        from app.services.ecomm_api_product_workspace_service import (
+            EcommApiProductWorkspace,
+            blank_fields,
+        )
+
+        fields = blank_fields()
+        fields["note"] = "Primer borrador sintético"
+        with Session(self.engine) as db:
+            EcommApiProductWorkspace(db).save(self.ids[0], fields, "DRAFT", 0)
+        with Session(self.engine, expire_on_commit=False) as stale:
+            held = stale.scalar(
+                select(EcommApiProductEdit).where(
+                    EcommApiProductEdit.ecomm_id == self.ids[0]
+                )
+            )
+            self.assertEqual(held.version, 1)
+            with Session(self.engine) as newer:
+                updated = {**fields, "note": "Cambio concurrente que debe preservarse"}
+                EcommApiProductWorkspace(newer).save(self.ids[0], updated, "DRAFT", 1)
+            with self.assertRaises(ValueError):
+                EcommApiProductWorkspace(stale).save(self.ids[0], fields, "DRAFT", 1)
+            stale.rollback()
+            restored = EcommApiProductWorkspace(stale).get(self.ids[0])
+            self.assertEqual(restored["version"], 2)
+            self.assertEqual(restored["fields"]["note"], updated["note"])
+
+    def test_ready_documentary_guard_and_bulk_editor_share_lock_order_without_deadlock(
+        self,
+    ):
+        from concurrent.futures import ThreadPoolExecutor
+        from unittest.mock import patch
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from app.database.models import EcommApiProductEdit
+        from app.services.ecomm_api_product_workspace_service import (
+            EcommApiProductWorkspace,
+            blank_fields,
+        )
+        from app.services.documental.storage import Document
+        from app.services.documental.research import Research
+        from app.services.documental.proposals import Proposals
+        from app.services.documental.commercial_review import CommercialReview
+        import app.services.documental.channel_readiness_guard as gate
+
+        ident = self.ids[0]
+        with Session(self.engine) as db:
+            docid = self.seed(db)[0]
+            Proposals(db, self.actor).generate(ident, 0)
+            fields = blank_fields()
+            generated, _ = Proposals.generate_fields(
+                Research(db, self.actor).dossier(ident).facts
+            )
+            fields.update({key: row["value"] for key, row in generated.items()})
+            fields["media"] = [self.media()]
+            fields["sources"] = [
+                {
+                    "kind": "FABRICANTE",
+                    "name": "Fuente FICTICIA PG18",
+                    "url": self.media()["source_url"],
+                    "verified": True,
+                    "note": "Comprobación sintética explícita para probar mutex; no aceptación comercial real.",
+                }
+            ]
+            EcommApiProductWorkspace(db).save(ident, fields, "DRAFT", 0)
+            research = Research(db, self.actor)
+            item = research.dossier(ident)
+            document = db.get(Document, docid)
+            extracted = research.extract(ident, item.version, docid, document.version)
+            for candidate in extracted["facts"]:
+                item = research.dossier(ident)
+                fact = next(row for row in item.facts if row["id"] == candidate["id"])
+                if fact["state"] != "APPROVED":
+                    research.review(
+                        ident,
+                        item.version,
+                        fact["id"],
+                        fact["version"],
+                        "APPROVED",
+                        "Revisión SINTÉTICA de nueva identidad editorial para comprobar el orden transaccional.",
+                    )
+            self.rights(research, document, self.media())
+            db.commit()
+            Proposals(db, self.actor).generate(ident, 1)
+            preview = CommercialReview(db, self.actor).preview([ident])
+            choices = self.decisions(preview)
+            db.rollback()
+        editor_held, guard_obtained_control = Event(), Event()
+        original = gate.require_primary_evidence
+
+        def guarded(*args, **kwargs):
+            result = original(*args, **kwargs)
+            guard_obtained_control.set()
+            return result
+
+        def bulk():
+            with Session(self.engine) as db:
+                db.scalar(
+                    select(EcommApiProductEdit)
+                    .where(EcommApiProductEdit.ecomm_id == ident)
+                    .with_for_update()
+                )
+                editor_held.set()
+                # With the correct order the READY request waits for this row
+                # before Control, so this bounded wait expires, then both finish.
+                # Reversed Control→editor order creates a genuine PG deadlock.
+                guard_obtained_control.wait(timeout=0.5)
+                CommercialReview(db, self.actor).apply(
+                    preview["fingerprint"], choices, [ident]
+                )
+                db.commit()
+                return "bulk"
+
+        def ready():
+            if not editor_held.wait(timeout=5):
+                raise AssertionError("Fixture editor lock was not obtained")
+            with Session(self.engine) as db:
+                saved = EcommApiProductWorkspace(db).save(
+                    ident, fields, "READY_FOR_CHANNELS", 1, session=self.actor
+                )
+                self.assertEqual(saved["version"], 2)
+                return "ready"
+
+        with patch.object(gate, "require_primary_evidence", guarded):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first, second = pool.submit(bulk), pool.submit(ready)
+                self.assertEqual(
+                    {first.result(timeout=15), second.result(timeout=15)},
+                    {"bulk", "ready"},
+                )
+        with Session(self.engine) as db:
+            saved = EcommApiProductWorkspace(db).get(ident)
+            self.assertEqual(saved["status"], "READY_FOR_CHANNELS")
+            self.assertEqual(saved["version"], 2)
+            self.assertEqual(saved["fields"], fields)
+
+    def test_twenty_cached_variants_preflight_sql_cost_with_3200_api_variants(self):
+        from time import perf_counter
+        from sqlalchemy import event, select
+        from sqlalchemy.orm import Session
+        from app.database.models import CatalogSnapshot
+        from app.services.documental.catalog_automation import CatalogAutomation
+
+        class NoSearch:
+            def search(self, _identity):
+                raise AssertionError(
+                    "Performance acceptance is offline; no search authorized"
+                )
+
+        measured = []
+        with Session(self.engine) as db:
+            self.seed(db, 20)
+
+            def measure(label):
+                statements = []
+
+                def sql_seen(_connection, _cursor, statement, _params, _context, _many):
+                    if statement.lstrip().upper().startswith("SELECT"):
+                        statements.append(statement)
+
+                event.listen(self.engine, "before_cursor_execute", sql_seen)
+                started = perf_counter()
+                try:
+                    result = CatalogAutomation(
+                        db, self.actor, NoSearch(), "fabricante-e4.invalid"
+                    ).create(str(uuid4()), self.ids)
+                finally:
+                    elapsed = perf_counter() - started
+                    event.remove(self.engine, "before_cursor_execute", sql_seen)
+                self.assertEqual(result["total"], 20)
+                self.assertEqual(
+                    {row["ecomm_id"] for row in result["items"]}, set(self.ids)
+                )
+                self.assertTrue(
+                    all(row["automation"]["reused_original"] for row in result["items"])
+                )
+                self.assertEqual(result["search_requests"], 0)
+                measured.append((len(statements), elapsed))
+                print(
+                    f"PG18 PERF {label}: selected=20 SELECTs={len(statements)} seconds={elapsed:.3f} provider_calls=0",
+                    flush=True,
+                )
+
+            measure("catalogue=20")
+            stage = db.scalar(
+                select(CatalogSnapshot).where(
+                    CatalogSnapshot.source == "ECOMM_APP_API_STAGE"
+                )
+            )
+            template = captured_variants(3200)[0]
+            self.capture = [
+                {
+                    **template,
+                    "page": index + 1,
+                    "total_pages": 64,
+                    "items": template["items"][index * 50 : (index + 1) * 50],
+                }
+                for index in range(64)
+            ]
+            stage.payload = deepcopy(self.capture)
+            db.commit()
+            measure("catalogue=3200")
+            self.assertEqual(measured[0][0], measured[1][0])
+            self.no_editor_writes(db)
 
 
 def main(argv=None):

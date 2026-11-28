@@ -1,0 +1,16 @@
+{
+  "provenance": "USER_DECLARED_REFERENCE_2026_11_28",
+  "ecomm_id": "9439612",
+  "sku": "108",
+  "name": "Fideos de arroz Spaguetti x 500",
+  "declared_ean": "7730114100015",
+  "brand_candidate": "Blue Patna",
+  "manufacturer_candidate": "Coopar S.A.",
+  "source_candidate": "https://www.coopar.com.uy/Producto.aspx?id=21",
+  "identity_verified": false,
+  "official_provenance_reviewed": false,
+  "commercial_facts_approved": false,
+  "catalogue_record_created": false,
+  "external_download_enabled": false,
+  "instructions": "Compare exact current Ecomm-App API variant, presentation and pack status; archive authorized original before approving any claim. User declaration is not manufacturer evidence."
+}

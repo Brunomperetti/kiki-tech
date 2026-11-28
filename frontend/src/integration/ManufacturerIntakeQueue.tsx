@@ -51,7 +51,7 @@ type Job = {
   max_attempts?: number;
   items: JobItem[];
   sitemap_url: string;
-  selection_mode: "EXACT_OPERATOR_URL" | "REVIEWED_SITEMAP";
+  selection_mode: "EXACT_OPERATOR_URL" | "REVIEWED_SITEMAP" | "AUTOMATED_SEARCH";
   source_host: string;
   external_writes_enabled: false;
   manual_steps_only: true;
@@ -59,14 +59,14 @@ type Job = {
   claims_approved: 0;
 };
 
-function verified(value: unknown): Job {
+function verified(value: unknown, allowAutomatedReference = false): Job {
   const row = value as Job;
   const states = ["PENDING", "RUNNING", "IMPORTED", "ALREADY_PRESENT", "BLOCKED", "CANCELLED"];
   if (!row || row.mode !== "MANUAL_RESUMABLE_SOURCE_INTAKE" ||
       row.external_writes_enabled !== false || row.manual_steps_only !== true ||
       row.ai_requests !== 0 || row.claims_approved !== 0 ||
       (row.pipeline_schema_version !== undefined && row.pipeline_schema_version !== "kiki-documental-pipeline-v1") ||
-      !["EXACT_OPERATOR_URL", "REVIEWED_SITEMAP"].includes(row.selection_mode) ||
+      !["EXACT_OPERATOR_URL", "REVIEWED_SITEMAP", ...(allowAutomatedReference ? ["AUTOMATED_SEARCH"] : [])].includes(row.selection_mode) ||
       !/^[a-f0-9-]{36}$/.test(row.id) ||
       !Number.isSafeInteger(row.revision) || row.revision < 1 || !Array.isArray(row.items) ||
       row.total !== row.items.length || row.total < 1 || row.total > 20 ||
@@ -106,6 +106,7 @@ export function ManufacturerIntakeQueue({
   onOpen: (id: string) => void;
 }) {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [automatedCount, setAutomatedCount] = useState(0);
   const [current, setCurrent] = useState<Job>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -146,9 +147,13 @@ export function ManufacturerIntakeQueue({
     const data = await response.json() as { mode?: string; items?: unknown[]; detail?: string };
     if (!response.ok || data.mode !== "MANUAL_RESUMABLE_SOURCE_INTAKE" ||
         !Array.isArray(data.items)) throw new Error(data.detail || "No se pudo leer la cola.");
-    const safe = data.items.map(verified);
+    // The same persistent queue contains automated batches. Validate their
+    // reference but keep their actions in the integrated research workflow.
+    const all = data.items.map(value => verified(value, true));
+    const safe = all.filter(row => row.selection_mode !== "AUTOMATED_SEARCH");
     if (mounted.current) {
       setJobs(safe);
+      setAutomatedCount(all.length - safe.length);
       setCurrent(old => old ? safe.find(job => job.id === old.id) || old : safe[0]);
     }
   }
@@ -433,6 +438,7 @@ export function ManufacturerIntakeQueue({
         Actualizar estados
       </button>
     </div>
+    {automatedCount > 0 && <p>{automatedCount} lotes de investigación integral se gestionan en «Investigar y completar». Esta lista conserva los manifiestos manuales.</p>}
     {jobs.length > 0 && <label>
       Lotes guardados
       <select aria-label="Seleccionar lote de fuentes" disabled={busy} value={current?.id || ""} onChange={event => {

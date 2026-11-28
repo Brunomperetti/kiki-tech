@@ -31,6 +31,7 @@ STAGE3 = False
 PRODUCTION_WEB_PATHS = frozenset({
     "/", "/v2", "/v2/", "/dashboard-classic", "/products", "/queue", "/channels",
 })
+STAGE4 = False
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.integration-dist"
 WEB_CSP = (
@@ -77,7 +78,9 @@ class Handler(BaseHTTPRequestHandler):
         ):
             self.serve_static(path.path)
             return
-        if not route_allowed(self.command, path.path, connections=CONNECTIONS, production_compat=PRODUCTION_COMPAT, stage3=STAGE3):
+        from integration_sandbox.stage4_policy import route_allowed as stage4_route
+        if not (route_allowed(self.command, path.path, connections=CONNECTIONS, production_compat=PRODUCTION_COMPAT, stage3=STAGE3)
+                or (STAGE4 and stage4_route(self.command, path.path))):
             self.deny(403)
             return
         try:
@@ -93,6 +96,8 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 else 16_384
             )
+            if STAGE4 and stage4_route(self.command, path.path):
+                max_body = 2_097_152
             if self.command == "POST" and re.fullmatch(
                 r"/api/test-documents/" + HILERET_ID + "/import", path.path
             ):
@@ -247,6 +252,11 @@ if __name__ == "__main__":
     compat_mode = compat_flag.read_text().strip() if compat_flag.exists() else "off"
     if compat_mode not in {"off", "isolated-only"}:
         raise RuntimeError("Modo de compatibilidad inválido.")
+    stage4_flag = directory / "stage4-mode"
+    stage4_mode = stage4_flag.read_text().strip() if stage4_flag.exists() else "off"
+    if stage4_mode not in {"off", "synthetic-commercial"}:
+        raise RuntimeError("Modo comercial aislado inválido.")
+    STAGE4 = stage4_mode == "synthetic-commercial"
     PRODUCTION_COMPAT = compat_mode == "isolated-only"
     stage3_flag = directory / "stage3-mode"
     stage3_mode = stage3_flag.read_text().strip() if stage3_flag.exists() else "off"
@@ -255,6 +265,8 @@ if __name__ == "__main__":
     ):
         raise RuntimeError("Modo documental de etapa 3 inválido.")
     STAGE3 = stage3_mode == "local-synthetic"
+    if STAGE4 and (STAGE3 or not PRODUCTION_COMPAT or CONNECTIONS):
+        raise RuntimeError("El modo comercial sintético requiere un escenario independiente.")
     if PRODUCTION_COMPAT:
         WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend/.production-dist"
     print(

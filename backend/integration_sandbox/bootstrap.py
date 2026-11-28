@@ -1,9 +1,11 @@
 from .policy import route_allowed, CSP, preflight
 
 
-def create_sandbox_app(*, autonomous=False, connections=False, production_compat=False, stage3=False):
-    if stage3 and (not production_compat or autonomous or connections):
+def create_sandbox_app(*, autonomous=False, connections=False, production_compat=False, stage3=False, stage4=False):
+    if stage3 and (not production_compat or autonomous or connections or stage4):
         raise RuntimeError("Etapa 3 requiere el perfil productivo aislado y ejecución manual independiente.")
+    if stage4 and (stage3 or not production_compat or autonomous or connections):
+        raise RuntimeError("Etapa 4 requiere un perfil comercial sintético independiente.")
     preflight()
     # Import ONLY after configuration, socket guard and database identity checks.
     from argon2 import PasswordHasher
@@ -38,10 +40,12 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
         kiki_editorial_batches_enabled=True,
         kiki_editorial_executor_enabled=autonomous,
         kiki_editorial_lease_seconds=6,
-        kiki_document_resumable_intake_enabled=stage3,
-        kiki_document_explicit_url_intake_enabled=stage3,
-        kiki_document_parser_kernel_required=stage3,
-        kiki_document_source_fetch_hosts="fabricante-stage3.invalid" if stage3 else "",
+        kiki_document_resumable_intake_enabled=stage3 or stage4,
+        kiki_document_explicit_url_intake_enabled=stage3 or stage4,
+        kiki_document_parser_kernel_required=stage3 or stage4,
+        kiki_document_source_fetch_hosts="fabricante-stage3.invalid" if stage3 else "fabricante-stage4.invalid" if stage4 else "",
+        kiki_research_search_enabled=stage4,
+        kiki_research_search_api_key="SYNTHETIC-OFFLINE-TEST-NOT-A-CREDENTIAL" if stage4 else "",
     )
     # Harness-only binding, before any service imports. Production get_settings is unchanged.
     config.get_settings = lambda: settings
@@ -84,7 +88,18 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
             from app.database.models import Base
             Base.metadata.create_all(engine)
         async with original_lifespan(app):
-            seed(SessionLocal, allow_scaled=autonomous)
+            if stage4:
+                from sqlalchemy import select
+                from app.database.models import CatalogSnapshot
+                from app.integrations.ecomm_app.catalog_stage import STAGE_SOURCE
+                from .stage4_fixtures import capture
+                with SessionLocal() as db:
+                    current = db.scalar(select(CatalogSnapshot).where(CatalogSnapshot.source == STAGE_SOURCE))
+                    already_seeded = bool(current and current.payload == capture())
+                if not already_seeded:
+                    seed(SessionLocal)
+            else:
+                seed(SessionLocal, allow_scaled=autonomous)
             initialize_research(engine, SessionLocal)
             if connections:
                 from .connection_fixtures import seed_connection
@@ -109,7 +124,7 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
                 if not inspect(connection).has_table("kiki_editorial_batch_signals"):
                     for statement in EXECUTOR_UP:
                         connection.execute(text(statement))
-            if stage3:
+            if stage3 or stage4:
                 # Test-only explicit migration after preflight and synthetic
                 # source verification, never production app startup DDL.
                 from app.services.documental.source_intake_migration import UP as INTAKE_UP
@@ -117,8 +132,13 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
                     if not inspect(connection).has_table("kiki_source_intake_jobs"):
                         for statement in INTAKE_UP:
                             connection.execute(text(statement))
+            if stage3:
                 from .stage3_fixtures import initialize
                 initialize(app, SessionLocal)
+            if stage4:
+                from .stage4_fixtures import initialize, install_automation
+                initialize(SessionLocal)
+                install_automation(app)
             try:
                 yield
             finally:
@@ -128,7 +148,9 @@ def create_sandbox_app(*, autonomous=False, connections=False, production_compat
 
     @application.middleware("http")
     async def isolation_boundary(request, call_next):
-        if not route_allowed(request.method, request.url.path, connections=connections, production_compat=production_compat, stage3=stage3):
+        from .stage4_policy import route_allowed as stage4_route
+        if not (route_allowed(request.method, request.url.path, connections=connections, production_compat=production_compat, stage3=stage3)
+                or (stage4 and stage4_route(request.method, request.url.path))):
             response = JSONResponse(
                 status_code=403,
                 content={"detail": "Operación deshabilitada en etapa 2B sintética."},

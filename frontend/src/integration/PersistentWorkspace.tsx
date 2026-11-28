@@ -6,7 +6,13 @@ import {
 } from "./runtime";
 import { GenerationReadiness } from "./GenerationReadiness";
 import { ChannelsPanel } from "./ChannelsPanel";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   CommercialBackofficeFields,
   assessCommercialReadiness,
@@ -35,6 +41,7 @@ import {
 } from "./workspace-adapter";
 import { ResearchPanel, ResearchSummary } from "./ResearchPanel";
 import { Stage2PilotSummary, naturalSeedPilotId } from "./Stage2PilotSummary";
+import { AutomationFlowPanel } from "./AutomationFlowPanel";
 import { ProposalPanel } from "./ProposalPanel";
 import { CommercialCoveragePanel } from "./CommercialCoverage";
 import { MediaReview } from "./MediaReview";
@@ -111,7 +118,9 @@ export function PersistentWorkspace({
     return () => onDirty(false);
   }, [dirty, proposalDirty, onDirty]);
   useEffect(() => {
-    onBusy(saving || researchBusy || proposalBusy || channelBusy || sourceLinkBusy);
+    onBusy(
+      saving || researchBusy || proposalBusy || channelBusy || sourceLinkBusy,
+    );
     return () => onBusy(false);
   }, [saving, researchBusy, proposalBusy, channelBusy, sourceLinkBusy, onBusy]);
   useEffect(() => {
@@ -149,7 +158,8 @@ export function PersistentWorkspace({
     onRecord(value);
   }
   async function reuseReviewedDocumentSources() {
-    if (!record || !fields || saving || sourceLinkBusy || identityBlocked) return;
+    if (!record || !fields || saving || sourceLinkBusy || identityBlocked)
+      return;
     setSourceLinkBusy(true);
     setError("");
     setMessage("");
@@ -164,7 +174,13 @@ export function PersistentWorkspace({
         automatically_verified: boolean;
         suggestions: Array<{
           requires_operator_confirmation: boolean;
-          source: { kind: string; name: string; url: string; note: string; verified: boolean };
+          source: {
+            kind: string;
+            name: string;
+            url: string;
+            note: string;
+            verified: boolean;
+          };
         }>;
       };
       if (
@@ -174,16 +190,27 @@ export function PersistentWorkspace({
         payload.automatically_verified !== false ||
         !Array.isArray(payload.suggestions) ||
         payload.suggestions.length > 10
-      ) throw new Error("El servidor devolvió fuentes sin garantías de revisión.");
+      )
+        throw new Error(
+          "El servidor devolvió fuentes sin garantías de revisión.",
+        );
       const candidates = payload.suggestions.map((item) => {
         const src = item.source;
         if (
           item.requires_operator_confirmation !== true ||
-          !src || src.verified !== false || src.kind !== "OTRO" ||
-          typeof src.name !== "string" || !src.name.trim() ||
-          typeof src.url !== "string" || !src.url.startsWith("https://") ||
-          typeof src.note !== "string" || !src.note.trim()
-        ) throw new Error("Una fuente no cumple la revisión documental mínima.");
+          !src ||
+          src.verified !== false ||
+          src.kind !== "OTRO" ||
+          typeof src.name !== "string" ||
+          !src.name.trim() ||
+          typeof src.url !== "string" ||
+          !src.url.startsWith("https://") ||
+          typeof src.note !== "string" ||
+          !src.note.trim()
+        )
+          throw new Error(
+            "Una fuente no cumple la revisión documental mínima.",
+          );
         return {
           kind: "OTRO" as const,
           name: src.name,
@@ -195,7 +222,11 @@ export function PersistentWorkspace({
       let prepared = 0;
       setFields((previous) => {
         if (!previous) return previous;
-        const urls = new Set(previous.sources.map((x) => x.url.trim().replace(/\/$/, "").toLowerCase()));
+        const urls = new Set(
+          previous.sources.map((x) =>
+            x.url.trim().replace(/\/$/, "").toLowerCase(),
+          ),
+        );
         const next = [...previous.sources];
         for (const item of candidates) {
           const key = item.url.trim().replace(/\/$/, "").toLowerCase();
@@ -415,16 +446,21 @@ export function PersistentWorkspace({
         )}
         {record && fields && (
           <>
-            {record.documentary_gate?.enabled && record.status === "READY_FOR_CHANNELS" && (
-              <div className="i-message" role={record.documentary_gate.ready ? "status" : "alert"}>
-                {record.documentary_gate.ready
-                  ? "Control documental del piloto aprobado: identidad respaldada por el original archivado. La ficha sigue siendo interna, no se publicó en canales."
-                  : "La ficha conservó un estado anterior, pero su fuente documental ya no cumple los requisitos. No debe enviarse a canales ni confirmarse una nueva revisión hasta corregir la evidencia."}
-                {!record.documentary_gate.ready && record.documentary_gate.reason && (
-                  <p>{record.documentary_gate.reason}</p>
-                )}
-              </div>
-            )}
+            {record.documentary_gate?.enabled &&
+              record.status === "READY_FOR_CHANNELS" && (
+                <div
+                  className="i-message"
+                  role={record.documentary_gate.ready ? "status" : "alert"}
+                >
+                  {record.documentary_gate.ready
+                    ? "Control documental del piloto aprobado: identidad respaldada por el original archivado. La ficha sigue siendo interna, no se publicó en canales."
+                    : "La ficha conservó un estado anterior, pero su fuente documental ya no cumple los requisitos. No debe enviarse a canales ni confirmarse una nueva revisión hasta corregir la evidencia."}
+                  {!record.documentary_gate.ready &&
+                    record.documentary_gate.reason && (
+                      <p>{record.documentary_gate.reason}</p>
+                    )}
+                </div>
+              )}
             {identityBlocked && (
               <div className="i-message" role="alert">
                 La identidad de Ecomm-App es incompatible con esta ficha o
@@ -514,7 +550,12 @@ export function PersistentWorkspace({
             {tab === "Ficha" && (
               <>
                 {availableFeature("documents") && (
-                  <CommercialCoveragePanel id={variant.id} revision={record.version} dirty={dirty} onReview={onTab} />
+                  <CommercialCoveragePanel
+                    id={variant.id}
+                    revision={record.version}
+                    dirty={dirty}
+                    onReview={onTab}
+                  />
                 )}
                 {gtinEvidence}
                 {production && variant.id === naturalSeedPilotId && (
@@ -623,7 +664,11 @@ export function PersistentWorkspace({
                     readiness={assessCommercialReadiness(fields)}
                     categories={[]}
                     allowExternalResources={false}
-                    onSuggestSources={availableFeature("documents") ? reuseReviewedDocumentSources : undefined}
+                    onSuggestSources={
+                      availableFeature("documents")
+                        ? reuseReviewedDocumentSources
+                        : undefined
+                    }
                   />
                   <label className="i-editor-state">
                     Estado editorial
@@ -653,10 +698,15 @@ export function PersistentWorkspace({
             {tab === "Evidencias" && (
               <>
                 {availableFeature("documents") && (
-                  <MediaReview id={variant.id} media={fields.media}
-                    presentation={fields.presentation} csrf={csrf}
-                    revision={record.version} disabled={dirty || identityBlocked || saving || !!remote}
-                    onBusy={setResearchBusy} />
+                  <MediaReview
+                    id={variant.id}
+                    media={fields.media}
+                    presentation={fields.presentation}
+                    csrf={csrf}
+                    revision={record.version}
+                    disabled={dirty || identityBlocked || saving || !!remote}
+                    onBusy={setResearchBusy}
+                  />
                 )}
                 <fieldset
                   className="i-editor-fields"
@@ -767,30 +817,38 @@ export function PersistentWorkspace({
                 aria-label="Disponibilidad de investigación e IA"
               >
                 <h3>Investigar, revisar y completar</h3>
+                {!isAuxiliaryPilot(variant.id) &&
+                  availableFeature("documents") && (
+                    <AutomationFlowPanel
+                      ids={new Set([variant.id])}
+                      csrf={csrf}
+                      disabled={
+                        !canWrite() ||
+                        dirty ||
+                        proposalDirty ||
+                        saving ||
+                        researchBusy ||
+                        proposalBusy ||
+                        identityBlocked ||
+                        reauth ||
+                        !!remote
+                      }
+                      onOpen={() => onTab("Evidencias")}
+                    />
+                  )}
                 <button
-                  className="d-primary"
-                  disabled={
-                    !canWrite() ||
-                    dirty ||
-                    proposalDirty ||
-                    saving ||
-                    researchBusy ||
-                    proposalBusy ||
-                    identityBlocked ||
-                    reauth ||
-                    !!remote
-                  }
+                  disabled={saving || researchBusy || proposalBusy}
                   onClick={() => {
                     setResearchStart(isAuxiliaryPilot(variant.id) ? 0 : 1);
                     onTab("Evidencias");
                   }}
                 >
-                  Investigar y completar ficha con IA
+                  Revisar fuentes y documentos existentes
                 </button>
                 <p className="r-notice">
                   {environmentText(
                     "Investigación web real y OpenAI: bloqueados en este entorno. Se reutilizan fuentes de prueba o documentos locales autorizados y el generador determinista existente. Ninguna llamada externa ni consumo.",
-                    "Investigación web automática aún no validada ni habilitada. Incorporá documentación autorizada, revisá sus hechos y utilizá las propuestas respaldadas existentes. OpenAI histórico se informa por separado con su cuota original.",
+                    "La disponibilidad efectiva de búsqueda y descarga se comprueba arriba. Los hechos nuevos requieren revisión humana antes de preparar propuestas. OpenAI histórico se informa por separado con su cuota original.",
                   )}{" "}
                   Recorrido: identidad → Evidencias → hechos aprobados →
                   propuesta → revisión por campo → guardado versionado.
@@ -835,7 +893,11 @@ export function PersistentWorkspace({
               (availableFeature("channels") ? (
                 <ChannelsPanel
                   key={variant.id}
-                  productTitle={variant.commercialName || variant.name || "Producto sin nombre"}
+                  productTitle={
+                    variant.commercialName ||
+                    variant.name ||
+                    "Producto sin nombre"
+                  }
                   productSku={variant.sku || ""}
                   editorialLabel={stateLabels[record.status] || "Por revisar"}
                   editorialReady={record.status === "READY_FOR_CHANNELS"}
@@ -862,55 +924,59 @@ export function PersistentWorkspace({
                   capturas comerciales permanecen disponibles en la tabla.
                 </p>
               ))}
-            {(tab !== "Canales" || dirty || saving) && <div className="i-save-bar">
-              <span aria-live="polite">
-                {saving
-                  ? "Guardando…"
-                  : dirty
-                    ? "Cambios sin guardar"
-                    : `Versión guardada: ${record.version}`}
-              </span>
-              <button
-                className="d-primary"
-                disabled={
-                  !canWrite() ||
-                  !dirty ||
-                  saving ||
-                  proposalBusy ||
-                  !!remote ||
-                  identityBlocked ||
-                  reauth
-                }
-                onClick={() => persist("DRAFT")}
-              >
-                Guardar borrador
-              </button>
-              <button
-                disabled={
-                  !canWrite() ||
-                  !dirty ||
-                  saving ||
-                  proposalBusy ||
-                  !!remote ||
-                  identityBlocked ||
-                  reauth
-                }
-                onClick={() => persist(status)}
-              >
-                Guardar estado editorial
-              </button>
-            </div>}
+            {(tab !== "Canales" || dirty || saving) && (
+              <div className="i-save-bar">
+                <span aria-live="polite">
+                  {saving
+                    ? "Guardando…"
+                    : dirty
+                      ? "Cambios sin guardar"
+                      : `Versión guardada: ${record.version}`}
+                </span>
+                <button
+                  className="d-primary"
+                  disabled={
+                    !canWrite() ||
+                    !dirty ||
+                    saving ||
+                    proposalBusy ||
+                    !!remote ||
+                    identityBlocked ||
+                    reauth
+                  }
+                  onClick={() => persist("DRAFT")}
+                >
+                  Guardar borrador
+                </button>
+                <button
+                  disabled={
+                    !canWrite() ||
+                    !dirty ||
+                    saving ||
+                    proposalBusy ||
+                    !!remote ||
+                    identityBlocked ||
+                    reauth
+                  }
+                  onClick={() => persist(status)}
+                >
+                  Guardar estado editorial
+                </button>
+              </div>
+            )}
           </>
         )}
-        {tab !== "Canales" && <div className="i-disabled-actions">
-          {["Generar con IA", "Aprobar cambios", "Preparar por canal"].map(
-            (label) => (
-              <button key={label} disabled>
-                {label}
-              </button>
-            ),
-          )}
-        </div>}
+        {tab !== "Canales" && (
+          <div className="i-disabled-actions">
+            {["Generar con IA", "Aprobar cambios", "Preparar por canal"].map(
+              (label) => (
+                <button key={label} disabled>
+                  {label}
+                </button>
+              ),
+            )}
+          </div>
+        )}
         <button disabled={saving} onClick={onClose}>
           Volver a la tabla
         </button>

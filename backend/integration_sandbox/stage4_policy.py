@@ -10,6 +10,14 @@ ROOT = "/api/ecomm-app/workspace/"
 
 
 def route_allowed(method, path):
+    if method == "GET" and path == ROOT + "api-barcode/summary":
+        return True
+    if method == "GET" and re.fullmatch(ROOT + r"sources/intake-jobs(?:/[a-f0-9-]{36}(?:/report)?)?", path):
+        return True
+    if method == "GET" and re.fullmatch(ROOT + r"(?:research/automation(?:/(?:capabilities|[a-f0-9-]{36}))?|reports/periodic/(?:policy|tasks|automation))",path):
+        return True
+    if method == "POST" and re.fullmatch(ROOT + r"(?:research/automation(?:/[a-f0-9-]{36}/(?:step|recover|retry|cancel|proposals|select-source))?|reports/periodic/policy)",path):
+        return True
     if method == "GET" and path == ROOT + "taxonomy/catalog":
         return True
     if method == "POST" and path in {

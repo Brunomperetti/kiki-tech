@@ -163,6 +163,7 @@ def main():
             "status",
         ],
     )
+    parser.add_argument("--stage4", action="store_true", help="Revisión comercial sintética de 20 variantes en PG18 aislado.")
     parser.add_argument("--presentation", action="store_true", help="Presentación: canales sintéticos y documentos pendientes de revisión.")
     parser.add_argument("--production-compat", action="store_true", help="Build productivo contra PostgreSQL descartable; sin proveedores ni datos reales.")
     parser.add_argument("--connections", action="store_true", help="Conexiones: servicios originales con dobles locales, sin red.")
@@ -172,8 +173,10 @@ def main():
     parser.add_argument("--stage3", action="store_true", help="Etapa 3: pipeline con fabricante HTTP/DNS simulado y perfil /v2/ aislado (up/browser-test).")
     arguments = parser.parse_args()
     command = arguments.command
-    if arguments.stage3 and (command not in {"up", "browser-test"} or any((arguments.production_compat, arguments.connections, arguments.presentation, arguments.autonomous, arguments.batches, arguments.channels))):
+    if arguments.stage3 and (command not in {"up", "browser-test"} or any((arguments.production_compat, arguments.connections, arguments.presentation, arguments.autonomous, arguments.batches, arguments.channels, arguments.stage4))):
         parser.error("--stage3 requiere up/browser-test y un escenario independiente.")
+    if arguments.stage4 and (command not in {"up", "browser-test"} or any((arguments.production_compat, arguments.connections, arguments.presentation, arguments.autonomous, arguments.batches, arguments.channels, arguments.stage3))):
+        parser.error("--stage4 requiere up/browser-test y escenario sintético independiente.")
     if arguments.production_compat and (command not in {"up", "browser-test"} or any((arguments.connections,arguments.presentation,arguments.autonomous,arguments.batches,arguments.channels))):
         parser.error("--production-compat requiere up/browser-test y escenario independiente.")
     if arguments.connections and (command not in {"up", "browser-test"} or any((arguments.presentation, arguments.autonomous, arguments.batches, arguments.channels))):
@@ -186,8 +189,10 @@ def main():
         parser.error("--batches requiere up/browser-test y no se combina con --channels.")
     if arguments.channels and command not in {"up", "browser-test"}:
         parser.error("--channels sólo es válido para up o browser-test en el entorno descartable.")
-    if arguments.stage3:
+    if arguments.stage3 or arguments.stage4:
         COMPOSE.extend(["--file", str(ROOT / "integration/stage3.compose.yaml")])
+    if arguments.stage4:
+        COMPOSE.extend(["--file", str(ROOT / "integration/stage4.compose.yaml")])
     if command == "build":
         subprocess.run(
             ["npm", "run", "build:integration"],
@@ -199,7 +204,7 @@ def main():
         # Runtime pull_policy stays "never"; only this explicit setup step may download.
         compose("pull", "--policy", "missing", "postgres", build=True)
     elif command in {"up", "test", "legacy-test", "browser-test"}:
-        production_profile = arguments.production_compat or arguments.stage3
+        production_profile = arguments.production_compat or arguments.stage3 or arguments.stage4
         frontend_file = ROOT / ("frontend/.production-dist/index.html" if production_profile else "frontend/.integration-dist/integration.html")
         if not frontend_file.is_file():
             raise RuntimeError(
@@ -208,15 +213,16 @@ def main():
         directory = runtime_directory()
         (directory / "production-compat-mode").write_text("isolated-only" if production_profile else "off")
         (directory / "stage3-mode").write_text("local-synthetic" if arguments.stage3 else "off")
+        (directory / "stage4-mode").write_text("synthetic-commercial" if arguments.stage4 else "off")
         (directory / "connections-mode").write_text("offline-fixtures" if arguments.connections else "off")
-        (directory / "editorial-mode").write_text("backend" if command in {"up", "browser-test"} and not arguments.stage3 else "manual")
+        (directory / "editorial-mode").write_text("backend" if command in {"up", "browser-test"} and not (arguments.stage3 or arguments.stage4) else "manual")
         (directory / "editorial-workers").write_text("1")
         try:
-            if arguments.stage3:
+            if arguments.stage3 or arguments.stage4:
                 build_stage3_reader()
             compose("up", "--detach", "--no-build", "--wait", "--wait-timeout", "90")
-            verify_containers(stage3=arguments.stage3)
-            if arguments.stage3:
+            verify_containers(stage3=arguments.stage3 or arguments.stage4)
+            if arguments.stage3 or arguments.stage4:
                 compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.stage3_fixtures", "--verify-reader")
             if arguments.presentation:
                 compose("exec", "-T", "backend", "python", "-m", "integration_sandbox.presentation_fixtures")
@@ -314,7 +320,7 @@ def main():
             elif command == "browser-test":
                 # Runs its own gateway and Playwright against the actual isolated backend.
                 subprocess.run(
-                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--stage3"] if arguments.stage3 else ["--production-compat"] if arguments.production_compat else ["--connections"] if arguments.connections else ["--presentation"] if arguments.presentation else ["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
+                    [sys.executable, str(ROOT / "integration/browser_tests.py"), *(["--stage3"] if arguments.stage3 else ["--stage4"] if arguments.stage4 else ["--production-compat"] if arguments.production_compat else ["--connections"] if arguments.connections else ["--presentation"] if arguments.presentation else ["--channels"] if arguments.channels else ["--batches"] if arguments.batches else ["--autonomous"] if arguments.autonomous else [])],
                     check=True,
                     env=clean_environment(browser=True),
                 )
@@ -348,6 +354,7 @@ def main():
             (directory / "connections-mode").write_text("off")
             (directory / "production-compat-mode").write_text("off")
             (directory / "stage3-mode").write_text("off")
+            (directory / "stage4-mode").write_text("off")
     elif command == "down":
         compose("down", "--volumes")
     else:

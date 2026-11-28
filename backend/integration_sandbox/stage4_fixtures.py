@@ -94,7 +94,7 @@ def capture():
 
 def original_text(ident):
     lines = [f"Nombre: {_name(ident)}", "Presentación: " + ("2 x 250 g" if ident == PACK_ID else "250 g"),
-             "Tipo de venta: " + ("Combo" if ident == PACK_ID else "Unidad"),
+             "Tipo de venta: " + ("Pack" if ident == PACK_ID else "Unidad"),
              "Características: Material ficticio para pruebas locales de catálogo"]
     if ident != NATURAL_SEED_ID:
         lines.extend([
@@ -175,6 +175,10 @@ def initialize(factory):
                       for fact in extracted["facts"] if fact["state"] == "PENDING" and fact["document_id"] == document_id]
             if not chosen:
                 raise RuntimeError("Stage4 fixture original did not produce cited candidates.")
+            blocked = [(fact["field"], fact.get("blockers")) for fact in extracted["facts"]
+                       if fact["id"] in {decision.fact_id for decision in chosen} and fact.get("blockers")]
+            if blocked:
+                raise RuntimeError(f"Synthetic stage4 seed blocked for {ident}: {blocked}")
             research.review_batch(ident, extracted["version"], document_id, source.version, chosen)
 
             fields = blank_fields()
@@ -203,3 +207,78 @@ def initialize(factory):
         snapshot.payload = capture()
         db.commit()
         print("Stage4: 20 units + pack/shared-code/incomplete fixtures, actual local originals; prior approvals are explicitly SYNTHETIC SEEDS, not human acceptance.", flush=True)
+
+
+def install_automation(application):
+    """Private dependency replacement: real orchestration/parser, local HTTP/DNS.
+
+    No transport in this profile can resolve/contact the actual manufacturer or
+    search provider. Discovery references are never approved by this fixture.
+    """
+    from datetime import datetime, timezone
+    from urllib.parse import urlsplit
+    from app.api.routes import catalog_automation as routes
+    from app.api.routes.documental_workspace import _resumable_intake_ready
+    from app.services.documental.catalog_automation import CatalogAutomation
+    from app.services.documental.explicit_url_intake import import_explicit_url
+    from app.services.documental.local_documents import parse_local
+    from .ci_stage3_pipeline_smoke import (
+        HOST as STAGE3_HOST, MockManufacturer, synthetic_page,
+    )
+
+    names = {
+        "900003": ("Semillas de chía sintéticas", "250 g"),
+        "900004": ("Harina integral sintética", "1 kg"),
+        "900005": ("Avena sintética", "500 g"),
+        "900006": ("Lentejas sintéticas", "1 kg"),
+    }
+
+    class Manufacturer(MockManufacturer):
+        def resolve(self, hostname):
+            if hostname != HOST:
+                raise ValueError("Only the synthetic manufacturer is configured")
+            return super().resolve(STAGE3_HOST)
+
+        def get(self, hostname, ip, path, byte_limit):
+            if hostname != HOST:
+                raise ValueError("Only the synthetic manufacturer is configured")
+            return super().get(STAGE3_HOST, ip, path, byte_limit)
+
+        def import_exact(self, db, actor, **kwargs):
+            return import_explicit_url(
+                db, actor, **kwargs, downloader=self.download, parser=parse_local,
+            )
+
+    manufacturer = Manufacturer({
+        urlsplit(source_url(ident)).path: synthetic_page(name, presentation)
+        for ident, (name, presentation) in names.items()
+    })
+
+    class Search:
+        def search(self, identity):
+            ident = identity.get("ecomm_id")
+            if ident not in names:
+                raise ValueError("No synthetic discovery reference for this ID")
+            return {
+                "queried_at": datetime.now(timezone.utc).isoformat(),
+                "provider": "SYNTHETIC_OFFLINE_SEARCH",
+                "results": [{"url": source_url(ident), "title": names[ident][0],
+                             "snippet": "Explicit synthetic local discovery result, not manufacturer verification.",
+                             "source_kind": "OFFICIAL_CANDIDATE", "official_verified": False}],
+            }
+
+    class Automation(CatalogAutomation):
+        def step(self, ident, revision, **kwargs):
+            return super().step(ident, revision, explicit_importer=manufacturer.import_exact)
+
+    def make_automation(db, session):
+        _guard(db)
+        return Automation(
+            db, session, Search(), HOST, max_search_requests=20,
+            network_enabled=True, readiness_check=lambda: _resumable_intake_ready(db),
+        )
+
+    # Only the isolated bootstrap calls this; the production factory stays intact
+    # in every other process. This avoids an authentication or network bypass.
+    routes.make_automation = make_automation
+    application.state.stage4_manufacturer = manufacturer
