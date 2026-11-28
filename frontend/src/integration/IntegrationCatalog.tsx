@@ -1343,14 +1343,16 @@ export function IntegrationCatalog() {
                             {item.tiendanubeApi.capturedAt && <small>{captureDate(item.tiendanubeApi.capturedAt)}</small>}
                           </>
                         ) : <strong>{label}</strong>}
-                        {channel === "tn" && item.tiendanubeApi && <small>CSV histórico: {label}</small>}
-                        {!!state?.candidatesTotal && (
+                        {!(channel === "tn" && item.tiendanubeApi) && !!state?.candidatesTotal && (
                           <small>
                             {state.candidatesTotal} coincidencias por revisar
                           </small>
                         )}
                         <details>
                           <summary>{channel === "tn" ? "Ver evidencia histórica CSV" : "Ver coincidencias y evidencia"}</summary>
+                          {channel === "tn" && item.tiendanubeApi && (
+                            <small>CSV histórico: {label} · {state?.snapshotAt ? captureDate(state.snapshotAt) : "Sin fecha"}</small>
+                          )}
                         {(state?.matchesPreview || []).map((match, index) => (
                           <div
                             className="i-match-preview"
@@ -1381,12 +1383,12 @@ export function IntegrationCatalog() {
                             "Sin evidencia suficiente. No implica que no esté publicado."}
                         </small>
                         </details>
-                        {state?.fresh === false && (
+                        {!(channel === "tn" && item.tiendanubeApi) && state?.fresh === false && (
                           <strong>
                             Captura desactualizada
                           </strong>
                         )}
-                        {state?.snapshotAt && (
+                        {!(channel === "tn" && item.tiendanubeApi) && state?.snapshotAt && (
                           <small>{captureDate(state.snapshotAt)}</small>
                         )}
                         <button
