@@ -286,7 +286,7 @@ class LocalDocuments:
         return result
 
     def reparse_saved_html(self, ident, doc_id, expected_version, document_version):
-        """Re-read an insufficient original, never fetching or approving anything."""
+        """Re-read an original missing identity, never fetching or approving anything."""
         case = self.research.dossier(ident)
         self.research.expect(case, expected_version)
         doc = self.document(ident, doc_id)
@@ -295,13 +295,14 @@ class LocalDocuments:
         stored = doc.body
         original = stored.get("original") or {}
         source = stored.get("source") or {}
+        identity = stored.get("identity") or {}
         if (
             stored.get("synthetic") is not False
             or stored.get("origin_kind") != "FILE"
             or source.get("capture_mode") != "USER_SAVED_WEB_HTML"
             or source.get("review_state") != "PENDING"
-            or stored.get("parse_status") != "INSUFFICIENT_DATA"
-            or stored.get("claims")
+            or stored.get("parse_status") not in {"INSUFFICIENT_DATA", "TEXT_EXTRACTED"}
+            or (identity.get("name") and identity.get("presentation"))
             or any(f.get("document_id") == doc_id for f in case.facts)
             or original.get("content_type") != "text/html"
         ):
@@ -320,8 +321,13 @@ class LocalDocuments:
             kind="FILE", web_snapshot=True, filename=original["filename"],
             content_type=original["content_type"], content_base64=encoded,
         ))
-        if parsed.get("parse_status") != "TEXT_EXTRACTED":
-            raise ValueError("El lector sigue sin datos extraíbles; se conservó el original.")
+        new_identity = parsed.get("identity") or {}
+        if (
+            parsed.get("parse_status") != "TEXT_EXTRACTED"
+            or not new_identity.get("name")
+            or not new_identity.get("presentation")
+        ):
+            raise ValueError("El lector sigue sin nombre y presentación completos; se conservó el original.")
         updated = deepcopy(stored)
         for key in ("sections", "identity", "identity_evidence", "claims",
                     "parser_warnings", "parser_blockers", "parse_status"):

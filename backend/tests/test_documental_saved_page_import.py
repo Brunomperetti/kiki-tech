@@ -225,8 +225,12 @@ def test_saved_web_capture_requires_url_date_and_true_html_format(tmp_path, monk
         assert len(svc.research.documents(IDENT)) == 1  # only preexisting test doc
 
 
+@pytest.mark.parametrize("old_html,old_status", [
+    ("<html><body></body></html>", "INSUFFICIENT_DATA"),
+    ("<html><body><main><h1>Arroz</h1></main></body></html>", "TEXT_EXTRACTED"),
+])
 def test_reparse_archived_insufficient_html_keeps_original_and_requires_review(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, old_html, old_status,
 ):
     import app.services.documental.local_documents as local_module
     import app.services.documental.research as research_module
@@ -243,10 +247,13 @@ def test_reparse_archived_insufficient_html_keeps_original_and_requires_review(
     })
     old_result = parse(
         payload.filename, payload.content_type,
-        base64.b64encode(b"<html><body></body></html>").decode(),
+        base64.b64encode(old_html.encode()).decode(),
         web_snapshot=True,
     )
-    assert old_result["parse_status"] == "INSUFFICIENT_DATA"
+    assert old_result["parse_status"] == old_status
+    assert old_result["identity"]["presentation"] is None
+    if old_status == "TEXT_EXTRACTED":
+        assert old_result["claims"]  # parser candidates, not registered facts
     monkeypatch.setattr(
         local_module, "parse_local",
         lambda body: parse(
@@ -270,7 +277,8 @@ def test_reparse_archived_insufficient_html_keeps_original_and_requires_review(
         assert doc.body["identity"]["ean"] is None
         assert not result["facts"]
         assert result["history"][-1]["action"] == "DOCUMENT_REPARSED"
-        assert doc.history[-1]["body"]["parse_status"] == "INSUFFICIENT_DATA"
+        assert doc.history[-1]["body"]["parse_status"] == old_status
+        assert doc.history[-1]["body"]["claims"] == old_result["claims"]
         assert base64.b64decode(doc.body["original_base64"]) == raw
         with pytest.raises(ValueError, match="documento cambió"):
             service.reparse_saved_html(IDENT, doc_id, result["version"], 1)

@@ -602,7 +602,9 @@ export function DocumentImport({
             Comprobar original conservado
           </button>
           {originalInfo && <p role="status">{originalInfo}</p>}
-          {production && document.body.parse_status === "INSUFFICIENT_DATA" &&
+          {production && ["INSUFFICIENT_DATA", "TEXT_EXTRACTED"].includes(document.body.parse_status || "") &&
+            (!document.body.identity?.name || !document.body.identity?.presentation) &&
+            !data.facts.some((fact) => fact.document_id === document.id) &&
             document.body.source?.capture_mode === "USER_SAVED_WEB_HTML" &&
             document.body.source?.review_state === "PENDING" && (
               <button
