@@ -321,6 +321,102 @@ class PageSnapshotHTML(HTMLParser):
 
 
 
+
+class StructuredProductHTML(PageSnapshotHTML):
+    """Fallback for a single product H2 with an explicit terminal package size.
+
+    Only a structural product container is considered. A top-level form may
+    wrap static page content (e.g. ASP.NET Web Forms); nested forms, controls,
+    scripts, templates and all existing hidden subtrees remain inert/ignored.
+    No network, rendering, manufacturer inference, or automatic approval.
+    """
+
+    SIZE_AT_END = re.compile(r"(\d{1,5}(?:[.,]\d{1,3})?\s*(?:kg|g|gr|ml|l))$", re.I)
+    PACK_MARKER = re.compile(r"\b(?:pack|combo|caja|lote|multipack)\b|\bx\s*\d+\s*x\b", re.I)
+
+    def __init__(self):
+        super().__init__()
+        self.scope_ids = {}
+        self.next_scope = 0
+        self.scoped_titles = []
+        self.scoped_paragraphs = []
+        self.visible_h2 = 0
+        self.root_forms = 0
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        depth = len(self.tags)
+        wrapper = tag == "form" and depth > 0 and self.tags[-1][0] == "body"
+        if wrapper:
+            self.root_forms += 1
+        omit = self.OMIT
+        try:
+            if wrapper:
+                self.OMIT = omit - {"form"}
+            elif tag == "a" and any(node[0] == "h2" for node in self.tags):
+                # A heading often includes a back/navigation link.
+                self.OMIT = omit | {"a"}
+            super().handle_starttag(tag, attrs)
+        finally:
+            self.OMIT = omit
+        classes = set((attrs_dict.get("class") or "").lower().split())
+        if (
+            len(self.tags) == depth + 1 and not self.tags[-1][1]
+            and (tag in {"main", "article"} or (tag == "div" and "container" in classes))
+        ):
+            self.next_scope += 1
+            self.scope_ids[depth] = self.next_scope
+
+    def handle_endtag(self, tag):
+        depth = len(self.tags)
+        scope = next(
+            (self.scope_ids[i] for i in sorted(self.scope_ids, reverse=True)), None
+        )
+        direct_scope = self.scope_ids.get(depth - 2)
+        before = len(self.blocks)
+        super().handle_endtag(tag)
+        if len(self.tags) == depth:
+            return
+        self.scope_ids.pop(depth - 1, None)
+        if len(self.blocks) == before:
+            return
+        block_tag, line, value, _ = self.blocks[-1]
+        if block_tag == "h2":
+            self.visible_h2 += 1
+            if direct_scope is not None:
+                self.scoped_titles.append((direct_scope, line, value))
+        elif block_tag == "p" and scope is not None:
+            self.scoped_paragraphs.append((scope, line, value))
+
+    def sections(self):
+        # Do not rescue ambiguous headings, multiple forms or arbitrary lists.
+        if (
+            self.headings or self.visible_h2 != 1
+            or len(self.scoped_titles) != 1 or self.root_forms > 1
+        ):
+            return {}
+        scope, line, title = self.scoped_titles[0]
+        size = self.SIZE_AT_END.search(title)
+        if (
+            not size or len(title) > 180 or not title[:size.start()].strip()
+            or len(self.WEIGHT.findall(title)) != 1 or self.PACK_MARKER.search(title)
+        ):
+            return {}
+        result = {f"web/h2/linea/{line}": "Nombre: " + title}
+        for i, (area, paragraph_line, value) in enumerate(self.scoped_paragraphs, 1):
+            if area != scope or paragraph_line < line or len(value) > 2000:
+                continue
+            # Only explicitly labelled, bounded ingredient text is promoted to
+            # candidate facts. Other descriptions remain inspectable text.
+            label = normalized(value.partition(":")[0])
+            if label == "ingredientes" and ":" in value and len(value) <= 450:
+                prefix = "web/product"
+            else:
+                prefix = "web"
+            result[f"{prefix}/p/linea/{paragraph_line}/bloque/{i}"] = value
+        return result
+
+
 def pdf_sections(raw):
     from .hileret_brochure import matches, STREAM_LIMIT, TOTAL_STREAM_LIMIT
 
@@ -477,6 +573,13 @@ def parse(name, mime, encoded, *, web_snapshot=False):
                 page.feed(text)
                 page.close()
                 sections = page.sections()
+                if not page.headings:
+                    fallback = StructuredProductHTML()
+                    fallback.feed(text)
+                    fallback.close()
+                    structured = fallback.sections()
+                    if structured:
+                        sections = structured
             else:
                 html = PassiveHTML()
                 html.feed(text)
@@ -536,7 +639,7 @@ def parse(name, mime, encoded, *, web_snapshot=False):
             for loc, line in sections.items()
             if ":" in line and (
                 not (web_snapshot and extension == ".html")
-                or loc.startswith(("web/h1/", "web/tabla/", "web/product/p/"))
+                or loc.startswith(("web/h1/", "web/h2/", "web/tabla/", "web/product/p/"))
             )
         ]
     )
@@ -549,6 +652,11 @@ def parse(name, mime, encoded, *, web_snapshot=False):
         # health benefits, dosage instructions, nutrition or medical claims.
         from .product_package import page_presentation
 
+        for location, quote in sections.items():
+            if location.startswith("web/h2/"):
+                size = StructuredProductHTML.SIZE_AT_END.search(quote)
+                if size:
+                    entries.append(("presentación", size.group(1), None, location, quote))
         package = page_presentation(sections)
         if package:
             presentation, location, quote = package
