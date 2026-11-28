@@ -59,6 +59,26 @@ type Job = {
   claims_approved: 0;
 };
 
+// Match the backend's narrow exception for numeric ASPX product IDs.
+export function validExactManufacturerUrl(value: string): boolean {
+  if (!/^https:\/\/[^/]+\/[^?#]+(?:\?id=[1-9][0-9]{0,9})?$/.test(value) ||
+      /[%\\\s#]/.test(value) || /[^\x21-\x7e]/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || url.port || !url.hostname ||
+        !/^[a-z0-9.-]+$/i.test(url.hostname) || url.hostname.includes("..") ||
+        /^\d+$/.test(url.hostname.replace(/\./g, ""))) return false;
+    if (value.includes("?")) {
+      return /\.aspx$/i.test(url.pathname) &&
+        /^\?id=[1-9][0-9]{0,9}$/.test(url.search) &&
+        /^https:\/\/[^/:]+\//.test(value);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function verified(value: unknown, allowAutomatedReference = false): Job {
   const row = value as Job;
   const states = ["PENDING", "RUNNING", "IMPORTED", "ALREADY_PRESENT", "BLOCKED", "CANCELLED"];
@@ -236,7 +256,7 @@ export function ManufacturerIntakeQueue({
         const [ecomm_id, url, provenance_note] = columns.map(x => x.trim());
         if (!/^[1-9][0-9]{0,19}$/.test(ecomm_id) ||
             !selected.has(ecomm_id) ||
-            !/^https:\/\/[^/]+\/[^?#]+$/.test(url) ||
+            !validExactManufacturerUrl(url) ||
             provenance_note.length < 10 || provenance_note.length > 600) {
           throw new Error(
             `Línea ${i + 1}: seleccioná esa variante y completá URL HTTPS exacta y procedencia.`
