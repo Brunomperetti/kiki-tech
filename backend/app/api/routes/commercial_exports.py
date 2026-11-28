@@ -243,3 +243,11 @@ def mercadolibre_preview(
     from app.services.mercadolibre_publication_preview import local_preview
 
     return execute(db, lambda: local_preview(db, session, body.ecomm_id))
+
+
+@router.post("/tiendanube/connection/check")
+def tiendanube_connection_check(_session=Depends(require_csrf)):
+    from app.services.tiendanube_connection import check_connection
+
+    result = check_connection(get_settings())
+    return result
