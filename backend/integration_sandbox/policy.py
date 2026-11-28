@@ -126,7 +126,7 @@ def route_allowed(method: str, path: str, *, connections=False, production_compa
 def is_documental_workspace_route(method: str, path: str) -> bool:
     prefix = r"/api/ecomm-app/workspace/90000[1-6]/"
     suffix = (
-        r"(?:evidence|proposals(?:/generation-context)?|documents/local-[a-f0-9]{32}/original/[1-8])"
+        r"(?:evidence|commercial-coverage|media-review|proposals(?:/generation-context)?|documents/local-[a-f0-9]{32}/original/[1-8])"
         if method == "GET"
         else r"(?:evidence/(?:extract|facts/[a-f0-9]{24}/review)|documents/(?:import|local-[a-f0-9]{32}/provenance)|proposals/(?:generate|[1-9][0-9]{0,9}/review))"
     )

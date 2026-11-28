@@ -58,17 +58,34 @@ def allowed_hosts(csv_value):
 
 
 def target(url, hosts):
-    """No hostname wildcards or IP literals, query, fragments or alternate ports."""
+    """Exact public source URL; only numeric ASPX product IDs allow a query.
+
+    A manufacturer's product identity may live in ``Producto.aspx?id=21``.
+    Preserve that literal ID in the HTTP target and provenance; never drop,
+    normalize or decode it into the identity of another document. This does
+    not enable arbitrary query parameters or general search endpoints.
+    """
     try:
         parsed = urlsplit(url)
         host = parsed.hostname or ""
+        numeric_product_query = (
+            parsed.path.lower().endswith(".aspx")
+            and re.fullmatch(r"id=[1-9][0-9]{0,9}", parsed.query) is not None
+            and parsed.port is None
+        )
         if (
-            len(url) > MAX_URL or parsed.scheme != "https"
-            or not HOST_PATTERN.fullmatch(host) or ".." in host
-            or host not in hosts or parsed.username or parsed.password
+            len(url) > MAX_URL
+            or parsed.scheme != "https"
+            or not HOST_PATTERN.fullmatch(host)
+            or ".." in host
+            or host not in hosts
+            or parsed.username
+            or parsed.password
             or parsed.port not in (None, 443)
-            or parsed.query or parsed.fragment
-            or "%" in url or "\\" in url
+            or ("?" in url and not numeric_product_query)
+            or "#" in url
+            or "%" in url
+            or "\\" in url
             or any(ord(ch) <= 32 or ord(ch) >= 127 for ch in url)
             or not parsed.path.startswith("/")
             or host.replace(".", "").isdigit()
@@ -77,9 +94,9 @@ def target(url, hosts):
     except (ValueError, TypeError):
         raise ValueError(
             "Fuente rechazada: solo HTTPS y URL exacta de fabricante autorizado, "
-            "sin consultas, credenciales ni redirecciones."
+            "sin consultas generales, credenciales ni redirecciones."
         ) from None
-    return host, parsed.path
+    return host, parsed.path + ("?" + parsed.query if numeric_product_query else "")
 
 
 class DNSResolver:

@@ -74,13 +74,17 @@ def test_source_backed_channel_preview_download_is_read_only(dbcase, monkeypatch
     with Session(dbcase) as db:
         before = deepcopy(edit_for(db).history)
         preview = preview_commercial_export(db, SimpleNamespace(id=1), "ml", [IDENT])
-        assert preview["total"] == preview["prepared_internal"] == 1
-        assert preview["blocked"] == 0
+        assert preview["total"] == preview["blocked"] == 1
+        assert preview["prepared_internal"] == 0
         assert preview["provider_calls"] == preview["ai_requests"] == 0
         assert preview["external_writes_enabled"] is False
         assert preview["native_provider_import_file"] is False
         item = preview["items"][0]
-        assert item["evidence_verified"] is True
+        # This older source fixture has neither a versioned KIKI/channel
+        # classification nor a metadata-bound media licence. It remains a
+        # valid review package, never a falsely prepared channel package.
+        assert item["evidence_verified"] is False
+        assert any("clasificación interna" in reason for reason in item["blockers"])
         assert item["channel_requirements_pending"]
         data, latest = download_commercial_export(
             db, SimpleNamespace(id=1), "ml", [IDENT], preview["preview_fingerprint"]

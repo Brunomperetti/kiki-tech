@@ -359,6 +359,28 @@ class EcommApiProductWorkspace:
             raise ValueError("Número de versión inválido.")
         normalized = _canonical_fields(fields)
         _validate(normalized, status)
+        source = self._source(ecomm_id)
+        if source.get("identity_blockers"):
+            raise ValueError("Identidad contradictoria: barcode y gtin discrepan. Guardado bloqueado.")
+        edit = self.db.scalar(
+            select(EcommApiProductEdit)
+            .where(EcommApiProductEdit.ecomm_id == ecomm_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        actual = edit.version if edit else 0
+        if expected_version != actual:
+            raise ValueError(
+                "La ficha fue actualizada en otra sesión. Volvé a abrirla antes de guardar."
+            )
+        if edit and edit.source_sku != source["sku"]:
+            raise ValueError(
+                "El SKU del ID Ecomm cambió desde que se guardó esta ficha. "
+                "Revisá la identidad antes de seguir editando."
+            )
+        # Lock the editor before the documentary Control mutex, matching
+        # proposal/batch review. Guard rules remain identical and run even
+        # when a saved READY record has unchanged fields.
         # Keep the legacy editor and all channel integrations unchanged until
         # explicit pilot activation; all direct calls fail closed when guarded.
         if status == "READY_FOR_CHANNELS":
@@ -374,24 +396,6 @@ class EcommApiProductWorkspace:
                 from .documental.channel_readiness_guard import require_primary_evidence
 
                 require_primary_evidence(self.db, session, ecomm_id, normalized)
-        source = self._source(ecomm_id)
-        if source.get("identity_blockers"):
-            raise ValueError("Identidad contradictoria: barcode y gtin discrepan. Guardado bloqueado.")
-        edit = self.db.scalar(
-            select(EcommApiProductEdit)
-            .where(EcommApiProductEdit.ecomm_id == ecomm_id)
-            .with_for_update()
-        )
-        actual = edit.version if edit else 0
-        if expected_version != actual:
-            raise ValueError(
-                "La ficha fue actualizada en otra sesión. Volvé a abrirla antes de guardar."
-            )
-        if edit and edit.source_sku != source["sku"]:
-            raise ValueError(
-                "El SKU del ID Ecomm cambió desde que se guardó esta ficha. "
-                "Revisá la identidad antes de seguir editando."
-            )
         if edit and edit.fields == normalized and edit.status == status:
             return self._serialize(edit, source)
 

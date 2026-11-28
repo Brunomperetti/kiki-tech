@@ -140,3 +140,26 @@ class TiendanubeClient:
         if result.get("visibility") != "hidden" or result.get("published") is True:
             raise TiendanubeError(502, outcome_unknown=True)
         return result
+
+
+    def update_product_content(self, product_id, *, name, description, brand=""):
+        """Content-only PUT: visibility, variant identity, prices and stock excluded.
+
+        Caller must authorize/pin the exact existing remote product beforehand.
+        Errors after dispatch are not automatically retried.
+        """
+        if not self._writes_enabled:
+            raise PermissionError("Escritura Tiendanube deshabilitada")
+        ident = _id(product_id)
+        if not all(isinstance(value, str) for value in (name, description, brand)):
+            raise ValueError("Campos comerciales inválidos")
+        if not name.strip() or not description.strip():
+            raise ValueError("Nombre y descripción son obligatorios")
+        payload = {"name": {"es": name.strip()}, "description": {"es": description.strip()}}
+        if brand.strip():
+            payload["brand"] = brand.strip()
+        result = self._transport("PUT", self._base + "/products/" + ident,
+                                 headers=self._headers.copy(), payload=payload)
+        if not isinstance(result, dict) or str(result.get("id")) != ident:
+            raise TiendanubeError(502, outcome_unknown=True)
+        return result

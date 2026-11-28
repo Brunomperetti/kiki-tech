@@ -20,7 +20,7 @@ from app.services.documental.storage import Document, Dossier, Control, digest
 from app.integrations.ecomm_app.api_catalog_browser import valid_variant_id
 from app.services.editorial_batches.context import sources
 from .manufacturer_batch_intake import _identity, _eligible_unit, capture_selected, preflight
-from .explicit_url_intake import import_explicit_url, _existing_documents, _reject_repeated
+from .explicit_url_intake import import_explicit_url, _existing_documents, _reject_repeated, verified_refresh_result, recover_refresh_result
 from .source_intake_pipeline import (
     PIPELINE_SCHEMA, PipelineError, identity_pin, check_identity, document_for_item,
     receipt_for_document, extract_candidates, safe_failure, repin_reviewed_metadata,
@@ -128,6 +128,7 @@ def _summary(job, document_versions=None):
                         "document_id", "error", "next_action", "claim_until")
         } | {
             "processing": _processing(row),
+            **({"automation": deepcopy(row["automation"])} if "automation" in row else {}),
             "public_state": _public_state(row),
             "complete_available": bool(row.get("document_id"))
             and row.get("identity_schema") == 2
@@ -147,7 +148,9 @@ def _summary(job, document_versions=None):
         "sitemap_url": job.sitemap_url,
         "sitemap_sha256": job.sitemap_sha256,
         "selection_mode": (
-            "EXACT_OPERATOR_URL"
+            "AUTOMATED_SEARCH"
+            if job.items and job.items[0].get("source_mode") == "AUTOMATED_SEARCH"
+            else "EXACT_OPERATOR_URL"
             if job.items and job.items[0].get("source_mode") == "EXACT_OPERATOR_URL"
             else "REVIEWED_SITEMAP"
         ),
@@ -424,7 +427,13 @@ class SourceIntakeQueue:
                 continue
             try:
                 check_identity(row, sources(self.db))
-                doc = document_for_item(self.db, row)
+                if (row.get("source_mode") == "AUTOMATED_SEARCH" and (row.get("automation") or {}).get("refresh_receipt")
+                        and not (row.get("processing") or {}).get("refresh_verified")):
+                    document_id, receipt = recover_refresh_result(self.db, row)
+                    row["processing"] = receipt
+                    doc = self.db.get(Document, document_id)
+                else:
+                    doc = document_for_item(self.db, row)
                 if doc:
                     row["document_id"] = doc.id
                     with self.db.begin_nested():
@@ -460,7 +469,7 @@ class SourceIntakeQueue:
 
     def step(
         self, ident, revision, *, importer=capture_selected,
-        explicit_importer=import_explicit_url,
+        explicit_importer=import_explicit_url, source_resolver=None,
     ):
         job = self._get(ident, locked=True)
         if job.revision != revision:
@@ -505,15 +514,23 @@ class SourceIntakeQueue:
         selected["processing"] = {**_processing(selected), "started_at": now().isoformat(), "finished_at": None, "phase": "PENDING", "error_code": None, "retryable": False}
         self._update(job, rows, "CLAIMED")
 
+        refresh_requested = bool(selected.get("source_mode") == "AUTOMATED_SEARCH" and (selected.get("automation") or {}).get("refresh_receipt"))
         try:
-            archived = document_for_item(self.db, selected)
+            if selected.get("source_mode") == "AUTOMATED_SEARCH" and not selected.get("url"):
+                if source_resolver is None:
+                    raise PipelineError("DISCOVERY_REQUIRED", "El lote requiere el orquestador de búsqueda autorizado.")
+                selected = source_resolver(ident, selected["ecomm_id"], token)
+                # Resolver persists the exact URL while retaining this lease.
+                check_identity(selected, sources(self.db))
+            archived = None if refresh_requested else document_for_item(self.db, selected)
             if archived:
                 self._finish(ident, selected["ecomm_id"], token, archived.id, None)
                 return self.detail(ident)
-            _reject_repeated(_existing_documents(self.db, selected["ecomm_id"]), selected["url"], today=now().date())
+            if not refresh_requested:
+                _reject_repeated(_existing_documents(self.db, selected["ecomm_id"]), selected["url"], today=now().date())
             # Persist reservation before invoking the existing guarded importer.
             self._reserve_download(ident, selected["ecomm_id"], token)
-            if selected.get("source_mode") == "EXACT_OPERATOR_URL":
+            if selected.get("source_mode") in {"EXACT_OPERATOR_URL", "AUTOMATED_SEARCH"}:
                 expected = self.db.scalar(
                     select(Dossier.version).where(
                         Dossier.ecomm_id == selected["ecomm_id"]
@@ -526,15 +543,29 @@ class SourceIntakeQueue:
                     reference_url=selected["url"],
                     provenance_note=selected["provenance_note"],
                     configured_hosts=",".join(sorted(self.hosts)),
+                    **({"selection_mode": "AUTOMATED_SEARCH_CANDIDATE"} if selected.get("source_mode") == "AUTOMATED_SEARCH" else {}),
+                    **({"refresh_existing": True, "expected_refresh_receipt": selected["automation"]["refresh_receipt"],
+                        "refresh_request_key": token} if refresh_requested else {}),
                 )
+                if refresh_requested:
+                    current_job = self._get(ident, locked=True)
+                    current_rows = deepcopy(current_job.items)
+                    current_item = next(row for row in current_rows if row["ecomm_id"] == selected["ecomm_id"])
+                    if current_item["state"] != "RUNNING" or current_item["claim_token"] != token:
+                        raise ValueError("La actualización perdió la propiedad del paso.")
+                    refreshed_id, receipt = verified_refresh_result(self.db, current_item, result)
+                    current_item["document_id"], current_item["processing"] = refreshed_id, receipt
+                    self._update(current_job, current_rows, "REFRESH_RECEIPT_PINNED")
+                    selected = deepcopy(current_item)
                 document_id = result["incorporated_document_id"]
                 document = self.db.get(Document, document_id)
                 if (
                     not document
                     or document.body.get("associated_ecomm_id")
                     != selected["ecomm_id"]
-                    or document.body.get("source", {}).get("review_state")
-                    != "PENDING"
+                    or document.body.get("source", {}).get("review_state") not in (
+                        {"PENDING", "REVIEWED"} if refresh_requested and result.get("refresh_outcome") == "UNCHANGED" else {"PENDING"}
+                    )
                     or document.body.get("source", {}).get("reference_url")
                     != selected["url"]
                 ):
@@ -565,7 +596,7 @@ class SourceIntakeQueue:
             self.db.rollback()
             failure = safe_failure(error)
             try:
-                existing = document_for_item(self.db, selected)
+                existing = None if refresh_requested else document_for_item(self.db, selected)
             except PipelineError:
                 existing = None
             self._finish(ident, selected["ecomm_id"], token, existing.id if existing else None, failure)

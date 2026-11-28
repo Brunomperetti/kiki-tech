@@ -1,0 +1,9 @@
+# Private commercial acceptance only. Historical integration base stays PG16.
+# Disposable PG18 has neither network nor persistent data, same checked role/DB.
+services:
+  postgres:
+    image: postgres:18
+    pull_policy: never
+    tmpfs: !override
+      - /var/lib/postgresql
+      - /tmp

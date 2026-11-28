@@ -57,10 +57,22 @@ class Proposals:
 
     def __init__(self, db, session):
         self.db = db
-        self.research = self.research_type(
-            db, session
-        )  # same mutex as evidence/revocations
+        self._research = None
+        self._session = session
         self.workspace = self.workspace_type(db)
+
+    @property
+    def research(self):
+        # Context first locks the editorial row, then this existing documentary
+        # mutex. Do not acquire Control in the constructor before lock_edit:
+        # that reverses the bulk/editor lock order and can deadlock operators.
+        if self._research is None:
+            self._research = self.research_type(self.db, self._session)
+        return self._research
+
+    @research.setter
+    def research(self, value):
+        self._research = value
 
     def lock_edit(self, ident):
         # Serialize against existing commercial saves before checking their fields.
@@ -283,7 +295,54 @@ class Proposals:
             )
         if record.review_status == "APPLIED":
             reasons.append("La selección ya fue guardada; no puede aplicarse otra vez.")
+        taxonomy_pin = meta.get("taxonomy_pin")
+        if taxonomy_pin:
+            facts = [
+                fact for fact in item.facts
+                if fact.get("state") == "APPROVED"
+                and not self.research.blockers(item, fact)
+            ]
+            mapping = self.taxonomy_context(edit, item, facts)
+            if (
+                mapping.get("state") != "APPROVED"
+                or digest(mapping.get("record")) != taxonomy_pin
+            ):
+                reasons.append("La clasificación o su vocabulario cambió; revisá la propuesta nueva.")
         return reasons
+
+    def taxonomy_context(self, edit, item, facts):
+        from .taxonomy_catalog import catalog_state
+        from .taxonomy_review import inspection_from_context, current_review
+
+        inspected = inspection_from_context(
+            item.ecomm_id, item, edit, facts,
+            self.research.documents(item.ecomm_id), catalog_state(self.db),
+        )
+        return current_review(inspected, item.history, "KIKI")
+
+    def taxonomy_fields(self, edit, item, facts, fields):
+        """A reviewed internal classification is not a manufacturer assertion."""
+        mapping = self.taxonomy_context(edit, item, facts)
+        if mapping["state"] != "APPROVED" or not mapping["catalog_bound"]:
+            return None
+        record = mapping["record"]
+        evidence_ids = record.get("evidence_ids") or []
+        if not evidence_ids or not set(evidence_ids).issubset({f["id"] for f in facts}):
+            return None
+        for key in ("category", "subcategory"):
+            value = record["target_pair"][key]
+            fields[key] = {
+                "value": value, "clauses": [value], "evidence_ids": evidence_ids,
+                "evidence_kind": "INTERNAL_TAXONOMY_DECISION",
+                "taxonomy_revision": record["taxonomy_revision"],
+                "taxonomy_reviewer": record["reviewer"],
+                "explanation": record["reason"],
+            }
+        # Do not silently replace the manufacturer's terms in SEO. Such copy
+        # remains a separate evidence-backed, field-specific human decision.
+        if record["source_pair"] != record["target_pair"]:
+            fields.pop("seo_keywords", None)
+        return digest(record)
 
     def serialize(self, record, edit, item, authorized, fingerprint):
         reasons = self.validity(record, edit, item, fingerprint)
@@ -375,6 +434,9 @@ class Proposals:
                 "La ficha cambió. Recuperá la versión nueva antes de generar."
             )
         fields, missing = self.generate_fields(facts)
+        taxonomy_pin = self.taxonomy_fields(edit, item, facts, fields)
+        if taxonomy_pin and "seo_keywords" not in fields:
+            missing.append("seo_keywords: revisar palabras clave de la clasificación interna sin agregar afirmaciones no documentadas.")
         if only_missing:
             fields = {
                 key: value
@@ -392,6 +454,7 @@ class Proposals:
             "fields": fields,
             "missing": missing,
             "decisions": {},
+            **({"taxonomy_pin": taxonomy_pin} if taxonomy_pin else {}),
         }
         record = KikiAiEditorialDraft(
             product_key=self.product_prefix + ident,

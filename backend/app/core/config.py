@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     kiki_editorial_review_soon_days: int = Field(default=7, ge=1, le=30)
     kiki_channel_workspace_enabled: bool = False
     kiki_document_workspace_enabled: bool = False
+    kiki_tiendanube_writes_enabled: bool = False
+    kiki_ml_official_validation_enabled: bool = False
+    kiki_monthly_review_enabled: bool = False
+    kiki_research_search_enabled: bool = False
+    kiki_research_search_provider: str = "BRAVE"
+    kiki_research_search_api_key: str = Field(default="", repr=False)
+    kiki_research_search_max_requests: int = Field(default=20, ge=1, le=20)
+    kiki_research_search_daily_requests: int = Field(default=20, ge=1, le=200)
     # Explicit pilot allowlist. No network access until every value is set.
     kiki_document_source_fetch_enabled: bool = False
     # Explicit manual URL pilot, sitemap optional; still requires domain allowlist,

@@ -224,6 +224,15 @@ def test_video_permission_is_exact_revocable_and_never_shared_with_other_assets(
         db.flush()
         research = Research(db, user)
         dossier = research.dossier(IDENT)
+        # The original's hash changed when this fictional permission was
+        # added. Its prior identity decision cannot approve the revised file.
+        previous_version = dossier.version
+        reviewed = research.review_document_identity(
+            IDENT, dossier.version, doc.id, doc.version, "APPROVED",
+            "Revisé explícitamente la identidad y presentación del original ficticio con el nuevo permiso de video.",
+        )
+        assert reviewed["version"] > previous_version
+        dossier = research.dossier(IDENT)
         review_media_rights(
             research,
             IDENT,

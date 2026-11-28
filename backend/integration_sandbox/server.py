@@ -21,7 +21,11 @@ def main():
     stage3_mode = stage3_flag.read_text().strip() if stage3_flag.exists() else "off"
     if stage3_mode not in {"off", "local-synthetic"}:
         raise RuntimeError("Modo documental de etapa 3 inválido.")
-    application = create_sandbox_app(production_compat=compat_mode=="isolated-only", autonomous=mode()=="backend", connections=connection_mode=="offline-fixtures", stage3=stage3_mode=="local-synthetic")
+    stage4_flag = Path("/runtime/stage4-mode")
+    stage4_mode = stage4_flag.read_text().strip() if stage4_flag.exists() else "off"
+    if stage4_mode not in {"off", "synthetic-commercial"}:
+        raise RuntimeError("Modo comercial aislado inválido.")
+    application = create_sandbox_app(production_compat=compat_mode=="isolated-only", autonomous=mode()=="backend", connections=connection_mode=="offline-fixtures", stage3=stage3_mode=="local-synthetic", stage4=stage4_mode=="synthetic-commercial")
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa

@@ -1,4 +1,8 @@
-import { environmentText, capabilities } from "./runtime";
+import { environmentText, capabilities, availableFeature } from "./runtime";
+import { PeriodicReviewPanel } from "./PeriodicReviewPanel";
+import { AutomationFlowPanel } from "./AutomationFlowPanel";
+import { CommercialBulkReview } from "./CommercialBulkReview";
+import { TaxonomyReview } from "./TaxonomyReview";
 import { ManufacturerIntakeQueue } from "./ManufacturerIntakeQueue";
 import { CommercialPreparationPlan } from "./CommercialPreparationPlan";
 import { ReviewedEvidenceBatch } from "./ReviewedEvidenceBatch";
@@ -28,9 +32,17 @@ const labels: Record<string, string> = {
  * sends the visible Ecomm item title to the search engine in a new tab.
  */
 function officialSourceSearchUrl(name: string, presentation?: string): string {
-  const title = name.replace(/[\x00-\x1f\x7f]/g, " ").trim().slice(0, 140);
-  const variant = (presentation || "").replace(/[\x00-\x1f\x7f]/g, " ").trim().slice(0, 70);
-  const query = [title, variant, "fabricante sitio oficial producto"].filter(Boolean).join(" ");
+  const title = name
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .trim()
+    .slice(0, 140);
+  const variant = (presentation || "")
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .trim()
+    .slice(0, 70);
+  const query = [title, variant, "fabricante sitio oficial producto"]
+    .filter(Boolean)
+    .join(" ");
   const url = new URL("https://www.google.com/search");
   url.searchParams.set("q", query);
   return url.toString();
@@ -91,7 +103,12 @@ type Batch = {
 };
 type SitemapPreview = {
   mode: "READ_ONLY_MANUFACTURER_SITEMAP_PREVIEW";
-  receipt: { sitemap_url: string; sitemap_sha256: string; urls_inspected: number; robots_checked: true };
+  receipt: {
+    sitemap_url: string;
+    sitemap_sha256: string;
+    urls_inspected: number;
+    robots_checked: true;
+  };
   items: {
     ecomm_id: string;
     name: string;
@@ -163,7 +180,9 @@ export function BatchPanel({
   const [operation, setOperation] = useState("GENERATE_PROPOSALS");
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [sitemapResult, setSitemapResult] = useState<SitemapPreview>();
-  const [capturedManufacturerIds, setCapturedManufacturerIds] = useState<string[]>([]);
+  const [capturedManufacturerIds, setCapturedManufacturerIds] = useState<
+    string[]
+  >([]);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const mounted = useRef(true);
@@ -207,7 +226,9 @@ export function BatchPanel({
   async function preview(filtered: boolean) {
     const selectedCount = filtered ? matches : ids.size;
     if (selectedCount < 1 || selectedCount > PILOT_BATCH_LIMIT) {
-      setError("Seleccioná entre 1 y 100 variantes. Refiná el filtro antes de preparar el lote.");
+      setError(
+        "Seleccioná entre 1 y 100 variantes. Refiná el filtro antes de preparar el lote.",
+      );
       setExpanded(true);
       return;
     }
@@ -226,94 +247,140 @@ export function BatchPanel({
   }
   async function discoverManufacturer() {
     if (!sitemapUrl.startsWith("https://") || ids.size < 1 || ids.size > 20) {
-      setError("Seleccioná entre 1 y 20 variantes e ingresá el sitemap HTTPS oficial del fabricante.");
+      setError(
+        "Seleccioná entre 1 y 20 variantes e ingresá el sitemap HTTPS oficial del fabricante.",
+      );
       return;
     }
     await act(async () => {
-      const response = await request("/api/ecomm-app/workspace/sources/sitemap-preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
-        body: JSON.stringify({ sitemap_url: sitemapUrl.trim(), ecomm_ids: [...ids] }),
-      });
-      const data = (await response.json()) as SitemapPreview & { detail?: string };
-      if (!response.ok) throw new Error(data.detail || "No se pudo comprobar el índice oficial.");
+      const response = await request(
+        "/api/ecomm-app/workspace/sources/sitemap-preview",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+          body: JSON.stringify({
+            sitemap_url: sitemapUrl.trim(),
+            ecomm_ids: [...ids],
+          }),
+        },
+      );
+      const data = (await response.json()) as SitemapPreview & {
+        detail?: string;
+      };
+      if (!response.ok)
+        throw new Error(
+          data.detail || "No se pudo comprobar el índice oficial.",
+        );
       if (
         data.mode !== "READ_ONLY_MANUFACTURER_SITEMAP_PREVIEW" ||
         !Array.isArray(data.items) ||
-        data.items.some((item) =>
-          !ids.has(item.ecomm_id) ||
-          !Array.isArray(item.candidates) ||
-          item.candidates.some((candidate) =>
-            candidate.verified !== false ||
-            candidate.review_required !== true ||
-            !candidate.url.startsWith("https://")
-          )
+        data.items.some(
+          (item) =>
+            !ids.has(item.ecomm_id) ||
+            !Array.isArray(item.candidates) ||
+            item.candidates.some(
+              (candidate) =>
+                candidate.verified !== false ||
+                candidate.review_required !== true ||
+                !candidate.url.startsWith("https://"),
+            ),
         )
-      ) throw new Error("La búsqueda devolvió datos incompatibles; no se usaron.");
+      )
+        throw new Error(
+          "La búsqueda devolvió datos incompatibles; no se usaron.",
+        );
       if (!/^[a-f0-9]{64}$/.test(data.receipt?.sitemap_sha256 || "")) {
-        throw new Error("El fabricante no devolvió un comprobante verificable del índice.");
+        throw new Error(
+          "El fabricante no devolvió un comprobante verificable del índice.",
+        );
       }
       setSitemapResult(data);
       setCapturedManufacturerIds([]);
     });
   }
   async function captureManufacturer() {
-    if (!sitemapResult || capabilities?.document_batch_source_import !== true) return;
-    const chosen = sitemapResult.items.filter((item) =>
-      ids.has(item.ecomm_id) &&
-      !capturedManufacturerIds.includes(item.ecomm_id) &&
-      item.state === "CANDIDATES" &&
-      item.ambiguous === false &&
-      item.candidate_count === 1 &&
-      item.candidates.length === 1
-    ).slice(0, 2);
+    if (!sitemapResult || capabilities?.document_batch_source_import !== true)
+      return;
+    const chosen = sitemapResult.items
+      .filter(
+        (item) =>
+          ids.has(item.ecomm_id) &&
+          !capturedManufacturerIds.includes(item.ecomm_id) &&
+          item.state === "CANDIDATES" &&
+          item.ambiguous === false &&
+          item.candidate_count === 1 &&
+          item.candidates.length === 1,
+      )
+      .slice(0, 2);
     if (!chosen.length) return;
-    if (!window.confirm(
-      `¿Incorporar ${chosen.length} documentos originales de fabricante? KIKI guardará HTML y procedencia como PENDIENTES; ningún dato quedará aprobado ni se publicará nada.`
-    )) return;
+    if (
+      !window.confirm(
+        `¿Incorporar ${chosen.length} documentos originales de fabricante? KIKI guardará HTML y procedencia como PENDIENTES; ningún dato quedará aprobado ni se publicará nada.`,
+      )
+    )
+      return;
     await act(async () => {
-      const response = await request("/api/ecomm-app/workspace/sources/batch-import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
-        body: JSON.stringify({
-          sitemap_url: sitemapResult.receipt.sitemap_url,
-          sitemap_sha256: sitemapResult.receipt.sitemap_sha256,
-          items: chosen.map((item) => ({
-            ecomm_id: item.ecomm_id,
-            url: item.candidates[0].url,
-          })),
-          authorized_local_processing: true,
-          confirm: true,
-        }),
-      });
-      const data = await response.json() as {
+      const response = await request(
+        "/api/ecomm-app/workspace/sources/batch-import",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+          body: JSON.stringify({
+            sitemap_url: sitemapResult.receipt.sitemap_url,
+            sitemap_sha256: sitemapResult.receipt.sitemap_sha256,
+            items: chosen.map((item) => ({
+              ecomm_id: item.ecomm_id,
+              url: item.candidates[0].url,
+            })),
+            authorized_local_processing: true,
+            confirm: true,
+          }),
+        },
+      );
+      const data = (await response.json()) as {
         mode?: string;
         detail?: string;
-        documents?: {ecomm_id: string; document_id: string; review_state: string; facts_approved: number}[];
+        documents?: {
+          ecomm_id: string;
+          document_id: string;
+          review_state: string;
+          facts_approved: number;
+        }[];
         external_catalogue_writes?: number;
         facts_approved?: number;
       };
-      if (!response.ok) throw new Error(data.detail || "No se incorporaron las fuentes.");
-      if (data.mode !== "EXPLICIT_BATCH_SOURCE_INTAKE" ||
-          data.external_catalogue_writes !== 0 ||
-          data.facts_approved !== 0 ||
-          !Array.isArray(data.documents) ||
-          data.documents.length !== chosen.length ||
-          data.documents.some((doc) =>
-            !chosen.some(item => item.ecomm_id === doc.ecomm_id) ||
+      if (!response.ok)
+        throw new Error(data.detail || "No se incorporaron las fuentes.");
+      if (
+        data.mode !== "EXPLICIT_BATCH_SOURCE_INTAKE" ||
+        data.external_catalogue_writes !== 0 ||
+        data.facts_approved !== 0 ||
+        !Array.isArray(data.documents) ||
+        data.documents.length !== chosen.length ||
+        data.documents.some(
+          (doc) =>
+            !chosen.some((item) => item.ecomm_id === doc.ecomm_id) ||
             !doc.document_id?.startsWith("local-") ||
             doc.review_state !== "PENDING" ||
-            doc.facts_approved !== 0
-          )) throw new Error("El resultado no prueba la incorporación segura; revisá antes de reintentar.");
+            doc.facts_approved !== 0,
+        )
+      )
+        throw new Error(
+          "El resultado no prueba la incorporación segura; revisá antes de reintentar.",
+        );
       setCapturedManufacturerIds((old) => [
-        ...new Set([...old, ...data.documents!.map((doc) => doc.ecomm_id)])
+        ...new Set([...old, ...data.documents!.map((doc) => doc.ecomm_id)]),
       ]);
     });
   }
   async function run() {
-    if (!batch || !window.confirm(
-      "¿Confirmás preparar únicamente propuestas internas de las variantes previsualizadas? Cada ficha seguirá requiriendo aprobación humana y no habrá publicaciones externas.",
-    )) return;
+    if (
+      !batch ||
+      !window.confirm(
+        "¿Confirmás preparar únicamente propuestas internas de las variantes previsualizadas? Cada ficha seguirá requiriendo aprobación humana y no habrá publicaciones externas.",
+      )
+    )
+      return;
     await act(async () => {
       await api(`/${batch.id}/start`, csrf, {
         confirm: true,
@@ -326,8 +393,7 @@ export function BatchPanel({
     });
   }
   async function processManualStep() {
-    if (!batch || batch.autonomous || batch.state !== "PENDING")
-      return;
+    if (!batch || batch.autonomous || batch.state !== "PENDING") return;
     await act(async () => {
       // Explicit single bounded backend step. Never starts a browser-side
       // loop or an always-on executor; the operator controls every group.
@@ -353,7 +419,14 @@ export function BatchPanel({
         });
     }, 1500);
     return () => window.clearInterval(timer);
-  }, [expanded, batch?.id, batch?.state, batch?.page, batch?.cancel_requested, jobsPage]);
+  }, [
+    expanded,
+    batch?.id,
+    batch?.state,
+    batch?.page,
+    batch?.cancel_requested,
+    jobsPage,
+  ]);
   useEffect(() => {
     if (!expanded) return;
     const previous = document.body.style.overflow;
@@ -442,15 +515,54 @@ export function BatchPanel({
                 Las propuestas se revisan y guardan individualmente. No se
                 aprueban fichas ni se publica automáticamente.
               </p>
-              <p>Para tareas sin documentación, «Buscar posible fabricante»
-                abre una consulta externa con el nombre de esa variante; sus
+              <p>
+                Para tareas sin documentación, «Buscar posible fabricante» abre
+                una consulta externa con el nombre de esa variante; sus
                 resultados no están verificados. «Investigar y revisar fuente»
                 abre Evidencias para registrar y comprobar la identidad y
-                procedencia antes de generar contenido.</p>
-              <p>Este piloto admite hasta 100 variantes por selección. Cada clic en
-                «Procesar siguiente grupo» prepara hasta 5 variantes sin IA paga y
-                sin ejecutar trabajo en segundo plano. Se requiere una revisión
-                humana independiente antes de guardar cada ficha.</p>
+                procedencia antes de generar contenido.
+              </p>
+              <p>
+                Este piloto admite hasta 100 variantes por selección. Cada clic
+                en «Procesar siguiente grupo» prepara hasta 5 variantes sin IA
+                paga y sin ejecutar trabajo en segundo plano. Se requiere una
+                revisión humana independiente antes de guardar cada ficha.
+              </p>
+              {availableFeature("documents") && (
+                <PeriodicReviewPanel
+                  csrf={csrf}
+                  disabled={locked}
+                  onOpen={(id, tab) => {
+                    setExpanded(false);
+                    onOpen(id, undefined, tab);
+                  }}
+                />
+              )}
+              {availableFeature("documents") && (
+                <AutomationFlowPanel
+                  ids={ids}
+                  csrf={csrf}
+                  disabled={locked}
+                  onOpen={(id) => {
+                    setExpanded(false);
+                    onOpen(id, undefined, "Evidencias");
+                  }}
+                />
+              )}
+              {availableFeature("documents") && (
+                <CommercialBulkReview
+                  ids={ids}
+                  csrf={csrf}
+                  disabled={locked}
+                  onOpen={(id) => {
+                    setExpanded(false);
+                    onOpen(id, undefined, "Ficha");
+                  }}
+                />
+              )}
+              {availableFeature("documents") && (
+                <TaxonomyReview ids={ids} csrf={csrf} disabled={locked} />
+              )}
               {capabilities?.documents === true && (
                 <ReviewedEvidenceBatch
                   ids={ids}
@@ -480,7 +592,9 @@ export function BatchPanel({
                   selected={ids}
                   sitemap={sitemapResult}
                   disabled={locked}
-                  executionEnabled={capabilities?.document_resumable_intake === true}
+                  executionEnabled={
+                    capabilities?.document_resumable_intake === true
+                  }
                   onOpen={(id) => {
                     setExpanded(false);
                     onOpen(id, undefined, "Evidencias");
@@ -488,12 +602,16 @@ export function BatchPanel({
                 />
               )}
               {capabilities?.document_sitemap_discovery === true && (
-                <section className="b-detail" aria-label="Descubrimiento de fabricante">
+                <section
+                  className="b-detail"
+                  aria-label="Descubrimiento de fabricante"
+                >
                   <h3>Buscar fuentes oficiales por fabricante</h3>
                   <p>
-                    Seleccioná hasta 20 variantes de un mismo fabricante e ingresá
-                    una vez la URL exacta de su sitemap de productos. KIKI coteja
-                    las páginas publicadas sin descargar fichas ni aprobar datos.
+                    Seleccioná hasta 20 variantes de un mismo fabricante e
+                    ingresá una vez la URL exacta de su sitemap de productos.
+                    KIKI coteja las páginas publicadas sin descargar fichas ni
+                    aprobar datos.
                   </p>
                   <label>
                     Sitemap XML oficial del fabricante
@@ -513,35 +631,48 @@ export function BatchPanel({
                   <div className="b-actions">
                     <button
                       type="button"
-                      disabled={locked || !ids.size || ids.size > 20 || !sitemapUrl.startsWith("https://")}
+                      disabled={
+                        locked ||
+                        !ids.size ||
+                        ids.size > 20 ||
+                        !sitemapUrl.startsWith("https://")
+                      }
                       onClick={() => void discoverManufacturer()}
                     >
                       Buscar fuentes para {ids.size} variantes
                     </button>
                   </div>
-                  {sitemapResult && capabilities?.document_batch_source_import === true &&
+                  {sitemapResult &&
+                    capabilities?.document_batch_source_import === true &&
                     capabilities?.document_resumable_intake !== true && (
-                    <div className="b-actions">
-                      <p>
-                        La incorporación por lotes conserva hasta 2 HTML originales por paso.
-                        Las fuentes quedan pendientes de comprobar. No se aprueban hechos.
-                      </p>
-                      <button
-                        type="button"
-                        disabled={locked || !sitemapResult.items.some((item) =>
-                          ids.has(item.ecomm_id) &&
-                          !capturedManufacturerIds.includes(item.ecomm_id) &&
-                          item.state === "CANDIDATES" &&
-                          item.ambiguous === false &&
-                          item.candidate_count === 1 &&
-                          item.candidates.length === 1
-                        )}
-                        onClick={() => void captureManufacturer()}
-                      >
-                        Incorporar siguientes 2 fuentes candidatas
-                      </button>
-                    </div>
-                  )}
+                      <div className="b-actions">
+                        <p>
+                          La incorporación por lotes conserva hasta 2 HTML
+                          originales por paso. Las fuentes quedan pendientes de
+                          comprobar. No se aprueban hechos.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={
+                            locked ||
+                            !sitemapResult.items.some(
+                              (item) =>
+                                ids.has(item.ecomm_id) &&
+                                !capturedManufacturerIds.includes(
+                                  item.ecomm_id,
+                                ) &&
+                                item.state === "CANDIDATES" &&
+                                item.ambiguous === false &&
+                                item.candidate_count === 1 &&
+                                item.candidates.length === 1,
+                            )
+                          }
+                          onClick={() => void captureManufacturer()}
+                        >
+                          Incorporar siguientes 2 fuentes candidatas
+                        </button>
+                      </div>
+                    )}
                   {sitemapResult && (
                     <div role="region" aria-label="Posibles fuentes oficiales">
                       <p>
@@ -552,17 +683,28 @@ export function BatchPanel({
                         <article key={item.ecomm_id}>
                           <strong>{item.name || item.ecomm_id}</strong>
                           <p>
-                            {capturedManufacturerIds.includes(item.ecomm_id) ? "Original incorporado; evidencia pendiente de revisión · " : ""}
+                            {capturedManufacturerIds.includes(item.ecomm_id)
+                              ? "Original incorporado; evidencia pendiente de revisión · "
+                              : ""}
                             {item.candidate_count} posibles páginas ·
-                            {item.ambiguous ? " coincidencia no inequívoca" : " revisar identidad"}
+                            {item.ambiguous
+                              ? " coincidencia no inequívoca"
+                              : " revisar identidad"}
                           </p>
-                          {item.reasons.map((reason) => <p key={reason}>{reason}</p>)}
+                          {item.reasons.map((reason) => (
+                            <p key={reason}>{reason}</p>
+                          ))}
                           {item.candidates.map((candidate) => (
                             <p key={candidate.url}>
-                              <a href={candidate.url} target="_blank" rel="noopener noreferrer">
+                              <a
+                                href={candidate.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 Examinar posible fuente del fabricante
                               </a>
-                              {" · "}Coincidencias: {candidate.matched_tokens.join(", ")}
+                              {" · "}Coincidencias:{" "}
+                              {candidate.matched_tokens.join(", ")}
                             </p>
                           ))}
                           <button
@@ -686,19 +828,20 @@ export function BatchPanel({
                         disabled={locked}
                         onClick={run}
                       >
-                        {batch.autonomous ? "Confirmar e iniciar lote" : "Confirmar lote para procesar por pasos"}
+                        {batch.autonomous
+                          ? "Confirmar e iniciar lote"
+                          : "Confirmar lote para procesar por pasos"}
                       </button>
                     )}
-                    {!batch.autonomous &&
-                      batch.state === "PENDING" && (
-                        <button
-                          className="d-primary"
-                          disabled={locked || batch.cancel_requested}
-                          onClick={processManualStep}
-                        >
-                          Procesar siguiente grupo (hasta 5 variantes)
-                        </button>
-                      )}
+                    {!batch.autonomous && batch.state === "PENDING" && (
+                      <button
+                        className="d-primary"
+                        disabled={locked || batch.cancel_requested}
+                        onClick={processManualStep}
+                      >
+                        Procesar siguiente grupo (hasta 5 variantes)
+                      </button>
+                    )}
                     {batch.state === "PREPARING" && (
                       <p role="status">
                         Analizando {batch.progress.prepared} de {batch.total}{" "}
@@ -839,23 +982,29 @@ export function BatchPanel({
                           </button>
                           {!item.result.proposal_id && (
                             <>
-                              {item.result.preview?.name && <a
-                                href={officialSourceSearchUrl(
-                                  item.result.preview?.name || "",
-                                  item.result.preview?.presentation,
-                                )}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Abre una búsqueda externa. Los resultados son candidatos, no fuentes verificadas."
-                              >
-                                Buscar posible fabricante ↗
-                              </a>}
+                              {item.result.preview?.name && (
+                                <a
+                                  href={officialSourceSearchUrl(
+                                    item.result.preview?.name || "",
+                                    item.result.preview?.presentation,
+                                  )}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Abre una búsqueda externa. Los resultados son candidatos, no fuentes verificadas."
+                                >
+                                  Buscar posible fabricante ↗
+                                </a>
+                              )}
                               <button
                                 type="button"
                                 disabled={locked}
                                 onClick={() => {
                                   setExpanded(false);
-                                  onOpen(item.ecomm_id, undefined, "Evidencias");
+                                  onOpen(
+                                    item.ecomm_id,
+                                    undefined,
+                                    "Evidencias",
+                                  );
                                 }}
                               >
                                 Investigar y revisar fuente

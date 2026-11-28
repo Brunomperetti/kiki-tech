@@ -11,6 +11,8 @@ from app.core.security import require_session, require_csrf
 from app.database.session import get_db
 from app.services.documental.research import Research
 from app.services.documental.proposals import Proposals
+from app.services.documental.contracts import CommercialReviewPreview, CommercialReviewApply
+from app.services.documental.commercial_review import CommercialReview
 from app.services.documental.commercial_plan import commercial_plan
 from app.services.documental.reextract_reviewed_batch import extract_reviewed_selection
 from app.services.documental.source_links import suggest_reviewed_sources
@@ -195,15 +197,20 @@ def review_asset_permissions(
     session=Depends(require_csrf),
 ):
     """Review an explicit original written grant for a specific asset URL."""
-    return execute(
-        db,
-        lambda: review_media_rights(
-            Research(db, session),
+    def operation():
+        service = Proposals(db, session)
+        service.lock_edit(ecomm_id)
+        return review_media_rights(
+            service.research,
             ecomm_id, body.expected_version, document_id, body.document_version,
             body.media_url, body.media_kind, body.source_url, body.decision,
             body.licence_basis, body.location, body.quote, body.reason,
-        ),
-    )
+            alt_text=body.alt_text, presentation=body.presentation,
+            valid_until=body.valid_until,
+            expected_workspace_version=body.expected_workspace_version,
+        )
+
+    return execute(db, operation)
 
 
 @router.post("/{ecomm_id}/documents/fetch-manufacturer")
@@ -843,3 +850,181 @@ def preview_commercial_plan(
     except Exception:
         db.rollback()
         raise
+
+
+@router.post("/commercial-review/preview")
+def preview_editorial_selection(
+    body: CommercialReviewPreview,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    try:
+        result = CommercialReview(db, session).preview(body.ecomm_ids)
+        db.rollback()
+        return result
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post("/commercial-review/apply")
+def save_editorial_selection(
+    body: CommercialReviewApply,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    try:
+        result = CommercialReview(db, session).apply(
+            body.expected_fingerprint,
+            [item.model_dump() for item in body.items],
+            body.ecomm_ids,
+        )
+        db.commit()
+        return result
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.get("/{ecomm_id}/commercial-coverage")
+def commercial_field_coverage(
+    ecomm_id: str, db: Session = Depends(get_db), session=Depends(require_session),
+):
+    from app.services.documental.completion import saved_field_coverage
+
+    def operation():
+        service = Proposals(db, session)
+        edit, item, _facts, _fingerprint = service.context(ecomm_id)
+        return saved_field_coverage(
+            service.research, item, edit["fields"],
+            taxonomy=service.taxonomy_context(edit, item, _facts),
+        )
+
+    return execute(db, operation)
+
+
+@router.get("/{ecomm_id}/media-review")
+def media_review_registry(
+    ecomm_id: str, db: Session = Depends(get_db), session=Depends(require_session),
+):
+    from app.services.documental.media_rights import media_review_registry as registry
+
+    def operation():
+        service = Proposals(db, session)
+        edit, _item, _facts, _fingerprint = service.context(ecomm_id)
+        return registry(service.research, ecomm_id, edit["fields"])
+
+    return execute(db, operation)
+
+
+class TaxonomyPair(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=80)
+    category: str = Field(min_length=1, max_length=160)
+    subcategory: str = Field(min_length=1, max_length=160)
+    state: Literal["ACTIVE", "RETIRED"]
+
+
+class TaxonomyChannelPair(TaxonomyPair):
+    pair_id: str = Field(min_length=1, max_length=80)
+    channel: Literal["ECOMM", "ML", "TN"]
+
+
+class SaveTaxonomyCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    revision: str = Field(min_length=1, max_length=100)
+    entries: list[TaxonomyPair] = Field(max_length=1000)
+    mappings: list[TaxonomyChannelPair] = Field(max_length=1000)
+    reason: str = Field(min_length=20, max_length=600)
+    confirm: Literal[True]
+
+
+class PreviewTaxonomyBatch(CommercialReviewPreview):
+    channel: Literal["KIKI", "ECOMM", "ML", "TN"] = "KIKI"
+
+
+class TaxonomyBatchDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ecomm_id: str = Field(min_length=1, max_length=120)
+    decision: Literal["APPROVED", "REVOKED", "SKIP"]
+    reason: str = Field(min_length=20, max_length=600)
+    expected_version: int | None = Field(default=None, ge=0)
+    expected_workspace_version: int | None = Field(default=None, ge=0)
+    expected_fingerprint: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    taxonomy_revision: str | None = Field(default=None, min_length=1, max_length=100)
+    target_category: str | None = Field(default=None, min_length=1, max_length=160)
+    target_subcategory: str | None = Field(default=None, min_length=1, max_length=160)
+    catalog_version: int | None = Field(default=None, ge=1)
+    catalog_pair_id: str | None = Field(default=None, min_length=1, max_length=80)
+    channel_mapping_id: str | None = Field(default=None, min_length=1, max_length=80)
+
+
+class ReviewTaxonomyBatch(PreviewTaxonomyBatch):
+    expected_selection_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+    decisions: list[TaxonomyBatchDecision] = Field(min_length=1, max_length=20)
+    confirm: Literal[True]
+
+
+def taxonomy_operation(db, operation, *, write=False):
+    try:
+        result = operation()
+        if write:
+            db.commit()
+        else:
+            db.rollback()
+        return result
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.get("/taxonomy/catalog")
+def taxonomy_catalog_state(db: Session = Depends(get_db), session=Depends(require_session)):
+    from app.services.documental.taxonomy_catalog import TaxonomyCatalog
+
+    return taxonomy_operation(db, lambda: TaxonomyCatalog(db, session).get())
+
+
+@router.post("/taxonomy/catalog")
+def taxonomy_catalog_save(
+    body: SaveTaxonomyCatalog, db: Session = Depends(get_db), session=Depends(require_csrf),
+):
+    from app.services.documental.taxonomy_catalog import TaxonomyCatalog
+
+    return taxonomy_operation(db, lambda: TaxonomyCatalog(db, session).save(
+        expected_version=body.expected_version, revision=body.revision,
+        entries=[row.model_dump() for row in body.entries],
+        mappings=[row.model_dump() for row in body.mappings], reason=body.reason,
+    ), write=True)
+
+
+@router.post("/taxonomy/review-preview")
+def taxonomy_batch_preview(
+    body: PreviewTaxonomyBatch, db: Session = Depends(get_db), session=Depends(require_csrf),
+):
+    from app.services.documental.taxonomy_review import TaxonomyReview
+
+    return taxonomy_operation(db, lambda: TaxonomyReview(db, session).preview_batch(body.ecomm_ids, body.channel))
+
+
+@router.post("/taxonomy/review-batch")
+def taxonomy_batch_review(
+    body: ReviewTaxonomyBatch, db: Session = Depends(get_db), session=Depends(require_csrf),
+):
+    from app.services.documental.taxonomy_review import TaxonomyReview
+
+    return taxonomy_operation(db, lambda: TaxonomyReview(db, session).review_batch(
+        ids=body.ecomm_ids, channel=body.channel,
+        expected_selection_fingerprint=body.expected_selection_fingerprint,
+        decisions=[row.model_dump(exclude_none=True) for row in body.decisions],
+    ), write=True)

@@ -72,8 +72,17 @@ class Executor:
             return True
 
     def run(self, stop):
+        from app.services.periodic_review_runner import PeriodicReviewRunner
+
+        periodic = PeriodicReviewRunner(self.factory)
         # Idle polling does not touch providers. Work survives this process in PG.
         while not stop.is_set():
+            try:
+                periodic.tick()
+            except Exception:
+                # An archived diagnostic cannot stop unrelated editorial jobs.
+                # Error details may contain credentials; keep logs categorical.
+                log.warning("Diagnóstico mensual pendiente; reintento después del límite horario.")
             try:
                 worked = self.tick()
             except Exception:
