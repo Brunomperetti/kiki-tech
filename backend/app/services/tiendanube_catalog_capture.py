@@ -78,7 +78,7 @@ def read_catalog(client, *, deadline_seconds=45):
                     "sku": sku.strip() if sku else "",
                     "name": name, "brand": _text(product.get("brand")),
                     "barcode": _text(variant.get("barcode")),
-                    "visibility": visibility if visibility in ("visible", "hidden", "link_only") else None,
+                    "visibility": visibility if visibility in ("visible", "hidden", "unlisted") else None,
                     "published": product.get("published") if type(product.get("published")) is bool else None,
                 })
                 if len(rows) > MAX_VARIANTS:
