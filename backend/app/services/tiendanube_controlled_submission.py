@@ -6,6 +6,7 @@ remain UNKNOWN for human reconciliation, including a process crash. Stock,
 prices, external categories, media and visibility changes are never sent.
 """
 from copy import deepcopy
+from html import escape
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
@@ -83,6 +84,10 @@ def public(row):
             "target_variant_id": audit.get("target_variant_id"),
             "preview_fingerprint": audit["preview_fingerprint"],
             "payload_preview": deepcopy(audit["payload"]),
+            "review_mode": audit.get("review_mode", "DOCUMENTED"),
+            "product_admin_url": (f"https://www.tiendanube.com/admin/v2/products/{audit['target_product_id']}"
+                                  if row.status == "SUCCEEDED" and audit.get("target_product_id") else None),
+            "optional_fields_notice": "No se envían precios, stock, categorías locales sin equivalencia, imágenes sin permisos, videos ni medidas no disponibles. Se pueden completar después en Tiendanube. La presentación debe estar incluida en el nombre revisado.",
             "blockers": audit.get("blockers", []), "history": audit.get("history", []),
             "created_at": audit["created_at"], "expires_at": audit["expires_at"],
             "error_code": audit.get("error_code"), "provider_calls": audit.get("provider_calls", 0),
@@ -122,10 +127,11 @@ def _remote_identity(rows, product_id):
     ], key=lambda row: str(row["variant_id"]))
 
 
-def _matches(rows, sku, code):
+def _matches(rows, sku, code, name=None):
     # Matching creates blockers/candidates; it never establishes a link.
     return [row for row in rows if normalized_sku(row.get("sku")) == normalized_sku(sku)
-            or (code and row.get("barcode") and str(row["barcode"]).zfill(14) == str(code).zfill(14))]
+            or (code and row.get("barcode") and str(row["barcode"]).zfill(14) == str(code).zfill(14))
+            or (name and normalize(row.get("name")) == normalize(name))]
 
 
 
@@ -160,8 +166,89 @@ def _payload(item, operation):
     return value
 
 
+def _manual_review(db, session, ecomm_id):
+    """Saved editor + explicit operator attestation; not documentary approval.
+
+    Reuses the API master and editor. Optional editorial coverage, AI and a
+    READY state are deliberately not requirements for an unpublished draft.
+    """
+    from app.services.editorial_batches.context import sources
+    from app.services.ecomm_api_product_workspace_service import EcommApiProductWorkspace
+    catalog = sources(db)
+    workspace = EcommApiProductWorkspace(db).get(ecomm_id, session=session)
+    source, fields = workspace["source"], workspace["fields"]
+    blockers = []
+    sku = source["sku"]
+    if not workspace["available"] or not fields.get("title", "").strip():
+        blockers.append("Guardá la ficha con un nombre de producto antes de enviarla.")
+    if workspace["source_sku_changed"] or source.get("identity_blockers"):
+        blockers.append("La identidad Ecomm-App cambió o presenta códigos contradictorios.")
+    if sum(normalized_sku(row.get("sku")) == normalized_sku(sku) for row in catalog.values()) != 1:
+        blockers.append("SKU repetido en Ecomm-App; revisá la variante antes de crear un producto.")
+    source_name = str(source.get("product_name") or "") + " " + str(source.get("variant_description") or "")
+    title = fields.get("title", "") + " " + fields.get("presentation", "")
+    if variant_conflict(source_name, sku, title, sku) or (quantity(title) or 1) != (quantity(source_name) or 1):
+        blockers.append("La presentación o cantidad de la ficha difiere de la variante Ecomm-App.")
+    if re.search(r"\b(?:pack|combo)\b", title + " " + source_name, re.IGNORECASE) or (quantity(title) or 1) != 1:
+        blockers.append("Un pack o combo necesita validación específica; no se creará como unidad individual.")
+    codes = [source.get("gtin_raw"), source.get("barcode")]
+    codes = [code for code in codes if code]
+    if any(not isinstance(code, str) or not _gtin_check_digit_valid(code) for code in codes):
+        blockers.append("El código original Ecomm-App no es un GTIN válido.")
+    code = codes[0] if codes else None
+    if code and any(row["ecomm_id"] != ecomm_id and any(
+        isinstance(other, str) and other.zfill(14) == code.zfill(14)
+        for other in (row.get("gtin_raw"), row.get("barcode"))
+    ) for row in catalog.values()):
+        blockers.append("El código también identifica otra variante: no crear hasta resolver unidad y pack.")
+    if fields.get("proposed_gtin") and fields["proposed_gtin"] != code:
+        blockers.append("El EAN editado difiere del original; requiere resolver su procedencia antes del envío.")
+    item = {"ecomm_id": ecomm_id, "sku": sku, "workspace_version": workspace["version"],
+            "source_is_combo": source.get("is_combo"), "source_parent_is_combo": source.get("parent_is_combo"),
+            "gtin_original": code, "commercial_fields": deepcopy(fields), "blockers": blockers}
+    # Include ALL source identity and saved fields, not just the outbound subset.
+    pin = fingerprint({"source": source, "fields": fields, "version": workspace["version"]})
+    return {"items": [item], "blocked": bool(blockers), "preview_fingerprint": pin}
+
+
+def _review(db, session, ecomm_id, mode):
+    if mode == "MANUAL":
+        return _manual_review(db, session, ecomm_id)
+    return preview_commercial_export(db, session, "tn", [ecomm_id])
+
+
+def _manual_payload(item):
+    fields = item["commercial_fields"]
+    variant = {"sku": item["sku"].strip()}
+    if item.get("gtin_original"):
+        variant["barcode"] = item["gtin_original"]
+    # The editor stores plain text; the provider renders HTML. Never execute
+    # arbitrary operator HTML, remote scripts or unapproved embedded images.
+    payload = {"name": {"es": fields["title"].strip()}, "published": False,
+               "variants": [variant]}
+    for local, remote in (("description", "description"), ("seo_title", "seo_title"),
+                          ("seo_description", "seo_description")):
+        value = fields.get(local, "").strip()
+        if value:
+            payload[remote] = {"es": escape(value).replace("\n", "<br>") if local == "description" else value}
+    if fields.get("brand", "").strip():
+        payload["brand"] = fields["brand"].strip()
+    return payload
+
+
+def _capture_pin(db, store, mode):
+    if mode != "MANUAL":
+        return fingerprint(_capture(db, store))
+    # A cached capture is informative, not an authorization prerequisite. A
+    # complete live duplicate check is still mandatory immediately before POST.
+    row = _record(db)
+    capture = row.payload[0] if row and row.payload else None
+    return fingerprint(capture) if capture and str(capture.get("store_id")) == store else None
+
+
 def prepare_submission(db, session, settings, *, request_key, ecomm_id, operation,
-                       identity_checks, reason, target_product_id=None, target_variant_id=None):
+                       identity_checks, reason, target_product_id=None, target_variant_id=None,
+                       review_mode="DOCUMENTED"):
     actor = _actor(session)
     store = _read_enabled(settings)
     if not getattr(settings, "kiki_v2_writes_enabled", False):
@@ -179,7 +266,9 @@ def prepare_submission(db, session, settings, *, request_key, ecomm_id, operatio
         target_product_id, target_variant_id = _id(target_product_id), _id(target_variant_id)
     elif target_product_id is not None or target_variant_id is not None:
         raise ValueError("Una creación no admite identificadores externos inventados")
-    manifest = {"store_id": store, "ecomm_id": ecomm_id, "operation": operation,
+    if review_mode not in {"DOCUMENTED", "MANUAL"} or (review_mode == "MANUAL" and operation != "CREATE_HIDDEN"):
+        raise ValueError("La revisión manual simplificada sólo permite crear un producto oculto")
+    manifest = {"review_mode": review_mode, "store_id": store, "ecomm_id": ecomm_id, "operation": operation,
                 "target_product_id": target_product_id, "target_variant_id": target_variant_id,
                 "identity_checks": sorted(identity_checks), "reason": reason.strip()}
     _scope(db, store)
@@ -190,9 +279,11 @@ def prepare_submission(db, session, settings, *, request_key, ecomm_id, operatio
         if previous.diagnostics["manifest"] != manifest:
             raise ValueError("La clave idempotente ya pertenece a otra selección")
         return public(previous)
-    review = preview_commercial_export(db, session, "tn", [ecomm_id])
+    review = _review(db, session, ecomm_id, review_mode)
     item = review["items"][0]
-    capture = _capture(db, store)
+    capture_pin = _capture_pin(db, store, review_mode)
+    record = _record(db)
+    capture = record.payload[0] if record and record.payload and str(record.payload[0].get("store_id")) == store else {"rows": []}
     blockers = list(item["blockers"])
     if item.get("source_is_combo") is not False or item.get("source_parent_is_combo") is not False:
         blockers.append("Este envío controlado requiere una unidad individual con identidad explícita; packs pendientes de validación específica")
@@ -207,11 +298,11 @@ def prepare_submission(db, session, settings, *, request_key, ecomm_id, operatio
             blockers.extend(_target_conflicts(item, remote[0]))
     elif _matches(capture["rows"], item["sku"], item.get("gtin_original") or item.get("barcode_original")):
         blockers.append("Existen candidatos en la captura; no crear un duplicado ni vincular automáticamente")
-    payload = _payload(item, operation)
+    payload = _manual_payload(item) if review_mode == "MANUAL" else _payload(item, operation)
     created = now()
     audit = {**manifest, "manifest": manifest, "request_key": request_key,
              "commercial_fingerprint": review["preview_fingerprint"],
-             "capture_fingerprint": fingerprint(capture), "remote_identity": remote,
+             "capture_fingerprint": capture_pin, "remote_identity": remote,
              "workspace_version": item["workspace_version"],
              "code": item.get("gtin_original") or item.get("barcode_original"),
              "payload": payload, "created_at": created.isoformat(),
@@ -268,10 +359,10 @@ def send_submission(db, session, settings, ident, *, expected_revision,
         raise ValueError("Previsualización cambiada o bloqueada; revisá la versión actual")
     if now() > datetime.fromisoformat(audit["expires_at"]):
         raise ValueError("La autorización de envío venció; generá otra previsualización")
-    fresh = preview_commercial_export(db, session, "tn", [audit["ecomm_id"]])
+    fresh = _review(db, session, audit["ecomm_id"], audit.get("review_mode", "DOCUMENTED"))
     if fresh["blocked"] or fresh["preview_fingerprint"] != audit["commercial_fingerprint"]:
         raise ValueError("La ficha, identidad, evidencia o permisos cambiaron; envío bloqueado")
-    if fingerprint(_capture(db, store)) != audit["capture_fingerprint"]:
+    if _capture_pin(db, store, audit.get("review_mode", "DOCUMENTED")) != audit["capture_fingerprint"]:
         raise ValueError("Cambió la captura del canal; compará nuevamente antes del envío")
     conflicts = list(db.scalars(select(ImportJobRecord).where(
         ImportJobRecord.source == SOURCE, ImportJobRecord.id != ident,
@@ -313,9 +404,11 @@ def send_submission(db, session, settings, ident, *, expected_revision,
         client._transport = counted_transport
         remote = read_catalog(client)
         item = fresh["items"][0]
-        matches = _matches(remote["rows"], item["sku"], audit.get("code"))
+        matches = _matches(remote["rows"], item["sku"], audit.get("code"),
+                           item["commercial_fields"].get("title") if audit.get("review_mode") == "MANUAL" else None)
         if audit["operation"] == "CREATE_HIDDEN":
-            if matches or any(not r.get("sku") for r in remote["rows"]):
+            if matches or any(not r.get("sku") and (audit.get("review_mode") != "MANUAL" or
+                             not (r.get("barcode") or r.get("name"))) for r in remote["rows"]):
                 return _finish(db, ident, "BLOCKED", error_code="REMOTE_DUPLICATE_OR_INCOMPLETE_IDENTITY", calls=calls)
         elif _remote_identity(remote["rows"], audit["target_product_id"]) != audit["remote_identity"]:
             return _finish(db, ident, "BLOCKED", error_code="REMOTE_IDENTITY_CHANGED", calls=calls)
@@ -324,17 +417,20 @@ def send_submission(db, session, settings, ident, *, expected_revision,
                 return _finish(db, ident, "BLOCKED", error_code="REMOTE_AMBIGUOUS_IDENTITY", calls=calls)
         # Re-check all local pins after the remote wait, immediately before dispatch.
         db.expire_all()
-        latest = preview_commercial_export(db, session, "tn", [audit["ecomm_id"]])
+        latest = _review(db, session, audit["ecomm_id"], audit.get("review_mode", "DOCUMENTED"))
         if latest["blocked"] or latest["preview_fingerprint"] != audit["commercial_fingerprint"]:
             return _finish(db, ident, "BLOCKED", error_code="LOCAL_EVIDENCE_CHANGED", calls=calls)
-        if fingerprint(_capture(db, store)) != audit["capture_fingerprint"]:
+        if _capture_pin(db, store, audit.get("review_mode", "DOCUMENTED")) != audit["capture_fingerprint"]:
             return _finish(db, ident, "BLOCKED", error_code="LOCAL_CAPTURE_CHANGED", calls=calls)
         db.rollback()
         fields = item["commercial_fields"]
         dispatched = True
         if audit["operation"] == "CREATE_HIDDEN":
-            response = client.create_hidden_product(name=fields["title"], description=fields["description"],
-                                                    sku=item["sku"], brand=fields.get("brand", ""))
+            if audit.get("review_mode") == "MANUAL":
+                response = client.create_hidden_product_payload(audit["payload"])
+            else:
+                response = client.create_hidden_product(name=fields["title"], description=fields["description"],
+                                                        sku=item["sku"], brand=fields.get("brand", ""))
             variants = response.get("variants")
             if not isinstance(variants, list) or len(variants) != 1 or normalized_sku(variants[0].get("sku")) != normalized_sku(item["sku"]):
                 raise TiendanubeError(502, outcome_unknown=True)
@@ -343,6 +439,11 @@ def send_submission(db, session, settings, ident, *, expected_revision,
             response = client.update_product_content(audit["target_product_id"], name=fields["title"],
                                                       description=fields["description"], brand=fields.get("brand", ""))
         return _finish(db, ident, "SUCCEEDED", response=response, calls=calls)
+    except TiendanubeError as exc:
+        db.rollback()
+        uncertain = dispatched and exc.outcome_unknown
+        return _finish(db, ident, "UNKNOWN" if uncertain else "FAILED" if dispatched else "BLOCKED",
+                       error_code="PROVIDER_OUTCOME_UNKNOWN" if uncertain else f"PROVIDER_HTTP_{exc.status_code}", calls=calls)
     except Exception:
         # Do not retain exception text, response body, token or credentials.
         db.rollback()

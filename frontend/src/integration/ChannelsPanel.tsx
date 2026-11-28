@@ -269,17 +269,12 @@ export function ChannelsPanel({
               : "Información técnica"}
         </h3>
         <div hidden={view !== "tn"}>
-          <TiendanubePreviewPanel
-            key={id}
-            id={id}
-            csrf={csrf}
-            blocked={blocked || busy}
-          />
           <ControlledSubmissionPanel
             id={id}
             csrf={csrf}
             blocked={blocked || busy}
           />
+          <details><summary>Captura API y preparación editorial avanzada</summary><TiendanubePreviewPanel key={id} id={id} csrf={csrf} blocked={blocked || busy} /></details>
         </div>
         <div hidden={view !== "ml"}>
           <MercadoLibrePreviewPanel
