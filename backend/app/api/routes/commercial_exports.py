@@ -251,3 +251,35 @@ def tiendanube_connection_check(_session=Depends(require_csrf)):
 
     result = check_connection(get_settings())
     return result
+
+
+@router.get("/tiendanube/catalog/{ecomm_id}")
+def tiendanube_catalog_report(
+    ecomm_id: str, db: Session = Depends(get_db), _session=Depends(require_session)
+):
+    from app.services.tiendanube_catalog_capture import catalog_report
+
+    if not ecomm_id.isascii() or not ecomm_id.isdigit() or not 1 <= len(ecomm_id) <= 20:
+        raise HTTPException(422, "Identificador inválido.")
+    return execute(db, lambda: catalog_report(db, get_settings(), ecomm_id))
+
+
+@router.post("/tiendanube/catalog/refresh")
+def tiendanube_catalog_refresh(
+    body: TiendanubePreview, db: Session = Depends(get_db), _session=Depends(require_csrf)
+):
+    from app.integrations.tiendanube.client import TiendanubeError
+    from app.services.tiendanube_catalog_capture import refresh_catalog, catalog_report
+    from app.services.editorial_batches.context import sources
+
+    def operation():
+        if body.ecomm_id not in sources(db):
+            raise ValueError("Variante Ecomm-App no disponible.")
+        refresh_catalog(db, get_settings())
+        return catalog_report(db, get_settings(), body.ecomm_id)
+
+    try:
+        return execute(db, operation)
+    except TiendanubeError as exc:
+        db.rollback()
+        raise HTTPException(502, f"Tiendanube no completó la lectura (HTTP {exc.status_code}). Se conserva la captura anterior.") from None
