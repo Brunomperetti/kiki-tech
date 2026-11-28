@@ -223,3 +223,57 @@ def test_saved_web_capture_requires_url_date_and_true_html_format(tmp_path, monk
         with pytest.raises(ValueError, match="captura web debe ser un archivo HTML"):
             parse_local(upload_payload(kind="URL"))
         assert len(svc.research.documents(IDENT)) == 1  # only preexisting test doc
+
+
+def test_reparse_archived_insufficient_html_keeps_original_and_requires_review(
+    tmp_path, monkeypatch,
+):
+    import app.services.documental.local_documents as local_module
+    import app.services.documental.research as research_module
+    from test_documental_structured_h2 import product_page
+
+    monkeypatch.setattr(
+        research_module, "get_settings",
+        lambda: SimpleNamespace(kiki_admin_username="test"),
+    )
+    engine, _ = prepare(tmp_path)
+    raw = product_page().encode("utf-8")
+    payload = upload_payload().model_copy(update={
+        "content_base64": base64.b64encode(raw).decode(),
+    })
+    old_result = parse(
+        payload.filename, payload.content_type,
+        base64.b64encode(b"<html><body></body></html>").decode(),
+        web_snapshot=True,
+    )
+    assert old_result["parse_status"] == "INSUFFICIENT_DATA"
+    monkeypatch.setattr(
+        local_module, "parse_local",
+        lambda body: parse(
+            body.filename, body.content_type, body.content_base64,
+            web_snapshot=body.web_snapshot,
+        ),
+    )
+    with Session(engine) as db:
+        service = LocalDocuments(db, SimpleNamespace(id=1))
+        imported = service.incorporate(IDENT, payload, old_result)
+        doc_id = imported["incorporated_document_id"]
+        doc = db.get(Document, doc_id)
+        original = dict(doc.body["original"])
+        original_source = dict(doc.body["source"])
+        result = service.reparse_saved_html(IDENT, doc_id, imported["version"], 1)
+        assert doc.version == 2
+        assert doc.body["original"] == original
+        assert doc.body["source"] == original_source
+        assert doc.body["source"]["review_state"] == "PENDING"
+        assert doc.body["identity"]["presentation"] == "500 g"
+        assert doc.body["identity"]["ean"] is None
+        assert not result["facts"]
+        assert result["history"][-1]["action"] == "DOCUMENT_REPARSED"
+        assert doc.history[-1]["body"]["parse_status"] == "INSUFFICIENT_DATA"
+        assert base64.b64decode(doc.body["original_base64"]) == raw
+        with pytest.raises(ValueError, match="documento cambió"):
+            service.reparse_saved_html(IDENT, doc_id, result["version"], 1)
+        with pytest.raises(ValueError, match="Solo se releen"):
+            service.reparse_saved_html(IDENT, doc_id, result["version"], 2)
+        assert doc.version == 2
