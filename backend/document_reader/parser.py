@@ -332,7 +332,7 @@ class StructuredProductHTML(PageSnapshotHTML):
     """
 
     SIZE_AT_END = re.compile(r"(\d{1,5}(?:[.,]\d{1,3})?\s*(?:kg|g|gr|ml|l))$", re.I)
-    PACK_MARKER = re.compile(r"\b(?:pack|combo|caja|lote|multipack)\b|\bx\s*\d+\s*x\b", re.I)
+    PACK_MARKER = re.compile(r"\b(?:pack|combo|caja|lote|multipack)\b|\b\d+\s*[x×]\s*\d|\bx\s*\d+\s*x\b", re.I)
 
     def __init__(self):
         super().__init__()
