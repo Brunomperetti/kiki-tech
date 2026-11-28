@@ -147,12 +147,14 @@ export function AutomationFlowPanel({
     }
   }
   async function execute(current: Job) {
+    if (!alive.current) return;
+    const executionSelection = selectionRef.current;
     pause.current = false;
     setRunning(true);
     setError("");
     try {
       let next = current;
-      for (let count = 0; count < 20 && !pause.current; count++) {
+      for (let count = 0; count < 20 && !pause.current && alive.current && selectionRef.current === executionSelection; count++) {
         if (!next.items.some((i) => i.state === "PENDING")) break;
         next = checked(
           await api(`/${next.id}/step`, {
@@ -161,7 +163,7 @@ export function AutomationFlowPanel({
           }),
           next,
         );
-        if (alive.current) setJob(next);
+        if (alive.current && selectionRef.current === executionSelection) setJob(next);
       }
     } catch (e) {
       if (alive.current) setError((e as Error).message);
@@ -192,6 +194,7 @@ export function AutomationFlowPanel({
         }),
         expectedIds,
       );
+      if (!alive.current) return;
       if (selectionRef.current !== createdForSelection)
         throw new Error(
           "Cambió la selección. El lote permanece guardado; recuperalo antes de continuar.",

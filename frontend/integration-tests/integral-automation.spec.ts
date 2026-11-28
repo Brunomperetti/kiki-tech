@@ -67,7 +67,9 @@ test("investigar desde catálogo: original y citas PENDING, sin aprobación ni e
   const after = await read(page, workspace(id));
   expect(after.version).toBe(before.version);
   expect(after.fields).toEqual(before.fields);
-  await page.screenshot({ path: `artifacts/integral-documentary-research-${info.project.name}.png`, fullPage: true });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await panel.getByRole("region", { name: "Resultado de investigación", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `artifacts/integral-documentary-research-${info.project.name}.png`, fullPage: false });
   await panel.getByRole("button", { name: "Revisar evidencia y propuesta", exact: true }).click();
   await expect(page.getByRole("tab", { name: "IA", exact: true })).toBeVisible();
 });
@@ -104,4 +106,77 @@ test("20 fuentes archivadas: reutilización sin búsquedas, límites persistente
     expect(evidence.documents.map((doc: { id: string }) => doc.id).sort()).toEqual(originals.get(id));
     expect((await read(page, workspace(id))).version).toBe(versions.get(id));
   }
+});
+
+test("cerrar operaciones antes de recibir la creación real impide iniciar descargas", async ({ page }) => {
+  const id = "900005";
+  const before = await read(page, workspace(id));
+  const evidenceBefore = await read(page, workspace(id) + "/evidence");
+  expect(evidenceBefore.documents).toHaveLength(0);
+  const steps: string[] = [];
+  page.on("request", request => {
+    const path = new URL(request.url()).pathname;
+    if (request.method() === "POST" && path.startsWith(endpoint + "/") && path.endsWith("/step")) steps.push(path);
+  });
+  // Hold only delivery of an actual successful FastAPI response. No fulfilled
+  // route, fabricated JSON, fake job or simulated backend mutation is used.
+  await page.evaluate(path => {
+    type Gate = { id?: string; release: () => void; delivered: boolean };
+    const target = window as typeof window & { __actualCreationGate?: Gate };
+    const original = window.fetch.bind(window);
+    let release!: () => void;
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const gate: Gate = { release, delivered: false };
+    target.__actualCreationGate = gate;
+    window.fetch = async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+      const method = init?.method || (input instanceof Request ? input.method : "GET");
+      const response = await original(input, init);
+      if (method === "POST" && url.pathname === path) {
+        if (!response.ok) throw new Error("La creación auténtica del lote falló");
+        const actual = await response.clone().json();
+        gate.id = actual.id;
+        await hold;
+        gate.delivered = true;
+      }
+      return response;
+    };
+  }, endpoint);
+  await search(page, id);
+  await page.locator(`[data-ecomm-id="${id}"]`).getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Operaciones", exact: true }).click();
+  const panel = page.getByLabel("Investigar y completar productos", { exact: true });
+  await panel.locator("summary").first().click();
+  await panel.getByRole("button", { name: "Comprobar disponibilidad y recuperar lotes", exact: true }).click();
+  await expect(panel).toContainText("configurado");
+  await panel.getByRole("checkbox", { name: "Autorizo investigar estas 1 variantes con los proveedores y límites configurados. Revisaré las excepciones y los campos antes de guardarlos.", exact: true }).check();
+  await panel.getByRole("button", { name: "Investigar y completar 1 productos", exact: true }).click();
+  await page.waitForFunction(() => !!(window as typeof window & { __actualCreationGate?: { id?: string } }).__actualCreationGate?.id);
+  const jobId = await page.evaluate(() => (window as typeof window & { __actualCreationGate: { id: string } }).__actualCreationGate.id);
+  const created = await read(page, `${endpoint}/${jobId}`);
+  expect(created.items[0].state).toBe("PENDING");
+  expect(steps).toEqual([]);
+  await page.getByRole("button", { name: "Cerrar lotes", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Lotes editoriales", exact: true })).toHaveCount(0);
+  await page.evaluate(async () => {
+    (window as typeof window & { __actualCreationGate: { release: () => void } }).__actualCreationGate.release();
+    // Drain the released fetch/body microtasks and two actual browser frames.
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  await page.waitForFunction(() => (window as typeof window & { __actualCreationGate?: { delivered: boolean } }).__actualCreationGate?.delivered === true);
+  const afterJob = await read(page, `${endpoint}/${jobId}`);
+  expect(afterJob.items[0].state).toBe("PENDING");
+  expect(afterJob.items[0].attempts).toBe(0);
+  expect(afterJob.items[0].document_id).toBeNull();
+  expect(afterJob.search_requests).toBe(0);
+  expect(afterJob.automatic_fact_approvals).toBe(0);
+  expect(steps).toEqual([]);
+  const after = await read(page, workspace(id));
+  expect(after.fields).toEqual(before.fields);
+  expect(after.version).toBe(before.version);
+  expect(after.history).toEqual(before.history);
+  const evidenceAfter = await read(page, workspace(id) + "/evidence");
+  expect(evidenceAfter.documents).toEqual(evidenceBefore.documents);
+  expect(evidenceAfter.facts).toEqual(evidenceBefore.facts);
+  expect(steps).toEqual([]);
 });

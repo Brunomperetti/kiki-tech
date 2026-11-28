@@ -94,7 +94,9 @@ test("20 variantes: revisión humana → borradores versionados sin transferir h
   expect(result.total).toBe(20);
   expect(result.items.every((r: { state: string }) => r.state === "SAVED_DRAFT")).toBe(true);
   await expect(panel.getByRole("status")).toContainText("20 variantes revisadas");
-  await page.screenshot({ path: `artifacts/integral-commercial-review-${info.project.name}.png`, fullPage: true });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await panel.getByRole("status").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `artifacts/integral-commercial-review-${info.project.name}.png`, fullPage: false });
   for (const id of ids) {
     const after = await get(page, url(id));
     const proposal = preview.items.find((r: { ecomm_id: string }) => r.ecomm_id === id);

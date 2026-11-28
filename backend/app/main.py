@@ -91,6 +91,8 @@ def create_app(settings=None) -> FastAPI:
     application.include_router(catalog_automation_router)
     from .api.routes.tiendanube_controlled_submission import router as controlled_submission_router
     application.include_router(controlled_submission_router)
+    from .api.routes.mercadolibre_official_validation import router as ml_validation_router
+    application.include_router(ml_validation_router)
     from .api.routes.ecomm_api_channels import router as channel_router
     application.include_router(channel_router)
 

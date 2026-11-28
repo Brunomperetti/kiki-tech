@@ -35,6 +35,7 @@ Se recupera el trabajo local de E4; no se reemplazan catálogo, editor, integrac
 | `KIKI_RESEARCH_SEARCH_DAILY_REQUESTS` | `20` | Cuota global persistente UTC, máximo configurable 200 |
 | `KIKI_MONTHLY_REVIEW_ENABLED` | `false` | Diagnósticos en el ejecutor existente, no otro servicio |
 | `KIKI_TIENDANUBE_WRITES_ENABLED` | `false` | Escritura externa independiente de lectura/previsualización |
+| `KIKI_ML_OFFICIAL_VALIDATION_ENABLED` | `false` | Sólo comprobación oficial del payload; nunca publicación |
 
 Se conservan todos los requisitos previos: espacio documental, esquema ya instalado, lector de producción con kernel guard y salud efectiva, flags de incorporación y dominios exactos autorizados, TLS/DNS/robots, límites de tamaño y permisos del sitio. La búsqueda no debe empezar si el lector no está disponible. El caso `.aspx?id=<entero positivo>` conserva la consulta exacta; no habilita parámetros arbitrarios ni redirecciones.
 
@@ -60,5 +61,21 @@ Sin DDL nuevo: se reutilizan `CatalogSnapshot`, `SourceIntakeJob`, expedientes/d
 - [Referencia Coopar](reference-candidates/coopar-blue-patna.json): datos declarados por el usuario; EAN con checksum válido. No se descargó su página ni se acreditó la relación fabricante/producto. No se creó una variante ni se aprobaron datos de ese caso.
 - Los ensayos usan PostgreSQL descartable y documentación/transportes sintéticos identificados; no prueban derechos reales ni aceptación de Guillermo/Mercedes.
 - Natural Seed incompleto conserva DRAFT y bloqueos; no se transfieren aprobaciones de unidad a pack ni por GTIN repetido.
-- ML conserva la previsualización existente y su método de validación oficial; sin payload/seller/permisos validados no se afirma validación oficial exitosa.
+- ML reutiliza el cliente existente para validar un payload completo sólo bajo confirmación, con control de permisos, propietario y token vigente, sin renovarlo. Sin parámetros/seller/permisos y respuesta oficial 204 no se afirma validación exitosa. Los atributos de canal no respaldados o no mapeados bloquean la operación.
 - TN crea ocultos y actualiza únicamente contenido expresamente admitido por el cliente existente. SEO, multimedia y taxonomía se conservan en el paquete revisado; no se inventan contratos remotos para enviarlos.
+
+## Evidencia de validación aislada
+
+- Backend: **1.344 pruebas**, Ruff; TypeScript y builds demostrativo/productivo aprobados.
+- PostgreSQL **18.7**: **22 pruebas**, con concurrencia real, recuperación, cuota global, 20 variantes, refresh de originales, informes automáticos y ledger de validación ML. El HTTP de fabricantes/canales es simulado; no son resultados de proveedores auténticos.
+- Navegador: **20 casos** escritorio/móvil sobre `/v2/`, FastAPI y PostgreSQL descartable; **2 regresiones adicionales** prueban cerrar antes de recibir la creación del lote sin iniciar pasos posteriores. Se usa el lector productivo con aislamiento de kernel.
+- Demo estática: **58 pruebas**. Dockerfile/supervisor productivo: API+lector, red deshabilitada, sin CAP_KILL, inicio y cierre correctos.
+- Rendimiento local: 20 seleccionados entre 3.200 variantes sintéticas, **88 SELECTs / 1,107 s**; catálogo de 20, **88 SELECTs / 0,406 s**. No extrapolar estos tiempos al servidor productivo.
+
+Capturas **de validación con datos sintéticos**, no operaciones sobre el catálogo del cliente:
+[revisión escritorio](../frontend/artifacts/integral-commercial-review-desktop.png) ·
+[revisión celular](../frontend/artifacts/integral-commercial-review-mobile.png) ·
+[investigación escritorio](../frontend/artifacts/integral-documentary-research-desktop.png) ·
+[investigación celular](../frontend/artifacts/integral-documentary-research-mobile.png).
+
+La incorporación automática conserva el contrato HTML de hasta 4 MiB. Los PDF se incorporan mediante el lector manual existente y sus límites; no se simula una descarga PDF no ejecutada. La aceptación comercial y las fuentes auténticas siguen requiriendo revisión del responsable.

@@ -84,7 +84,7 @@ export function MercadoLibrePreviewPanel({
           </details>
         </div>
       )}
-      <button type="button" disabled>Enviar producto a Mercado Libre (pendiente de habilitación)</button>
+      <p>La publicación externa requiere una autorización independiente. La validación del contenido se gestiona en el panel de validación oficial.</p>
     </section>
   );
 }

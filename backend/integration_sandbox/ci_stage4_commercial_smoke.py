@@ -1545,6 +1545,209 @@ class Stage4Commercial(unittest.TestCase):
             self.assertEqual(measured[0][0], measured[1][0])
             self.no_editor_writes(db)
 
+    def test_ml_official_validation_positive_204_pg_ledger_replay_without_editor_or_token_change(
+        self,
+    ):
+        """Real PG ledger/client, fake official HTTP and reviewed preview DTO.
+
+        This isolates validation execution/CAS, not the strict documentary
+        export gate already exercised by the other PostgreSQL cases. No real
+        account, price, stock, licence, publication or vendor call is asserted.
+        """
+        from unittest.mock import patch
+        from sqlalchemy import select, func
+        from sqlalchemy.orm import Session
+        from app.database.models import ImportJobRecord, MercadoLibreConnection
+        from app.integrations.mercadolibre.client import MercadoLibreClient
+        from app.integrations.mercadolibre.transport import Response
+        from app.services import mercadolibre_official_validation as official
+        from app.services.ecomm_api_product_workspace_service import (
+            EcommApiProductWorkspace,
+            blank_fields,
+        )
+
+        ident = self.ids[0]
+        actor = SimpleNamespace(id=1)  # Synthetic authenticated-session shape.
+        settings = SimpleNamespace(
+            kiki_ml_official_validation_enabled=True,
+            kiki_v2_writes_enabled=True,
+            ml_api_url="https://api.mercadolibre.com",
+        )
+        review = {
+            "preview_fingerprint": "a" * 64,
+            "items": [
+                {
+                    "blockers": [],
+                    "channel_taxonomy": {
+                        "target_pair": {"category": "Alimentos", "subcategory": "Arroz"}
+                    },
+                    "field_evidence": {},
+                    "commercial_fields": {
+                        "title": "Arroz FICTICIO 250 g",
+                        "media": [
+                            {
+                                "kind": "IMAGE",
+                                "url": "https://fabricante-e4.invalid/fixture.png",
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        class FakeHTTP:
+            def __init__(self):
+                self.calls = []
+
+            def request(self, method, url, *, headers=None, data=None):
+                self.calls.append((method, url))
+                if method == "GET" and url.endswith("/users/me"):
+                    return Response(200, {"id": 123})
+                if method == "GET" and url.endswith("/categories/MLA1400/attributes"):
+                    return Response(200, [])
+                if method == "GET" and url.endswith("/categories/MLA1400"):
+                    return Response(
+                        200,
+                        {
+                            "id": "MLA1400",
+                            "path_from_root": [
+                                {"name": "Alimentos"},
+                                {"name": "Arroz"},
+                            ],
+                        },
+                    )
+                if (
+                    method == "POST"
+                    and url == "https://api.mercadolibre.com/items/validate"
+                ):
+                    return Response(204, {})
+                raise AssertionError(
+                    "OAuth, writes and unrelated URLs are forbidden in this fixture"
+                )
+
+        class Factory:
+            def __call__(self, _db):
+                return self
+
+            def _client(self, _connection):
+                return MercadoLibreClient(
+                    settings, "SYNTHETIC-NOT-A-REAL-ML-TOKEN", transport=FakeHTTP()
+                )
+
+            def _run(self, *_args, **_kwargs):
+                raise AssertionError("No automatic OAuth refresh")
+
+            def _refresh(self, *_args, **_kwargs):
+                raise AssertionError("No token refresh")
+
+        http = FakeHTTP()
+        with patch.object(
+            official, "preview_commercial_export", lambda *_a, **_k: deepcopy(review)
+        ):
+            with Session(self.engine) as db:
+                fields = blank_fields()
+                fields["note"] = (
+                    "Borrador SINTÉTICO preservado durante validación ML del test"
+                )
+                before = EcommApiProductWorkspace(db).save(ident, fields, "DRAFT", 0)
+                db.add(
+                    MercadoLibreConnection(
+                        id=1,
+                        user_id="123",
+                        access_token="SYNTHETIC-ENCRYPTED-FIXTURE-ONLY",
+                        refresh_token="SYNTHETIC-REFRESH-NEVER-USED",
+                        expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+                        connected_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+                db.commit()
+                connection = db.get(MercadoLibreConnection, 1)
+                credentials = (
+                    connection.access_token,
+                    connection.refresh_token,
+                    connection.expires_at,
+                )
+                prepared = official.prepare(
+                    db,
+                    actor,
+                    settings,
+                    request_key=str(uuid4()),
+                    ecomm_id=ident,
+                    parameters={
+                        "seller_id": "123",
+                        "category_id": "MLA1400",
+                        "price": 1234.5,
+                        "currency_id": "ARS",
+                        "available_quantity": 1,
+                        "condition": "new",
+                        "buying_mode": "buy_it_now",
+                        "listing_type_id": "gold_special",
+                        "attributes": [],
+                    },
+                    reason="Parámetros FICTICIOS de ensayo; sólo validar con transporte local, nunca publicar.",
+                )
+                self.assertEqual(prepared["state"], "PREVIEW")
+                receipt = official.validate(
+                    db,
+                    actor,
+                    settings,
+                    prepared["id"],
+                    expected_revision=prepared["revision"],
+                    expected_preview_fingerprint=prepared["preview_fingerprint"],
+                    confirm=True,
+                    service_factory=Factory(),
+                    transport=http,
+                )
+                self.assertEqual(receipt["state"], "VALIDATED")
+                self.assertTrue(receipt["official_payload_validated"])
+                self.assertFalse(receipt["publication_created"])
+                self.assertEqual(receipt["provider_calls"], 4)
+            with Session(self.engine) as db:
+                # A fresh session/restart replays the persisted result without
+                # another validation POST or OAuth work.
+                replay = official.validate(
+                    db,
+                    actor,
+                    settings,
+                    prepared["id"],
+                    expected_revision=prepared["revision"],
+                    expected_preview_fingerprint=prepared["preview_fingerprint"],
+                    confirm=True,
+                    service_factory=Factory(),
+                    transport=http,
+                )
+                self.assertEqual(replay["state"], "VALIDATED")
+                self.assertEqual(len(http.calls), 4)
+                self.assertEqual(
+                    [method for method, _url in http.calls],
+                    ["GET", "GET", "GET", "POST"],
+                )
+                self.assertTrue(http.calls[-1][1].endswith("/items/validate"))
+                self.assertEqual(
+                    db.scalar(
+                        select(func.count())
+                        .select_from(ImportJobRecord)
+                        .where(ImportJobRecord.source == official.SOURCE)
+                    ),
+                    1,
+                )
+                ledger = db.get(ImportJobRecord, prepared["id"])
+                self.assertNotIn(
+                    "SYNTHETIC-NOT-A-REAL-ML-TOKEN", str(ledger.diagnostics)
+                )
+                self.assertEqual(ledger.status, "VALIDATED")
+                after = EcommApiProductWorkspace(db).get(ident)
+                self.assertEqual(
+                    (after["version"], after["fields"], after["history"]),
+                    (before["version"], before["fields"], before["history"]),
+                )
+                current = db.get(MercadoLibreConnection, 1)
+                self.assertEqual(
+                    (current.access_token, current.refresh_token, current.expires_at),
+                    credentials,
+                )
+
 
 def main(argv=None):
     global MODE, TARGET

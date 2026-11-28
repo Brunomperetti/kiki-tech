@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     kiki_channel_workspace_enabled: bool = False
     kiki_document_workspace_enabled: bool = False
     kiki_tiendanube_writes_enabled: bool = False
+    kiki_ml_official_validation_enabled: bool = False
     kiki_monthly_review_enabled: bool = False
     kiki_research_search_enabled: bool = False
     kiki_research_search_provider: str = "BRAVE"

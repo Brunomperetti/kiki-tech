@@ -41,6 +41,8 @@ const commercialFixtureIds = new Set([
 ]);
 function commercialReviewRequest(method: string, path: string): boolean {
   const root = "/api/ecomm-app/workspace/";
+  if (method === "GET" && path === root+"channels/ml/validations") return true;
+  if (method === "POST" && (path === root+"channels/ml/validations/preview" || /^\/api\/ecomm-app\/workspace\/channels\/ml\/validations\/[1-9][0-9]*\/validate$/.test(path))) return true;
   if (method === "GET" && (path === root+"taxonomy/catalog" || /^\/api\/ecomm-app\/workspace\/(?:research\/automation(?:\/(?:capabilities|[a-f0-9-]{36}))?|reports\/periodic\/(?:policy|tasks|automation))$/.test(path))) return true;
   if (method === "POST" && /^\/api\/ecomm-app\/workspace\/(?:research\/automation(?:\/[a-f0-9-]{36}\/(?:step|recover|retry|cancel|proposals|select-source))?|reports\/periodic\/policy)$/.test(path)) return true;
   if (method === "POST" && ["commercial-review/preview", "commercial-review/apply", "taxonomy/catalog", "taxonomy/review-preview", "taxonomy/review-batch", "exports/commercial/preview", "exports/commercial/download"].some(s => path===root+s)) return true;

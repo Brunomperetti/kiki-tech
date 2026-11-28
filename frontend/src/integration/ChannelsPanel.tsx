@@ -1,5 +1,6 @@
 import { environmentText } from "./runtime";
 import "./channel-cards.css";
+import { ControlledMLValidationPanel } from "./ControlledMLValidationPanel";
 import { ControlledSubmissionPanel } from "./ControlledSubmissionPanel";
 import { TiendanubePreviewPanel } from "./TiendanubePreviewPanel";
 import { MercadoLibrePreviewPanel } from "./MercadoLibrePreviewPanel";
@@ -287,6 +288,7 @@ export function ChannelsPanel({
             csrf={csrf}
             blocked={blocked || busy}
           />
+          <ControlledMLValidationPanel id={id} csrf={csrf} blocked={blocked || busy} />
         </div>
         <div hidden={view !== "identity"}>
           <p className="r-notice">
