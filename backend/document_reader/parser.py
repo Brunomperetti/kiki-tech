@@ -402,7 +402,7 @@ class StructuredProductHTML(PageSnapshotHTML):
             or len(self.WEIGHT.findall(title)) != 1 or self.PACK_MARKER.search(title)
         ):
             return {}
-        result = {f"web/h2/linea/{line}": "Nombre: " + title}
+        result = {f"web/structured-product/h2/linea/{line}": "Nombre: " + title}
         for i, (area, paragraph_line, value) in enumerate(self.scoped_paragraphs, 1):
             if area != scope or paragraph_line < line or len(value) > 2000:
                 continue
@@ -639,7 +639,7 @@ def parse(name, mime, encoded, *, web_snapshot=False):
             for loc, line in sections.items()
             if ":" in line and (
                 not (web_snapshot and extension == ".html")
-                or loc.startswith(("web/h1/", "web/h2/", "web/tabla/", "web/product/p/"))
+                or loc.startswith(("web/h1/", "web/structured-product/h2/", "web/tabla/", "web/product/p/"))
             )
         ]
     )
@@ -653,7 +653,7 @@ def parse(name, mime, encoded, *, web_snapshot=False):
         from .product_package import page_presentation
 
         for location, quote in sections.items():
-            if location.startswith("web/h2/"):
+            if location.startswith("web/structured-product/h2/"):
                 size = StructuredProductHTML.SIZE_AT_END.search(quote)
                 if size:
                     entries.append(("presentación", size.group(1), None, location, quote))
