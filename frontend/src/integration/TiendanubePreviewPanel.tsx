@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "./catalog-adapter";
+import { TiendanubeCatalogPanel } from "./TiendanubeCatalogPanel";
 import { canWrite, production } from "./runtime";
 
 type Preview = {
@@ -88,6 +89,8 @@ export function TiendanubePreviewPanel({
   }
   if (!production) return null;
   return (
+    <>
+      <TiendanubeCatalogPanel id={id} csrf={csrf} />
     <section className="r-notice" aria-label="Preparar producto para Tiendanube">
       <h4>Tiendanube · Preparar envío</h4>
       <button type="button" disabled={checking || !canWrite()} onClick={() => void checkConnection()}>
@@ -117,5 +120,6 @@ export function TiendanubePreviewPanel({
       )}
       <button type="button" disabled>Enviar producto a Tiendanube (pendiente de habilitación)</button>
     </section>
+    </>
   );
 }
