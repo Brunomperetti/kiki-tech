@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic import field_validator, Field
+from pydantic import field_validator, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     ml_authorization_url: str = "https://auth.mercadolibre.com.ar/authorization"
     ml_state_ttl_minutes: int = 10
     ml_snapshot_fresh_hours: int = 24
+    tiendanube_store_id: str = ""
+    tiendanube_access_token: SecretStr = SecretStr("")
+    tiendanube_user_agent: str = "KIKI Tech 2.0"
+    kiki_tiendanube_read_enabled: bool = False
     kiki_admin_username: str = ""
     kiki_admin_password_hash: str = ""
     app_session_secret: str = ""
