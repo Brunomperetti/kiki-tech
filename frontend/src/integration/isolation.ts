@@ -32,6 +32,25 @@ export function setConnectionActionsEnabled(value: boolean) {
   connectionActionsEnabled = value;
 }
 
+// Finite acceptance fixtures only; production uses its authenticated same-origin
+// transport. No supplier, arbitrary-ID, image, video or redirect origin is allowed.
+const commercialFixtureIds = new Set([
+  ...Array.from({length: 6}, (_, i) => String(900001+i)),
+  ...Array.from({length: 20}, (_, i) => String(9104001+i)),
+  "9104091", "9104092", "9104093", "7518949",
+]);
+function commercialReviewRequest(method: string, path: string): boolean {
+  const root = "/api/ecomm-app/workspace/";
+  if (method === "GET" && path === root+"taxonomy/catalog") return true;
+  if (method === "POST" && ["commercial-review/preview", "commercial-review/apply", "taxonomy/catalog", "taxonomy/review-preview", "taxonomy/review-batch", "exports/commercial/preview", "exports/commercial/download"].some(s => path===root+s)) return true;
+  if (!path.startsWith(root)) return false;
+  const [id,...parts] = path.slice(root.length).split("/");
+  if (!commercialFixtureIds.has(id)) return false;
+  const suffix = parts.join("/");
+  if (method === "GET") return ["", "evidence", "proposals", "proposals/generation-context", "taxonomy-review", "media-review", "commercial-coverage", "channels"].includes(suffix);
+  return method === "POST" && (["", "taxonomy-review", "proposals/generate", "evidence/extract", "evidence/facts/review-batch"].includes(suffix) || /^(?:documents\/local-[a-f0-9]{32}\/(?:media-rights|provenance)|proposals\/[1-9][0-9]{0,9}\/review|evidence\/facts\/[a-f0-9]{24}\/review)$/.test(suffix));
+}
+
 export function installIntegrationIsolation() {
   const nativeFetch = window.fetch.bind(window);
   // Install the deny boundary even if validation fails. No automatic demo fallback.
@@ -51,6 +70,7 @@ export function installIntegrationIsolation() {
       url.password ||
       !(
         allowed.has(`${method} ${url.pathname}`) ||
+        commercialReviewRequest(method, url.pathname) ||
         (connectionActionsEnabled &&
           connectionActions.has(`${method} ${url.pathname}`)) ||
         (method === "POST" &&

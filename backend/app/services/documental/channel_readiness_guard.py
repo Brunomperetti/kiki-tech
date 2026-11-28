@@ -28,15 +28,18 @@ COPY_FIELDS = (
 )
 
 
-def _commercial_coverage(research, item, fields, approved):
+def _commercial_coverage(research, item, fields, approved, *, facts=None, strict_stage4=False, applied_proposals=None, taxonomy=None):
     """Exact approved fields and explicit asset permissions, never inferred."""
     from .media_rights import media_grant_current
     from .proposals import Proposals, TEXT
 
     missing = []
+    internal_pair = ((taxonomy or {}).get("record") or {}).get("target_pair") or {}
+    reviewed_internal = bool(strict_stage4 and taxonomy and taxonomy.get("state") == "APPROVED" and taxonomy.get("catalog_bound") is True)
     for key in TAXONOMY_FIELDS:
         values = approved.get(key, [])
-        if not fields.get(key) or values != [fields[key]]:
+        supported = fields.get(key) == internal_pair.get(key) if reviewed_internal else values == [fields.get(key)]
+        if not fields.get(key) or not supported:
             missing.append(key)
 
     # The editor's checksum validation only checks the format. It cannot
@@ -67,17 +70,25 @@ def _commercial_coverage(research, item, fields, approved):
     # commercially plausible paragraph or a checkbox does not verify a claim.
     # Use the very generator behind the reviewed-evidence proposal; this
     # excludes arbitrary health benefits, SEO synonyms and promotional copy.
-    facts = [
+    canonical_facts = facts if facts is not None else [
         {"id": f"reviewed-{key}", "field": key, "value": values[0], "unit": None}
         for key, values in approved.items()
         if len(values) == 1
     ]
-    canonical, _missing = Proposals.generate_fields(facts)
+    canonical, _missing = Proposals.generate_fields(canonical_facts)
+    assessment = None
+    if strict_stage4:
+        from .completion import saved_field_coverage
+        assessment = saved_field_coverage(research, item, fields, applied_proposals=applied_proposals, taxonomy=taxonomy)
+    field_rows = {row["field"]: row for row in assessment["fields"]} if assessment else {}
     copy_errors = []
     for key in COPY_FIELDS:
         generated = canonical.get(key)
         expected = generated["value"] if generated else ""
-        if fields.get(key, "") != expected:
+        supported = (field_rows.get(key) or {}).get("state") == "APPROVED_BACKED" if assessment else fields.get(key, "") == expected
+        # Empty optional fields do not acquire a fictitious citation, but do
+        # not block a package merely because an unknown value was omitted.
+        if fields.get(key, "") and not supported or not fields.get(key, "") and expected:
             copy_errors.append(key)
             missing.append("commercial_copy[" + key + "]")
 
@@ -85,8 +96,12 @@ def _commercial_coverage(research, item, fields, approved):
     media_approved = 0
     if not media:
         missing.append("media")
+    strict_media = None
+    if strict_stage4:
+        from .media_rights import media_permission_report
+        strict_media = media_permission_report(research, item, media)
     for index, resource in enumerate(media, 1):
-        if media_grant_current(research, item, resource):
+        if media_grant_current(research, item, resource) and (not strict_stage4 or strict_media[index - 1].get("stage4_ready") is True):
             media_approved += 1
         else:
             missing.append(f"media_rights[{index}]")
@@ -100,6 +115,17 @@ def _commercial_coverage(research, item, fields, approved):
         "commercial_copy_supported": not copy_errors,
         "commercial_copy_fields_checked": len(COPY_FIELDS),
         "commercial_copy_mismatches": copy_errors,
+        "field_evidence": {
+            key: (field_rows[key].get("citations") or [])
+            for key in field_rows
+            if field_rows[key].get("state") == "APPROVED_BACKED"
+        } if assessment else {
+            key: [{"fact_id": ident} for ident in value.get("evidence_ids", [])]
+            for key, value in canonical.items()
+            if fields.get(key) == value.get("value")
+        },
+        "field_lineage": {key: row["lineage"] for key, row in field_rows.items()
+                          if row.get("state") == "APPROVED_BACKED" and row.get("lineage")},
         "media_rights_verified": bool(media) and media_approved == len(media),
         "media_rights_status": (
             "AUTORIZACIONES_DOCUMENTADAS_Y_VIGENTES"
@@ -111,7 +137,7 @@ def _commercial_coverage(research, item, fields, approved):
     }
 
 
-def require_primary_evidence(db, session, ecomm_id, fields, *, research=None):
+def require_primary_evidence(db, session, ecomm_id, fields, *, research=None, strict_stage4=False, applied_proposals=None, taxonomy=None):
     if session is None:
         raise ValueError("Validación documental exige una sesión autenticada.")
     # Reuse exactly the documentary mutex and current-source reconciliation:
@@ -197,11 +223,28 @@ def require_primary_evidence(db, session, ecomm_id, fields, *, research=None):
             name = valid["product_name"]
             if (
                 valid["presentation"] != fields["presentation"]
-                or fields.get("short_title") != name
-                or fields.get("title") != name + " · " + fields["presentation"]
+                or (not strict_stage4 and fields.get("short_title") != name)
+                or (not strict_stage4 and fields.get("title") != name + " · " + fields["presentation"])
             ):
                 continue
-            coverage = _commercial_coverage(research, dossier, fields, approved)
+            coverage_facts, coverage_approved = facts, approved
+            if strict_stage4:
+                # A complete fiche can cite several reviewed originals. Keep
+                # the primary identity anchor above, then reuse *all* current
+                # individual approvals instead of silently discarding labels
+                # or technical documents outside that one original.
+                coverage_facts = [fact for fact in dossier.facts
+                                  if fact.get("state") == "APPROVED" and fact.get("reviewer")
+                                  and fact.get("verification_digest")
+                                  and not research.blockers(dossier, fact)]
+                coverage_approved = {}
+                for fact in coverage_facts:
+                    value = fact["value"] + (" " + fact["unit"] if fact.get("unit") else "")
+                    if value not in coverage_approved.setdefault(fact["field"], []):
+                        coverage_approved[fact["field"]].append(value)
+                if any(len(values) != 1 for values in coverage_approved.values()):
+                    raise ValueError("Hay hechos aprobados contradictorios entre las fuentes; revisá las afirmaciones antes de preparar canales.")
+            coverage = _commercial_coverage(research, dossier, fields, coverage_approved, facts=coverage_facts, strict_stage4=strict_stage4, applied_proposals=applied_proposals, taxonomy=taxonomy)
             if not coverage["verified"]:
                 raise ValueError(
                     "Faltan datos respaldados o permisos multimedia vigentes "

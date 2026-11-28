@@ -62,15 +62,19 @@ class MediaRightsReview(BaseModel):
     """Explicit asset-specific usage permission in a reviewed original."""
     model_config = ConfigDict(extra="forbid")
     expected_version: int = Field(ge=0)
+    expected_workspace_version: int | None = Field(default=None, ge=0)
     document_version: int = Field(ge=1)
     media_kind: Literal["IMAGE", "VIDEO"]
     media_url: str = Field(min_length=9, max_length=1000)
     source_url: str = Field(min_length=9, max_length=1000)
-    decision: Literal["APPROVED", "REVOKED"]
+    decision: Literal["APPROVED", "REVOKED", "REJECTED"]
     licence_basis: Literal["OWNER_AUTHORIZATION", "DOCUMENTED_LICENSE"]
     location: str = Field(min_length=1, max_length=200)
     quote: str = Field(min_length=30, max_length=1500)
     reason: str = Field(min_length=25, max_length=600)
+    alt_text: str | None = Field(default=None, min_length=1, max_length=180)
+    presentation: str | None = Field(default=None, min_length=1, max_length=750)
+    valid_until: str | None = Field(default=None, max_length=40)
 
 
 class Revision(BaseModel):
@@ -165,3 +169,23 @@ class Review(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision: int = Field(ge=1)
     decisions: dict[str, Decision] = Field(max_length=18)
+
+
+class CommercialReviewPreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ecomm_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+class CommercialReviewItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ecomm_id: str = Field(min_length=1, max_length=120)
+    draft_id: int = Field(ge=1)
+    expected_revision: int = Field(ge=1)
+    expected_workspace_version: int = Field(ge=0)
+    decisions: dict[str, Decision] = Field(min_length=1, max_length=18)
+
+
+class CommercialReviewApply(CommercialReviewPreview):
+    expected_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirm: Literal[True]
+    items: list[CommercialReviewItem] = Field(min_length=1, max_length=20)

@@ -217,3 +217,54 @@ def seo_field_audit(inspection, taxonomy=None):
         )
         for field in SEO_FIELDS
     }
+
+
+def catalog_proposal(inspection, catalog, reviewed=None):
+    """Explain a candidate without inheriting another product's category."""
+    reviewed = reviewed or {}
+    approved = inspection.get("approved_taxonomy") or []
+    groups = {field: {} for field in ("category", "subcategory")}
+    for fact in approved:
+        if (
+            fact.get("field") in groups
+            and _key(fact.get("value"))
+            and fact.get("evidence_id")
+        ):
+            groups[fact["field"]][_key(fact["value"])] = fact["value"]
+    source = {
+        field: next(iter(values)) if len(values) == 1 else None
+        for field, values in groups.items()
+    }
+    candidates = []
+    if all(source.values()):
+        candidates = [
+            entry
+            for entry in catalog.get("entries", [])
+            if entry["state"] == "ACTIVE"
+            and _key(entry["category"]) == source["category"]
+            and _key(entry["subcategory"]) == source["subcategory"]
+        ]
+    result = {
+        "state": "REVIEW_REQUIRED",
+        "pair_id": None,
+        "reason": "Sin equivalencia demostrada; elegir y justificar una clasificación humana con hechos aprobados.",
+        "evidence_ids": sorted({fact["evidence_id"] for fact in approved}),
+        "automatic_assignment": False,
+        "catalog_version": catalog.get("version", 0),
+    }
+    if reviewed.get("state") == "APPROVED" and reviewed.get("catalog_bound"):
+        result.update(
+            state="HUMAN_REVIEWED",
+            pair_id=reviewed["record"]["internal_pair_id"],
+            reason="Decisión humana vigente de esta variante, ligada al vocabulario y a sus citas.",
+        )
+    elif reviewed.get("state") in {"STALE", "BLOCKED", "REVOKED"}:
+        result["reason"] = (
+            "La clasificación anterior fue revocada o perdió vigencia; no reutilizar su sugerencia."
+        )
+    elif len(candidates) == 1:
+        result.update(
+            pair_id=candidates[0]["id"],
+            reason="Las categorías documentales coinciden literalmente con este par interno; confirmar la equivalencia para esta variante.",
+        )
+    return result

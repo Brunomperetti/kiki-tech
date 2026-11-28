@@ -12,6 +12,7 @@ from app.integrations.ecomm_app.api_catalog_browser import valid_variant_id
 from app.services.editorial_batches.context import Context, sources
 from .taxonomy_alignment import align_taxonomy, reviewed_internal_pairs, seo_field_audit
 from .taxonomy_review import current_review, histories_for
+from .taxonomy_catalog import catalog_state
 
 
 MAX_ITEMS = 20
@@ -63,8 +64,10 @@ def summarize_inspections(rows, vocabulary=None):
             supported = []
         elif taxonomy["state"] != "EXACT_REVIEWED_PAIR" and not (
             taxonomy["state"] == "REVIEWED_INTERNAL_MAPPING"
-            and taxonomy["reviewed_mapping"]["record"]["source_pair"]
-            == taxonomy["reviewed_mapping"]["record"]["target_pair"]
+            and (taxonomy["reviewed_mapping"].get("catalog_bound") or (
+                taxonomy["reviewed_mapping"]["record"]["source_pair"]
+                == taxonomy["reviewed_mapping"]["record"]["target_pair"]
+            ))
         ):
             # An approved manufacturer label is not automatically a KIKI
             # category. Keep it out of supported editorial fields until mapped.
@@ -145,11 +148,20 @@ def commercial_plan(
     try:
         reports = [(ident, context.inspect(db, session, ident)) for ident in ids]
         if isinstance(context, Context):
+            catalog = catalog_state(db)
             histories = histories_for(
                 db, ids, byte_limit=get_settings().kiki_editorial_context_bytes
             )
             for ident, inspected in reports:
                 inspected["ecomm_id"] = ident
+                inspected["taxonomy_catalog"] = catalog
+                authorized_ids = {f[0] for f in inspected["expected"].get("facts", [])}
+                dossier = context.dossiers.get(ident)
+                inspected["classification_evidence"] = [
+                    {"field": f["field"], "value": f["value"], "evidence_id": f["id"]}
+                    for f in (dossier.facts if dossier else [])
+                    if f["id"] in authorized_ids and f["field"] in {"product_name", "presentation"}
+                ]
                 inspected["reviewed_taxonomy_mapping"] = current_review(
                     inspected, histories.get(ident, []), "KIKI"
                 )

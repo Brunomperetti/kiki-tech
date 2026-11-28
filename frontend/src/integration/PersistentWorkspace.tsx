@@ -36,6 +36,8 @@ import {
 import { ResearchPanel, ResearchSummary } from "./ResearchPanel";
 import { Stage2PilotSummary, naturalSeedPilotId } from "./Stage2PilotSummary";
 import { ProposalPanel } from "./ProposalPanel";
+import { CommercialCoveragePanel } from "./CommercialCoverage";
+import { MediaReview } from "./MediaReview";
 import { MamaPilotSummary } from "./MamaPilot";
 import { mamaPilotId } from "./mama-pilot";
 import { HileretPilotSummary } from "./HileretPilot";
@@ -511,6 +513,9 @@ export function PersistentWorkspace({
             )}
             {tab === "Ficha" && (
               <>
+                {availableFeature("documents") && (
+                  <CommercialCoveragePanel id={variant.id} revision={record.version} dirty={dirty} onReview={onTab} />
+                )}
                 {gtinEvidence}
                 {production && variant.id === naturalSeedPilotId && (
                   <Stage2PilotSummary
@@ -647,6 +652,12 @@ export function PersistentWorkspace({
             )}
             {tab === "Evidencias" && (
               <>
+                {availableFeature("documents") && (
+                  <MediaReview id={variant.id} media={fields.media}
+                    presentation={fields.presentation} csrf={csrf}
+                    revision={record.version} disabled={dirty || identityBlocked || saving || !!remote}
+                    onBusy={setResearchBusy} />
+                )}
                 <fieldset
                   className="i-editor-fields"
                   disabled={

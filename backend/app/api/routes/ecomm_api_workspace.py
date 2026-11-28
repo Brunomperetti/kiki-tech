@@ -100,6 +100,9 @@ class TaxonomyReviewRequest(BaseModel):
     target_subcategory: str = Field(min_length=1, max_length=160)
     reason: str = Field(min_length=20, max_length=600)
     confirm: Literal[True]
+    catalog_version: int | None = Field(default=None, ge=1)
+    catalog_pair_id: str | None = Field(default=None, min_length=1, max_length=80)
+    channel_mapping_id: str | None = Field(default=None, min_length=1, max_length=80)
 
 
 def require_taxonomy_workspace():

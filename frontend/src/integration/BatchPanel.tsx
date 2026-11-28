@@ -1,4 +1,6 @@
-import { environmentText, capabilities } from "./runtime";
+import { environmentText, capabilities, availableFeature } from "./runtime";
+import { CommercialBulkReview } from "./CommercialBulkReview";
+import { TaxonomyReview } from "./TaxonomyReview";
 import { ManufacturerIntakeQueue } from "./ManufacturerIntakeQueue";
 import { CommercialPreparationPlan } from "./CommercialPreparationPlan";
 import { ReviewedEvidenceBatch } from "./ReviewedEvidenceBatch";
@@ -451,6 +453,18 @@ export function BatchPanel({
                 «Procesar siguiente grupo» prepara hasta 5 variantes sin IA paga y
                 sin ejecutar trabajo en segundo plano. Se requiere una revisión
                 humana independiente antes de guardar cada ficha.</p>
+              {availableFeature("documents") && (
+                <CommercialBulkReview
+                  ids={ids} csrf={csrf} disabled={locked}
+                  onOpen={(id) => {
+                    setExpanded(false);
+                    onOpen(id, undefined, "Ficha");
+                  }}
+                />
+              )}
+              {availableFeature("documents") && (
+                <TaxonomyReview ids={ids} csrf={csrf} disabled={locked} />
+              )}
               {capabilities?.documents === true && (
                 <ReviewedEvidenceBatch
                   ids={ids}
