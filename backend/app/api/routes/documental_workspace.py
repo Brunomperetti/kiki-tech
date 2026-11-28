@@ -347,6 +347,28 @@ def incorporate(
     return execute(db, operation)
 
 
+class ReparseSavedHtmlRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=0)
+    document_version: int = Field(ge=1)
+    confirm: Literal[True]
+
+
+@router.post("/{ecomm_id}/documents/{document_id}/reparse-saved-html")
+def reparse_saved_html(
+    ecomm_id: str,
+    document_id: str,
+    body: ReparseSavedHtmlRequest,
+    db: Session = Depends(get_db),
+    session=Depends(require_csrf),
+):
+    return execute(
+        db, lambda: LocalDocuments(db, session).reparse_saved_html(
+            ecomm_id, document_id, body.expected_version, body.document_version,
+        ),
+    )
+
+
 @router.post("/{ecomm_id}/documents/{document_id}/provenance")
 def provenance(
     ecomm_id: str,
