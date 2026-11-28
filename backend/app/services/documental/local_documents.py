@@ -6,6 +6,7 @@ import hashlib
 import json
 import socket
 import struct
+from types import SimpleNamespace
 from urllib.parse import urlsplit
 from uuid import uuid4
 from .research import Research, now
@@ -283,6 +284,56 @@ class LocalDocuments:
         result = self.research.serialize(case)
         result["incorporated_document_id"] = key
         return result
+
+    def reparse_saved_html(self, ident, doc_id, expected_version, document_version):
+        """Re-read an insufficient original, never fetching or approving anything."""
+        case = self.research.dossier(ident)
+        self.research.expect(case, expected_version)
+        doc = self.document(ident, doc_id)
+        if doc.version != document_version:
+            raise ValueError("El documento cambió; actualizá las evidencias.")
+        stored = doc.body
+        original = stored.get("original") or {}
+        source = stored.get("source") or {}
+        if (
+            stored.get("synthetic") is not False
+            or stored.get("origin_kind") != "FILE"
+            or source.get("capture_mode") != "USER_SAVED_WEB_HTML"
+            or source.get("review_state") != "PENDING"
+            or stored.get("parse_status") != "INSUFFICIENT_DATA"
+            or stored.get("claims")
+            or any(f.get("document_id") == doc_id for f in case.facts)
+            or original.get("content_type") != "text/html"
+        ):
+            raise ValueError("Solo se releen HTML originales pendientes sin hechos extraídos.")
+        encoded = stored.get("original_base64") or ""
+        from document_reader.parser import MAX_SAVED_HTML_BYTES
+        if not encoded or len(encoded) > ((MAX_SAVED_HTML_BYTES + 2) // 3) * 4:
+            raise ValueError("El original no está disponible dentro de los límites.")
+        raw = base64.b64decode(encoded, validate=True)
+        if (
+            len(raw) != original.get("size")
+            or hashlib.sha256(raw).hexdigest() != original.get("sha256")
+        ):
+            raise ValueError("El SHA-256 del original no coincide.")
+        parsed = parse_local(SimpleNamespace(
+            kind="FILE", web_snapshot=True, filename=original["filename"],
+            content_type=original["content_type"], content_base64=encoded,
+        ))
+        if parsed.get("parse_status") != "TEXT_EXTRACTED":
+            raise ValueError("El lector sigue sin datos extraíbles; se conservó el original.")
+        updated = deepcopy(stored)
+        for key in ("sections", "identity", "identity_evidence", "claims",
+                    "parser_warnings", "parser_blockers", "parse_status"):
+            updated[key] = parsed[key]
+        self.store_revision(doc, updated, "REPARSE_SAVED_HTML")
+        self.research.commit_change(
+            case, deepcopy(case.facts), "DOCUMENT_REPARSED",
+            {"document_id": doc.id, "version": doc.version,
+             "original_sha256": original["sha256"]},
+        )
+        self.research.refresh(case)
+        return self.research.serialize(case)
 
     def provenance(self, ident, doc_id, body):
         case = self.research.dossier(ident)

@@ -602,6 +602,30 @@ export function DocumentImport({
             Comprobar original conservado
           </button>
           {originalInfo && <p role="status">{originalInfo}</p>}
+          {production && document.body.parse_status === "INSUFFICIENT_DATA" &&
+            document.body.source?.capture_mode === "USER_SAVED_WEB_HTML" &&
+            document.body.source?.review_state === "PENDING" && (
+              <button
+                disabled={busy}
+                onClick={() => {
+                  if (!window.confirm(
+                    "¿Volver a leer el HTML original guardado? No se descarga, no se consume IA y no se aprueban hechos.",
+                  )) return;
+                  void perform(async () => {
+                    const value = await changeResearch(
+                      id, `${basePath(id)}/${document.id}/reparse-saved-html`,
+                      { expected_version: data.version,
+                        document_version: document.version, confirm: true },
+                      csrf,
+                    );
+                    onResult(value, "Original releído. Revisá procedencia, identidad y hechos candidatos.");
+                  });
+                }}
+              >
+                Volver a leer original guardado
+              </button>
+            )}
+
           <label>
             Motivo de revisión de procedencia
             <textarea
