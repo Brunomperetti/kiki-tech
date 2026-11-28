@@ -40,6 +40,7 @@ import {
   adaptVariant,
   validVariantId,
   queueFilters,
+  tnApiLabels,
   validQueueFilter,
   type QueueFilter,
   type Variant,
@@ -1335,14 +1336,21 @@ export function IntegrationCatalog() {
                           channel === "ml" ? "Mercado Libre" : "Tiendanube"
                         }
                       >
-                        <strong>{label}</strong>
+                        {channel === "tn" && item.tiendanubeApi ? (
+                          <>
+                            <strong>{tnApiLabels[item.tiendanubeApi.state]}</strong>
+                            <small>API · {item.tiendanubeApi.matches} coincidencias por SKU</small>
+                            {item.tiendanubeApi.capturedAt && <small>{captureDate(item.tiendanubeApi.capturedAt)}</small>}
+                          </>
+                        ) : <strong>{label}</strong>}
+                        {channel === "tn" && item.tiendanubeApi && <small>CSV histórico: {label}</small>}
                         {!!state?.candidatesTotal && (
                           <small>
                             {state.candidatesTotal} coincidencias por revisar
                           </small>
                         )}
                         <details>
-                          <summary>Ver coincidencias y evidencia</summary>
+                          <summary>{channel === "tn" ? "Ver evidencia histórica CSV" : "Ver coincidencias y evidencia"}</summary>
                         {(state?.matchesPreview || []).map((match, index) => (
                           <div
                             className="i-match-preview"
@@ -1387,9 +1395,11 @@ export function IntegrationCatalog() {
                             update({ product: item.id, tab: "Canales" })
                           }
                         >
-                          {state?.candidatesTotal
-                            ? "Revisar candidatos"
-                            : "Ver última captura"}
+                          {channel === "tn" && item.tiendanubeApi
+                            ? "Ver Tiendanube"
+                            : state?.candidatesTotal
+                              ? "Revisar candidatos"
+                              : "Ver última captura"}
                         </button>
 
                       </td>
