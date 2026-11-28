@@ -332,3 +332,48 @@ def test_research_queue_excludes_missing_presentation_even_with_api_barcode(tmp_
         db.commit()
         # Both synthetic API variants lack explicit variant description.
         assert build_queue(db, filter_name="research_gtin_unique")["total"] == 0
+
+
+def test_tiendanube_api_queue_filters_and_stale_capture(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "kiki_tiendanube_read_enabled", True)
+    monkeypatch.setattr(settings, "tiendanube_store_id", "123")
+    engine = db_fixture(tmp_path)
+    with Session(engine) as db:
+        assert build_queue(db, filter_name="tn_api_unavailable")["total"] == 2
+        assert build_queue(db, filter_name="tn_api_no_match")["total"] == 0
+        initial = build_queue(db)["items"]
+        sku = next(row["sku"] for row in initial if row["ecomm_id"] == "101")
+        snapshot = CatalogSnapshot(source="TIENDANUBE_API", payload=[{
+            "store_id": "123", "captured_at": datetime.now(timezone.utc).isoformat(),
+            "products": 1, "rows": [{"product_id": 5, "variant_id": 6, "sku": sku}],
+        }])
+        db.add(snapshot)
+        db.commit()
+        candidates = build_queue(db, filter_name="tn_api_candidate")
+        assert candidates["total"] == 1
+        assert candidates["items"][0]["ecomm_id"] == "101"
+        assert candidates["items"][0]["tiendanube_api"]["identity_verified"] is False
+        assert build_queue(db, filter_name="tn_api_no_match")["total"] == 1
+        assert build_queue(db, filter_name="tn_api_candidate+pack")["total"] == 0
+        changed = deepcopy(snapshot.payload)
+        changed[0]["rows"].append({"product_id": 5, "variant_id": 7, "sku": sku})
+        snapshot.payload = changed
+        db.commit()
+        assert build_queue(db, filter_name="tn_api_conflict")["total"] == 1
+        assert build_queue(db, filter_name="tn_api_candidate")["total"] == 0
+        changed = deepcopy(snapshot.payload)
+        changed[0]["captured_at"] = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
+        snapshot.payload = changed
+        db.commit()
+        assert build_queue(db, filter_name="tn_api_stale")["total"] == 2
+        assert build_queue(db, filter_name="tn_api_no_match")["total"] == 0
+        changed = deepcopy(snapshot.payload)
+        changed[0]["store_id"] = "456"
+        snapshot.payload = changed
+        db.commit()
+        assert build_queue(db, filter_name="tn_api_unavailable")["total"] == 2
+        assert build_queue(db, filter_name="tn_api_no_match")["total"] == 0
